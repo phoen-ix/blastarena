@@ -205,6 +205,14 @@ export class LobbyUI {
               <option value="31">31x31 (Massive)</option>
             </select>
           </div>
+          <div class="form-group" id="bot-difficulty-row" style="display:none;">
+            <label>Bot Difficulty</label>
+            <select id="room-bot-difficulty">
+              <option value="easy">Easy</option>
+              <option value="normal" selected>Normal</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
         </div>
 
         <div id="friendly-fire-row" style="display:none;gap:12px;margin-top:12px;">
@@ -245,6 +253,15 @@ export class LobbyUI {
     modeSelect.addEventListener('change', updateFFVisibility);
     updateFFVisibility();
 
+    // Show bot difficulty only when bots > 0
+    const botsSelect = modal.querySelector('#room-bots') as HTMLSelectElement;
+    const botDiffRow = modal.querySelector('#bot-difficulty-row') as HTMLElement;
+    const updateBotDiffVisibility = () => {
+      botDiffRow.style.display = parseInt(botsSelect.value) > 0 ? 'block' : 'none';
+    };
+    botsSelect.addEventListener('change', updateBotDiffVisibility);
+    updateBotDiffVisibility();
+
     modal.querySelector('#modal-cancel')!.addEventListener('click', () => modal.remove());
     modal.querySelector('#modal-create')!.addEventListener('click', () => {
       const name = (modal.querySelector('#room-name') as HTMLInputElement).value.trim();
@@ -254,6 +271,7 @@ export class LobbyUI {
       const wallDensity = parseFloat((modal.querySelector('#room-wall-density') as HTMLSelectElement).value);
       const powerUpDropRate = parseFloat((modal.querySelector('#room-powerup-rate') as HTMLSelectElement).value);
       const botCount = parseInt((modal.querySelector('#room-bots') as HTMLSelectElement).value);
+      const botDifficulty = (modal.querySelector('#room-bot-difficulty') as HTMLSelectElement).value as 'easy' | 'normal' | 'hard';
 
       const enabledPowerUps: PowerUpType[] = [];
       modal.querySelectorAll('.powerup-check:checked').forEach((cb: any) => {
@@ -286,6 +304,7 @@ export class LobbyUI {
           enabledPowerUps,
           powerUpDropRate,
           botCount: effectiveBots,
+          botDifficulty: effectiveBots > 0 ? botDifficulty : undefined,
           friendlyFire,
         },
       }, (response: any) => {

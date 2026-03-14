@@ -37,7 +37,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - 20 tick/sec server game loop (GameLoop.ts -> GameState.ts)
 - GameState.processTick(): bot AI -> inputs -> movement -> bomb slide -> bomb timers -> explosions -> collisions -> power-ups -> zone -> win check
 - Bomb kick: player with hasKick walking into a bomb sets bomb.sliding direction; sliding bombs advance 1 tile/tick until blocked
-- BotAI: danger detection, flee to safe tiles, place bombs near destructible walls
+- BotAI: difficulty-aware (easy/normal/hard) with configurable awareness, aggression, escape depth, reaction delay, and kick usage
+- Bot difficulty set per-room via MatchConfig.botDifficulty; defaults to 'normal'; UI dropdown hidden when bots = 0
 - Camera follows local player with smooth lerp when map exceeds viewport
 
 ## Testing

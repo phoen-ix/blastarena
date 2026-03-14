@@ -42,6 +42,7 @@ export class GameStateManager {
   private enabledPowerUps: PowerUpType[];
   private powerUpDropRate: number;
   private friendlyFire: boolean;
+  private botDifficulty: 'easy' | 'normal' | 'hard';
   private botAIs: Map<number, BotAI> = new Map();
 
   constructor(
@@ -54,7 +55,8 @@ export class GameStateManager {
     wallDensity: number = DEFAULT_WALL_DENSITY,
     enabledPowerUps?: PowerUpType[],
     powerUpDropRate: number = DEFAULT_POWERUP_DROP_RATE,
-    friendlyFire: boolean = true
+    friendlyFire: boolean = true,
+    botDifficulty: 'easy' | 'normal' | 'hard' = 'normal'
   ) {
     this.map = generateMap(mapWidth, mapHeight, mapSeed, wallDensity);
     this.collisionSystem = new CollisionSystem(this.map.tiles, this.map.width, this.map.height);
@@ -64,6 +66,7 @@ export class GameStateManager {
     this.enabledPowerUps = enabledPowerUps ?? ['bomb_up', 'fire_up', 'speed_up', 'shield', 'kick'];
     this.powerUpDropRate = powerUpDropRate;
     this.friendlyFire = friendlyFire;
+    this.botDifficulty = botDifficulty;
 
     if (hasZone) {
       this.zone = new BattleRoyaleZone(mapWidth, mapHeight);
@@ -77,7 +80,7 @@ export class GameStateManager {
     this.players.set(id, player);
     this.placementCounter++;
     if (isBot) {
-      this.botAIs.set(id, new BotAI());
+      this.botAIs.set(id, new BotAI(this.botDifficulty));
     }
     return player;
   }

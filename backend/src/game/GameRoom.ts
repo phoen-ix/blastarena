@@ -33,7 +33,8 @@ export class GameRoom {
       room.config.wallDensity ?? 0.65,
       room.config.enabledPowerUps,
       room.config.powerUpDropRate ?? 0.3,
-      room.config.friendlyFire ?? true
+      room.config.friendlyFire ?? true,
+      room.config.botDifficulty ?? 'normal'
     );
 
     // Add human players

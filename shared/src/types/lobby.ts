@@ -14,6 +14,7 @@ export interface MatchConfig {
   enabledPowerUps?: PowerUpType[];
   powerUpDropRate?: number;
   botCount?: number;
+  botDifficulty?: 'easy' | 'normal' | 'hard';
   friendlyFire?: boolean;
 }
 

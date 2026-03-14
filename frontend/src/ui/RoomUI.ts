@@ -190,7 +190,7 @@ export class RoomUI {
             </div>
             <div style="display:flex;justify-content:space-between;">
               <span style="color:#a0a0b0;">Bots</span>
-              <span style="color:#fff;">${this.room.config.botCount || 0}</span>
+              <span style="color:#fff;">${this.room.config.botCount || 0}${this.room.config.botCount ? ` (${(this.room.config.botDifficulty || 'normal').charAt(0).toUpperCase() + (this.room.config.botDifficulty || 'normal').slice(1)})` : ''}</span>
             </div>
             ${this.room.config.gameMode === 'teams' ? `
             <div style="display:flex;justify-content:space-between;">
