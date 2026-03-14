@@ -21,6 +21,9 @@ export class GameScene extends Phaser.Scene {
   private lastInputSeq: number = 0;
   private lastGameState: GameState | null = null;
   private lastInputTime: number = 0;
+  private localPlayerDead: boolean = false;
+  private freeCamX: number = 0;
+  private freeCamY: number = 0;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -84,10 +87,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateCamera(): void {
+    const cam = this.cameras.main;
+
+    if (this.localPlayerDead) {
+      // Spectator free-cam: smooth lerp to target
+      cam.scrollX = Phaser.Math.Linear(cam.scrollX, this.freeCamX - cam.width / 2, 0.15);
+      cam.scrollY = Phaser.Math.Linear(cam.scrollY, this.freeCamY - cam.height / 2, 0.15);
+      return;
+    }
+
     const sprite = this.playerSprites.get(this.localPlayerId);
     if (!sprite) return;
 
-    const cam = this.cameras.main;
     // Smooth lerp toward player position
     cam.scrollX = Phaser.Math.Linear(cam.scrollX, sprite.x - cam.width / 2, 0.15);
     cam.scrollY = Phaser.Math.Linear(cam.scrollY, sprite.y - cam.height / 2, 0.15);
@@ -95,6 +106,16 @@ export class GameScene extends Phaser.Scene {
 
   private processInput(): void {
     if (!this.cursors) return;
+
+    // When dead, use movement keys to pan the spectator camera
+    if (this.localPlayerDead) {
+      const panSpeed = 5;
+      if (this.cursors.up.isDown || this.wasd?.up.isDown) this.freeCamY -= panSpeed;
+      if (this.cursors.down.isDown || this.wasd?.down.isDown) this.freeCamY += panSpeed;
+      if (this.cursors.left.isDown || this.wasd?.left.isDown) this.freeCamX -= panSpeed;
+      if (this.cursors.right.isDown || this.wasd?.right.isDown) this.freeCamX += panSpeed;
+      return;
+    }
 
     // Rate-limit input to match server tick rate (no point sending faster)
     const now = Date.now();
@@ -199,6 +220,12 @@ export class GameScene extends Phaser.Scene {
       const targetY = player.position.y * TILE_SIZE + TILE_SIZE / 2;
 
       if (!player.alive) {
+        // Initialize spectator free-cam from death position
+        if (player.id === this.localPlayerId && !this.localPlayerDead) {
+          this.localPlayerDead = true;
+          this.freeCamX = targetX;
+          this.freeCamY = targetY;
+        }
         // Play death effect then remove
         const existing = this.playerSprites.get(player.id);
         if (existing) {
