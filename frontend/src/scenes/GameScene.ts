@@ -90,9 +90,9 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
 
     if (this.localPlayerDead) {
-      // Spectator free-cam: smooth lerp to target
-      cam.scrollX = Phaser.Math.Linear(cam.scrollX, this.freeCamX - cam.width / 2, 0.15);
-      cam.scrollY = Phaser.Math.Linear(cam.scrollY, this.freeCamY - cam.height / 2, 0.15);
+      // Spectator free-cam: direct scroll for immediate response
+      cam.scrollX = this.freeCamX - cam.width / 2;
+      cam.scrollY = this.freeCamY - cam.height / 2;
       return;
     }
 
@@ -114,6 +114,13 @@ export class GameScene extends Phaser.Scene {
       if (this.cursors.down.isDown || this.wasd?.down.isDown) this.freeCamY += panSpeed;
       if (this.cursors.left.isDown || this.wasd?.left.isDown) this.freeCamX -= panSpeed;
       if (this.cursors.right.isDown || this.wasd?.right.isDown) this.freeCamX += panSpeed;
+      // Clamp to map area
+      if (this.lastGameState) {
+        const worldW = this.lastGameState.map.width * TILE_SIZE;
+        const worldH = this.lastGameState.map.height * TILE_SIZE;
+        this.freeCamX = Phaser.Math.Clamp(this.freeCamX, 0, worldW);
+        this.freeCamY = Phaser.Math.Clamp(this.freeCamY, 0, worldH);
+      }
       return;
     }
 
@@ -225,6 +232,8 @@ export class GameScene extends Phaser.Scene {
           this.localPlayerDead = true;
           this.freeCamX = targetX;
           this.freeCamY = targetY;
+          // Remove camera bounds so panning works even when map fits on screen
+          this.cameras.main.removeBounds();
         }
         // Play death effect then remove
         const existing = this.playerSprites.get(player.id);
