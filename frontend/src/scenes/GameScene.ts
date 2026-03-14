@@ -199,16 +199,32 @@ export class GameScene extends Phaser.Scene {
       const targetY = player.position.y * TILE_SIZE + TILE_SIZE / 2;
 
       if (!player.alive) {
-        // Remove dead players from the scene entirely
+        // Play death effect then remove
         const existing = this.playerSprites.get(player.id);
         if (existing) {
-          existing.destroy();
           this.playerSprites.delete(player.id);
+          existing.setTint(0xff0000);
+          this.tweens.add({
+            targets: existing,
+            alpha: 0,
+            scaleX: 0.2,
+            scaleY: 0.2,
+            duration: 500,
+            ease: 'Power2',
+            onComplete: () => existing.destroy(),
+          });
         }
         const existingLabel = this.playerLabels.get(player.id);
         if (existingLabel) {
-          existingLabel.destroy();
           this.playerLabels.delete(player.id);
+          this.tweens.add({
+            targets: existingLabel,
+            alpha: 0,
+            y: existingLabel.y - 20,
+            duration: 500,
+            ease: 'Power2',
+            onComplete: () => existingLabel.destroy(),
+          });
         }
         return;
       }

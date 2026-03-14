@@ -44,6 +44,8 @@ export class GameStateManager {
   private friendlyFire: boolean;
   private botDifficulty: 'easy' | 'normal' | 'hard';
   private botAIs: Map<number, BotAI> = new Map();
+  private finishTick: number | null = null;
+  private static readonly FINISH_DELAY_TICKS = 30; // 1.5s grace period to show final explosions
 
   constructor(
     mapWidth: number,
@@ -95,27 +97,40 @@ export class GameStateManager {
     if (this.status !== 'playing') return;
     this.tick++;
 
-    // 0. Generate bot inputs
-    for (const [botId, ai] of this.botAIs) {
-      const botPlayer = this.players.get(botId);
-      if (botPlayer && botPlayer.alive) {
-        const input = ai.generateInput(botPlayer, this);
-        if (input) {
-          this.inputBuffer.addInput(botId, input);
-        }
+    // Check if grace period has elapsed
+    if (this.finishTick !== null) {
+      if (this.tick >= this.finishTick + GameStateManager.FINISH_DELAY_TICKS) {
+        this.status = 'finished';
+        return;
       }
+      // During grace period: skip player/bot input, but keep processing explosions and bombs below
     }
 
-    // 1. Process inputs
-    for (const [playerId, player] of this.players) {
-      if (!player.alive) continue;
+    const isFinishing = this.finishTick !== null;
 
-      const input = this.inputBuffer.getLatestInput(playerId);
-      if (input) {
-        this.processPlayerInput(player, input);
+    if (!isFinishing) {
+      // 0. Generate bot inputs
+      for (const [botId, ai] of this.botAIs) {
+        const botPlayer = this.players.get(botId);
+        if (botPlayer && botPlayer.alive) {
+          const input = ai.generateInput(botPlayer, this);
+          if (input) {
+            this.inputBuffer.addInput(botId, input);
+          }
+        }
       }
 
-      player.tick();
+      // 1. Process inputs
+      for (const [playerId, player] of this.players) {
+        if (!player.alive) continue;
+
+        const input = this.inputBuffer.getLatestInput(playerId);
+        if (input) {
+          this.processPlayerInput(player, input);
+        }
+
+        player.tick();
+      }
     }
 
     // 2. Update bomb timers and slide kicked bombs
@@ -223,18 +238,22 @@ export class GameStateManager {
     }
 
     // 8. Time limit check
-    const timeElapsed = this.tick / TICK_RATE;
-    if (timeElapsed >= this.roundTime && this.status === 'playing') {
-      this.status = 'finished';
-      const alive = this.getAlivePlayers();
-      if (alive.length === 1) {
-        this.winnerId = alive[0].id;
-        alive[0].placement = 1;
+    if (this.finishTick === null) {
+      const timeElapsed = this.tick / TICK_RATE;
+      if (timeElapsed >= this.roundTime && this.status === 'playing') {
+        const alive = this.getAlivePlayers();
+        if (alive.length === 1) {
+          this.winnerId = alive[0].id;
+          alive[0].placement = 1;
+        }
+        this.finishTick = this.tick;
       }
     }
 
     // 9. Check win condition
-    this.checkWinCondition();
+    if (this.finishTick === null) {
+      this.checkWinCondition();
+    }
   }
 
   private processPlayerInput(player: Player, input: PlayerInput): void {
@@ -340,14 +359,14 @@ export class GameStateManager {
     if (this.gameMode === 'teams') {
       const aliveTeams = new Set(alivePlayers.map(p => p.team));
       if (aliveTeams.size <= 1 && alivePlayers.length > 0) {
-        this.status = 'finished';
+        this.finishTick = this.tick;
         this.winnerTeam = alivePlayers[0].team;
       } else if (alivePlayers.length === 0) {
-        this.status = 'finished';
+        this.finishTick = this.tick;
       }
     } else {
       if (alivePlayers.length <= 1) {
-        this.status = 'finished';
+        this.finishTick = this.tick;
         if (alivePlayers.length === 1) {
           this.winnerId = alivePlayers[0].id;
           alivePlayers[0].placement = 1;
