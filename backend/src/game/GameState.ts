@@ -41,6 +41,7 @@ export class GameStateManager {
   private placementCounter: number = 0;
   private enabledPowerUps: PowerUpType[];
   private powerUpDropRate: number;
+  private friendlyFire: boolean;
   private botAIs: Map<number, BotAI> = new Map();
 
   constructor(
@@ -52,7 +53,8 @@ export class GameStateManager {
     roundTime: number = 180,
     wallDensity: number = DEFAULT_WALL_DENSITY,
     enabledPowerUps?: PowerUpType[],
-    powerUpDropRate: number = DEFAULT_POWERUP_DROP_RATE
+    powerUpDropRate: number = DEFAULT_POWERUP_DROP_RATE,
+    friendlyFire: boolean = true
   ) {
     this.map = generateMap(mapWidth, mapHeight, mapSeed, wallDensity);
     this.collisionSystem = new CollisionSystem(this.map.tiles, this.map.width, this.map.height);
@@ -61,6 +63,7 @@ export class GameStateManager {
     this.roundTime = roundTime;
     this.enabledPowerUps = enabledPowerUps ?? ['bomb_up', 'fire_up', 'speed_up', 'shield', 'kick'];
     this.powerUpDropRate = powerUpDropRate;
+    this.friendlyFire = friendlyFire;
 
     if (hasZone) {
       this.zone = new BattleRoyaleZone(mapWidth, mapHeight);
@@ -138,6 +141,14 @@ export class GameStateManager {
 
       for (const explosion of this.explosions.values()) {
         if (explosion.containsCell(player.position.x, player.position.y)) {
+          const owner = this.players.get(explosion.ownerId);
+
+          // Friendly fire check: skip damage if FF is off and same team (but self-damage always applies)
+          if (!this.friendlyFire && owner && owner.id !== player.id &&
+              player.team !== null && owner.team === player.team) {
+            continue;
+          }
+
           if (player.hasShield) {
             player.hasShield = false;
             player.shieldTicksRemaining = 0;
@@ -147,9 +158,8 @@ export class GameStateManager {
             player.placement = this.getAlivePlayers().length + 1;
 
             // Credit kill
-            const killer = this.players.get(explosion.ownerId);
-            if (killer && killer.id !== player.id) {
-              killer.kills++;
+            if (owner && owner.id !== player.id) {
+              owner.kills++;
             }
           }
           break;

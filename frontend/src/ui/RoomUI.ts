@@ -117,8 +117,9 @@ export class RoomUI {
     const isHost = this.isHost();
     const isReady = this.isReady();
     const allReady = this.allPlayersReady();
-    const totalPlayers = this.room.players.length + (this.room.config.botCount || 0);
-    const canStart = isHost && allReady && totalPlayers >= 2;
+    const botCount = this.room.config.botCount || 0;
+    const totalPlayers = this.room.players.length + botCount;
+    const canStart = isHost && allReady && (this.room.players.length >= 2 || botCount >= 1);
 
     const modeLabel = this.room.config.gameMode.replace('_', ' ').toUpperCase();
 
@@ -148,7 +149,7 @@ export class RoomUI {
             ${isHost ? `
               <button class="btn btn-primary" id="room-start" ${canStart ? '' : 'disabled'}
                 style="flex:1;padding:14px;font-size:16px;">
-                ${totalPlayers < 2 ? 'Need 2+ Players' : !allReady ? 'Waiting for Players...' : 'Start Game'}
+                ${this.room.players.length < 2 && botCount < 1 ? 'Need Players or Bots' : !allReady ? 'Waiting for Players...' : 'Start Game'}
               </button>
             ` : `
               <button class="btn ${isReady ? 'btn-secondary' : 'btn-primary'}" id="room-ready"
@@ -190,6 +191,10 @@ export class RoomUI {
             <div style="display:flex;justify-content:space-between;">
               <span style="color:#a0a0b0;">Bots</span>
               <span style="color:#fff;">${this.room.config.botCount || 0}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:#a0a0b0;">Friendly Fire</span>
+              <span style="color:${this.room.config.friendlyFire !== false ? '#e94560' : '#44ff44'};">${this.room.config.friendlyFire !== false ? 'ON' : 'OFF'}</span>
             </div>
             <div style="display:flex;justify-content:space-between;">
               <span style="color:#a0a0b0;">Host</span>

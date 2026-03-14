@@ -131,9 +131,9 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
         return;
       }
 
-      const totalPlayers = room.players.length + (room.config.botCount || 0);
-      if (totalPlayers < 2) {
-        socket.emit('error', { message: 'Need at least 2 players' });
+      const botCount = room.config.botCount || 0;
+      if (room.players.length < 2 && botCount < 1) {
+        socket.emit('error', { message: 'Need at least 2 players or add bots' });
         return;
       }
 

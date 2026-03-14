@@ -32,7 +32,8 @@ export class GameRoom {
       room.config.roundTime || modeConfig.roundTimeSeconds,
       room.config.wallDensity ?? 0.65,
       room.config.enabledPowerUps,
-      room.config.powerUpDropRate ?? 0.3
+      room.config.powerUpDropRate ?? 0.3,
+      room.config.friendlyFire ?? true
     );
 
     // Add human players
@@ -43,8 +44,8 @@ export class GameRoom {
       playerIndex++;
     });
 
-    // Add bots
-    const botCount = room.config.botCount || 0;
+    // Add bots (capped so total doesn't exceed maxPlayers)
+    const botCount = Math.min(room.config.botCount || 0, room.config.maxPlayers - room.players.length);
     const botNames = ['Bomber Bot', 'Blast Bot', 'Kaboom', 'TNT', 'Dynamite', 'Sparky'];
     for (let i = 0; i < botCount; i++) {
       const botId = -(i + 1); // Negative IDs for bots

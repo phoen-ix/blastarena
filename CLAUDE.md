@@ -28,6 +28,9 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - All game constants in shared/src/constants/
 - Socket.io listeners use one-shot pattern for game:start to prevent leaks across scene transitions
 - Bot players use negative IDs (-(i+1)) to avoid DB conflicts; skipped in DB writes
+- Bot count auto-capped to maxPlayers - humanPlayers (both frontend and backend)
+- Singleplayer: 1 human + 1+ bots is enough to start a game
+- Friendly fire config: when OFF, same-team explosions don't damage teammates (self-damage still applies)
 - Map dimensions should be odd numbers for proper indestructible wall grid pattern
 
 ## Game Architecture

@@ -207,6 +207,14 @@ export class LobbyUI {
           </div>
         </div>
 
+        <div style="display:flex;gap:12px;margin-top:12px;">
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;
+            background:#1a1a2e;border:1px solid #0f3460;border-radius:6px;cursor:pointer;font-size:13px;flex:1;">
+            <input type="checkbox" id="room-friendly-fire" checked style="accent-color:#e94560;">
+            <span style="color:#e94560;font-weight:600;">Friendly Fire</span>
+          </label>
+        </div>
+
         <div class="form-group" style="margin-top:12px;">
           <label>Power-Ups</label>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
@@ -248,7 +256,14 @@ export class LobbyUI {
         return;
       }
 
+      // Cap bots so total (1 host + bots) doesn't exceed maxPlayers
+      const effectiveBots = Math.min(botCount, maxPlayers - 1);
+      if (effectiveBots < botCount) {
+        this.notifications.info(`Bot count capped to ${effectiveBots} (max ${maxPlayers} players)`);
+      }
+
       const mapSize = parseInt((modal.querySelector('#room-map-size') as HTMLSelectElement).value);
+      const friendlyFire = (modal.querySelector('#room-friendly-fire') as HTMLInputElement).checked;
 
       this.socketClient.emit('room:create', {
         name,
@@ -261,7 +276,8 @@ export class LobbyUI {
           wallDensity,
           enabledPowerUps,
           powerUpDropRate,
-          botCount,
+          botCount: effectiveBots,
+          friendlyFire,
         },
       }, (response: any) => {
         if (response.success && response.room) {

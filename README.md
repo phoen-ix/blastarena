@@ -31,8 +31,10 @@ Open `http://localhost:8080` in your browser.
 
 ## Features
 
+- **Singleplayer & Multiplayer**: Play solo against bots or with friends; 1 human + bots is enough to start
 - **Configurable rooms**: Map size (square grids from 11x11 to 31x31), match time, wall density, power-up types and drop rates
-- **Bot players**: Add 1-6 AI bots to any room; bots dodge explosions, seek destructible walls, and place bombs strategically
+- **Friendly fire toggle**: Enable or disable teammate damage in Teams mode
+- **Bot players**: Add 1-6 AI bots to any room (auto-capped to fit max players); bots dodge explosions, seek destructible walls, and place bombs strategically
 - **Power-ups**: Bomb Up, Fire Up, Speed Up, Shield, Bomb Kick - each individually toggleable per room
 - **Live HUD**: Countdown timer, alive player list (dead players removed from view)
 - **Camera follow**: Smooth scrolling camera that follows your player on maps larger than the viewport
