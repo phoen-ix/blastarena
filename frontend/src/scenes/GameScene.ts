@@ -24,10 +24,10 @@ export class GameScene extends Phaser.Scene {
   private localPlayerDead: boolean = false;
   private freeCamX: number = 0;
   private freeCamY: number = 0;
-  // DOM-level key tracking for spectator mode (independent of Phaser input)
+  // DOM-level key tracking for spectator mode (bypasses Phaser input entirely)
   private keysDown: Set<string> = new Set();
-  private onKeyDown: ((e: KeyboardEvent) => void) | null = null;
-  private onKeyUp: ((e: KeyboardEvent) => void) | null = null;
+  private boundKeyDown: ((e: KeyboardEvent) => void) | null = null;
+  private boundKeyUp: ((e: KeyboardEvent) => void) | null = null;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -39,15 +39,18 @@ export class GameScene extends Phaser.Scene {
     this.localPlayerId = this.authManager.getUser()?.id ?? 0;
     const initialState: GameState = this.registry.get('initialGameState');
 
-    // Reset spectator state for scene restarts
+    // Reset state for scene restarts
     this.localPlayerDead = false;
     this.freeCamX = 0;
     this.freeCamY = 0;
-    this.cleanupSpectatorKeys();
+    this.removeSpectatorListeners();
 
-    console.log('[GameScene] create() called, initialState:', initialState ? `${initialState.players.length} players, map ${initialState.map.width}x${initialState.map.height}` : 'NULL');
+    // Always install DOM key listeners from the start (for spectator mode later)
+    this.installSpectatorListeners();
 
-    // Setup input
+    console.log('[GameScene] create() called, localPlayerId:', this.localPlayerId, 'initialState:', initialState ? `${initialState.players.length} players, map ${initialState.map.width}x${initialState.map.height}` : 'NULL');
+
+    // Setup Phaser input (for alive gameplay)
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys();
       this.wasd = {
@@ -91,7 +94,46 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private installSpectatorListeners(): void {
+    this.keysDown.clear();
+    this.boundKeyDown = (e: KeyboardEvent) => {
+      this.keysDown.add(e.code);
+      // Prevent browser scrolling when spectating
+      if (this.localPlayerDead && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+        e.preventDefault();
+      }
+    };
+    this.boundKeyUp = (e: KeyboardEvent) => {
+      this.keysDown.delete(e.code);
+    };
+    window.addEventListener('keydown', this.boundKeyDown);
+    window.addEventListener('keyup', this.boundKeyUp);
+  }
+
+  private removeSpectatorListeners(): void {
+    if (this.boundKeyDown) {
+      window.removeEventListener('keydown', this.boundKeyDown);
+      this.boundKeyDown = null;
+    }
+    if (this.boundKeyUp) {
+      window.removeEventListener('keyup', this.boundKeyUp);
+      this.boundKeyUp = null;
+    }
+    this.keysDown.clear();
+  }
+
   update(): void {
+    // Detect local player death from latest game state (every frame, very robust)
+    if (!this.localPlayerDead && this.lastGameState) {
+      const me = this.lastGameState.players.find(p => p.id === this.localPlayerId);
+      if (me && !me.alive) {
+        this.localPlayerDead = true;
+        this.freeCamX = me.position.x * TILE_SIZE + TILE_SIZE / 2;
+        this.freeCamY = me.position.y * TILE_SIZE + TILE_SIZE / 2;
+        console.log('[GameScene] Spectator mode ON — pos:', this.freeCamX, this.freeCamY);
+      }
+    }
+
     this.processInput();
     this.updateCamera();
   }
@@ -100,7 +142,8 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
 
     if (this.localPlayerDead) {
-      // Spectator free-cam: direct scroll for immediate response
+      // Force-disable camera bounds every frame to prevent Phaser from clamping scroll
+      (cam as any).useBounds = false;
       cam.scrollX = this.freeCamX - cam.width / 2;
       cam.scrollY = this.freeCamY - cam.height / 2;
       return;
@@ -114,34 +157,8 @@ export class GameScene extends Phaser.Scene {
     cam.scrollY = Phaser.Math.Linear(cam.scrollY, sprite.y - cam.height / 2, 0.15);
   }
 
-  private setupSpectatorKeys(): void {
-    this.keysDown.clear();
-    this.onKeyDown = (e: KeyboardEvent) => {
-      this.keysDown.add(e.code);
-    };
-    this.onKeyUp = (e: KeyboardEvent) => {
-      this.keysDown.delete(e.code);
-    };
-    window.addEventListener('keydown', this.onKeyDown);
-    window.addEventListener('keyup', this.onKeyUp);
-  }
-
-  private cleanupSpectatorKeys(): void {
-    if (this.onKeyDown) {
-      window.removeEventListener('keydown', this.onKeyDown);
-      this.onKeyDown = null;
-    }
-    if (this.onKeyUp) {
-      window.removeEventListener('keyup', this.onKeyUp);
-      this.onKeyUp = null;
-    }
-    this.keysDown.clear();
-  }
-
   private processInput(): void {
-    if (!this.cursors) return;
-
-    // When dead, use DOM-level key tracking to pan the spectator camera
+    // When dead, use DOM key tracking to pan the spectator camera
     if (this.localPlayerDead) {
       const panSpeed = 5;
       if (this.keysDown.has('ArrowUp') || this.keysDown.has('KeyW')) this.freeCamY -= panSpeed;
@@ -157,6 +174,8 @@ export class GameScene extends Phaser.Scene {
       }
       return;
     }
+
+    if (!this.cursors) return;
 
     // Rate-limit input to match server tick rate (no point sending faster)
     const now = Date.now();
@@ -261,15 +280,7 @@ export class GameScene extends Phaser.Scene {
       const targetY = player.position.y * TILE_SIZE + TILE_SIZE / 2;
 
       if (!player.alive) {
-        // Initialize spectator free-cam from death position
-        if (player.id === this.localPlayerId && !this.localPlayerDead) {
-          this.localPlayerDead = true;
-          this.freeCamX = targetX;
-          this.freeCamY = targetY;
-          this.cameras.main.removeBounds();
-          this.setupSpectatorKeys();
-        }
-        // Play death effect then remove
+        // Play death effect then remove sprite
         const existing = this.playerSprites.get(player.id);
         if (existing) {
           this.playerSprites.delete(player.id);
@@ -445,8 +456,8 @@ export class GameScene extends Phaser.Scene {
     this.socketClient.off('game:state' as any);
     this.socketClient.off('game:over' as any);
 
-    // Clean up spectator key listeners
-    this.cleanupSpectatorKeys();
+    // Clean up DOM key listeners
+    this.removeSpectatorListeners();
 
     this.playerSprites.forEach(s => s.destroy());
     this.playerLabels.forEach(s => s.destroy());
