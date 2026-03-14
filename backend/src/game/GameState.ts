@@ -115,9 +115,28 @@ export class GameStateManager {
       player.tick();
     }
 
-    // 2. Update bomb timers
+    // 2. Update bomb timers and slide kicked bombs
     const bombsToDetonate: Bomb[] = [];
     for (const bomb of this.bombs.values()) {
+      // Slide kicked bombs
+      if (bomb.sliding) {
+        const dx = bomb.sliding === 'left' ? -1 : bomb.sliding === 'right' ? 1 : 0;
+        const dy = bomb.sliding === 'up' ? -1 : bomb.sliding === 'down' ? 1 : 0;
+        const nextX = bomb.position.x + dx;
+        const nextY = bomb.position.y + dy;
+
+        // Stop if hitting a wall, another bomb, or a player
+        const blocked = !this.collisionSystem.isWalkable(nextX, nextY)
+          || Array.from(this.bombs.values()).some(b => b.id !== bomb.id && b.position.x === nextX && b.position.y === nextY)
+          || Array.from(this.players.values()).some(p => p.alive && p.position.x === nextX && p.position.y === nextY);
+
+        if (blocked) {
+          bomb.sliding = null;
+        } else {
+          bomb.position = { x: nextX, y: nextY };
+        }
+      }
+
       if (bomb.tick()) {
         bombsToDetonate.push(bomb);
       }
@@ -233,6 +252,19 @@ export class GameStateManager {
       if (newPos) {
         player.position = newPos;
         player.applyMoveCooldown();
+      } else if (player.hasKick) {
+        // Try to kick a bomb in the movement direction
+        const dx = input.direction === 'left' ? -1 : input.direction === 'right' ? 1 : 0;
+        const dy = input.direction === 'up' ? -1 : input.direction === 'down' ? 1 : 0;
+        const targetX = player.position.x + dx;
+        const targetY = player.position.y + dy;
+
+        for (const bomb of this.bombs.values()) {
+          if (bomb.position.x === targetX && bomb.position.y === targetY && !bomb.sliding) {
+            bomb.sliding = input.direction;
+            break;
+          }
+        }
       }
     }
 

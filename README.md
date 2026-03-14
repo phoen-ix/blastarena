@@ -28,6 +28,7 @@ Open `http://localhost:8080` in your browser.
 
 - **Arrow Keys / WASD**: Move
 - **Space**: Place bomb
+- **Walk into a bomb** (with Kick power-up): Kicks the bomb, sending it sliding until it hits a wall, player, or another bomb
 
 ## Features
 
