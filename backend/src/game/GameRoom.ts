@@ -6,6 +6,7 @@ import { GameStateManager } from './GameState';
 import { GameLoop } from './GameLoop';
 import { execute } from '../db/connection';
 import { logger } from '../utils/logger';
+import { GameLogger } from '../utils/gameLogger';
 import * as lobbyService from '../services/lobby';
 
 export class GameRoom {
@@ -55,6 +56,28 @@ export class GameRoom {
       this.gameState.addPlayer(botId, `bot_${i}`, botName, team, true);
       playerIndex++;
     }
+
+    // Game logger for detailed analysis
+    this.gameState.gameLogger = new GameLogger(
+      room.code,
+      room.config.gameMode,
+      room.players.length + botCount,
+    );
+    // Log player roster
+    for (const p of this.gameState.players.values()) {
+      this.gameState.gameLogger.log('player', {
+        id: p.id, name: p.displayName, isBot: p.isBot, team: p.team,
+        spawn: p.position,
+      });
+    }
+    this.gameState.gameLogger.log('config', {
+      mapSize: `${this.gameState.map.width}x${this.gameState.map.height}`,
+      seed: this.gameState.map.seed,
+      botDifficulty: room.config.botDifficulty ?? 'normal',
+      wallDensity: room.config.wallDensity,
+      roundTime: room.config.roundTime,
+      friendlyFire: room.config.friendlyFire,
+    });
 
     this.gameLoop = new GameLoop(
       this.gameState,
@@ -133,10 +156,21 @@ export class GameRoom {
   private async onGameOver(): Promise<void> {
     const state = this.gameState.toState();
 
-    // Build placements
+    // Build placements sorted by kills (descending), tiebreak by survival placement
     const placements = Array.from(this.gameState.players.values())
-      .sort((a, b) => (a.placement || 999) - (b.placement || 999))
-      .map(p => ({ userId: p.id, displayName: p.displayName, isBot: p.isBot, placement: p.placement || 0, kills: p.kills }));
+      .map(p => ({
+        userId: p.id,
+        displayName: p.displayName,
+        isBot: p.isBot,
+        placement: p.placement || 0,
+        kills: p.kills,
+        selfKills: p.selfKills,
+      }))
+      .sort((a, b) => b.kills - a.kills || a.placement - b.placement);
+
+    logger.info({ code: this.code, placements: placements.map(p => ({ name: p.displayName, kills: p.kills, selfKills: p.selfKills, placement: p.placement })) }, 'Game over placements');
+
+    this.gameState.gameLogger?.logGameOver(state.winnerId, placements);
 
     this.io.to(`room:${this.code}`).emit('game:over', {
       winnerId: state.winnerId,

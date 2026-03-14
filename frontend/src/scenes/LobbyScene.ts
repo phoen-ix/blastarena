@@ -23,6 +23,14 @@ export class LobbyScene extends Phaser.Scene {
     this.socketClient = this.registry.get('socketClient');
     this.notifications = this.registry.get('notifications');
 
+    // Clear any leftover DOM overlays (countdown, HUD, etc.)
+    const uiOverlay = document.getElementById('ui-overlay');
+    if (uiOverlay) {
+      while (uiOverlay.firstChild) {
+        uiOverlay.removeChild(uiOverlay.firstChild);
+      }
+    }
+
     // Listen for auth changes
     this.authManager.onChange((user) => {
       if (!user) {

@@ -23,6 +23,7 @@ export class Player {
   // Stats tracking
   public kills: number = 0;
   public deaths: number = 0;
+  public selfKills: number = 0;
   public bombsPlaced: number = 0;
   public powerupsCollected: number = 0;
   public placement: number | null = null;

@@ -10,6 +10,7 @@ import { BattleRoyaleZone } from './BattleRoyale';
 import { generateMap } from './Map';
 import { InputBuffer } from './InputBuffer';
 import { BotAI } from './BotAI';
+import { GameLogger } from '../utils/gameLogger';
 
 // Simple seeded random for power-up drops
 class SeededRandom {
@@ -45,6 +46,7 @@ export class GameStateManager {
   private botDifficulty: 'easy' | 'normal' | 'hard';
   private botAIs: Map<number, BotAI> = new Map();
   private finishTick: number | null = null;
+  public gameLogger: GameLogger | null = null;
   private static readonly FINISH_DELAY_TICKS = 30; // 1.5s grace period to show final explosions
 
   constructor(
@@ -108,12 +110,22 @@ export class GameStateManager {
 
     const isFinishing = this.finishTick !== null;
 
+    // Log state every 5 ticks
+    if (this.gameLogger && this.tick % 5 === 0) {
+      this.gameLogger.logTick(
+        this.tick,
+        Array.from(this.players.values()),
+        Array.from(this.bombs.values()),
+        Array.from(this.explosions.values()),
+      );
+    }
+
     if (!isFinishing) {
       // 0. Generate bot inputs
       for (const [botId, ai] of this.botAIs) {
         const botPlayer = this.players.get(botId);
         if (botPlayer && botPlayer.alive) {
-          const input = ai.generateInput(botPlayer, this);
+          const input = ai.generateInput(botPlayer, this, this.gameLogger);
           if (input) {
             this.inputBuffer.addInput(botId, input);
           }
@@ -194,11 +206,14 @@ export class GameStateManager {
             this.placementCounter--;
             player.placement = this.getAlivePlayers().length + 1;
 
-            // Credit kill or penalize self-kill
+            // Credit kill or track self-kill (self-kills subtract 1 from score)
             if (owner && owner.id !== player.id) {
               owner.kills++;
+              this.gameLogger?.logKill(owner.id, owner.displayName, player.id, player.displayName, false);
             } else if (owner && owner.id === player.id) {
+              owner.selfKills++;
               owner.kills = Math.max(0, owner.kills - 1);
+              this.gameLogger?.logKill(owner.id, owner.displayName, player.id, player.displayName, true);
             }
           }
           break;
@@ -303,6 +318,7 @@ export class GameStateManager {
         this.bombs.set(bomb.id, bomb);
         player.bombCount++;
         player.bombsPlaced++;
+        this.gameLogger?.logBomb('place', player.id, player.displayName, player.position, player.fireRange);
       }
     }
   }
@@ -315,6 +331,7 @@ export class GameStateManager {
     if (owner) {
       owner.bombCount = Math.max(0, owner.bombCount - 1);
     }
+    this.gameLogger?.logBomb('detonate', bomb.ownerId, owner?.displayName || '?', bomb.position, bomb.fireRange);
 
     // Calculate explosion cells
     const cells = getExplosionCells(

@@ -84,6 +84,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - ./data/gamelogs:/app/gamelogs
     networks:
       - internal
     healthcheck:

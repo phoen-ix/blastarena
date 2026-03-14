@@ -195,6 +195,14 @@ export class LobbyUI {
               <option value="6">6 Bots</option>
             </select>
           </div>
+          <div class="form-group" id="bot-difficulty-row" style="display:none;">
+            <label>Bot Difficulty</label>
+            <select id="room-bot-difficulty">
+              <option value="easy">Easy</option>
+              <option value="normal" selected>Normal</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
           <div class="form-group">
             <label>Map Size</label>
             <select id="room-map-size">
@@ -203,14 +211,6 @@ export class LobbyUI {
               <option value="19">19x19 (Large)</option>
               <option value="25">25x25 (Huge)</option>
               <option value="31">31x31 (Massive)</option>
-            </select>
-          </div>
-          <div class="form-group" id="bot-difficulty-row" style="display:none;">
-            <label>Bot Difficulty</label>
-            <select id="room-bot-difficulty">
-              <option value="easy">Easy</option>
-              <option value="normal" selected>Normal</option>
-              <option value="hard">Hard</option>
             </select>
           </div>
         </div>
