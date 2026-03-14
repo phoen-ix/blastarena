@@ -176,9 +176,11 @@ export class GameStateManager {
             this.placementCounter--;
             player.placement = this.getAlivePlayers().length + 1;
 
-            // Credit kill
+            // Credit kill or penalize self-kill
             if (owner && owner.id !== player.id) {
               owner.kills++;
+            } else if (owner && owner.id === player.id) {
+              owner.kills = Math.max(0, owner.kills - 1);
             }
           }
           break;
