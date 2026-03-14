@@ -128,9 +128,10 @@ export class GameScene extends Phaser.Scene {
       const me = this.lastGameState.players.find(p => p.id === this.localPlayerId);
       if (me && !me.alive) {
         this.localPlayerDead = true;
-        this.freeCamX = me.position.x * TILE_SIZE + TILE_SIZE / 2;
-        this.freeCamY = me.position.y * TILE_SIZE + TILE_SIZE / 2;
-        console.log('[GameScene] Spectator mode ON — pos:', this.freeCamX, this.freeCamY);
+        // Start spectator cam from current camera center (no jump)
+        const cam = this.cameras.main;
+        this.freeCamX = cam.scrollX + cam.width / 2;
+        this.freeCamY = cam.scrollY + cam.height / 2;
       }
     }
 
