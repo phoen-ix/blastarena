@@ -207,7 +207,7 @@ export class LobbyUI {
           </div>
         </div>
 
-        <div style="display:flex;gap:12px;margin-top:12px;">
+        <div id="friendly-fire-row" style="display:none;gap:12px;margin-top:12px;">
           <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;
             background:#1a1a2e;border:1px solid #0f3460;border-radius:6px;cursor:pointer;font-size:13px;flex:1;">
             <input type="checkbox" id="room-friendly-fire" checked style="accent-color:#e94560;">
@@ -236,6 +236,15 @@ export class LobbyUI {
       </div>
     `;
 
+    // Show friendly fire option only for teams mode
+    const modeSelect = modal.querySelector('#room-mode') as HTMLSelectElement;
+    const ffRow = modal.querySelector('#friendly-fire-row') as HTMLElement;
+    const updateFFVisibility = () => {
+      ffRow.style.display = modeSelect.value === 'teams' ? 'flex' : 'none';
+    };
+    modeSelect.addEventListener('change', updateFFVisibility);
+    updateFFVisibility();
+
     modal.querySelector('#modal-cancel')!.addEventListener('click', () => modal.remove());
     modal.querySelector('#modal-create')!.addEventListener('click', () => {
       const name = (modal.querySelector('#room-name') as HTMLInputElement).value.trim();
@@ -263,7 +272,7 @@ export class LobbyUI {
       }
 
       const mapSize = parseInt((modal.querySelector('#room-map-size') as HTMLSelectElement).value);
-      const friendlyFire = (modal.querySelector('#room-friendly-fire') as HTMLInputElement).checked;
+      const friendlyFire = gameMode === 'teams' ? (modal.querySelector('#room-friendly-fire') as HTMLInputElement).checked : true;
 
       this.socketClient.emit('room:create', {
         name,

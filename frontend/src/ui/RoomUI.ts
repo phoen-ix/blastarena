@@ -192,10 +192,11 @@ export class RoomUI {
               <span style="color:#a0a0b0;">Bots</span>
               <span style="color:#fff;">${this.room.config.botCount || 0}</span>
             </div>
+            ${this.room.config.gameMode === 'teams' ? `
             <div style="display:flex;justify-content:space-between;">
               <span style="color:#a0a0b0;">Friendly Fire</span>
               <span style="color:${this.room.config.friendlyFire !== false ? '#e94560' : '#44ff44'};">${this.room.config.friendlyFire !== false ? 'ON' : 'OFF'}</span>
-            </div>
+            </div>` : ''}
             <div style="display:flex;justify-content:space-between;">
               <span style="color:#a0a0b0;">Host</span>
               <span style="color:#fff;">${this.escapeHtml(this.room.host.displayName)}</span>
