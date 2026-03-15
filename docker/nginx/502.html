@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>BlastArena — Restarting</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;color:#e0e0e0;font-family:'Segoe UI',system-ui,sans-serif;
+  display:flex;align-items:center;justify-content:center;height:100vh;text-align:center}
+.wrap{max-width:400px}
+h1{color:#e94560;font-size:28px;margin-bottom:12px}
+p{color:#a0a0b0;font-size:15px;margin-bottom:20px}
+.spinner{width:32px;height:32px;border:3px solid #333;border-top-color:#e94560;
+  border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+#status{font-size:13px;color:#666}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>BlastArena</h1>
+  <p>Server is restarting...</p>
+  <div class="spinner"></div>
+  <div id="status">Waiting for server</div>
+</div>
+<script>
+(function(){
+  var el=document.getElementById('status');
+  var attempt=0;
+  function check(){
+    attempt++;
+    el.textContent='Reconnecting... (attempt '+attempt+')';
+    fetch(window.location.href,{cache:'no-store'}).then(function(r){
+      if(r.ok && r.headers.get('content-type') && r.headers.get('content-type').indexOf('text/html')!==-1){
+        return r.text().then(function(body){
+          // Only reload if the response is the real app, not this error page
+          if(body.indexOf('game-container')!==-1){
+            window.location.reload();
+          } else {
+            setTimeout(check,2000);
+          }
+        });
+      }
+      setTimeout(check,2000);
+    }).catch(function(){
+      setTimeout(check,2000);
+    });
+  }
+  setTimeout(check,2000);
+})();
+</script>
+</body>
+</html>
