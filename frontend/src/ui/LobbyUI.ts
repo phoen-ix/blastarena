@@ -3,6 +3,7 @@ import { AuthManager } from '../network/AuthManager';
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
 import { RoomListItem, Room, GAME_MODES, GameMode, PowerUpType, POWERUP_DEFINITIONS } from '@blast-arena/shared';
+import { getSettings, saveSettings, VisualSettings } from '../game/Settings';
 
 export class LobbyUI {
   private container: HTMLElement;
@@ -47,6 +48,8 @@ export class LobbyUI {
           <span style="color:#a0a0b0;">Welcome, <strong style="color:#fff;">${user?.displayName || user?.username}</strong></span>
           ${user?.role === 'admin' ? '<button class="btn btn-secondary" id="admin-btn">Admin</button>' : ''}
           <button class="btn btn-primary" id="create-room-btn">Create Room</button>
+          <button class="btn btn-secondary" id="settings-btn">Settings</button>
+          <button class="btn btn-secondary" id="help-btn">Help</button>
           <button class="btn btn-secondary" id="logout-btn">Logout</button>
         </div>
       </div>
@@ -60,6 +63,8 @@ export class LobbyUI {
     `;
 
     this.container.querySelector('#create-room-btn')!.addEventListener('click', () => this.showCreateRoomModal());
+    this.container.querySelector('#settings-btn')!.addEventListener('click', () => this.showSettingsModal());
+    this.container.querySelector('#help-btn')!.addEventListener('click', () => this.showHelpModal());
     this.container.querySelector('#refresh-btn')!.addEventListener('click', () => this.loadRooms());
     this.container.querySelector('#logout-btn')!.addEventListener('click', () => {
       this.authManager.logout();
@@ -344,6 +349,92 @@ export class LobbyUI {
         }
       });
     });
+
+    document.getElementById('ui-overlay')!.appendChild(modal);
+  }
+
+  private showSettingsModal(): void {
+    const settings = getSettings();
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal" style="width:300px;">
+        <h2>Visual Settings</h2>
+        <label class="settings-option">
+          <input type="checkbox" name="animations" ${settings.animations ? 'checked' : ''}>
+          <span>Animations</span>
+        </label>
+        <label class="settings-option">
+          <input type="checkbox" name="screenShake" ${settings.screenShake ? 'checked' : ''}>
+          <span>Screen Shake</span>
+        </label>
+        <label class="settings-option">
+          <input type="checkbox" name="particles" ${settings.particles ? 'checked' : ''}>
+          <span>Particles</span>
+        </label>
+        <div class="modal-actions">
+          <button class="btn btn-primary" id="modal-close">Close</button>
+        </div>
+      </div>
+    `;
+
+    modal.addEventListener('change', (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      if (!target || target.type !== 'checkbox') return;
+      const key = target.name as keyof VisualSettings;
+      const current = getSettings();
+      (current as any)[key] = target.checked;
+      saveSettings(current);
+    });
+
+    modal.querySelector('#modal-close')!.addEventListener('click', () => modal.remove());
+
+    document.getElementById('ui-overlay')!.appendChild(modal);
+  }
+
+  private showHelpModal(): void {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal" style="width:450px;max-height:80vh;overflow-y:auto;">
+        <h2>Controls & Items</h2>
+
+        <div class="help-section">
+          <div class="help-heading">Controls</div>
+          <div class="help-row"><span class="help-key">WASD / Arrows</span> Move</div>
+          <div class="help-row"><span class="help-key">Space</span> Place bomb</div>
+          <div class="help-row"><span class="help-key">E</span> Detonate remote bombs</div>
+          <div class="help-row"><span class="help-key">1-9</span> Spectate Nth player (when dead)</div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-heading">Power-Ups</div>
+          <div class="help-row"><span class="help-icon" style="color:#FF4444">💣+</span> <b>Bomb Up</b> — +1 max bombs (up to 8)</div>
+          <div class="help-row"><span class="help-icon" style="color:#FF8800">🔥+</span> <b>Fire Up</b> — +1 explosion range (up to 8)</div>
+          <div class="help-row"><span class="help-icon" style="color:#44AAFF">⚡+</span> <b>Speed Up</b> — faster movement (up to 5)</div>
+          <div class="help-row"><span class="help-icon" style="color:#44FF44">🛡️</span> <b>Shield</b> — absorbs one explosion</div>
+          <div class="help-row"><span class="help-icon" style="color:#CC44FF">👢</span> <b>Kick</b> — walk into a bomb to slide it</div>
+          <div class="help-row"><span class="help-icon" style="color:#FF2222">➜</span> <b>Pierce Bomb</b> — blasts go through breakable walls</div>
+          <div class="help-row"><span class="help-icon" style="color:#4488FF">📡</span> <b>Remote Bomb</b> — bombs don't auto-explode; press <span class="help-key">E</span> to detonate all at once</div>
+          <div class="help-row"><span class="help-icon" style="color:#FFAA44">●●●</span> <b>Line Bomb</b> — places a line of bombs in your facing direction</div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-heading">Tips</div>
+          <div class="help-row">Stand behind a wall before your bomb explodes</div>
+          <div class="help-row">Chain reactions: bombs caught in an explosion detonate instantly</div>
+          <div class="help-row">Self-kills subtract from your score</div>
+          <div class="help-row">You're invulnerable for 2s after spawning</div>
+          <div class="help-row">Kicked bombs slide until they hit a wall, bomb, or player</div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-primary" id="modal-close">Close</button>
+        </div>
+      </div>
+    `;
+
+    modal.querySelector('#modal-close')!.addEventListener('click', () => modal.remove());
 
     document.getElementById('ui-overlay')!.appendChild(modal);
   }

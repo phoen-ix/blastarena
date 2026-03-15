@@ -1,5 +1,5 @@
 import { PlayerState, Position, Direction, PowerUpType } from '@blast-arena/shared';
-import { DEFAULT_SPEED, DEFAULT_MAX_BOMBS, DEFAULT_FIRE_RANGE, MAX_SPEED, MAX_BOMBS, MAX_FIRE_RANGE, SHIELD_DURATION_TICKS, INVULNERABILITY_TICKS, MOVE_COOLDOWN_BASE } from '@blast-arena/shared';
+import { DEFAULT_SPEED, DEFAULT_MAX_BOMBS, DEFAULT_FIRE_RANGE, MAX_SPEED, MAX_BOMBS, MAX_FIRE_RANGE, INVULNERABILITY_TICKS, MOVE_COOLDOWN_BASE } from '@blast-arena/shared';
 
 export class Player {
   public readonly id: number;
@@ -12,7 +12,6 @@ export class Player {
   public fireRange: number = DEFAULT_FIRE_RANGE;
   public speed: number = DEFAULT_SPEED;
   public hasShield: boolean = false;
-  public shieldTicksRemaining: number = 0;
   public hasKick: boolean = false;
   public hasPierceBomb: boolean = false;
   public hasRemoteBomb: boolean = false;
@@ -56,8 +55,9 @@ export class Player {
         this.speed = Math.min(this.speed + 1, MAX_SPEED);
         break;
       case 'shield':
-        this.hasShield = true;
-        this.shieldTicksRemaining = SHIELD_DURATION_TICKS;
+        if (!this.hasShield) {
+          this.hasShield = true;
+        }
         break;
       case 'kick':
         this.hasKick = true;
@@ -100,7 +100,6 @@ export class Player {
     this.fireRange = DEFAULT_FIRE_RANGE;
     this.speed = DEFAULT_SPEED;
     this.hasShield = false;
-    this.shieldTicksRemaining = 0;
     this.hasKick = false;
     this.hasPierceBomb = false;
     this.hasRemoteBomb = false;
@@ -117,12 +116,6 @@ export class Player {
     }
     if (this.moveCooldown > 0) {
       this.moveCooldown--;
-    }
-    if (this.hasShield) {
-      this.shieldTicksRemaining--;
-      if (this.shieldTicksRemaining <= 0) {
-        this.hasShield = false;
-      }
     }
   }
 

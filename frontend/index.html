@@ -443,38 +443,14 @@
       transition: opacity 0.3s;
     }
 
-    /* Settings Button & Panel */
-    .hud-settings-btn {
+    /* Stats Bar (bottom-left) */
+    .hud-stats-bar {
       position: absolute;
       bottom: 12px;
-      right: 12px;
-      width: 36px;
-      height: 36px;
-      font-size: 22px;
-      line-height: 36px;
-      text-align: center;
-      background: rgba(0, 0, 0, 0.5);
-      border-radius: 8px;
-      cursor: pointer;
-      pointer-events: auto;
-      transition: background 0.2s;
-      user-select: none;
-    }
-
-    .hud-settings-btn:hover {
-      background: rgba(233, 69, 96, 0.4);
-    }
-
-    .hud-settings-panel {
-      position: absolute;
-      bottom: 56px;
-      right: 12px;
-      background: #16213e;
-      border: 1px solid #0f3460;
-      border-radius: 8px;
-      padding: 12px 16px;
-      min-width: 180px;
-      pointer-events: auto;
+      left: 12px;
+      display: flex;
+      gap: 8px;
+      pointer-events: none;
     }
 
     .settings-title {
@@ -511,47 +487,6 @@
       color: #e94560;
       text-align: center;
       pointer-events: none;
-    }
-
-    /* Help Button & Panel */
-    .hud-help-btn {
-      position: absolute;
-      bottom: 12px;
-      right: 56px;
-      width: 36px;
-      height: 36px;
-      font-size: 20px;
-      font-weight: bold;
-      line-height: 36px;
-      text-align: center;
-      background: rgba(0, 0, 0, 0.5);
-      border-radius: 8px;
-      cursor: pointer;
-      pointer-events: auto;
-      transition: background 0.2s;
-      user-select: none;
-      color: #e0e0e0;
-    }
-
-    .hud-help-btn:hover {
-      background: rgba(233, 69, 96, 0.4);
-    }
-
-    .hud-help-panel {
-      position: absolute;
-      bottom: 56px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #16213e;
-      border: 1px solid #0f3460;
-      border-radius: 10px;
-      padding: 16px 22px;
-      max-width: 420px;
-      width: 90%;
-      max-height: 70vh;
-      overflow-y: auto;
-      pointer-events: auto;
-      z-index: 200;
     }
 
     .help-close {

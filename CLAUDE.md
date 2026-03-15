@@ -46,8 +46,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
   - `Settings.ts` — per-user visual settings (animations, screen shake, particles) stored in localStorage
 - **Procedural textures**: All sprites generated in `BootScene.generateTextures()` — no external image assets. Player textures include 4 directional variants with eyes per color.
 - **Particle textures**: `particle_fire`, `particle_smoke`, `particle_spark`, `particle_debris`, `particle_star`, `particle_shield` generated in BootScene
-- **HUD**: DOM-based overlay in HUDScene.ts with timer, player list, kill feed, stats bar, spectator banner, and settings gear
-- Settings gear button in HUD opens a panel to toggle animations/screen shake/particles per user
+- **HUD**: DOM-based overlay in HUDScene.ts with timer, player list, kill feed, stats bar (bottom-left), spectator banner
+- Settings and Help are in the lobby header (LobbyUI), not in-game HUD, to avoid overlapping player names
 
 ## Game Architecture
 - 20 tick/sec server game loop (GameLoop.ts -> GameState.ts)
@@ -69,6 +69,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - Play Again: room:restart socket event resets room to 'waiting' so all players can rematch; other players auto-navigate via room:state listener
 - Phaser scene lifecycle: shutdown() must be registered via `this.events.once('shutdown', this.shutdown, this)` — Phaser does NOT auto-call shutdown() methods. Scenes also defensively clean up stale state at the top of create() in case shutdown wasn't called.
 - `tickEvents` buffer on GameStateManager accumulates per-tick events (explosions, deaths, power-up pickups) for fine-grained socket emission in GameRoom
+- Chain reaction tile snapshot: before processing detonations, tiles are snapshotted so chained bombs calculate blast cells against original wall layout (prevents blasts going through walls destroyed by earlier bombs in the same tick)
+- Shield has no time limit — lasts until consumed by an explosion. Extra shield pickups are consumed but don't stack.
 
 ## Game Modes
 - **Free for All (FFA)**: 2-8 players, last player standing wins, 3 min

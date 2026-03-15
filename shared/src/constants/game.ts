@@ -24,7 +24,6 @@ export const MOVE_COOLDOWN_BASE = 5;
 // Timings (in ticks at 20 tps)
 export const BOMB_TIMER_TICKS = 60; // 3 seconds
 export const EXPLOSION_DURATION_TICKS = 10; // 0.5 seconds
-export const SHIELD_DURATION_TICKS = 200; // 10 seconds
 export const COUNTDOWN_SECONDS = 3;
 export const INVULNERABILITY_TICKS = 40; // 2 seconds after spawn
 

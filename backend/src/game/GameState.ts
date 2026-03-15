@@ -206,8 +206,10 @@ export class GameStateManager {
     }
 
     // 3. Process detonations (including chain reactions)
+    // Snapshot tiles before detonations so chain reactions use original wall layout
+    const tileSnapshot = this.map.tiles.map(row => [...row]);
     for (const bomb of bombsToDetonate) {
-      this.detonateBomb(bomb);
+      this.detonateBomb(bomb, tileSnapshot);
     }
 
     // 4. Update explosion timers
@@ -235,7 +237,6 @@ export class GameStateManager {
 
           if (player.hasShield) {
             player.hasShield = false;
-            player.shieldTicksRemaining = 0;
           } else {
             player.die();
             this.placementCounter--;
@@ -464,8 +465,9 @@ export class GameStateManager {
           remoteBombs.push(bomb);
         }
       }
+      const tileSnapshot = this.map.tiles.map(row => [...row]);
       for (const bomb of remoteBombs) {
-        this.detonateBomb(bomb);
+        this.detonateBomb(bomb, tileSnapshot);
       }
     }
 
@@ -536,7 +538,7 @@ export class GameStateManager {
     }
   }
 
-  private detonateBomb(bomb: Bomb): void {
+  private detonateBomb(bomb: Bomb, tileSnapshot?: TileType[][]): void {
     this.bombs.delete(bomb.id);
 
     // Return bomb count to player
@@ -547,9 +549,10 @@ export class GameStateManager {
     this.gameLogger?.logBomb('detonate', bomb.ownerId, owner?.displayName || '?', bomb.position, bomb.fireRange);
 
     // Calculate explosion cells (pass pierce flag)
+    // Use tile snapshot if provided to prevent chain reactions blasting through already-destroyed walls
     const cells = getExplosionCells(
       bomb.position.x, bomb.position.y, bomb.fireRange,
-      this.map.width, this.map.height, this.map.tiles,
+      this.map.width, this.map.height, tileSnapshot || this.map.tiles,
       bomb.isPierce
     );
 
@@ -577,7 +580,7 @@ export class GameStateManager {
       }
     }
     for (const chainBomb of chainingBombs) {
-      this.detonateBomb(chainBomb);
+      this.detonateBomb(chainBomb, tileSnapshot);
     }
   }
 
