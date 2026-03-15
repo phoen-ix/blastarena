@@ -147,6 +147,42 @@ export class BotAI {
       this.reactionDelayRemaining = this.config.reactionDelay;
     }
 
+    // === PRIORITY 2.5: Detonate remote bombs if enemy is in their blast zone ===
+    if (player.hasRemoteBomb) {
+      const ownRemoteBombs = Array.from(state.bombs.values())
+        .filter(b => b.ownerId === player.id && b.bombType === 'remote');
+      if (ownRemoteBombs.length > 0) {
+        // Check if any enemy is in the blast zone of any of our remote bombs
+        let enemyInBlast = false;
+        for (const bomb of ownRemoteBombs) {
+          for (const { dx, dy } of Object.values(DIR_DELTA)) {
+            for (let i = 0; i <= bomb.fireRange; i++) {
+              const cx = bomb.position.x + dx * i;
+              const cy = bomb.position.y + dy * i;
+              const tile = state.collisionSystem.getTileAt(cx, cy);
+              if (tile === 'wall') break;
+              if (isDestructibleTile(tile) && i > 0) break;
+              for (const other of state.players.values()) {
+                if (other.id !== player.id && other.alive &&
+                    other.position.x === cx && other.position.y === cy) {
+                  enemyInBlast = true;
+                }
+              }
+              if (enemyInBlast) break;
+            }
+            if (enemyInBlast) break;
+          }
+          if (enemyInBlast) break;
+        }
+        // Also detonate if we've placed max bombs and need to free up slots
+        const shouldDetonate = enemyInBlast || ownRemoteBombs.length >= player.maxBombs;
+        if (shouldDetonate) {
+          logDecision('detonate_remote', { count: ownRemoteBombs.length });
+          return { seq: this.seq, direction: null, action: 'detonate', tick: state.tick };
+        }
+      }
+    }
+
     // === PRIORITY 3: Bomb placement (check even when can't move) ===
     if (this.bombCooldown <= 0 && player.canPlaceBomb()) {
       const canEscape = !this.config.escapeCheckBeforeBomb ||

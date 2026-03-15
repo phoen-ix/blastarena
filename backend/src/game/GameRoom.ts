@@ -201,6 +201,7 @@ export class GameRoom {
       winnerId: state.winnerId,
       winnerTeam: state.winnerTeam,
       placements,
+      reason: this.gameState.finishReason || '',
     });
 
     // Save match results

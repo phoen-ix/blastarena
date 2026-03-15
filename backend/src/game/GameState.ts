@@ -51,6 +51,7 @@ export class GameStateManager {
   private botDifficulty: 'easy' | 'normal' | 'hard';
   private botAIs: Map<number, BotAI> = new Map();
   private finishTick: number | null = null;
+  public finishReason: string = '';
   public gameLogger: GameLogger | null = null;
   public reinforcedWalls: boolean;
   public enableMapEvents: boolean;
@@ -237,6 +238,9 @@ export class GameStateManager {
 
           if (player.hasShield) {
             player.hasShield = false;
+            // Brief invulnerability so the same multi-tick explosion
+            // doesn't kill the now-unshielded player next tick
+            player.invulnerableTicks = 10;
           } else {
             player.die();
             this.placementCounter--;
@@ -295,6 +299,7 @@ export class GameStateManager {
           this.winnerId = controllerId;
           playersInZone[0].placement = 1;
           this.finishTick = this.tick;
+          this.finishReason = `${playersInZone[0].displayName} controls the hill!`;
         }
       }
     }
@@ -411,6 +416,7 @@ export class GameStateManager {
           alive[0].placement = 1;
         }
         this.finishTick = this.tick;
+        this.finishReason = 'Time\'s up!';
       }
     }
 
@@ -598,6 +604,7 @@ export class GameStateManager {
           this.winnerId = player.id;
           player.placement = 1;
           this.finishTick = this.tick;
+          this.finishReason = `${player.displayName} reached ${DEATHMATCH_KILL_TARGET} kills!`;
           return;
         }
       }
@@ -610,8 +617,10 @@ export class GameStateManager {
       if (aliveTeams.size <= 1 && alivePlayers.length > 0) {
         this.finishTick = this.tick;
         this.winnerTeam = alivePlayers[0].team;
+        this.finishReason = `Team ${alivePlayers[0].team} wins!`;
       } else if (alivePlayers.length === 0) {
         this.finishTick = this.tick;
+        this.finishReason = 'Draw — no survivors!';
       }
     } else {
       if (alivePlayers.length <= 1) {
@@ -619,6 +628,9 @@ export class GameStateManager {
         if (alivePlayers.length === 1) {
           this.winnerId = alivePlayers[0].id;
           alivePlayers[0].placement = 1;
+          this.finishReason = `${alivePlayers[0].displayName} is the last survivor!`;
+        } else {
+          this.finishReason = 'Draw — no survivors!';
         }
       }
     }

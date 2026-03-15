@@ -36,11 +36,19 @@ export class GameOverScene extends Phaser.Scene {
 
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.85);
 
-    this.add.text(width / 2, 50, 'GAME OVER', {
+    this.add.text(width / 2, 45, 'GAME OVER', {
       fontSize: '42px',
       color: '#e94560',
       fontStyle: 'bold',
     }).setOrigin(0.5);
+
+    // Show reason text beneath game over
+    if (data?.reason) {
+      this.add.text(width / 2, 85, data.reason, {
+        fontSize: '16px',
+        color: '#a0a0b0',
+      }).setOrigin(0.5);
+    }
 
     // Play Again button
     const playAgainBtn = this.add.text(width / 2 - 100, height - 40, '[ Play Again ]', {
