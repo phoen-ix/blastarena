@@ -1,5 +1,6 @@
 import { SocketClient } from '../network/SocketClient';
 import { PublicUser } from '@blast-arena/shared';
+import { escapeHtml } from '../utils/html';
 
 export class ChatUI {
   private container: HTMLElement;
@@ -53,9 +54,12 @@ export class ChatUI {
   }
 
   private setupListener(): void {
-    this.socketClient.on('chat:message', (data: { user: PublicUser; message: string; timestamp: number }) => {
-      this.addMessage(data.user.username, data.message);
-    });
+    this.socketClient.on(
+      'chat:message',
+      (data: { user: PublicUser; message: string; timestamp: number }) => {
+        this.addMessage(data.user.username, data.message);
+      },
+    );
   }
 
   addMessage(username: string, message: string): void {
@@ -63,7 +67,7 @@ export class ChatUI {
 
     const el = document.createElement('div');
     el.className = 'chat-message';
-    el.innerHTML = `<span class="chat-user">${this.escapeHtml(username)}</span>: ${this.escapeHtml(message)}`;
+    el.innerHTML = `<span class="chat-user">${escapeHtml(username)}</span>: ${escapeHtml(message)}`;
     this.messages.appendChild(el);
     this.messages.scrollTop = this.messages.scrollHeight;
 
@@ -71,11 +75,5 @@ export class ChatUI {
     while (this.messages.children.length > 100) {
       this.messages.removeChild(this.messages.firstChild!);
     }
-  }
-
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
   }
 }

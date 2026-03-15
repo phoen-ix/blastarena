@@ -5,6 +5,7 @@ import { NotificationUI } from '../ui/NotificationUI';
 import { LobbyUI } from '../ui/LobbyUI';
 import { RoomUI } from '../ui/RoomUI';
 import { Room } from '@blast-arena/shared';
+import { escapeHtml } from '../utils/html';
 
 export class LobbyScene extends Phaser.Scene {
   private authManager!: AuthManager;
@@ -67,7 +68,7 @@ export class LobbyScene extends Phaser.Scene {
         if (data.message) {
           area.innerHTML = `
             <div class="admin-banner">
-              <span>${this.escapeHtml(data.message)}</span>
+              <span>${escapeHtml(data.message)}</span>
               <button class="banner-close" onclick="this.parentElement.remove()">&times;</button>
             </div>
           `;
@@ -100,7 +101,7 @@ export class LobbyScene extends Phaser.Scene {
       this.socketClient,
       this.authManager,
       this.notifications,
-      (room: Room) => this.onJoinRoom(room)
+      (room: Room) => this.onJoinRoom(room),
     );
     this.lobbyUI.show();
   }
@@ -112,12 +113,8 @@ export class LobbyScene extends Phaser.Scene {
     this.registry.set('currentRoom', room);
 
     // Show room waiting UI
-    this.roomUI = new RoomUI(
-      this.socketClient,
-      this.authManager,
-      this.notifications,
-      room,
-      () => this.showLobby()
+    this.roomUI = new RoomUI(this.socketClient, this.authManager, this.notifications, room, () =>
+      this.showLobby(),
     );
     this.roomUI.show();
 
@@ -149,12 +146,6 @@ export class LobbyScene extends Phaser.Scene {
       this.scene.launch('HUDScene');
     };
     this.socketClient.on('game:start' as any, this.gameStartHandler as any);
-  }
-
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
   }
 
   shutdown(): void {

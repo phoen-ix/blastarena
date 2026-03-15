@@ -2,12 +2,41 @@
   "name": "blast-arena",
   "version": "1.0.0",
   "private": true,
-  "workspaces": ["shared", "backend", "frontend"],
+  "workspaces": [
+    "shared",
+    "backend",
+    "frontend"
+  ],
   "scripts": {
     "dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
     "prod": "docker compose up --build -d",
     "down": "docker compose down",
     "test": "npm run test --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "eslint shared/src backend/src frontend/src",
+    "lint:fix": "eslint --fix shared/src backend/src frontend/src",
+    "format": "prettier --write \"**/*.ts\"",
+    "format:check": "prettier --check \"**/*.ts\"",
+    "prepare": "husky || true"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.0",
+    "@typescript-eslint/parser": "^8.57.0",
+    "eslint": "^10.0.3",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "husky": "^9.1.7",
+    "jest": "^30.3.0",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.1",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
+    "typescript-eslint": "^8.57.0"
   }
 }

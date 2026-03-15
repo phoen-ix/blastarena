@@ -6,6 +6,7 @@ import { logger } from './utils/logger';
 import * as lobbyService from './services/lobby';
 import { RoomManager } from './game/RoomManager';
 import { setRegistry } from './game/registry';
+import { createRateLimiters } from './utils/socketRateLimit';
 import {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -15,8 +16,25 @@ import {
   PublicUser,
 } from '@blast-arena/shared';
 
-export function createSocketServer(httpServer: HttpServer): Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData> {
-  const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(httpServer, {
+type TypedServer = Server<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>;
+
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+export function createSocketServer(httpServer: HttpServer): TypedServer {
+  const io: TypedServer = new Server<
+    ClientToServerEvents,
+    ServerToClientEvents,
+    InterServerEvents,
+    SocketData
+  >(httpServer, {
     cors: {
       origin: true,
       credentials: true,
@@ -25,8 +43,9 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
     pingTimeout: 60000,
   });
 
-  const roomManager = new RoomManager(io as any);
-  setRegistry(roomManager, io as any);
+  const roomManager = new RoomManager(io);
+  setRegistry(roomManager, io);
+  const { inputLimiter, createLimiter, joinLimiter } = createRateLimiters();
 
   // Auth middleware
   io.use((socket, next) => {
@@ -61,31 +80,35 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
     const currentUser: PublicUser = {
       id: socket.data.userId,
       username: socket.data.username,
-      role: socket.data.role as any,
+      role: socket.data.role,
     };
 
     // Room creation
     socket.on('room:create', async (data, callback) => {
+      if (!createLimiter(socket.id)) return;
       try {
         const room = await lobbyService.createRoom(currentUser, data.name, data.config);
         socket.join(`room:${room.code}`);
         callback({ success: true, room });
         broadcastRoomList();
-      } catch (err: any) {
-        callback({ success: false, error: err.message });
+      } catch (err: unknown) {
+        callback({ success: false, error: getErrorMessage(err) });
       }
     });
 
     // Join room
     socket.on('room:join', async (data, callback) => {
+      if (!joinLimiter(socket.id)) return;
       try {
         const room = await lobbyService.joinRoom(data.code, currentUser);
         socket.join(`room:${room.code}`);
-        socket.to(`room:${room.code}`).emit('room:playerJoined', { user: currentUser, ready: false, team: null });
+        socket
+          .to(`room:${room.code}`)
+          .emit('room:playerJoined', { user: currentUser, ready: false, team: null });
         callback({ success: true, room });
         broadcastRoomList();
-      } catch (err: any) {
-        callback({ success: false, error: err.message });
+      } catch (err: unknown) {
+        callback({ success: false, error: getErrorMessage(err) });
       }
     });
 
@@ -116,9 +139,12 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
 
       try {
         await lobbyService.setPlayerReady(roomCode, socket.data.userId, data.ready);
-        io.to(`room:${roomCode}`).emit('room:playerReady', { userId: socket.data.userId, ready: data.ready });
-      } catch (err: any) {
-        socket.emit('error', { message: err.message });
+        io.to(`room:${roomCode}`).emit('room:playerReady', {
+          userId: socket.data.userId,
+          ready: data.ready,
+        });
+      } catch (err: unknown) {
+        socket.emit('error', { message: getErrorMessage(err) });
       }
     });
 
@@ -137,7 +163,7 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
       }
 
       // Check all players ready
-      const allReady = room.players.every(p => p.user.id === room.host.id || p.ready);
+      const allReady = room.players.every((p) => p.user.id === room.host.id || p.ready);
       if (!allReady) {
         socket.emit('error', { message: 'Not all players are ready' });
         return;
@@ -157,7 +183,7 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
 
       try {
         await lobbyService.updateRoomStatus(roomCode, 'countdown');
-        const gameRoom = await roomManager.createGame(room);
+        await roomManager.createGame(room);
         logger.info({ roomCode, players: room.players.length }, 'Game started');
         broadcastRoomList();
       } catch (err) {
@@ -191,7 +217,7 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
 
       // Reset room state
       room.status = 'waiting';
-      room.players.forEach(p => p.ready = false);
+      room.players.forEach((p) => (p.ready = false));
       await lobbyService.updateRoom(roomCode, room);
 
       // Notify all players in the room
@@ -202,7 +228,7 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
     });
 
     // Set player team (host only, teams mode)
-    socket.on('room:setTeam' as any, async (data: { userId: number; team: number | null }) => {
+    socket.on('room:setTeam', async (data) => {
       const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
       if (!roomCode) return;
 
@@ -218,13 +244,13 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
       try {
         const updatedRoom = await lobbyService.setPlayerTeam(roomCode, data.userId, data.team);
         io.to(`room:${roomCode}`).emit('room:state', updatedRoom);
-      } catch (err: any) {
-        socket.emit('error', { message: err.message });
+      } catch (err: unknown) {
+        socket.emit('error', { message: getErrorMessage(err) });
       }
     });
 
     // Set bot team (host only, teams mode)
-    socket.on('room:setBotTeam' as any, async (data: { botIndex: number; team: number }) => {
+    socket.on('room:setBotTeam', async (data) => {
       const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
       if (!roomCode) return;
 
@@ -255,6 +281,8 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
 
     // Game input
     socket.on('game:input', async (input) => {
+      if (!inputLimiter(socket.id)) return;
+
       const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
       if (!roomCode) return;
 
@@ -265,7 +293,7 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
     });
 
     // Admin: kick player from room
-    socket.on('admin:kick' as any, async (data: { roomCode: string; userId: number; reason?: string }, callback: any) => {
+    socket.on('admin:kick', async (data, callback) => {
       if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') {
         return callback({ success: false, error: 'Insufficient permissions' });
       }
@@ -281,7 +309,7 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
       const sockets = await io.in(`room:${data.roomCode}`).fetchSockets();
       for (const s of sockets) {
         if (s.data.userId === data.userId) {
-          (s as any).emit('admin:kicked', { reason: data.reason || 'Kicked by admin' });
+          s.emit('admin:kicked', { reason: data.reason || 'Kicked by admin' });
           s.leave(`room:${data.roomCode}`);
         }
       }
@@ -292,18 +320,21 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
       }
       broadcastRoomList();
 
-      logger.info({ admin: socket.data.username, targetUserId: data.userId, roomCode: data.roomCode }, 'Admin kicked player');
+      logger.info(
+        { admin: socket.data.username, targetUserId: data.userId, roomCode: data.roomCode },
+        'Admin kicked player',
+      );
       callback({ success: true });
     });
 
     // Admin: force close room
-    socket.on('admin:closeRoom' as any, async (data: { roomCode: string }, callback: any) => {
+    socket.on('admin:closeRoom', async (data, callback) => {
       if (socket.data.role !== 'admin') {
         return callback({ success: false, error: 'Admin access required' });
       }
 
       // Notify all players in the room
-      io.to(`room:${data.roomCode}`).emit('admin:kicked' as any, { reason: 'Room closed by admin' });
+      io.to(`room:${data.roomCode}`).emit('admin:kicked', { reason: 'Room closed by admin' });
 
       // Remove all sockets from the room
       const sockets = await io.in(`room:${data.roomCode}`).fetchSockets();
@@ -321,7 +352,7 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
     });
 
     // Admin: spectate room
-    socket.on('admin:spectate' as any, async (data: { roomCode: string }, callback: any) => {
+    socket.on('admin:spectate', async (data, callback) => {
       if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') {
         return callback({ success: false, error: 'Insufficient permissions' });
       }
@@ -332,20 +363,26 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
       }
 
       socket.join(`room:${data.roomCode}`);
-      logger.info({ admin: socket.data.username, roomCode: data.roomCode }, 'Admin spectating room');
+      logger.info(
+        { admin: socket.data.username, roomCode: data.roomCode },
+        'Admin spectating room',
+      );
       callback({ success: true });
     });
 
     // Admin: send message to room
-    socket.on('admin:roomMessage' as any, (data: { roomCode: string; message: string }) => {
+    socket.on('admin:roomMessage', (data) => {
       if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') return;
 
-      io.to(`room:${data.roomCode}`).emit('admin:roomMessage' as any, {
+      io.to(`room:${data.roomCode}`).emit('admin:roomMessage', {
         message: data.message,
         from: socket.data.username,
       });
 
-      logger.info({ admin: socket.data.username, roomCode: data.roomCode }, 'Admin sent room message');
+      logger.info(
+        { admin: socket.data.username, roomCode: data.roomCode },
+        'Admin sent room message',
+      );
     });
 
     // Disconnect

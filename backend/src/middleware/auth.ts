@@ -3,11 +3,9 @@ import jwt from 'jsonwebtoken';
 import { getConfig } from '../config';
 import { AuthPayload } from '@blast-arena/shared';
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthPayload;
-    }
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: AuthPayload;
   }
 }
 

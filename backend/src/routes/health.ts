@@ -18,7 +18,7 @@ router.get('/health', async (_req, res) => {
     await redis.ping();
 
     res.json({ status: 'ok', buildId: BUILD_ID, timestamp: new Date().toISOString() });
-  } catch (err) {
+  } catch (_err) {
     res.status(503).json({ status: 'error', message: 'Service unavailable' });
   }
 });

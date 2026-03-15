@@ -1,6 +1,7 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
-import { UserRole } from '@blast-arena/shared';
+import { UserRole, getErrorMessage } from '@blast-arena/shared';
+import { escapeHtml, escapeAttr } from '../../utils/html';
 
 export class UsersTab {
   private container: HTMLElement | null = null;
@@ -36,7 +37,7 @@ export class UsersTab {
     this.container.innerHTML = `
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">
         <div class="admin-search" style="flex:1;margin-bottom:0;">
-          <input type="text" placeholder="Search by username or email..." id="admin-user-search" value="${this.escapeHtml(this.search)}">
+          <input type="text" placeholder="Search by username or email..." id="admin-user-search" value="${escapeHtml(this.search)}">
         </div>
         ${isAdmin ? '<button class="btn btn-primary" id="admin-create-user" style="flex-shrink:0;white-space:nowrap;">Create User</button>' : ''}
       </div>
@@ -90,10 +91,12 @@ export class UsersTab {
             </tr>
           </thead>
           <tbody>
-            ${result.users.map((u: any) => `
+            ${result.users
+              .map(
+                (u: any) => `
               <tr>
-                <td>${this.escapeHtml(u.username)}</td>
-                <td>${this.escapeHtml(u.email)}</td>
+                <td>${escapeHtml(u.username)}</td>
+                <td>${escapeHtml(u.email)}</td>
                 <td><span class="badge badge-${u.role}">${u.role}</span></td>
                 <td>${this.statusBadge(u)}</td>
                 <td>${u.total_matches}</td>
@@ -101,7 +104,9 @@ export class UsersTab {
                 <td>${new Date(u.created_at).toLocaleDateString()}</td>
                 <td>${u.last_login ? new Date(u.last_login).toLocaleDateString() : 'Never'}</td>
                 <td style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
-                  ${isAdmin ? `
+                  ${
+                    isAdmin
+                      ? `
                     <select class="admin-select" data-action="role" data-id="${u.id}">
                       <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
                       <option value="moderator" ${u.role === 'moderator' ? 'selected' : ''}>moderator</option>
@@ -110,11 +115,15 @@ export class UsersTab {
                     <button class="btn-warn btn-sm" data-action="deactivate" data-id="${u.id}" data-deactivated="${u.is_deactivated}">
                       ${u.is_deactivated ? 'Reactivate' : 'Deactivate'}
                     </button>
-                    <button class="btn-danger btn-sm" data-action="delete" data-id="${u.id}" data-username="${this.escapeAttr(u.username)}">Delete</button>
-                  ` : ''}
+                    <button class="btn-danger btn-sm" data-action="delete" data-id="${u.id}" data-username="${escapeAttr(u.username)}">Delete</button>
+                  `
+                      : ''
+                  }
                 </td>
               </tr>
-            `).join('')}
+            `,
+              )
+              .join('')}
           </tbody>
         </table>
       `;
@@ -132,7 +141,6 @@ export class UsersTab {
       // Event delegation
       this.container!.addEventListener('click', this.handleClick);
       this.container!.addEventListener('change', this.handleChange);
-
     } catch {
       tableEl.innerHTML = '<div style="color:var(--danger);">Failed to load users</div>';
     }
@@ -152,7 +160,8 @@ export class UsersTab {
     if (!action || !id) return;
 
     if (action === 'deactivate') {
-      const isDeactivated = target.dataset.deactivated === '1' || target.dataset.deactivated === 'true';
+      const isDeactivated =
+        target.dataset.deactivated === '1' || target.dataset.deactivated === 'true';
       await this.doDeactivate(parseInt(id), !isDeactivated);
     } else if (action === 'delete') {
       this.showDeleteModal(parseInt(id), target.dataset.username || '');
@@ -172,9 +181,9 @@ export class UsersTab {
     modal.innerHTML = `
       <div class="modal" style="max-width:420px;">
         <h2 style="margin-bottom:12px;color:var(--danger);">Delete User Permanently</h2>
-        <p style="color:var(--text-dim);font-size:14px;">This will permanently delete <strong style="color:var(--text);">${this.escapeHtml(username)}</strong> and all their data. This action cannot be undone.</p>
+        <p style="color:var(--text-dim);font-size:14px;">This will permanently delete <strong style="color:var(--text);">${escapeHtml(username)}</strong> and all their data. This action cannot be undone.</p>
         <p style="color:var(--text-dim);font-size:13px;margin-top:8px;">Type the username to confirm:</p>
-        <input type="text" class="confirm-input" id="delete-confirm-input" placeholder="${this.escapeAttr(username)}">
+        <input type="text" class="confirm-input" id="delete-confirm-input" placeholder="${escapeAttr(username)}">
         <div class="modal-actions" style="margin-top:16px;">
           <button class="btn btn-secondary" id="delete-cancel">Cancel</button>
           <button class="btn-danger" style="padding:8px 16px;font-size:14px;opacity:0.5;" id="delete-confirm" disabled>Delete</button>
@@ -193,7 +202,9 @@ export class UsersTab {
     });
 
     modal.querySelector('#delete-cancel')!.addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
     confirmBtn.addEventListener('click', async () => {
       modal.remove();
       await this.doDelete(userId);
@@ -238,7 +249,9 @@ export class UsersTab {
     document.getElementById('ui-overlay')!.appendChild(modal);
 
     modal.querySelector('#cu-cancel')!.addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
     modal.querySelector('#cu-submit')!.addEventListener('click', async () => {
       const username = (modal.querySelector('#cu-username') as HTMLInputElement).value.trim();
       const email = (modal.querySelector('#cu-email') as HTMLInputElement).value.trim();
@@ -259,14 +272,16 @@ export class UsersTab {
 
       try {
         await ApiClient.post('/admin/users', {
-          username, email, password,
+          username,
+          email,
+          password,
           role,
         });
         modal.remove();
         this.notifications.success(`User "${username}" created`);
         await this.loadUsers();
-      } catch (err: any) {
-        errorEl.textContent = err.message;
+      } catch (err: unknown) {
+        errorEl.textContent = getErrorMessage(err);
         errorEl.style.display = 'block';
       }
     });
@@ -277,8 +292,8 @@ export class UsersTab {
       await ApiClient.put(`/admin/users/${userId}/role`, { role });
       this.notifications.success(`Role changed to ${role}`);
       await this.loadUsers();
-    } catch (err: any) {
-      this.notifications.error(err.message);
+    } catch (err: unknown) {
+      this.notifications.error(getErrorMessage(err));
     }
   }
 
@@ -287,8 +302,8 @@ export class UsersTab {
       await ApiClient.put(`/admin/users/${userId}/deactivate`, { deactivated });
       this.notifications.success(deactivated ? 'User deactivated' : 'User reactivated');
       await this.loadUsers();
-    } catch (err: any) {
-      this.notifications.error(err.message);
+    } catch (err: unknown) {
+      this.notifications.error(getErrorMessage(err));
     }
   }
 
@@ -297,23 +312,13 @@ export class UsersTab {
       await ApiClient.delete(`/admin/users/${userId}`);
       this.notifications.success('User deleted permanently');
       await this.loadUsers();
-    } catch (err: any) {
-      this.notifications.error(err.message);
+    } catch (err: unknown) {
+      this.notifications.error(getErrorMessage(err));
     }
   }
 
   private statusBadge(u: any): string {
     if (u.is_deactivated) return '<span class="badge badge-deactivated">Deactivated</span>';
     return '<span class="badge badge-active">Active</span>';
-  }
-
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  private escapeAttr(text: string): string {
-    return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 }

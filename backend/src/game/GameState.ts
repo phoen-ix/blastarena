@@ -1,7 +1,19 @@
-import { GameState as GameStateType, TileType, Direction, PlayerInput, Position, PowerUpType, HillZone, MapEvent } from '@blast-arena/shared';
+import {
+  GameState as GameStateType,
+  TileType,
+  PlayerInput,
+  Position,
+  PowerUpType,
+} from '@blast-arena/shared';
 import { getExplosionCells } from '@blast-arena/shared';
 import { DEFAULT_WALL_DENSITY, DEFAULT_POWERUP_DROP_RATE, TICK_RATE } from '@blast-arena/shared';
-import { DEATHMATCH_RESPAWN_TICKS, DEATHMATCH_KILL_TARGET, KOTH_ZONE_SIZE, KOTH_SCORE_TARGET, KOTH_POINTS_PER_TICK } from '@blast-arena/shared';
+import {
+  DEATHMATCH_RESPAWN_TICKS,
+  DEATHMATCH_KILL_TARGET,
+  KOTH_ZONE_SIZE,
+  KOTH_SCORE_TARGET,
+  KOTH_POINTS_PER_TICK,
+} from '@blast-arena/shared';
 import { Player } from './Player';
 import { Bomb, BombType } from './Bomb';
 import { Explosion } from './Explosion';
@@ -16,11 +28,29 @@ import { GameLogger } from '../utils/gameLogger';
 // Simple seeded random for power-up drops
 class SeededRandom {
   private seed: number;
-  constructor(seed: number) { this.seed = seed; }
+  constructor(seed: number) {
+    this.seed = seed;
+  }
   next(): number {
     this.seed = (this.seed * 1664525 + 1013904223) & 0xffffffff;
     return (this.seed >>> 0) / 0xffffffff;
   }
+}
+
+export interface GameConfig {
+  mapWidth: number;
+  mapHeight: number;
+  mapSeed?: number;
+  gameMode?: string;
+  hasZone?: boolean;
+  roundTime?: number;
+  wallDensity?: number;
+  enabledPowerUps?: PowerUpType[];
+  powerUpDropRate?: number;
+  friendlyFire?: boolean;
+  botDifficulty?: 'easy' | 'normal' | 'hard';
+  reinforcedWalls?: boolean;
+  enableMapEvents?: boolean;
 }
 
 export class GameStateManager {
@@ -65,27 +95,35 @@ export class GameStateManager {
   } = { explosions: [], playerDied: [], powerupCollected: [] };
 
   // Map events (dynamic)
-  private mapEvents: { type: string; position?: Position; tick: number; warningTick?: number }[] = [];
+  private mapEvents: { type: string; position?: Position; tick: number; warningTick?: number }[] =
+    [];
   private nextMeteorTick: number = 0;
   private nextPowerupRainTick: number = 0;
 
-  constructor(
-    mapWidth: number,
-    mapHeight: number,
-    mapSeed?: number,
-    gameMode: string = 'ffa',
-    hasZone: boolean = false,
-    roundTime: number = 180,
-    wallDensity: number = DEFAULT_WALL_DENSITY,
-    enabledPowerUps?: PowerUpType[],
-    powerUpDropRate: number = DEFAULT_POWERUP_DROP_RATE,
-    friendlyFire: boolean = true,
-    botDifficulty: 'easy' | 'normal' | 'hard' = 'normal',
-    reinforcedWalls: boolean = false,
-    enableMapEvents: boolean = false
-  ) {
+  constructor(config: GameConfig) {
+    const {
+      mapWidth,
+      mapHeight,
+      mapSeed,
+      gameMode = 'ffa',
+      hasZone = false,
+      roundTime = 180,
+      wallDensity = DEFAULT_WALL_DENSITY,
+      enabledPowerUps,
+      powerUpDropRate = DEFAULT_POWERUP_DROP_RATE,
+      friendlyFire = true,
+      botDifficulty = 'normal',
+      reinforcedWalls = false,
+      enableMapEvents = false,
+    } = config;
+
     this.map = generateMap(mapWidth, mapHeight, mapSeed, wallDensity);
-    this.collisionSystem = new CollisionSystem(this.map.tiles, this.map.width, this.map.height, reinforcedWalls);
+    this.collisionSystem = new CollisionSystem(
+      this.map.tiles,
+      this.map.width,
+      this.map.height,
+      reinforcedWalls,
+    );
     this.rng = new SeededRandom(this.map.seed + 1);
     this.gameMode = gameMode;
     this.roundTime = roundTime;
@@ -108,7 +146,12 @@ export class GameStateManager {
     }
   }
 
-  addPlayer(id: number, username: string, team: number | null = null, isBot: boolean = false): Player {
+  addPlayer(
+    id: number,
+    username: string,
+    team: number | null = null,
+    isBot: boolean = false,
+  ): Player {
     const spawnIndex = this.players.size % this.map.spawnPoints.length;
     const spawnPos = this.map.spawnPoints[spawnIndex];
     const player = new Player(id, username, spawnPos, team, isBot);
@@ -190,9 +233,23 @@ export class GameStateManager {
         const nextY = bomb.position.y + dy;
 
         // Stop if hitting a wall, another bomb, or a player
-        const blocked = !this.collisionSystem.isWalkable(nextX, nextY)
-          || Array.from(this.bombs.values()).some(b => b.id !== bomb.id && b.position.x === nextX && b.position.y === nextY)
-          || Array.from(this.players.values()).some(p => p.alive && p.position.x === nextX && p.position.y === nextY);
+        let blocked = !this.collisionSystem.isWalkable(nextX, nextY);
+        if (!blocked) {
+          for (const b of this.bombs.values()) {
+            if (b.id !== bomb.id && b.position.x === nextX && b.position.y === nextY) {
+              blocked = true;
+              break;
+            }
+          }
+        }
+        if (!blocked) {
+          for (const p of this.players.values()) {
+            if (p.alive && p.position.x === nextX && p.position.y === nextY) {
+              blocked = true;
+              break;
+            }
+          }
+        }
 
         if (blocked) {
           bomb.sliding = null;
@@ -207,10 +264,12 @@ export class GameStateManager {
     }
 
     // 3. Process detonations (including chain reactions)
-    // Snapshot tiles before detonations so chain reactions use original wall layout
-    const tileSnapshot = this.map.tiles.map(row => [...row]);
-    for (const bomb of bombsToDetonate) {
-      this.detonateBomb(bomb, tileSnapshot);
+    if (bombsToDetonate.length > 0) {
+      // Snapshot tiles before detonations so chain reactions use original wall layout
+      const tileSnapshot = this.map.tiles.map((row) => [...row]);
+      for (const bomb of bombsToDetonate) {
+        this.detonateBomb(bomb, tileSnapshot);
+      }
     }
 
     // 4. Update explosion timers
@@ -231,8 +290,13 @@ export class GameStateManager {
           const owner = this.players.get(explosion.ownerId);
 
           // Friendly fire check: skip damage if FF is off and same team (but self-damage always applies)
-          if (!this.friendlyFire && owner && owner.id !== player.id &&
-              player.team !== null && owner.team === player.team) {
+          if (
+            !this.friendlyFire &&
+            owner &&
+            owner.id !== player.id &&
+            player.team !== null &&
+            owner.team === player.team
+          ) {
             continue;
           }
 
@@ -284,9 +348,12 @@ export class GameStateManager {
 
     // 6.5 King of the Hill scoring
     if (this.hillZone && this.finishTick === null) {
-      const playersInZone = this.getAlivePlayers().filter(p =>
-        p.position.x >= this.hillZone!.x && p.position.x < this.hillZone!.x + this.hillZone!.width &&
-        p.position.y >= this.hillZone!.y && p.position.y < this.hillZone!.y + this.hillZone!.height
+      const playersInZone = this.getAlivePlayers().filter(
+        (p) =>
+          p.position.x >= this.hillZone!.x &&
+          p.position.x < this.hillZone!.x + this.hillZone!.width &&
+          p.position.y >= this.hillZone!.y &&
+          p.position.y < this.hillZone!.y + this.hillZone!.height,
       );
 
       // Score only if exactly one player (or one team) controls the zone
@@ -306,8 +373,6 @@ export class GameStateManager {
 
     // 6.7 Dynamic map events
     if (this.enableMapEvents && this.finishTick === null) {
-      const currentTime = this.tick / TICK_RATE;
-
       // Meteor strike every 30-45 seconds
       if (this.tick >= this.nextMeteorTick) {
         // Find random empty tile
@@ -356,7 +421,14 @@ export class GameStateManager {
         const event = this.mapEvents[i];
         if (event.type === 'meteor' && event.position && this.tick >= event.tick) {
           // Create explosion at meteor position
-          const cells = getExplosionCells(event.position.x, event.position.y, 2, this.map.width, this.map.height, this.map.tiles);
+          const cells = getExplosionCells(
+            event.position.x,
+            event.position.y,
+            2,
+            this.map.width,
+            this.map.height,
+            this.map.tiles,
+          );
           const explosion = new Explosion(cells, -999); // System-owned
           this.explosions.set(explosion.id, explosion);
           // Destroy walls
@@ -368,7 +440,7 @@ export class GameStateManager {
       }
 
       // Clean old events
-      this.mapEvents = this.mapEvents.filter(e => this.tick - e.tick < 200);
+      this.mapEvents = this.mapEvents.filter((e) => this.tick - e.tick < 200);
     }
 
     // 7. Update Battle Royale zone
@@ -416,7 +488,7 @@ export class GameStateManager {
           alive[0].placement = 1;
         }
         this.finishTick = this.tick;
-        this.finishReason = 'Time\'s up!';
+        this.finishReason = "Time's up!";
       }
     }
 
@@ -426,13 +498,27 @@ export class GameStateManager {
     }
   }
 
+  private hasBombAt(x: number, y: number): boolean {
+    for (const b of this.bombs.values()) {
+      if (b.position.x === x && b.position.y === y) return true;
+    }
+    return false;
+  }
+
+  private hasAlivePlayerAt(x: number, y: number, excludeId?: number): boolean {
+    for (const p of this.players.values()) {
+      if (p.alive && p.position.x === x && p.position.y === y && p.id !== excludeId) return true;
+    }
+    return false;
+  }
+
   private processPlayerInput(player: Player, input: PlayerInput): void {
     // Movement (with cooldown)
     if (input.direction && player.canMove()) {
       player.direction = input.direction;
-      const bombPositions = Array.from(this.bombs.values()).map(b => b.position);
+      const bombPositions: { x: number; y: number }[] = [];
+      for (const b of this.bombs.values()) bombPositions.push(b.position);
 
-      // Collect other player positions for collision
       const otherPlayerPositions: { x: number; y: number }[] = [];
       for (const other of this.players.values()) {
         if (other.id !== player.id && other.alive) {
@@ -441,7 +527,11 @@ export class GameStateManager {
       }
 
       const newPos = this.collisionSystem.canMoveTo(
-        player.position.x, player.position.y, input.direction, bombPositions, otherPlayerPositions
+        player.position.x,
+        player.position.y,
+        input.direction,
+        bombPositions,
+        otherPlayerPositions,
       );
       if (newPos) {
         player.position = newPos;
@@ -471,18 +561,22 @@ export class GameStateManager {
           remoteBombs.push(bomb);
         }
       }
-      const tileSnapshot = this.map.tiles.map(row => [...row]);
-      for (const bomb of remoteBombs) {
-        this.detonateBomb(bomb, tileSnapshot);
+      if (remoteBombs.length > 0) {
+        const tileSnapshot = this.map.tiles.map((row) => [...row]);
+        for (const bomb of remoteBombs) {
+          this.detonateBomb(bomb, tileSnapshot);
+        }
       }
     }
 
     // Bomb placement
     if (input.action === 'bomb' && player.canPlaceBomb()) {
       // Determine bomb type
-      const bombType: BombType = player.hasRemoteBomb ? 'remote'
-        : player.hasPierceBomb ? 'pierce'
-        : 'normal';
+      const bombType: BombType = player.hasRemoteBomb
+        ? 'remote'
+        : player.hasPierceBomb
+          ? 'pierce'
+          : 'normal';
 
       if (player.hasLineBomb) {
         // Line bomb: place bombs in the player's facing direction on consecutive empty tiles
@@ -491,15 +585,19 @@ export class GameStateManager {
         const dy = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
 
         // First, place a bomb at current position if possible
-        const hasBombAtCurrent = Array.from(this.bombs.values()).some(
-          b => b.position.x === player.position.x && b.position.y === player.position.y
-        );
+        const hasBombAtCurrent = this.hasBombAt(player.position.x, player.position.y);
         if (!hasBombAtCurrent) {
           const bomb = new Bomb(player.position, player.id, player.fireRange, bombType);
           this.bombs.set(bomb.id, bomb);
           player.bombCount++;
           player.bombsPlaced++;
-          this.gameLogger?.logBomb('place', player.id, player.username, player.position, player.fireRange);
+          this.gameLogger?.logBomb(
+            'place',
+            player.id,
+            player.username,
+            player.position,
+            player.fireRange,
+          );
         }
 
         // Then place bombs in the facing direction
@@ -508,14 +606,8 @@ export class GameStateManager {
         while (player.canPlaceBomb()) {
           // Check if the tile is walkable, has no bomb, and has no player
           if (!this.collisionSystem.isWalkable(cx, cy)) break;
-          const hasBomb = Array.from(this.bombs.values()).some(
-            b => b.position.x === cx && b.position.y === cy
-          );
-          if (hasBomb) break;
-          const hasPlayer = Array.from(this.players.values()).some(
-            p => p.alive && p.position.x === cx && p.position.y === cy
-          );
-          if (hasPlayer) break;
+          if (this.hasBombAt(cx, cy)) break;
+          if (this.hasAlivePlayerAt(cx, cy)) break;
 
           const pos: Position = { x: cx, y: cy };
           const bomb = new Bomb(pos, player.id, player.fireRange, bombType);
@@ -530,15 +622,18 @@ export class GameStateManager {
       } else {
         // Normal single bomb placement
         // Check if there's already a bomb at this position
-        const hasBomb = Array.from(this.bombs.values()).some(
-          b => b.position.x === player.position.x && b.position.y === player.position.y
-        );
-        if (!hasBomb) {
+        if (!this.hasBombAt(player.position.x, player.position.y)) {
           const bomb = new Bomb(player.position, player.id, player.fireRange, bombType);
           this.bombs.set(bomb.id, bomb);
           player.bombCount++;
           player.bombsPlaced++;
-          this.gameLogger?.logBomb('place', player.id, player.username, player.position, player.fireRange);
+          this.gameLogger?.logBomb(
+            'place',
+            player.id,
+            player.username,
+            player.position,
+            player.fireRange,
+          );
         }
       }
     }
@@ -552,14 +647,24 @@ export class GameStateManager {
     if (owner) {
       owner.bombCount = Math.max(0, owner.bombCount - 1);
     }
-    this.gameLogger?.logBomb('detonate', bomb.ownerId, owner?.username || '?', bomb.position, bomb.fireRange);
+    this.gameLogger?.logBomb(
+      'detonate',
+      bomb.ownerId,
+      owner?.username || '?',
+      bomb.position,
+      bomb.fireRange,
+    );
 
     // Calculate explosion cells (pass pierce flag)
     // Use tile snapshot if provided to prevent chain reactions blasting through already-destroyed walls
     const cells = getExplosionCells(
-      bomb.position.x, bomb.position.y, bomb.fireRange,
-      this.map.width, this.map.height, tileSnapshot || this.map.tiles,
-      bomb.isPierce
+      bomb.position.x,
+      bomb.position.y,
+      bomb.fireRange,
+      this.map.width,
+      this.map.height,
+      tileSnapshot || this.map.tiles,
+      bomb.isPierce,
     );
 
     // Create explosion
@@ -581,7 +686,12 @@ export class GameStateManager {
     // Chain reaction: detonate other bombs caught in explosion
     const chainingBombs: Bomb[] = [];
     for (const otherBomb of this.bombs.values()) {
-      if (cells.some((c: { x: number; y: number }) => c.x === otherBomb.position.x && c.y === otherBomb.position.y)) {
+      if (
+        cells.some(
+          (c: { x: number; y: number }) =>
+            c.x === otherBomb.position.x && c.y === otherBomb.position.y,
+        )
+      ) {
         chainingBombs.push(otherBomb);
       }
     }
@@ -613,7 +723,7 @@ export class GameStateManager {
     }
 
     if (this.gameMode === 'teams') {
-      const aliveTeams = new Set(alivePlayers.map(p => p.team));
+      const aliveTeams = new Set(alivePlayers.map((p) => p.team));
       if (aliveTeams.size <= 1 && alivePlayers.length > 0) {
         this.finishTick = this.tick;
         this.winnerTeam = alivePlayers[0].team;
@@ -638,16 +748,16 @@ export class GameStateManager {
   }
 
   getAlivePlayers(): Player[] {
-    return Array.from(this.players.values()).filter(p => p.alive);
+    return Array.from(this.players.values()).filter((p) => p.alive);
   }
 
   toState(): GameStateType {
     return {
       tick: this.tick,
-      players: Array.from(this.players.values()).map(p => p.toState()),
-      bombs: Array.from(this.bombs.values()).map(b => b.toState()),
-      explosions: Array.from(this.explosions.values()).map(e => e.toState()),
-      powerUps: Array.from(this.powerUps.values()).map(p => p.toState()),
+      players: Array.from(this.players.values()).map((p) => p.toState()),
+      bombs: Array.from(this.bombs.values()).map((b) => b.toState()),
+      explosions: Array.from(this.explosions.values()).map((e) => e.toState()),
+      powerUps: Array.from(this.powerUps.values()).map((p) => p.toState()),
       map: {
         width: this.map.width,
         height: this.map.height,
@@ -656,24 +766,32 @@ export class GameStateManager {
         seed: this.map.seed,
       },
       zone: this.zone?.toState(),
-      hillZone: this.hillZone ? {
-        ...this.hillZone,
-        controllingPlayer: (() => {
-          const playersInZone = this.getAlivePlayers().filter(p =>
-            p.position.x >= this.hillZone!.x && p.position.x < this.hillZone!.x + this.hillZone!.width &&
-            p.position.y >= this.hillZone!.y && p.position.y < this.hillZone!.y + this.hillZone!.height
-          );
-          return playersInZone.length === 1 ? playersInZone[0].id : null;
-        })(),
-        controllingTeam: null,
-      } : undefined,
+      hillZone: this.hillZone
+        ? {
+            ...this.hillZone,
+            controllingPlayer: (() => {
+              const playersInZone = this.getAlivePlayers().filter(
+                (p) =>
+                  p.position.x >= this.hillZone!.x &&
+                  p.position.x < this.hillZone!.x + this.hillZone!.width &&
+                  p.position.y >= this.hillZone!.y &&
+                  p.position.y < this.hillZone!.y + this.hillZone!.height,
+              );
+              return playersInZone.length === 1 ? playersInZone[0].id : null;
+            })(),
+            controllingTeam: null,
+          }
+        : undefined,
       kothScores: this.hillZone ? Object.fromEntries(this.kothScores) : undefined,
-      mapEvents: this.mapEvents.length > 0 ? this.mapEvents.map(e => ({
-        type: e.type as 'meteor' | 'powerup_rain',
-        position: e.position,
-        tick: e.tick,
-        warningTick: e.warningTick,
-      })) : undefined,
+      mapEvents:
+        this.mapEvents.length > 0
+          ? this.mapEvents.map((e) => ({
+              type: e.type as 'meteor' | 'powerup_rain',
+              position: e.position,
+              tick: e.tick,
+              warningTick: e.warningTick,
+            }))
+          : undefined,
       status: this.status,
       winnerId: this.winnerId,
       winnerTeam: this.winnerTeam,

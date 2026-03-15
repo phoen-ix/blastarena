@@ -32,7 +32,7 @@ export async function createPool(): Promise<mysql.Pool> {
       retries--;
       if (retries === 0) throw err;
       logger.warn(`Database connection failed, retrying... (${retries} attempts left)`);
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
 
@@ -46,7 +46,10 @@ export function getPool(): mysql.Pool {
   return pool;
 }
 
-export async function query<T extends mysql.RowDataPacket[]>(sql: string, params?: any[]): Promise<T> {
+export async function query<T extends mysql.RowDataPacket[]>(
+  sql: string,
+  params?: any[],
+): Promise<T> {
   const [rows] = await getPool().execute<T>(sql, params);
   return rows;
 }
@@ -54,4 +57,25 @@ export async function query<T extends mysql.RowDataPacket[]>(sql: string, params
 export async function execute(sql: string, params?: any[]): Promise<mysql.ResultSetHeader> {
   const [result] = await getPool().execute<mysql.ResultSetHeader>(sql, params);
   return result;
+}
+
+/**
+ * Execute a function within a database transaction.
+ * Automatically commits on success, rolls back on error.
+ */
+export async function withTransaction<T>(
+  fn: (conn: mysql.PoolConnection) => Promise<T>,
+): Promise<T> {
+  const conn = await getPool().getConnection();
+  try {
+    await conn.beginTransaction();
+    const result = await fn(conn);
+    await conn.commit();
+    return result;
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 }

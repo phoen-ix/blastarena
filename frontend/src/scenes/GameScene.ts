@@ -8,6 +8,7 @@ import { BombSpriteRenderer } from '../game/BombSprite';
 import { ExplosionRenderer } from '../game/ExplosionSprite';
 import { PowerUpRenderer } from '../game/PowerUpSprite';
 import { ShrinkingZoneRenderer } from '../game/ShrinkingZone';
+import { HillZoneRenderer } from '../game/HillZone';
 import { EffectSystem } from '../game/EffectSystem';
 import { CountdownOverlay } from '../game/CountdownOverlay';
 import { GamepadManager } from '../game/GamepadManager';
@@ -24,6 +25,7 @@ export class GameScene extends Phaser.Scene {
   private explosionRenderer!: ExplosionRenderer;
   private powerUpRenderer!: PowerUpRenderer;
   private zoneRenderer!: ShrinkingZoneRenderer;
+  private hillZoneRenderer!: HillZoneRenderer;
   private effectSystem!: EffectSystem;
   private countdownOverlay!: CountdownOverlay;
 
@@ -102,10 +104,16 @@ export class GameScene extends Phaser.Scene {
     this.explosionRenderer = new ExplosionRenderer(this);
     this.powerUpRenderer = new PowerUpRenderer(this);
     this.zoneRenderer = new ShrinkingZoneRenderer(this);
+    this.hillZoneRenderer = new HillZoneRenderer(this);
     this.countdownOverlay = new CountdownOverlay(this);
 
     if (initialState) {
-      this.tileMap = new TileMapRenderer(this, initialState.map.tiles, initialState.map.width, initialState.map.height);
+      this.tileMap = new TileMapRenderer(
+        this,
+        initialState.map.tiles,
+        initialState.map.width,
+        initialState.map.height,
+      );
       this.updateState(initialState);
     }
 
@@ -161,8 +169,12 @@ export class GameScene extends Phaser.Scene {
       this.zoneRenderer.update(state.zone, state.map.width, state.map.height);
     }
 
+    if (state.hillZone) {
+      this.hillZoneRenderer.update(state.hillZone, state.kothScores);
+    }
+
     // Update effect system alive state
-    const me = state.players.find(p => p.id === this.localPlayerId);
+    const me = state.players.find((p) => p.id === this.localPlayerId);
     if (me) {
       this.effectSystem.setLocalPlayerAlive(me.alive);
     }
@@ -174,7 +186,7 @@ export class GameScene extends Phaser.Scene {
   update(): void {
     // Detect local player death
     if (!this.localPlayerDead && this.lastGameState) {
-      const me = this.lastGameState.players.find(p => p.id === this.localPlayerId);
+      const me = this.lastGameState.players.find((p) => p.id === this.localPlayerId);
       if (me && !me.alive) {
         this.localPlayerDead = true;
         const cam = this.cameras.main;
@@ -201,7 +213,9 @@ export class GameScene extends Phaser.Scene {
       (cam as any).useBounds = false;
 
       if (this.spectateTargetId !== null) {
-        const targetPlayer = this.lastGameState?.players.find(p => p.id === this.spectateTargetId && p.alive);
+        const targetPlayer = this.lastGameState?.players.find(
+          (p) => p.id === this.spectateTargetId && p.alive,
+        );
         if (targetPlayer) {
           const tx = targetPlayer.position.x * TILE_SIZE + TILE_SIZE / 2;
           const ty = targetPlayer.position.y * TILE_SIZE + TILE_SIZE / 2;
@@ -303,11 +317,11 @@ export class GameScene extends Phaser.Scene {
   private cycleSpectateTarget(delta: number): void {
     if (!this.lastGameState) return;
     const alivePlayers = this.lastGameState.players.filter(
-      p => p.alive && p.id !== this.localPlayerId
+      (p) => p.alive && p.id !== this.localPlayerId,
     );
     if (alivePlayers.length === 0) return;
 
-    const currentIdx = alivePlayers.findIndex(p => p.id === this.spectateTargetId);
+    const currentIdx = alivePlayers.findIndex((p) => p.id === this.spectateTargetId);
     let nextIdx: number;
     if (currentIdx === -1) {
       nextIdx = delta > 0 ? 0 : alivePlayers.length - 1;
@@ -319,10 +333,22 @@ export class GameScene extends Phaser.Scene {
 
   private installSpectatorListeners(): void {
     this.keysDown.clear();
-    const panKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD'];
+    const panKeys = [
+      'ArrowUp',
+      'ArrowDown',
+      'ArrowLeft',
+      'ArrowRight',
+      'KeyW',
+      'KeyA',
+      'KeyS',
+      'KeyD',
+    ];
     this.boundKeyDown = (e: KeyboardEvent) => {
       this.keysDown.add(e.code);
-      if (this.localPlayerDead && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+      if (
+        this.localPlayerDead &&
+        ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)
+      ) {
         e.preventDefault();
       }
       if (this.localPlayerDead && panKeys.includes(e.code)) {
@@ -331,7 +357,9 @@ export class GameScene extends Phaser.Scene {
       if (this.localPlayerDead && e.code.startsWith('Digit')) {
         const num = parseInt(e.code.replace('Digit', ''));
         if (num >= 1 && num <= 9 && this.lastGameState) {
-          const alivePlayers = this.lastGameState.players.filter(p => p.alive && p.id !== this.localPlayerId);
+          const alivePlayers = this.lastGameState.players.filter(
+            (p) => p.alive && p.id !== this.localPlayerId,
+          );
           if (num <= alivePlayers.length) {
             this.spectateTargetId = alivePlayers[num - 1].id;
           }
@@ -372,6 +400,7 @@ export class GameScene extends Phaser.Scene {
     this.explosionRenderer?.destroy();
     this.powerUpRenderer?.destroy();
     this.zoneRenderer?.destroy();
+    this.hillZoneRenderer?.destroy();
     this.effectSystem?.destroy();
     this.countdownOverlay?.destroy();
     this.gamepadManager?.destroy();

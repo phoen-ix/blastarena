@@ -9,9 +9,14 @@ describe('GameLoop', () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
-    gameState = new GameStateManager(15, 13, 12345, 'ffa', false);
-    gameState.addPlayer(1, 'player1', 'Player 1');
-    gameState.addPlayer(2, 'player2', 'Player 2');
+    gameState = new GameStateManager({
+      mapWidth: 15,
+      mapHeight: 13,
+      mapSeed: 12345,
+      gameMode: 'ffa',
+    });
+    gameState.addPlayer(1, 'player1', null);
+    gameState.addPlayer(2, 'player2', null);
     onTick = jest.fn();
     onGameOver = jest.fn();
   });
@@ -26,7 +31,7 @@ describe('GameLoop', () => {
 
     loop.start();
     expect(loop.isRunning()).toBe(true);
-    expect(gameState.status).toBe('playing');
+    expect(gameState.status).toBe('countdown');
 
     loop.stop();
     expect(loop.isRunning()).toBe(false);

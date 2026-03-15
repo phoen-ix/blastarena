@@ -9,8 +9,12 @@ export class EffectSystem {
   private localPlayerId: number;
   private localPlayerAlive: boolean = true;
 
-  private explosionHandler: ((data: { id: string; cells: { x: number; y: number }[]; ownerId: number }) => void) | null = null;
-  private playerDiedHandler: ((data: { playerId: number; killerId: number | null }) => void) | null = null;
+  private explosionHandler:
+    | ((data: { id: string; cells: { x: number; y: number }[]; ownerId: number }) => void)
+    | null = null;
+  private playerDiedHandler:
+    | ((data: { playerId: number; killerId: number | null }) => void)
+    | null = null;
   private powerupCollectedHandler: ((data: { id: string; playerId: number }) => void) | null = null;
 
   constructor(scene: Phaser.Scene, socketClient: SocketClient, localPlayerId: number) {
@@ -29,7 +33,7 @@ export class EffectSystem {
       this.onPlayerDied(data.playerId);
     };
 
-    this.powerupCollectedHandler = (data) => {
+    this.powerupCollectedHandler = (_data) => {
       // Power-up collection effects are handled in the renderer via state diff
     };
 
@@ -92,15 +96,18 @@ export class EffectSystem {
     }
 
     if (settings.animations) {
-      const name = type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const name = type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
       const colorHex = '#' + color.toString(16).padStart(6, '0');
-      const text = this.scene.add.text(px, py - 10, name, {
-        fontSize: '12px',
-        color: colorHex,
-        stroke: '#000000',
-        strokeThickness: 2,
-        fontStyle: 'bold',
-      }).setOrigin(0.5).setDepth(20);
+      const text = this.scene.add
+        .text(px, py - 10, name, {
+          fontSize: '12px',
+          color: colorHex,
+          stroke: '#000000',
+          strokeThickness: 2,
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+        .setDepth(20);
 
       this.scene.tweens.add({
         targets: text,

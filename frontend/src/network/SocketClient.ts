@@ -1,9 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { SOCKET_URL, API_URL } from '../config';
-import {
-  ClientToServerEvents,
-  ServerToClientEvents,
-} from '@blast-arena/shared';
+import { ClientToServerEvents, ServerToClientEvents } from '@blast-arena/shared';
 import { AuthManager } from './AuthManager';
 
 export class SocketClient {
@@ -64,20 +61,24 @@ export class SocketClient {
     return this.socket?.connected ?? false;
   }
 
-  emit<E extends keyof ClientToServerEvents>(event: E, ...args: Parameters<ClientToServerEvents[E]>): void {
+  // Socket.io's overloaded method signatures don't work with generic wrappers,
+  // so we cast to a minimal interface. Event names and payloads are still typed at call sites.
+  /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-function-type */
+  emit(event: string, ...args: any[]): void {
     if (!this.socket) return;
-    (this.socket as any).emit(event, ...args);
+    (this.socket.emit as Function).call(this.socket, event, ...args);
   }
 
-  on<E extends keyof ServerToClientEvents>(event: E, handler: ServerToClientEvents[E]): void {
+  on(event: string, handler: (...args: any[]) => void): void {
     if (!this.socket) return;
-    (this.socket as any).on(event, handler);
+    (this.socket.on as Function).call(this.socket, event, handler);
   }
 
-  off<E extends keyof ServerToClientEvents>(event: E, handler?: ServerToClientEvents[E]): void {
+  off(event: string, handler?: (...args: any[]) => void): void {
     if (!this.socket) return;
-    (this.socket as any).off(event, handler);
+    (this.socket.off as Function).call(this.socket, event, handler);
   }
+  /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-function-type */
 
   /** Check if the server has been rebuilt since we last connected */
   private async checkBuild(): Promise<void> {

@@ -1,5 +1,6 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
+import { escapeHtml } from '../../utils/html';
 
 export class MatchesTab {
   private container: HTMLElement | null = null;
@@ -44,18 +45,22 @@ export class MatchesTab {
             </tr>
           </thead>
           <tbody>
-            ${result.matches.map((m: any) => `
+            ${result.matches
+              .map(
+                (m: any) => `
               <tr style="cursor:pointer;" data-match-id="${m.id}">
                 <td>${m.id}</td>
-                <td>${this.escapeHtml(m.room_code)}</td>
-                <td>${this.escapeHtml(m.game_mode)}</td>
+                <td>${escapeHtml(m.room_code)}</td>
+                <td>${escapeHtml(m.game_mode)}</td>
                 <td>${m.player_count}</td>
                 <td>${m.duration ? `${m.duration}s` : '-'}</td>
-                <td>${m.winner_username ? this.escapeHtml(m.winner_username) : '-'}</td>
+                <td>${m.winner_username ? escapeHtml(m.winner_username) : '-'}</td>
                 <td><span class="badge badge-${this.statusBadgeClass(m)}">${this.statusLabel(m)}</span></td>
                 <td>${m.started_at ? new Date(m.started_at).toLocaleString() : '-'}</td>
               </tr>
-            `).join('')}
+            `,
+              )
+              .join('')}
             ${result.matches.length === 0 ? '<tr><td colspan="8" style="text-align:center;color:var(--text-dim);">No matches found</td></tr>' : ''}
           </tbody>
         </table>
@@ -98,8 +103,8 @@ export class MatchesTab {
         <div class="modal" style="max-width:600px;">
           <h2 style="margin-bottom:16px;">Match #${match.id} Details</h2>
           <div style="margin-bottom:16px;">
-            <div class="match-detail-row"><span class="label">Room Code:</span><span class="value">${this.escapeHtml(match.roomCode)}</span></div>
-            <div class="match-detail-row"><span class="label">Game Mode:</span><span class="value">${this.escapeHtml(match.gameMode)}</span></div>
+            <div class="match-detail-row"><span class="label">Room Code:</span><span class="value">${escapeHtml(match.roomCode)}</span></div>
+            <div class="match-detail-row"><span class="label">Game Mode:</span><span class="value">${escapeHtml(match.gameMode)}</span></div>
             <div class="match-detail-row"><span class="label">Map:</span><span class="value">${match.mapWidth}x${match.mapHeight} (seed: ${match.mapSeed})</span></div>
             <div class="match-detail-row"><span class="label">Status:</span><span class="value">${match.status}</span></div>
             <div class="match-detail-row"><span class="label">Duration:</span><span class="value">${match.duration ? `${match.duration}s` : '-'}</span></div>
@@ -121,10 +126,12 @@ export class MatchesTab {
               </tr>
             </thead>
             <tbody>
-              ${match.players.map((p: any) => `
+              ${match.players
+                .map(
+                  (p: any) => `
                 <tr>
                   <td>${p.placement ?? '-'}</td>
-                  <td>${this.escapeHtml(p.username)}${match.winnerId === p.userId ? ' <span style="color:#ffd700;">&#9733;</span>' : ''}</td>
+                  <td>${escapeHtml(p.username)}${match.winnerId === p.userId ? ' <span style="color:#ffd700;">&#9733;</span>' : ''}</td>
                   <td>${p.team !== null ? `Team ${p.team + 1}` : '-'}</td>
                   <td>${p.kills}</td>
                   <td>${p.deaths}</td>
@@ -132,7 +139,9 @@ export class MatchesTab {
                   <td>${p.powerupsCollected}</td>
                   <td>${p.survivedSeconds}s</td>
                 </tr>
-              `).join('')}
+              `,
+                )
+                .join('')}
             </tbody>
           </table>
           <div class="modal-actions" style="margin-top:16px;">
@@ -142,7 +151,9 @@ export class MatchesTab {
       `;
       document.getElementById('ui-overlay')!.appendChild(modal);
       modal.querySelector('#match-detail-close')!.addEventListener('click', () => modal.remove());
-      modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+      });
     } catch {
       this.notifications.error('Failed to load match details');
     }
@@ -159,11 +170,5 @@ export class MatchesTab {
   private statusLabel(m: any): string {
     if ((m.status === 'playing' || m.status === 'countdown') && !m.finished_at) return 'abandoned';
     return m.status;
-  }
-
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
   }
 }

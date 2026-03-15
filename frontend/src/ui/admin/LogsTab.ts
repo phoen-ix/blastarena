@@ -1,5 +1,6 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
+import { escapeHtml, escapeAttr } from '../../utils/html';
 
 export class LogsTab {
   private container: HTMLElement | null = null;
@@ -60,16 +61,20 @@ export class LogsTab {
             </tr>
           </thead>
           <tbody>
-            ${result.actions.map((a: any) => `
+            ${result.actions
+              .map(
+                (a: any) => `
               <tr>
                 <td>${new Date(a.created_at).toLocaleString()}</td>
-                <td>${this.escapeHtml(a.admin_username)}</td>
-                <td><span class="badge badge-${this.actionBadgeClass(a.action)}">${this.escapeHtml(a.action)}</span></td>
-                <td>${this.escapeHtml(a.target_type)}</td>
+                <td>${escapeHtml(a.admin_username)}</td>
+                <td><span class="badge badge-${this.actionBadgeClass(a.action)}">${escapeHtml(a.action)}</span></td>
+                <td>${escapeHtml(a.target_type)}</td>
                 <td>${a.target_id}</td>
-                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${this.escapeAttr(a.details || '')}">${this.escapeHtml(a.details || '-')}</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeAttr(a.details || '')}">${escapeHtml(a.details || '-')}</td>
               </tr>
-            `).join('')}
+            `,
+              )
+              .join('')}
             ${result.actions.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);">No actions found</td></tr>' : ''}
           </tbody>
         </table>
@@ -95,7 +100,8 @@ export class LogsTab {
         }
       });
     } catch {
-      this.container.innerHTML = '<div style="color:var(--danger);">Failed to load admin actions</div>';
+      this.container.innerHTML =
+        '<div style="color:var(--danger);">Failed to load admin actions</div>';
     }
   }
 
@@ -104,15 +110,5 @@ export class LogsTab {
     if (action === 'role_change') return 'moderator';
     if (action === 'deactivate') return 'deactivated';
     return 'user';
-  }
-
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  private escapeAttr(text: string): string {
-    return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 }

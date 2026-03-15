@@ -8,3 +8,4 @@ export * from './constants/powerups';
 export * from './constants/modes';
 export * from './utils/grid';
 export * from './utils/validation';
+export * from './utils/error';

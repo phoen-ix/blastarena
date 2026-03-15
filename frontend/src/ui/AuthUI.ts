@@ -1,5 +1,6 @@
 import { AuthManager } from '../network/AuthManager';
 import { NotificationUI } from './NotificationUI';
+import { getErrorMessage } from '@blast-arena/shared';
 
 export class AuthUI {
   private overlay: HTMLElement;
@@ -8,7 +9,11 @@ export class AuthUI {
   private mode: 'login' | 'register' | 'forgot' = 'login';
   private onAuthenticated: () => void;
 
-  constructor(authManager: AuthManager, notifications: NotificationUI, onAuthenticated: () => void) {
+  constructor(
+    authManager: AuthManager,
+    notifications: NotificationUI,
+    onAuthenticated: () => void,
+  ) {
     this.authManager = authManager;
     this.notifications = notifications;
     this.onAuthenticated = onAuthenticated;
@@ -129,7 +134,9 @@ export class AuthUI {
       </div>
     `;
 
-    this.overlay.querySelector('#forgot-btn')!.addEventListener('click', () => this.handleForgotPassword());
+    this.overlay
+      .querySelector('#forgot-btn')!
+      .addEventListener('click', () => this.handleForgotPassword());
     this.overlay.querySelector('#switch-login-back')!.addEventListener('click', () => {
       this.mode = 'login';
       this.render();
@@ -156,8 +163,8 @@ export class AuthUI {
       this.notifications.success('Welcome back!');
       this.hide();
       this.onAuthenticated();
-    } catch (err: any) {
-      errorEl.textContent = err.message;
+    } catch (err: unknown) {
+      errorEl.textContent = getErrorMessage(err);
     } finally {
       btn.disabled = false;
       btn.textContent = 'Login';
@@ -185,8 +192,8 @@ export class AuthUI {
       this.notifications.success('Account created! Check your email to verify.');
       this.hide();
       this.onAuthenticated();
-    } catch (err: any) {
-      errorEl.textContent = err.message;
+    } catch (err: unknown) {
+      errorEl.textContent = getErrorMessage(err);
     } finally {
       btn.disabled = false;
       btn.textContent = 'Register';
@@ -207,16 +214,18 @@ export class AuthUI {
     btn.textContent = 'Sending...';
 
     try {
-      await (await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      })).json();
+      await (
+        await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        })
+      ).json();
       this.notifications.info('If the email exists, a reset link has been sent');
       this.mode = 'login';
       this.render();
-    } catch (err: any) {
-      errorEl.textContent = err.message;
+    } catch (err: unknown) {
+      errorEl.textContent = getErrorMessage(err);
     } finally {
       btn.disabled = false;
       btn.textContent = 'Send Reset Link';

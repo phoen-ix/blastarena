@@ -1,6 +1,7 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
-import { UserRole } from '@blast-arena/shared';
+import { UserRole, getErrorMessage } from '@blast-arena/shared';
+import { escapeHtml } from '../../utils/html';
 
 export class AnnouncementsTab {
   private container: HTMLElement | null = null;
@@ -46,25 +47,33 @@ export class AnnouncementsTab {
         <div id="toast-preview-area"></div>
       </div>
 
-      ${isAdmin ? `
+      ${
+        isAdmin
+          ? `
         <div class="admin-section">
           <h3>Persistent Banner</h3>
           <p style="color:var(--text-dim);font-size:13px;margin-bottom:12px;">Set a banner that appears at the top of the lobby for all users until you clear it.</p>
-          ${currentBanner ? `
+          ${
+            currentBanner
+              ? `
             <div style="margin-bottom:12px;">
               <label style="color:var(--text-dim);font-size:12px;">Current Banner:</label>
               <div class="admin-banner" style="margin-top:6px;">
-                <span>${this.escapeHtml(currentBanner.message)}</span>
+                <span>${escapeHtml(currentBanner.message)}</span>
               </div>
               <button class="btn-danger btn-sm" id="banner-clear" style="margin-top:8px;">Clear Banner</button>
             </div>
-          ` : '<p style="color:var(--text-dim);font-size:13px;margin-bottom:12px;">No active banner.</p>'}
+          `
+              : '<p style="color:var(--text-dim);font-size:13px;margin-bottom:12px;">No active banner.</p>'
+          }
           <div style="display:flex;gap:12px;align-items:center;">
             <input type="text" class="admin-input" id="banner-input" placeholder="Type banner message..." style="flex:1;min-width:0;">
             <button class="btn btn-primary" id="banner-set">Set Banner</button>
           </div>
         </div>
-      ` : ''}
+      `
+          : ''
+      }
     `;
 
     // Toast preview
@@ -73,7 +82,7 @@ export class AnnouncementsTab {
     if (toastInput && previewArea) {
       toastInput.addEventListener('input', () => {
         if (toastInput.value.trim()) {
-          previewArea.innerHTML = `<div class="toast-preview">Preview: ${this.escapeHtml(toastInput.value)}</div>`;
+          previewArea.innerHTML = `<div class="toast-preview">Preview: ${escapeHtml(toastInput.value)}</div>`;
         } else {
           previewArea.innerHTML = '';
         }
@@ -92,8 +101,8 @@ export class AnnouncementsTab {
         this.notifications.success('Toast broadcasted');
         toastInput.value = '';
         if (previewArea) previewArea.innerHTML = '';
-      } catch (err: any) {
-        this.notifications.error(err.message);
+      } catch (err: unknown) {
+        this.notifications.error(getErrorMessage(err));
       }
     });
 
@@ -109,8 +118,8 @@ export class AnnouncementsTab {
         await ApiClient.post('/admin/announcements/banner', { message: msg });
         this.notifications.success('Banner set');
         await this.renderContent();
-      } catch (err: any) {
-        this.notifications.error(err.message);
+      } catch (err: unknown) {
+        this.notifications.error(getErrorMessage(err));
       }
     });
 
@@ -120,15 +129,9 @@ export class AnnouncementsTab {
         await ApiClient.delete('/admin/announcements/banner');
         this.notifications.success('Banner cleared');
         await this.renderContent();
-      } catch (err: any) {
-        this.notifications.error(err.message);
+      } catch (err: unknown) {
+        this.notifications.error(getErrorMessage(err));
       }
     });
-  }
-
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
   }
 }

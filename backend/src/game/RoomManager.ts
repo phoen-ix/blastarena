@@ -1,13 +1,26 @@
 import { Server } from 'socket.io';
-import { Room } from '@blast-arena/shared';
+import {
+  Room,
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData,
+} from '@blast-arena/shared';
 import { GameRoom } from './GameRoom';
 import { logger } from '../utils/logger';
 
+type TypedServer = Server<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>;
+
 export class RoomManager {
   private rooms: Map<string, GameRoom> = new Map();
-  private io: Server;
+  private io: TypedServer;
 
-  constructor(io: Server) {
+  constructor(io: TypedServer) {
     this.io = io;
   }
 

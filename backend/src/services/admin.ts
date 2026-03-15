@@ -1,19 +1,29 @@
 import { query, execute } from '../db/connection';
 import { AppError } from '../middleware/errorHandler';
-import { UserRole } from '@blast-arena/shared';
+import { UserRole, RoomListItem } from '@blast-arena/shared';
 import { getRoomManager, getIO } from '../game/registry';
 import { hashPassword } from '../utils/crypto';
-import { logger } from '../utils/logger';
 import * as lobbyService from './lobby';
+import {
+  CountRow,
+  IdRow,
+  AdminUserRow,
+  MatchRow,
+  MatchPlayerRow,
+  AdminActionRow,
+} from '../db/types';
 
 export async function createUser(
   adminId: number,
   username: string,
   email: string,
   password: string,
-  role?: UserRole
+  role?: UserRole,
 ): Promise<{ id: number; username: string }> {
-  const existing = await query('SELECT id FROM users WHERE username = ? OR email = ?', [username, email]);
+  const existing = await query<IdRow[]>('SELECT id FROM users WHERE username = ? OR email = ?', [
+    username,
+    email,
+  ]);
   if (existing.length > 0) {
     throw new AppError('Username or email already taken', 409, 'CONFLICT');
   }
@@ -23,14 +33,14 @@ export async function createUser(
 
   const result = await execute(
     'INSERT INTO users (username, email, password_hash, role, email_verified) VALUES (?, ?, ?, ?, TRUE)',
-    [username, email, passwordHash, userRole]
+    [username, email, passwordHash, userRole],
   );
 
   await execute('INSERT INTO user_stats (user_id) VALUES (?)', [result.insertId]);
 
   await execute(
     'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'create_user', 'user', result.insertId, `${username} (${userRole})`]
+    [adminId, 'create_user', 'user', result.insertId, `${username} (${userRole})`],
   );
 
   return { id: result.insertId, username };
@@ -47,7 +57,7 @@ export async function listUsers(page: number = 1, limit: number = 20, search?: s
     FROM users u
     LEFT JOIN user_stats s ON s.user_id = u.id
   `;
-  const params: any[] = [];
+  const params: (string | number)[] = [];
 
   if (search) {
     sql += ' WHERE u.username LIKE ? OR u.email LIKE ?';
@@ -57,21 +67,25 @@ export async function listUsers(page: number = 1, limit: number = 20, search?: s
   sql += ' ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
-  const rows = await query(sql, params);
+  const rows = await query<AdminUserRow[]>(sql, params);
 
   let countSql = 'SELECT COUNT(*) as total FROM users';
-  const countParams: any[] = [];
+  const countParams: (string | number)[] = [];
   if (search) {
     countSql += ' WHERE username LIKE ? OR email LIKE ?';
     countParams.push(`%${search}%`, `%${search}%`);
   }
-  const countRows = await query(countSql, countParams);
-  const total = (countRows[0] as any).total;
+  const countRows = await query<CountRow[]>(countSql, countParams);
+  const total = countRows[0].total;
 
   return { users: rows, total, page, limit };
 }
 
-export async function changeUserRole(adminId: number, userId: number, role: UserRole): Promise<void> {
+export async function changeUserRole(
+  adminId: number,
+  userId: number,
+  role: UserRole,
+): Promise<void> {
   if (adminId === userId) {
     throw new AppError('Cannot change your own role', 400, 'SELF_ACTION');
   }
@@ -80,23 +94,28 @@ export async function changeUserRole(adminId: number, userId: number, role: User
 
   await execute(
     'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'role_change', 'user', userId, role]
+    [adminId, 'role_change', 'user', userId, role],
   );
 }
 
-export async function deactivateUser(adminId: number, userId: number, deactivated: boolean): Promise<void> {
+export async function deactivateUser(
+  adminId: number,
+  userId: number,
+  deactivated: boolean,
+): Promise<void> {
   if (adminId === userId) {
     throw new AppError('Cannot deactivate yourself', 400, 'SELF_ACTION');
   }
 
-  await execute(
-    'UPDATE users SET is_deactivated = ?, deactivated_at = ? WHERE id = ?',
-    [deactivated, deactivated ? new Date() : null, userId]
-  );
+  await execute('UPDATE users SET is_deactivated = ?, deactivated_at = ? WHERE id = ?', [
+    deactivated,
+    deactivated ? new Date() : null,
+    userId,
+  ]);
 
   await execute(
     'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, deactivated ? 'deactivate' : 'reactivate', 'user', userId, null]
+    [adminId, deactivated ? 'deactivate' : 'reactivate', 'user', userId, null],
   );
 
   if (deactivated) {
@@ -110,17 +129,17 @@ export async function deleteUser(adminId: number, userId: number): Promise<void>
   }
 
   // Check user exists
-  const rows = await query('SELECT id, username FROM users WHERE id = ?', [userId]);
+  const rows = await query<AdminUserRow[]>('SELECT id, username FROM users WHERE id = ?', [userId]);
   if (rows.length === 0) {
     throw new AppError('User not found', 404, 'NOT_FOUND');
   }
 
-  const username = (rows[0] as any).username;
+  const username = rows[0].username;
 
   // Log action before deletion (FK cascade would remove the log if admin is the target)
   await execute(
     'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'delete', 'user', userId, username]
+    [adminId, 'delete', 'user', userId, username],
   );
 
   // Hard delete — FK cascades handle refresh_tokens, user_stats, match_players
@@ -128,11 +147,13 @@ export async function deleteUser(adminId: number, userId: number): Promise<void>
 }
 
 export async function getServerStats() {
-  const [userCount] = await query('SELECT COUNT(*) as total FROM users WHERE is_deactivated = FALSE');
-  const [activeCount] = await query(
-    'SELECT COUNT(*) as total FROM users WHERE last_login > DATE_SUB(NOW(), INTERVAL 24 HOUR)'
+  const [userCount] = await query<CountRow[]>(
+    'SELECT COUNT(*) as total FROM users WHERE is_deactivated = FALSE',
   );
-  const [matchCount] = await query('SELECT COUNT(*) as total FROM matches');
+  const [activeCount] = await query<CountRow[]>(
+    'SELECT COUNT(*) as total FROM users WHERE last_login > DATE_SUB(NOW(), INTERVAL 24 HOUR)',
+  );
+  const [matchCount] = await query<CountRow[]>('SELECT COUNT(*) as total FROM matches');
 
   let activeRooms = 0;
   let activePlayers = 0;
@@ -151,9 +172,9 @@ export async function getServerStats() {
   }
 
   return {
-    totalUsers: (userCount as any).total,
-    activeUsers24h: (activeCount as any).total,
-    totalMatches: (matchCount as any).total,
+    totalUsers: userCount.total,
+    activeUsers24h: activeCount.total,
+    totalMatches: matchCount.total,
     activeRooms,
     activePlayers,
   };
@@ -161,7 +182,7 @@ export async function getServerStats() {
 
 export async function getMatchHistory(page: number = 1, limit: number = 20) {
   const offset = (page - 1) * limit;
-  const rows = await query(
+  const rows = await query<MatchRow[]>(
     `SELECT m.id, m.room_code, m.game_mode, m.status, m.duration,
             m.started_at, m.finished_at,
             u.username as winner_username,
@@ -170,35 +191,35 @@ export async function getMatchHistory(page: number = 1, limit: number = 20) {
      LEFT JOIN users u ON u.id = m.winner_id
      ORDER BY m.created_at DESC
      LIMIT ? OFFSET ?`,
-    [limit, offset]
+    [limit, offset],
   );
 
-  const [countRow] = await query('SELECT COUNT(*) as total FROM matches');
-  return { matches: rows, total: (countRow as any).total, page, limit };
+  const [countRow] = await query<CountRow[]>('SELECT COUNT(*) as total FROM matches');
+  return { matches: rows, total: countRow.total, page, limit };
 }
 
 export async function getMatchDetail(matchId: number) {
-  const matchRows = await query(
+  const matchRows = await query<MatchRow[]>(
     `SELECT m.id, m.room_code, m.game_mode, m.map_seed, m.map_width, m.map_height,
             m.max_players, m.status, m.duration, m.winner_id, m.started_at, m.finished_at
      FROM matches m WHERE m.id = ?`,
-    [matchId]
+    [matchId],
   );
 
   if (matchRows.length === 0) {
     throw new AppError('Match not found', 404, 'NOT_FOUND');
   }
 
-  const match = matchRows[0] as any;
+  const match = matchRows[0];
 
-  const players = await query(
+  const players = await query<MatchPlayerRow[]>(
     `SELECT mp.user_id, u.username, mp.team, mp.placement, mp.kills, mp.deaths,
             mp.bombs_placed, mp.powerups_collected, mp.survived_seconds
      FROM match_players mp
      JOIN users u ON u.id = mp.user_id
      WHERE mp.match_id = ?
      ORDER BY mp.placement ASC`,
-    [matchId]
+    [matchId],
   );
 
   return {
@@ -214,7 +235,7 @@ export async function getMatchDetail(matchId: number) {
     winnerId: match.winner_id,
     startedAt: match.started_at,
     finishedAt: match.finished_at,
-    players: (players as any[]).map(p => ({
+    players: players.map((p) => ({
       userId: p.user_id,
       username: p.username,
       team: p.team,
@@ -236,7 +257,7 @@ export async function getAdminActions(page: number = 1, limit: number = 20, acti
     FROM admin_actions a
     JOIN users u ON u.id = a.admin_id
   `;
-  const params: any[] = [];
+  const params: (string | number)[] = [];
 
   if (action) {
     sql += ' WHERE a.action = ?';
@@ -246,23 +267,23 @@ export async function getAdminActions(page: number = 1, limit: number = 20, acti
   sql += ' ORDER BY a.created_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
-  const rows = await query(sql, params);
+  const rows = await query<AdminActionRow[]>(sql, params);
 
   let countSql = 'SELECT COUNT(*) as total FROM admin_actions';
-  const countParams: any[] = [];
+  const countParams: (string | number)[] = [];
   if (action) {
     countSql += ' WHERE action = ?';
     countParams.push(action);
   }
-  const [countRow] = await query(countSql, countParams);
+  const [countRow] = await query<CountRow[]>(countSql, countParams);
 
-  return { actions: rows, total: (countRow as any).total, page, limit };
+  return { actions: rows, total: countRow.total, page, limit };
 }
 
 export async function getActiveRooms() {
   try {
     const rooms = await lobbyService.listRooms();
-    return rooms.map((r: any) => ({
+    return rooms.map((r: RoomListItem) => ({
       code: r.code,
       name: r.name,
       host: r.host,
@@ -279,57 +300,57 @@ export async function getActiveRooms() {
 export async function sendToast(adminId: number, message: string): Promise<void> {
   try {
     const io = getIO();
-    io.emit('admin:toast' as any, { message });
+    io.emit('admin:toast', { message });
   } catch {
     throw new AppError('Socket server not available', 500);
   }
 
   await execute(
     'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'toast', 'broadcast', 0, message]
+    [adminId, 'toast', 'broadcast', 0, message],
   );
 }
 
 export async function setBanner(adminId: number, message: string): Promise<void> {
   // Deactivate existing banners
   await execute(
-    "UPDATE announcements SET is_active = FALSE, dismissed_at = NOW() WHERE is_active = TRUE AND type = 'banner'"
+    "UPDATE announcements SET is_active = FALSE, dismissed_at = NOW() WHERE is_active = TRUE AND type = 'banner'",
   );
 
   // Insert new banner
-  await execute(
-    "INSERT INTO announcements (admin_id, type, message) VALUES (?, 'banner', ?)",
-    [adminId, message]
-  );
+  await execute("INSERT INTO announcements (admin_id, type, message) VALUES (?, 'banner', ?)", [
+    adminId,
+    message,
+  ]);
 
   try {
     const io = getIO();
-    io.emit('admin:banner' as any, { message });
+    io.emit('admin:banner', { message });
   } catch {
     // Socket not available, banner still saved in DB
   }
 
   await execute(
     'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'set_banner', 'broadcast', 0, message]
+    [adminId, 'set_banner', 'broadcast', 0, message],
   );
 }
 
 export async function clearBanner(adminId: number): Promise<void> {
   await execute(
-    "UPDATE announcements SET is_active = FALSE, dismissed_at = NOW() WHERE is_active = TRUE AND type = 'banner'"
+    "UPDATE announcements SET is_active = FALSE, dismissed_at = NOW() WHERE is_active = TRUE AND type = 'banner'",
   );
 
   try {
     const io = getIO();
-    io.emit('admin:banner' as any, { message: null });
+    io.emit('admin:banner', { message: null });
   } catch {
     // Socket not available
   }
 
   await execute(
     'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'clear_banner', 'broadcast', 0, null]
+    [adminId, 'clear_banner', 'broadcast', 0, null],
   );
 }
 
@@ -339,7 +360,7 @@ export async function getActiveBanner() {
      FROM announcements a
      JOIN users u ON u.id = a.admin_id
      WHERE a.is_active = TRUE AND a.type = 'banner'
-     ORDER BY a.created_at DESC LIMIT 1`
+     ORDER BY a.created_at DESC LIMIT 1`,
   );
   return rows.length > 0 ? rows[0] : null;
 }

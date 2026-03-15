@@ -42,13 +42,14 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
   - `ExplosionSprite.ts` — animated explosions with expansion wave, sustain pulse, fade phase, and fire/smoke particles
   - `PowerUpSprite.ts` — power-up sprites with floating animation and distinctive icons per type
   - `ShrinkingZone.ts` — Battle Royale danger zone overlay using Graphics path with circle hole
+  - `HillZone.ts` — KOTH hill zone overlay with pulsing gold fill (green when controlled), corner markers, diamond center icon
   - `EffectSystem.ts` — subscribes to `game:explosion`, `game:playerDied`, `game:powerupCollected` socket events for screen shake, debris particles, and collection popups
   - `CountdownOverlay.ts` — animated "3, 2, 1, GO!" countdown at game start
   - `GamepadManager.ts` — gamepad/controller input polling with deadzone, D-pad/stick direction, just-pressed action tracking
   - `Settings.ts` — per-user visual settings (animations, screen shake, particles) stored in localStorage
 - **Procedural textures**: All sprites generated in `BootScene.generateTextures()` — no external image assets. Player textures include 4 directional variants with eyes per color. Power-up textures use Canvas2D with emoji icons (💣🔥⚡🛡️👢💥📡🧨) on colored rounded-rect backgrounds instead of abstract geometric shapes, matching the HUD stats display for visual consistency.
 - **Particle textures**: `particle_fire`, `particle_smoke`, `particle_spark`, `particle_debris`, `particle_star`, `particle_shield` generated in BootScene
-- **HUD**: DOM-based overlay in HUDScene.ts with timer, player list, kill feed, stats bar (bottom-left), spectator banner
+- **HUD**: DOM-based overlay in HUDScene.ts with timer, player list, kill feed, stats bar (bottom-left), spectator banner. In KOTH mode, player list shows scores sorted descending with crown icon for the controlling player
 - Settings and Help are in the lobby header (LobbyUI), not in-game HUD, to avoid overlapping player names
 - Help modal covers: controls (keyboard + gamepad), all 8 power-ups (with in-game tile preview + HUD emoji), all 6 game modes, map features (reinforced walls, map events, hazard tiles with visual previews), and core mechanics
 - Countdown synced between server and client: GameLoop holds `status: 'countdown'` for 36 ticks (1.8s) while CountdownOverlay plays "3, 2, 1" — gameplay starts on "GO!". Both client and server block inputs during countdown.
@@ -107,6 +108,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - BotAI roaming: tracks ticksSinceEnemyContact; after idle threshold (normal=5s, hard=3s) bot moves toward nearest enemy via manhattan heuristic
 - BotAI directional wall clearing: prefers breaking walls toward enemies rather than just the nearest wall
 - BotAI danger timer threshold: normal/hard bots ignore bombs with many ticks remaining (>30/40) unless within 2 tiles, reducing unnecessary fleeing from fresh bombs
+- BotAI KOTH hill-seeking: priority 4.5 in decision tree, bots navigate toward the 3x3 center zone using manhattan distance heuristic; once inside they stay put rather than wandering off
 - Self-kills subtract 1 from kill score (owner.kills decremented, owner.selfKills incremented)
 - Game over placements sorted by kills descending, tiebreak by survival placement
 - Grace period: 30 ticks (1.5s) after win condition before status='finished' to show final explosions
@@ -152,10 +154,28 @@ MatchConfig includes: gameMode, maxPlayers, mapWidth/Height, mapSeed, roundTime,
 - Logs every bot decision, kill, bomb placement/detonation, and tick snapshots (every 5 ticks)
 - Filename format: `{ISO-timestamp}_{roomCode}_{gameMode}_{playerCount}p.jsonl`
 
+## Code Quality & Tooling
+- ESLint v10 + `@typescript-eslint/recommended` via flat config (`eslint.config.mjs`); `no-explicit-any` as warning, `no-unused-vars` as error
+- Prettier with single quotes, trailing commas, 100 char width
+- Husky + lint-staged pre-commit hook runs ESLint `--fix` + Prettier on staged `.ts` files
+- `prepare` script uses `husky || true` to avoid failures in Docker builds where husky isn't installed
+- Socket rate limiting: `backend/src/utils/socketRateLimit.ts` — in-memory sliding window per socket ID (game:input 30/sec, room:create 2/sec, room:join 5/sec)
+- All Socket.io server types fully parameterized: `RoomManager`, `registry.ts`, `GameRoom` use `Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>` — no `as any` casts on socket events
+- DB row types in `backend/src/db/types.ts`: `UserRow`, `CountRow`, `IdRow`, `MatchRow`, `MatchPlayerRow`, `AdminActionRow`, etc. — all service queries use typed `query<T>()` calls
+- `shared/src/utils/error.ts`: `getErrorMessage(err: unknown)` helper used in all `catch` blocks instead of `catch (err: any)`
+- `backend/src/db/connection.ts`: `withTransaction<T>(fn)` helper for multi-statement DB operations
+- `GameStateManager` constructor takes a `GameConfig` object instead of 13 positional parameters
+- `frontend/src/utils/html.ts`: shared `escapeHtml()` and `escapeAttr()` utilities (extracted from 9+ files)
+- LobbyUI modals extracted to `frontend/src/ui/modals/`: `CreateRoomModal.ts`, `AccountModal.ts`, `SettingsModal.ts`, `HelpModal.ts` — LobbyUI.ts is a thin orchestrator (~200 lines)
+- `GameState.processTick()` optimizations: conditional tile snapshot (only when bombs detonate), `hasBombAt()`/`hasAlivePlayerAt()` helpers replace repeated `Array.from().some()`, `for...of` with early break on bomb slide collision
+
 ## Testing
 ```bash
-npm test
+npm test                    # Run all test suites
+npx jest --config tests/backend/jest.config.ts  # Run from project root
 ```
+- 92 tests across 6 suites (GameState integration, GameLoop, Bomb, Map, CollisionSystem, validation/grid)
+- GameState tests cover: lifecycle, movement, bombs, explosions, death, self-kills, shield, chain reactions, win conditions, grace period, power-ups, remote bombs, bomb kick, teams, deathmatch, KOTH, line/pierce bombs, reinforced walls, battle royale zone
 
 ## Connection Resilience
 - Socket.io reconnects indefinitely (1-5s backoff) with a "Reconnecting..." overlay when disconnected

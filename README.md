@@ -27,7 +27,7 @@ Open `http://localhost:8080` (or your configured `APP_EXTERNAL_PORT`).
 | **Battle Royale** | 4-8 | 5 min | Circular danger zone shrinks inward, damaging players outside |
 | **Sudden Death** | 2-8 | 2 min | Everyone starts fully powered (8 bombs, 8 range, max speed, kick). No power-ups spawn. One hit kills |
 | **Deathmatch** | 2-8 | 5 min | Respawn 3s after death with reset stats. First to 10 kills or most kills when time runs out |
-| **King of the Hill** | 2-8 | 4 min | Stand in the 3x3 center zone to score. First to 100 points wins |
+| **King of the Hill** | 2-8 | 4 min | Stand in the 3x3 center zone to score. First to 100 points wins. Zone highlighted with pulsing overlay; HUD shows live scores |
 
 ## Controls
 
@@ -98,7 +98,7 @@ AI bots fill empty slots and provide singleplayer/practice options. Three diffic
 - **Normal**: BFS pathfinding, directional wall breaking toward enemies, roaming after 5s idle
 - **Hard**: Deep search depth, aggressive hunting, 3s idle roaming, detonates remote bombs tactically
 
-Bots use BFS for escape routes and power-up seeking, hunt enemies with configurable search depth, and prefer breaking walls toward opponents.
+Bots use BFS for escape routes and power-up seeking, hunt enemies with configurable search depth, and prefer breaking walls toward opponents. In King of the Hill mode, bots actively navigate toward the hill zone and hold position once inside.
 
 ## Teams
 
@@ -213,7 +213,7 @@ blast-arena/
 │   ├── index.html           # HTML + full CSS design system (INFERNO theme)
 │   └── src/
 │       ├── scenes/          # Phaser scenes (Boot, Menu, Lobby, Game, HUD, GameOver)
-│       ├── ui/              # DOM-based UI (Auth, Lobby, Room, Admin + 6 admin tabs)
+│       ├── ui/              # DOM-based UI (Auth, Lobby, Room, Admin + 6 admin tabs, extracted modals)
 │       ├── game/            # Client renderers (players, bombs, explosions, effects, etc.)
 │       └── network/         # ApiClient, SocketClient, AuthManager
 ├── docker-compose.yml       # Production orchestration
@@ -287,12 +287,15 @@ Detailed JSONL game logs are written to `./data/gamelogs/` for every match:
 - Tick snapshots every 5 ticks with full game state
 - Filename: `{ISO-timestamp}_{roomCode}_{gameMode}_{playerCount}p.jsonl`
 
-## Testing
+## Testing & Linting
 
 ```bash
-npm test          # Run tests across all workspaces
-npm run lint      # Lint all workspaces
+npm test                    # Run all test suites (92 tests)
+npm run lint                # ESLint across all workspaces
+npm run format:check        # Prettier format check
 ```
+
+92 tests across 6 suites covering game state lifecycle, movement, bombs, explosions, death mechanics, shield, chain reactions, win conditions, power-ups, teams, deathmatch, KOTH, and more.
 
 ## Database Migrations
 

@@ -1,4 +1,4 @@
-import { TICK_RATE, TICK_MS, COUNTDOWN_SECONDS } from '@blast-arena/shared';
+import { TICK_RATE } from '@blast-arena/shared';
 import { GameStateManager } from './GameState';
 import { logger } from '../utils/logger';
 
@@ -20,7 +20,7 @@ export class GameLoop {
     gameState: GameStateManager,
     onTick: (state: ReturnType<GameStateManager['toState']>) => void,
     onGameOver: () => void,
-    tickRate: number = TICK_RATE
+    tickRate: number = TICK_RATE,
   ) {
     this.gameState = gameState;
     this.onTick = onTick;

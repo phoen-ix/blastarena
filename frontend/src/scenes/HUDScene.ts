@@ -10,9 +10,17 @@ export class HUDScene extends Phaser.Scene {
   private localPlayerId!: number;
   private boundClickHandler: ((e: MouseEvent) => void) | null = null;
   private socketClient: any = null;
-  private playerDiedHandler: ((data: { playerId: number; killerId: number | null }) => void) | null = null;
+  private playerDiedHandler:
+    | ((data: { playerId: number; killerId: number | null }) => void)
+    | null = null;
   private killFeedEntries: { text: string; time: number }[] = [];
-  private previousStats: { maxBombs: number; fireRange: number; speed: number; hasShield: boolean; hasKick: boolean } | null = null;
+  private previousStats: {
+    maxBombs: number;
+    fireRange: number;
+    speed: number;
+    hasShield: boolean;
+    hasKick: boolean;
+  } | null = null;
 
   constructor() {
     super({ key: 'HUDScene' });
@@ -81,7 +89,9 @@ export class HUDScene extends Phaser.Scene {
       e.stopPropagation();
       this.registry.set('spectateTargetId', id);
       (item as HTMLElement).style.background = 'rgba(255, 107, 53, 0.6)';
-      setTimeout(() => { (item as HTMLElement).style.background = ''; }, 300);
+      setTimeout(() => {
+        (item as HTMLElement).style.background = '';
+      }, 300);
     };
     this.playerListEl.addEventListener('mousedown', this.boundClickHandler);
 
@@ -106,8 +116,10 @@ export class HUDScene extends Phaser.Scene {
     if (!state) return;
 
     // We use the last known state stored in the event context
-    const victim = this.lastKnownPlayers?.find(p => p.id === data.playerId);
-    const killer = data.killerId ? this.lastKnownPlayers?.find(p => p.id === data.killerId) : null;
+    const victim = this.lastKnownPlayers?.find((p) => p.id === data.playerId);
+    const killer = data.killerId
+      ? this.lastKnownPlayers?.find((p) => p.id === data.killerId)
+      : null;
 
     let text: string;
     if (killer && killer.id !== data.playerId) {
@@ -128,14 +140,16 @@ export class HUDScene extends Phaser.Scene {
   private renderKillFeed(): void {
     const now = Date.now();
     // Remove entries older than 5 seconds
-    this.killFeedEntries = this.killFeedEntries.filter(e => now - e.time < 5000);
+    this.killFeedEntries = this.killFeedEntries.filter((e) => now - e.time < 5000);
 
     if (this.killFeedEl) {
-      this.killFeedEl.innerHTML = this.killFeedEntries.map(e => {
-        const age = now - e.time;
-        const opacity = Math.max(0.3, 1 - age / 5000);
-        return `<div class="killfeed-entry" style="opacity:${opacity}">${e.text}</div>`;
-      }).join('');
+      this.killFeedEl.innerHTML = this.killFeedEntries
+        .map((e) => {
+          const age = now - e.time;
+          const opacity = Math.max(0.3, 1 - age / 5000);
+          return `<div class="killfeed-entry" style="opacity:${opacity}">${e.text}</div>`;
+        })
+        .join('');
     }
   }
 
@@ -209,20 +223,46 @@ export class HUDScene extends Phaser.Scene {
       const teamColors = ['#ff4466', '#448aff'];
       let lastTeam = -1;
 
-      playersEl.innerHTML = sorted.map((p: any) => {
-        const dead = !p.alive;
-        const clickable = p.alive && this.localPlayerDead;
-        let teamHeader = '';
-        if (isTeamMode && p.team !== lastTeam) {
-          lastTeam = p.team;
-          const teamName = p.team === 0 ? 'Team Red' : 'Team Blue';
-          teamHeader = `<div style="font-size:11px;font-weight:600;color:${teamColors[p.team]};padding:4px 8px 2px;margin-top:${p.team > 0 ? '6px' : '0'};">${teamName}</div>`;
-        }
-        const teamDot = isTeamMode ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${teamColors[p.team]};margin-right:4px;vertical-align:middle;"></span>` : '';
-        return `${teamHeader}<div class="hud-player-item${dead ? ' dead' : ''}${clickable ? ' clickable' : ''}" data-player-id="${p.id}">
+      const isKOTH = !!state.kothScores;
+
+      // In KOTH, sort by score descending
+      if (isKOTH) {
+        sorted.sort((a: any, b: any) => {
+          const sa = state.kothScores?.[a.id] ?? 0;
+          const sb = state.kothScores?.[b.id] ?? 0;
+          return sb - sa || (b.alive ? 1 : 0) - (a.alive ? 1 : 0);
+        });
+      }
+
+      playersEl.innerHTML = sorted
+        .map((p: any) => {
+          const dead = !p.alive;
+          const clickable = p.alive && this.localPlayerDead;
+          let teamHeader = '';
+          if (isTeamMode && p.team !== lastTeam) {
+            lastTeam = p.team;
+            const teamName = p.team === 0 ? 'Team Red' : 'Team Blue';
+            teamHeader = `<div style="font-size:11px;font-weight:600;color:${teamColors[p.team]};padding:4px 8px 2px;margin-top:${p.team > 0 ? '6px' : '0'};">${teamName}</div>`;
+          }
+          const teamDot = isTeamMode
+            ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${teamColors[p.team]};margin-right:4px;vertical-align:middle;"></span>`
+            : '';
+
+          // KOTH score badge
+          let scoreBadge = '';
+          if (isKOTH) {
+            const score = state.kothScores?.[p.id] ?? 0;
+            const isControlling = state.hillZone?.controllingPlayer === p.id;
+            const scoreColor = isControlling ? '#00e676' : '#ffaa22';
+            scoreBadge = `<span style="margin-left:auto;font-size:11px;font-weight:700;color:${scoreColor};font-family:'Chakra Petch',monospace;">${isControlling ? '👑 ' : ''}${score}</span>`;
+          }
+
+          return `${teamHeader}<div class="hud-player-item${dead ? ' dead' : ''}${clickable ? ' clickable' : ''}" data-player-id="${p.id}" style="${isKOTH ? 'display:flex;align-items:center;gap:4px;' : ''}">
           <span>${teamDot}${p.isBot ? '🤖 ' : ''}${p.username}</span>
+          ${scoreBadge}
         </div>`;
-      }).join('');
+        })
+        .join('');
     }
 
     // Refresh kill feed (for age-based opacity)

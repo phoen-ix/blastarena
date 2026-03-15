@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getRedis } from '../db/redis';
-import { Room, RoomListItem, MatchConfig, RoomPlayer } from '@blast-arena/shared';
+import { Room, RoomListItem, MatchConfig } from '@blast-arena/shared';
 import { PublicUser } from '@blast-arena/shared';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
@@ -9,7 +9,11 @@ function generateRoomCode(): string {
   return uuidv4().substring(0, 6).toUpperCase();
 }
 
-export async function createRoom(host: PublicUser, name: string, config: MatchConfig): Promise<Room> {
+export async function createRoom(
+  host: PublicUser,
+  name: string,
+  config: MatchConfig,
+): Promise<Room> {
   const redis = getRedis();
   const code = generateRoomCode();
 
@@ -79,7 +83,7 @@ export async function joinRoom(code: string, user: PublicUser): Promise<Room> {
     throw new AppError('Room is full', 400, 'ROOM_FULL');
   }
 
-  if (room.players.some(p => p.user.id === user.id)) {
+  if (room.players.some((p) => p.user.id === user.id)) {
     throw new AppError('Already in this room', 400, 'ALREADY_IN_ROOM');
   }
 
@@ -97,7 +101,7 @@ export async function leaveRoom(code: string, userId: number): Promise<Room | nu
 
   if (!room) return null;
 
-  room.players = room.players.filter(p => p.user.id !== userId);
+  room.players = room.players.filter((p) => p.user.id !== userId);
   await redis.del(`player:${userId}:room`);
 
   if (room.players.length === 0) {
@@ -120,7 +124,7 @@ export async function setPlayerReady(code: string, userId: number, ready: boolea
 
   if (!room) throw new AppError('Room not found', 404, 'NOT_FOUND');
 
-  const player = room.players.find(p => p.user.id === userId);
+  const player = room.players.find((p) => p.user.id === userId);
   if (!player) throw new AppError('Not in this room', 400, 'NOT_IN_ROOM');
 
   player.ready = ready;
@@ -129,13 +133,17 @@ export async function setPlayerReady(code: string, userId: number, ready: boolea
   return room;
 }
 
-export async function setPlayerTeam(code: string, targetUserId: number, team: number | null): Promise<Room> {
+export async function setPlayerTeam(
+  code: string,
+  targetUserId: number,
+  team: number | null,
+): Promise<Room> {
   const redis = getRedis();
   const room = await getRoom(code);
 
   if (!room) throw new AppError('Room not found', 404, 'NOT_FOUND');
 
-  const player = room.players.find(p => p.user.id === targetUserId);
+  const player = room.players.find((p) => p.user.id === targetUserId);
   if (!player) throw new AppError('Player not in this room', 400, 'NOT_IN_ROOM');
 
   player.team = team;

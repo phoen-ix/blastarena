@@ -39,7 +39,7 @@ export class PlayerSpriteRenderer {
   }
 
   update(players: PlayerState[]): void {
-    const activeIds = new Set(players.map(p => p.id));
+    const activeIds = new Set(players.map((p) => p.id));
 
     // Remove sprites for players no longer in the array
     for (const [id] of this.sprites) {
@@ -64,7 +64,7 @@ export class PlayerSpriteRenderer {
             existing.setTint(0xff0000);
 
             // Get player color for death particles
-            const colorIndex = this.playerColorIndex.get(player.id) ?? (index % 8);
+            const colorIndex = this.playerColorIndex.get(player.id) ?? index % 8;
             const playerColor = PLAYER_COLORS[colorIndex];
 
             this.scene.tweens.add({
@@ -170,12 +170,15 @@ export class PlayerSpriteRenderer {
         const isTeamMode = player.team !== null && player.team !== undefined;
         const teamLabelColors = ['#ff6b7f', '#6bb8ff'];
         const labelColor = isTeamMode ? teamLabelColors[player.team!] : '#ffffff';
-        const label = this.scene.add.text(targetX, targetY - TILE_SIZE / 2 - 2, player.username, {
-          fontSize: '11px',
-          color: labelColor,
-          stroke: '#000000',
-          strokeThickness: 2,
-        }).setOrigin(0.5, 1).setDepth(11);
+        const label = this.scene.add
+          .text(targetX, targetY - TILE_SIZE / 2 - 2, player.username, {
+            fontSize: '11px',
+            color: labelColor,
+            stroke: '#000000',
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5, 1)
+          .setDepth(11);
         this.labels.set(player.id, label);
 
         // Team colored underline indicator
@@ -187,7 +190,9 @@ export class PlayerSpriteRenderer {
           teamGfx.fillRoundedRect(
             targetX - TILE_SIZE / 2 + 1,
             targetY + TILE_SIZE / 2 - 5,
-            TILE_SIZE - 2, 4, 2
+            TILE_SIZE - 2,
+            4,
+            2,
           );
           this.teamIndicators.set(player.id, teamGfx);
         }
@@ -198,8 +203,6 @@ export class PlayerSpriteRenderer {
       }
 
       // Interpolate position
-      const prevX = sprite.x;
-      const prevY = sprite.y;
       sprite.x = Phaser.Math.Linear(sprite.x, targetX, 0.18);
       sprite.y = Phaser.Math.Linear(sprite.y, targetY, 0.18);
 
@@ -211,7 +214,8 @@ export class PlayerSpriteRenderer {
 
       // Detect movement
       const prevPos = this.prevPositions.get(player.id);
-      const moved = prevPos && (Math.abs(prevPos.x - targetX) > 1 || Math.abs(prevPos.y - targetY) > 1);
+      const moved =
+        prevPos && (Math.abs(prevPos.x - targetX) > 1 || Math.abs(prevPos.y - targetY) > 1);
 
       if (moved) {
         // Squash/stretch on movement
@@ -309,7 +313,9 @@ export class PlayerSpriteRenderer {
         teamGfx.fillRoundedRect(
           sprite.x - TILE_SIZE / 2 + 1,
           sprite.y + TILE_SIZE / 2 - 5,
-          TILE_SIZE - 2, 4, 2
+          TILE_SIZE - 2,
+          4,
+          2,
         );
       }
     });
