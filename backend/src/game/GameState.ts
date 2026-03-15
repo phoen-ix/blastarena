@@ -282,6 +282,8 @@ export class GameStateManager {
     // 5. Check player-explosion collisions
     for (const player of this.players.values()) {
       if (!player.alive || player.invulnerableTicks > 0) continue;
+      // Winner is invulnerable during grace period
+      if (isFinishing && this.winnerId === player.id) continue;
 
       for (const explosion of this.explosions.values()) {
         // Skip damage during fade-out phase (last 3 ticks) — explosion is visually fading

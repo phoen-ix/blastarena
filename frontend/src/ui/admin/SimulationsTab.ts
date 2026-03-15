@@ -24,6 +24,12 @@ export class SimulationsTab {
   private detailResults: SimulationGameResult[] = [];
   private activeBatch: SimulationBatchStatus | null = null;
 
+  // Pagination and sorting for detail view
+  private detailPage: number = 1;
+  private detailPageSize: number = 25;
+  private detailSortKey: string = 'gameIndex';
+  private detailSortAsc: boolean = true;
+
   constructor(notifications: NotificationUI, socketClient: SocketClient) {
     this.notifications = notifications;
     this.socketClient = socketClient;
@@ -170,9 +176,14 @@ export class SimulationsTab {
         <td style="display:flex;gap:4px;">
           <button class="btn btn-secondary btn-sm" data-action="view" data-batch="${escapeHtml(b.batchId)}">View</button>
           ${
+            b.status !== 'running'
+              ? `<button class="btn-warn btn-sm" data-action="delete" data-batch="${escapeHtml(b.batchId)}">Delete</button>`
+              : ''
+          }
+          ${
             b.status === 'running'
               ? `
-            <button class="btn btn-secondary btn-sm" data-action="spectate" data-batch="${escapeHtml(b.batchId)}">Spectate</button>
+            ${b.config.speed === 'realtime' ? `<button class="btn btn-secondary btn-sm" data-action="spectate" data-batch="${escapeHtml(b.batchId)}">Spectate</button>` : ''}
             <button class="btn-warn btn-sm" data-action="cancel" data-batch="${escapeHtml(b.batchId)}">Cancel</button>
           `
               : ''
@@ -200,6 +211,16 @@ export class SimulationsTab {
       });
     } else if (action === 'spectate') {
       this.startSpectating(batchId);
+    } else if (action === 'delete') {
+      if (confirm(`Delete simulation batch and all its logs?`)) {
+        try {
+          await ApiClient.delete(`/admin/simulations/${batchId}`);
+          this.notifications.success('Simulation deleted');
+          this.loadBatchList();
+        } catch {
+          this.notifications.error('Failed to delete simulation');
+        }
+      }
     }
   };
 
@@ -323,7 +344,7 @@ export class SimulationsTab {
           status.status === 'running'
             ? `
           <div style="margin-top:12px;display:flex;gap:8px;">
-            <button class="btn btn-secondary btn-sm" id="sim-detail-spectate">Spectate Current Game</button>
+            ${status.config.speed === 'realtime' ? `<button class="btn btn-secondary btn-sm" id="sim-detail-spectate">Spectate Current Game</button>` : ''}
             <button class="btn-warn btn-sm" id="sim-detail-cancel">Cancel Batch</button>
           </div>
         `
@@ -353,41 +374,15 @@ export class SimulationsTab {
           : ''
       }
 
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Winner</th>
-            <th>Duration</th>
-            <th>Kill Leader</th>
-            <th>Reason</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${this.detailResults
-            .map((r) => {
-              const killLeader = [...r.placements].sort((a, b) => b.kills - a.kills)[0];
-              const mins = Math.floor(r.durationSeconds / 60);
-              const secs = r.durationSeconds % 60;
-              return `
-              <tr>
-                <td>${r.gameIndex + 1}</td>
-                <td style="color:var(--primary);font-weight:600;">${r.winnerName ? escapeHtml(r.winnerName) : '<span style="color:var(--text-dim);">Draw</span>'}</td>
-                <td>${mins}:${String(secs).padStart(2, '0')}</td>
-                <td>${killLeader ? `${escapeHtml(killLeader.name)} (${killLeader.kills})` : '-'}</td>
-                <td style="color:var(--text-dim);font-size:12px;">${escapeHtml(r.finishReason)}</td>
-              </tr>
-            `;
-            })
-            .join('')}
-          ${this.detailResults.length === 0 ? '<tr><td colspan="5" style="text-align:center;color:var(--text-dim);">No results yet</td></tr>' : ''}
-        </tbody>
-      </table>
+      ${this.renderResultsTable()}
     `;
 
     this.container.querySelector('#sim-back-to-list')?.addEventListener('click', () => {
       this.detailBatchId = null;
       this.detailResults = [];
+      this.detailPage = 1;
+      this.detailSortKey = 'gameIndex';
+      this.detailSortAsc = true;
       this.loadBatchList();
     });
 
@@ -408,6 +403,152 @@ export class SimulationsTab {
         });
       }
     });
+
+    this.attachResultsTableListeners();
+  }
+
+  private renderResultsTable(): string {
+    // Sort results
+    const sorted = [...this.detailResults].sort((a, b) => {
+      let cmp = 0;
+      switch (this.detailSortKey) {
+        case 'gameIndex':
+          cmp = a.gameIndex - b.gameIndex;
+          break;
+        case 'winner':
+          cmp = (a.winnerName || '').localeCompare(b.winnerName || '');
+          break;
+        case 'duration':
+          cmp = a.durationSeconds - b.durationSeconds;
+          break;
+        case 'kills': {
+          const aKills = Math.max(...a.placements.map((p) => p.kills));
+          const bKills = Math.max(...b.placements.map((p) => p.kills));
+          cmp = aKills - bKills;
+          break;
+        }
+        case 'reason':
+          cmp = a.finishReason.localeCompare(b.finishReason);
+          break;
+      }
+      return this.detailSortAsc ? cmp : -cmp;
+    });
+
+    // Paginate
+    const totalPages = Math.max(1, Math.ceil(sorted.length / this.detailPageSize));
+    if (this.detailPage > totalPages) this.detailPage = totalPages;
+    const start = (this.detailPage - 1) * this.detailPageSize;
+    const pageResults = sorted.slice(start, start + this.detailPageSize);
+
+    const sortIcon = (key: string) => {
+      if (this.detailSortKey !== key) return '';
+      return this.detailSortAsc ? ' ↑' : ' ↓';
+    };
+
+    const thStyle = 'cursor:pointer;user-select:none;';
+
+    return `
+      <table class="admin-table" id="sim-results-table">
+        <thead>
+          <tr>
+            <th style="${thStyle}" data-sort="gameIndex">#${sortIcon('gameIndex')}</th>
+            <th style="${thStyle}" data-sort="winner">Winner${sortIcon('winner')}</th>
+            <th style="${thStyle}" data-sort="duration">Duration${sortIcon('duration')}</th>
+            <th style="${thStyle}" data-sort="kills">Kill Leader${sortIcon('kills')}</th>
+            <th style="${thStyle}" data-sort="reason">Reason${sortIcon('reason')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${pageResults
+            .map((r) => {
+              const killLeader = [...r.placements].sort((a, b) => b.kills - a.kills)[0];
+              const mins = Math.floor(r.durationSeconds / 60);
+              const secs = r.durationSeconds % 60;
+              return `
+              <tr>
+                <td>${r.gameIndex + 1}</td>
+                <td style="color:var(--primary);font-weight:600;">${r.winnerName ? escapeHtml(r.winnerName) : '<span style="color:var(--text-dim);">Draw</span>'}</td>
+                <td>${mins}:${String(secs).padStart(2, '0')}</td>
+                <td>${killLeader ? `${escapeHtml(killLeader.name)} (${killLeader.kills})` : '-'}</td>
+                <td style="color:var(--text-dim);font-size:12px;">${escapeHtml(r.finishReason)}</td>
+              </tr>
+            `;
+            })
+            .join('')}
+          ${sorted.length === 0 ? '<tr><td colspan="5" style="text-align:center;color:var(--text-dim);">No results yet</td></tr>' : ''}
+        </tbody>
+      </table>
+      ${
+        totalPages > 1
+          ? `
+        <div style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:12px;">
+          <button class="btn btn-secondary btn-sm" id="sim-page-prev" ${this.detailPage <= 1 ? 'disabled' : ''}>Prev</button>
+          <span style="color:var(--text-dim);font-size:13px;">Page ${this.detailPage} of ${totalPages} (${sorted.length} results)</span>
+          <button class="btn btn-secondary btn-sm" id="sim-page-next" ${this.detailPage >= totalPages ? 'disabled' : ''}>Next</button>
+        </div>
+      `
+          : ''
+      }
+    `;
+  }
+
+  private attachResultsTableListeners(): void {
+    if (!this.container) return;
+
+    // Sort headers
+    this.container.querySelectorAll('#sim-results-table th[data-sort]').forEach((th) => {
+      th.addEventListener('click', () => {
+        const key = (th as HTMLElement).dataset.sort!;
+        if (this.detailSortKey === key) {
+          this.detailSortAsc = !this.detailSortAsc;
+        } else {
+          this.detailSortKey = key;
+          this.detailSortAsc = true;
+        }
+        this.detailPage = 1;
+        this.refreshResultsTable();
+      });
+    });
+
+    // Pagination
+    this.container.querySelector('#sim-page-prev')?.addEventListener('click', () => {
+      if (this.detailPage > 1) {
+        this.detailPage--;
+        this.refreshResultsTable();
+      }
+    });
+    this.container.querySelector('#sim-page-next')?.addEventListener('click', () => {
+      this.detailPage++;
+      this.refreshResultsTable();
+    });
+  }
+
+  private refreshResultsTable(): void {
+    if (!this.container) return;
+    const tableContainer = this.container.querySelector('#sim-results-table')?.parentElement;
+    if (!tableContainer) return;
+
+    // Find the table and pagination wrapper, replace them
+    const oldTable = this.container.querySelector('#sim-results-table');
+    const oldPagination = oldTable?.nextElementSibling;
+
+    const temp = document.createElement('div');
+    temp.innerHTML = this.renderResultsTable();
+
+    if (oldTable) {
+      oldTable.replaceWith(temp.querySelector('#sim-results-table')!);
+    }
+    if (oldPagination?.id === 'sim-page-prev' || oldPagination?.querySelector('#sim-page-prev')) {
+      oldPagination.replaceWith(...Array.from(temp.children));
+    } else {
+      // Append pagination if it wasn't there before
+      const newPagination = temp.querySelector('#sim-page-prev')?.parentElement;
+      if (newPagination && oldTable?.parentElement) {
+        oldTable.parentElement.appendChild(newPagination);
+      }
+    }
+
+    this.attachResultsTableListeners();
   }
 
   private showConfigModal(): void {

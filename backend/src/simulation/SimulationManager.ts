@@ -163,6 +163,45 @@ export class SimulationManager {
     return null;
   }
 
+  deleteBatch(batchId: string): boolean {
+    // Remove from memory
+    this.runners.delete(batchId);
+
+    // Find and delete from disk
+    try {
+      if (!fs.existsSync(SIM_LOG_DIR)) return false;
+
+      const gameModes = fs.readdirSync(SIM_LOG_DIR, { withFileTypes: true });
+      for (const modeDir of gameModes) {
+        if (!modeDir.isDirectory()) continue;
+        const modePath = path.join(SIM_LOG_DIR, modeDir.name);
+        const batchDirs = fs.readdirSync(modePath, { withFileTypes: true });
+
+        for (const batchDir of batchDirs) {
+          if (!batchDir.isDirectory()) continue;
+          const configPath = path.join(modePath, batchDir.name, 'batch_config.json');
+          if (!fs.existsSync(configPath)) continue;
+
+          try {
+            const configData = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+            if (configData.batchId === batchId) {
+              const dirPath = path.join(modePath, batchDir.name);
+              fs.rmSync(dirPath, { recursive: true, force: true });
+              logger.info({ batchId, path: dirPath }, 'Simulation batch deleted from disk');
+              return true;
+            }
+          } catch {
+            // Skip malformed
+          }
+        }
+      }
+    } catch (err) {
+      logger.error({ err, batchId }, 'Failed to delete simulation batch');
+    }
+
+    return false;
+  }
+
   cleanup(): void {
     // Remove finished runners from memory (keep only last 10)
     const entries = Array.from(this.runners.entries());

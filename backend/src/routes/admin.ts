@@ -288,12 +288,15 @@ router.post(
 
 router.delete('/admin/simulations/:batchId', adminOnlyMiddleware, (req, res) => {
   const mgr = getSimulationManager();
-  const success = mgr.cancelBatch(req.params.batchId);
-  if (!success) {
-    res.status(404).json({ error: 'Batch not found or not running' });
+  // Try cancelling if running
+  mgr.cancelBatch(req.params.batchId);
+  // Delete from disk and memory
+  const deleted = mgr.deleteBatch(req.params.batchId);
+  if (!deleted) {
+    res.status(404).json({ error: 'Batch not found' });
     return;
   }
-  res.json({ message: 'Batch cancelled' });
+  res.json({ message: 'Batch deleted' });
 });
 
 export default router;
