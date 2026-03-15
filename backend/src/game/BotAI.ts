@@ -244,11 +244,7 @@ export class BotAI {
         }
       }
 
-      // Completely stuck: try placing a bomb (might chain-react and open a path)
-      if (player.canPlaceBomb()) {
-        logDecision('stuck_bomb');
-        return { seq: this.seq, direction: null, action: 'bomb', tick: state.tick };
-      }
+      // Completely stuck: accept fate (don't bomb out of traps — feels unfair to human players)
       logDecision('stuck');
       return null;
     } else {
@@ -488,18 +484,22 @@ export class BotAI {
     }
 
     // Priority 6: Move toward nearest destructible wall
-    const wallDir = this.findDestructibleWallDirection(
-      pos,
-      state,
-      player,
-      danger,
-      bombPositions,
-      otherPlayers,
-    );
-    if (wallDir) {
-      this.lastDirection = wallDir;
-      logDecision('seek_wall', { dir: wallDir });
-      return { seq: this.seq, direction: wallDir, action: null, tick: state.tick };
+    // Skip if already adjacent to a destructible wall — stay put and wait for bomb cooldown
+    // (moving away causes seek_wall <-> wander oscillation)
+    if (!this.isNearDestructible(pos, state)) {
+      const wallDir = this.findDestructibleWallDirection(
+        pos,
+        state,
+        player,
+        danger,
+        bombPositions,
+        otherPlayers,
+      );
+      if (wallDir) {
+        this.lastDirection = wallDir;
+        logDecision('seek_wall', { dir: wallDir });
+        return { seq: this.seq, direction: wallDir, action: null, tick: state.tick };
+      }
     }
 
     // Priority 7: Wander
@@ -1103,6 +1103,22 @@ export class BotAI {
       const key = `${newPos.x},${newPos.y}`;
       if (danger.has(key)) continue;
       visited.add(key);
+
+      // Skip dead-end destinations — bot won't be able to bomb there (walkableDirs < 2)
+      let destWalkable = 0;
+      for (const d of DIRECTIONS) {
+        if (state.collisionSystem.canMoveTo(newPos.x, newPos.y, d, bombPositions, otherPlayers)) {
+          destWalkable++;
+        }
+      }
+      if (destWalkable < 2) {
+        // Still add to frontier for deeper BFS but don't suggest moving here
+        if (!this.wouldOscillate(newPos)) {
+          frontier.push({ pos: newPos, firstDir: dir });
+        }
+        continue;
+      }
+
       for (const { dx, dy } of Object.values(DIR_DELTA)) {
         if (isDestructibleTile(state.collisionSystem.getTileAt(newPos.x + dx, newPos.y + dy))) {
           const distToEnemy = nearestEnemy

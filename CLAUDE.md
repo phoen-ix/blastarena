@@ -138,8 +138,9 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - BotAI directional wall clearing: prefers breaking walls toward enemies rather than just the nearest wall
 - BotAI danger timer threshold: normal/hard bots ignore bombs with many ticks remaining (>30/40) unless within 2 tiles, reducing unnecessary fleeing from fresh bombs
 - BotAI KOTH hill-seeking: priority 4.5 in decision tree, bots navigate toward the 3x3 center zone using manhattan distance heuristic; once inside they stay put rather than wandering off
-- BotAI anti-oscillation: `orderedDirs()` helper iterates `lastDirection` first in all BFS seed steps; `posHistory` (last 4 positions) with `wouldOscillate()` check filters directions that revisit recent tiles; wander has 85% continuation probability and prefers non-oscillating candidates
-- BotAI flee stuck-breaker: tracks `lastFleePos`/`fleeStuckTicks` — after 3 ticks stuck at same position while fleeing, tries alternative directions (logged as `flee_unstick`); when completely stuck, places `stuck_bomb` as last resort
+- BotAI anti-oscillation: `orderedDirs()` helper iterates `lastDirection` first in all BFS seed steps; `posHistory` (last 4 positions) with `wouldOscillate()` check filters directions that revisit recent tiles; wander has 85% continuation probability and prefers non-oscillating candidates. `seek_wall` skips entirely when already adjacent to a destructible wall (prevents seek_wall↔wander ping-pong). `findDestructibleWallDirection` skips dead-end destinations (walkableDirs < 2) so bots aren't sent to positions where bomb_wall's safety check blocks them.
+- BotAI flee stuck-breaker: tracks `lastFleePos`/`fleeStuckTicks` — after 3 ticks stuck at same position while fleeing, tries alternative directions (logged as `flee_unstick`)
+- BotAI trapped behavior: when completely stuck in danger with no movement options, bots accept their fate instead of placing bombs to blow open walls (removed `stuck_bomb` — unfair escape from player traps)
 - BotAI normal difficulty: huntChance=0.7, bombCooldown=25-45 ticks (data-driven tuning from 5000+ simulation games)
 - Self-kills subtract 1 from kill score (owner.kills decremented, owner.selfKills incremented)
 - Game over placements sorted by kills descending, tiebreak by survival placement
