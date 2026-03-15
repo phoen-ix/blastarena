@@ -50,7 +50,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - **HUD**: DOM-based overlay in HUDScene.ts with timer, player list, kill feed, stats bar (bottom-left), spectator banner
 - Settings and Help are in the lobby header (LobbyUI), not in-game HUD, to avoid overlapping player names
 - Help modal covers: controls (keyboard + gamepad), all 8 power-ups (with in-game tile preview + HUD emoji), all 6 game modes, map features (reinforced walls, map events, hazard tiles with visual previews), and core mechanics
-- Countdown is only shown in-game (CountdownOverlay), not in the lobby/room UI
+- Countdown synced between server and client: GameLoop holds `status: 'countdown'` for 36 ticks (1.8s) while CountdownOverlay plays "3, 2, 1" — gameplay starts on "GO!". Both client and server block inputs during countdown.
 - **Gamepad support**: Xbox/standard gamepad via Phaser gamepad plugin (`input: { gamepad: true }` in config). D-pad/left stick for movement (0.3 deadzone, dominant-axis), A=bomb, B=detonate, LB/RB=cycle spectate. GamepadManager polls each frame; actions latched in `pendingGamepadAction` to survive 50ms tick throttle. Keyboard takes priority when both active.
 - **Real-time lobby**: Room list auto-updates via `room:list` socket broadcast on every room mutation (create/join/leave/start/restart/disconnect) — no manual refresh needed
 
@@ -83,7 +83,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - Shield has no time limit — lasts until consumed by an explosion. After shield breaks, player gets 10 ticks of invulnerability to escape the explosion area. Extra shield pickups are consumed but don't stack.
 - BotAI detonates remote bombs when an enemy is in their blast zone, or when all bomb slots are full (priority 2.5 in decision tree)
 - Game over screen shows context message (e.g., "Time's up!", "PlayerX is the last survivor!", "Draw — no survivors!")
-- Game start is instant (no server-side countdown delay); room:start guard checks both GameRoom existence and room status to prevent duplicate starts
+- Game start transitions instantly to game scene; room:start guard checks both GameRoom existence and room status to prevent duplicate starts
 - "Back to Lobby" from game over clears currentRoom registry to prevent stale room UI
 
 ## Game Modes

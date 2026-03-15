@@ -1,6 +1,11 @@
-import { TICK_RATE, TICK_MS } from '@blast-arena/shared';
+import { TICK_RATE, TICK_MS, COUNTDOWN_SECONDS } from '@blast-arena/shared';
 import { GameStateManager } from './GameState';
 import { logger } from '../utils/logger';
+
+// Ticks to wait in countdown before switching to 'playing'
+// Matches the frontend CountdownOverlay: "3","2","1" shown at 600ms intervals,
+// "GO!" appears at 1800ms — that's when gameplay should begin
+const COUNTDOWN_TICKS = Math.round(1.8 * TICK_RATE); // 36 ticks
 
 export class GameLoop {
   private gameState: GameStateManager;
@@ -9,6 +14,7 @@ export class GameLoop {
   private onGameOver: () => void;
   private tickRate: number;
   private running: boolean = false;
+  private countdownTicksRemaining: number = COUNTDOWN_TICKS;
 
   constructor(
     gameState: GameStateManager,
@@ -25,12 +31,23 @@ export class GameLoop {
   start(): void {
     if (this.running) return;
     this.running = true;
-    this.gameState.status = 'playing';
+    this.countdownTicksRemaining = COUNTDOWN_TICKS;
 
     const tickMs = 1000 / this.tickRate;
 
     this.interval = setInterval(() => {
       try {
+        // Countdown phase: broadcast state but don't process game ticks
+        if (this.countdownTicksRemaining > 0) {
+          this.countdownTicksRemaining--;
+          if (this.countdownTicksRemaining <= 0) {
+            this.gameState.status = 'playing';
+          }
+          const state = this.gameState.toState();
+          this.onTick(state);
+          return;
+        }
+
         this.gameState.processTick();
         const state = this.gameState.toState();
         this.onTick(state);

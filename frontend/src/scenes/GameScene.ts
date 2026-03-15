@@ -41,7 +41,6 @@ export class GameScene extends Phaser.Scene {
   private lastGameState: GameState | null = null;
   private localPlayerDead: boolean = false;
   private hasShownCountdown: boolean = false;
-  private previousStatus: string = '';
 
   // Spectator mode
   private freeCamX: number = 0;
@@ -75,7 +74,7 @@ export class GameScene extends Phaser.Scene {
     this.spectateTargetId = null;
     this.lastGameState = null;
     this.hasShownCountdown = false;
-    this.previousStatus = '';
+
     this.pendingGamepadAction = null;
 
     this.events.once('shutdown', this.shutdown, this);
@@ -139,12 +138,11 @@ export class GameScene extends Phaser.Scene {
   private updateState(state: GameState): void {
     this.lastGameState = state;
 
-    // Countdown overlay trigger
-    if (this.previousStatus === 'countdown' && state.status === 'playing' && !this.hasShownCountdown) {
+    // Countdown overlay trigger — show during countdown, not after
+    if (state.status === 'countdown' && !this.hasShownCountdown) {
       this.hasShownCountdown = true;
       this.countdownOverlay.show();
     }
-    this.previousStatus = state.status;
 
     // Update renderers
     if (this.tileMap && state.map.tiles) {
@@ -254,6 +252,9 @@ export class GameScene extends Phaser.Scene {
       }
       return;
     }
+
+    // Don't send inputs during countdown
+    if (this.lastGameState?.status !== 'playing') return;
 
     // Poll gamepad before throttle to capture just-pressed actions
     const gpInput = this.gamepadManager.poll();
