@@ -134,7 +134,7 @@ export class UsersTab {
       this.container!.addEventListener('change', this.handleChange);
 
     } catch {
-      tableEl.innerHTML = '<div style="color:#e94560;">Failed to load users</div>';
+      tableEl.innerHTML = '<div style="color:var(--danger);">Failed to load users</div>';
     }
   }
 
@@ -171,9 +171,9 @@ export class UsersTab {
     modal.className = 'modal-overlay';
     modal.innerHTML = `
       <div class="modal" style="max-width:420px;">
-        <h2 style="margin-bottom:12px;color:#e94560;">Delete User Permanently</h2>
-        <p style="color:#a0a0b0;font-size:14px;">This will permanently delete <strong style="color:#fff;">${this.escapeHtml(username)}</strong> and all their data. This action cannot be undone.</p>
-        <p style="color:#a0a0b0;font-size:13px;margin-top:8px;">Type the username to confirm:</p>
+        <h2 style="margin-bottom:12px;color:var(--danger);">Delete User Permanently</h2>
+        <p style="color:var(--text-dim);font-size:14px;">This will permanently delete <strong style="color:var(--text);">${this.escapeHtml(username)}</strong> and all their data. This action cannot be undone.</p>
+        <p style="color:var(--text-dim);font-size:13px;margin-top:8px;">Type the username to confirm:</p>
         <input type="text" class="confirm-input" id="delete-confirm-input" placeholder="${this.escapeAttr(username)}">
         <div class="modal-actions" style="margin-top:16px;">
           <button class="btn btn-secondary" id="delete-cancel">Cancel</button>
@@ -207,19 +207,19 @@ export class UsersTab {
         <h2 style="margin-bottom:16px;">Create User</h2>
         <div style="display:flex;flex-direction:column;gap:10px;">
           <div>
-            <label style="color:#a0a0b0;font-size:13px;">Username *</label>
+            <label style="color:var(--text-dim);font-size:13px;">Username *</label>
             <input type="text" class="admin-input" id="cu-username" placeholder="3-20 chars, alphanumeric, - _" style="margin-top:4px;">
           </div>
           <div>
-            <label style="color:#a0a0b0;font-size:13px;">Email *</label>
+            <label style="color:var(--text-dim);font-size:13px;">Email *</label>
             <input type="email" class="admin-input" id="cu-email" placeholder="user@example.com" style="margin-top:4px;">
           </div>
           <div>
-            <label style="color:#a0a0b0;font-size:13px;">Password *</label>
+            <label style="color:var(--text-dim);font-size:13px;">Password *</label>
             <input type="password" class="admin-input" id="cu-password" placeholder="Min 6 characters" style="margin-top:4px;">
           </div>
           <div>
-            <label style="color:#a0a0b0;font-size:13px;">Role</label>
+            <label style="color:var(--text-dim);font-size:13px;">Role</label>
             <select class="admin-select" id="cu-role" style="margin-top:4px;width:100%;padding:8px 12px;font-size:14px;">
               <option value="user" selected>user</option>
               <option value="moderator">moderator</option>
@@ -227,7 +227,7 @@ export class UsersTab {
             </select>
           </div>
         </div>
-        <div id="cu-error" style="color:#e94560;font-size:13px;margin-top:8px;display:none;"></div>
+        <div id="cu-error" style="color:var(--danger);font-size:13px;margin-top:8px;display:none;"></div>
         <div class="modal-actions" style="margin-top:16px;">
           <button class="btn btn-secondary" id="cu-cancel">Cancel</button>
           <button class="btn btn-primary" id="cu-submit">Create</button>

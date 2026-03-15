@@ -29,19 +29,22 @@ export class MenuScene extends Phaser.Scene {
     const height = this.cameras.main.height;
 
     this.add.text(width / 2, height / 2 - 60, 'BLAST ARENA', {
-      fontSize: '48px',
-      color: '#e94560',
+      fontSize: '52px',
+      color: '#ff6b35',
+      fontFamily: 'Chakra Petch, sans-serif',
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
     this.add.text(width / 2, height / 2, 'Multiplayer Explosive Combat', {
       fontSize: '16px',
-      color: '#a0a0b0',
+      color: '#8888a0',
+      fontFamily: 'DM Sans, sans-serif',
     }).setOrigin(0.5);
 
     this.add.text(width / 2, height / 2 + 60, 'Connecting...', {
       fontSize: '14px',
-      color: '#666',
+      color: '#505068',
+      fontFamily: 'DM Sans, sans-serif',
     }).setOrigin(0.5);
 
     // Try auto-login first

@@ -38,7 +38,8 @@ export class GameOverScene extends Phaser.Scene {
 
     this.add.text(width / 2, 45, 'GAME OVER', {
       fontSize: '42px',
-      color: '#e94560',
+      color: '#ff6b35',
+      fontFamily: 'Chakra Petch, sans-serif',
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
@@ -46,19 +47,21 @@ export class GameOverScene extends Phaser.Scene {
     if (data?.reason) {
       this.add.text(width / 2, 85, data.reason, {
         fontSize: '16px',
-        color: '#a0a0b0',
+        color: '#8888a0',
+        fontFamily: 'DM Sans, sans-serif',
       }).setOrigin(0.5);
     }
 
     // Play Again button
     const playAgainBtn = this.add.text(width / 2 - 100, height - 40, '[ Play Again ]', {
       fontSize: '20px',
-      color: '#44ff44',
+      color: '#00e676',
+      fontFamily: 'Chakra Petch, sans-serif',
       fontStyle: 'bold',
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
-    playAgainBtn.on('pointerover', () => playAgainBtn.setColor('#88ff88'));
-    playAgainBtn.on('pointerout', () => playAgainBtn.setColor('#44ff44'));
+    playAgainBtn.on('pointerover', () => playAgainBtn.setColor('#66ffaa'));
+    playAgainBtn.on('pointerout', () => playAgainBtn.setColor('#00e676'));
     playAgainBtn.on('pointerdown', () => {
       // Remove room:state listener to prevent double-navigation (callback handles this player)
       socketClient.off('room:state' as any, roomStateHandler as any);
@@ -73,12 +76,13 @@ export class GameOverScene extends Phaser.Scene {
     // Back to lobby button
     const backBtn = this.add.text(width / 2 + 100, height - 40, '[ Back to Lobby ]', {
       fontSize: '20px',
-      color: '#e94560',
+      color: '#ff6b35',
+      fontFamily: 'Chakra Petch, sans-serif',
       fontStyle: 'bold',
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
-    backBtn.on('pointerover', () => backBtn.setColor('#ff6b81'));
-    backBtn.on('pointerout', () => backBtn.setColor('#e94560'));
+    backBtn.on('pointerover', () => backBtn.setColor('#ff8555'));
+    backBtn.on('pointerout', () => backBtn.setColor('#ff6b35'));
     backBtn.on('pointerdown', () => {
       socketClient.emit('room:leave' as any);
       this.registry.remove('currentRoom');
@@ -94,7 +98,7 @@ export class GameOverScene extends Phaser.Scene {
 
       // Check if team mode (winnerTeam is set)
       const isTeamMode = data.winnerTeam !== null && data.winnerTeam !== undefined;
-      const teamColors = ['#e94560', '#44aaff'];
+      const teamColors = ['#ff4466', '#448aff'];
       const teamNames = ['Red', 'Blue'];
 
       // Column layout
@@ -103,7 +107,7 @@ export class GameOverScene extends Phaser.Scene {
       const colScore = width * 0.75;
 
       // Header
-      const hs = { fontSize: '13px', color: '#555', fontStyle: 'bold' } as Phaser.Types.GameObjects.Text.TextStyle;
+      const hs = { fontSize: '13px', color: '#505068', fontFamily: 'Chakra Petch, sans-serif', fontStyle: 'bold' } as Phaser.Types.GameObjects.Text.TextStyle;
       this.add.text(colName, 115, 'PLAYER', hs).setOrigin(0.5);
       if (isTeamMode) this.add.text(colTeam, 115, 'TEAM', hs).setOrigin(0.5);
       this.add.text(colScore, 115, 'SCORE', hs).setOrigin(0.5);

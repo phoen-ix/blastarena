@@ -56,7 +56,7 @@ export class MatchesTab {
                 <td>${m.started_at ? new Date(m.started_at).toLocaleString() : '-'}</td>
               </tr>
             `).join('')}
-            ${result.matches.length === 0 ? '<tr><td colspan="8" style="text-align:center;color:#a0a0b0;">No matches found</td></tr>' : ''}
+            ${result.matches.length === 0 ? '<tr><td colspan="8" style="text-align:center;color:var(--text-dim);">No matches found</td></tr>' : ''}
           </tbody>
         </table>
         <div class="admin-pagination">
@@ -68,7 +68,7 @@ export class MatchesTab {
 
       this.container.addEventListener('click', this.handleClick);
     } catch {
-      this.container.innerHTML = '<div style="color:#e94560;">Failed to load matches</div>';
+      this.container.innerHTML = '<div style="color:var(--danger);">Failed to load matches</div>';
     }
   }
 

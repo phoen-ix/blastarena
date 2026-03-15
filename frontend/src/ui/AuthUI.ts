@@ -45,7 +45,7 @@ export class AuthUI {
   private renderLogin(): void {
     this.overlay.innerHTML = `
       <div class="auth-form">
-        <h2>BlastArena</h2>
+        <h2>BLAST<span>ARENA</span></h2>
         <div class="form-group">
           <label>Username</label>
           <input type="text" id="login-username" placeholder="Enter username" autocomplete="username">
@@ -82,7 +82,7 @@ export class AuthUI {
   private renderRegister(): void {
     this.overlay.innerHTML = `
       <div class="auth-form">
-        <h2>Create Account</h2>
+        <h2>CREATE <span>ACCOUNT</span></h2>
         <div class="form-group">
           <label>Username</label>
           <input type="text" id="reg-username" placeholder="3-20 chars, letters/numbers/_/-" autocomplete="username">
@@ -116,7 +116,7 @@ export class AuthUI {
   private renderForgotPassword(): void {
     this.overlay.innerHTML = `
       <div class="auth-form">
-        <h2>Reset Password</h2>
+        <h2>RESET <span>PASSWORD</span></h2>
         <div class="form-group">
           <label>Email</label>
           <input type="email" id="forgot-email" placeholder="your@email.com">

@@ -38,7 +38,7 @@ export class AnnouncementsTab {
     this.container.innerHTML = `
       <div class="admin-section">
         <h3>Broadcast Toast</h3>
-        <p style="color:#a0a0b0;font-size:13px;margin-bottom:12px;">Send an ephemeral notification to all connected players. It will disappear after a few seconds.</p>
+        <p style="color:var(--text-dim);font-size:13px;margin-bottom:12px;">Send an ephemeral notification to all connected players. It will disappear after a few seconds.</p>
         <div style="display:flex;gap:12px;align-items:center;">
           <input type="text" class="admin-input" id="toast-input" placeholder="Type toast message..." style="flex:1;min-width:0;">
           <button class="btn btn-primary" id="toast-send">Send Toast</button>
@@ -49,16 +49,16 @@ export class AnnouncementsTab {
       ${isAdmin ? `
         <div class="admin-section">
           <h3>Persistent Banner</h3>
-          <p style="color:#a0a0b0;font-size:13px;margin-bottom:12px;">Set a banner that appears at the top of the lobby for all users until you clear it.</p>
+          <p style="color:var(--text-dim);font-size:13px;margin-bottom:12px;">Set a banner that appears at the top of the lobby for all users until you clear it.</p>
           ${currentBanner ? `
             <div style="margin-bottom:12px;">
-              <label style="color:#a0a0b0;font-size:12px;">Current Banner:</label>
+              <label style="color:var(--text-dim);font-size:12px;">Current Banner:</label>
               <div class="admin-banner" style="margin-top:6px;">
                 <span>${this.escapeHtml(currentBanner.message)}</span>
               </div>
               <button class="btn-danger btn-sm" id="banner-clear" style="margin-top:8px;">Clear Banner</button>
             </div>
-          ` : '<p style="color:#a0a0b0;font-size:13px;margin-bottom:12px;">No active banner.</p>'}
+          ` : '<p style="color:var(--text-dim);font-size:13px;margin-bottom:12px;">No active banner.</p>'}
           <div style="display:flex;gap:12px;align-items:center;">
             <input type="text" class="admin-input" id="banner-input" placeholder="Type banner message..." style="flex:1;min-width:0;">
             <button class="btn btn-primary" id="banner-set">Set Banner</button>

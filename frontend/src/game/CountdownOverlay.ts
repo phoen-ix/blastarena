@@ -20,7 +20,7 @@ export class CountdownOverlay {
     const cy = cam.height / 2;
 
     const items = ['3', '2', '1', 'GO!'];
-    const colors = ['#e94560', '#e94560', '#e94560', '#44ff44'];
+    const colors = ['#ff6b35', '#ff6b35', '#ff6b35', '#00e676'];
 
     items.forEach((label, i) => {
       this.scene.time.delayedCall(i * 600, () => {

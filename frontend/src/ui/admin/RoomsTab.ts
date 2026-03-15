@@ -67,14 +67,14 @@ export class RoomsTab {
                 </td>
               </tr>
             `).join('')}
-            ${rooms.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:#a0a0b0;">No active rooms</td></tr>' : ''}
+            ${rooms.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);">No active rooms</td></tr>' : ''}
           </tbody>
         </table>
       `;
 
       this.container.addEventListener('click', this.handleClick);
     } catch {
-      this.container.innerHTML = '<div style="color:#e94560;">Failed to load rooms</div>';
+      this.container.innerHTML = '<div style="color:var(--danger);">Failed to load rooms</div>';
     }
   }
 
@@ -151,9 +151,9 @@ export class RoomsTab {
     modal.innerHTML = `
       <div class="modal" style="max-width:400px;">
         <h2 style="margin-bottom:12px;">Kick Player from Room ${this.escapeHtml(code)}</h2>
-        <label style="color:#a0a0b0;font-size:13px;">Player User ID</label>
+        <label style="color:var(--text-dim);font-size:13px;">Player User ID</label>
         <input type="number" class="admin-input" id="kick-user-id" placeholder="Enter user ID" style="margin-top:6px;">
-        <label style="color:#a0a0b0;font-size:13px;margin-top:8px;display:block;">Reason (optional)</label>
+        <label style="color:var(--text-dim);font-size:13px;margin-top:8px;display:block;">Reason (optional)</label>
         <input type="text" class="admin-input" id="kick-reason" placeholder="Reason..." style="margin-top:6px;">
         <div class="modal-actions" style="margin-top:16px;">
           <button class="btn btn-secondary" id="kick-cancel">Cancel</button>
@@ -188,8 +188,8 @@ export class RoomsTab {
     modal.className = 'modal-overlay';
     modal.innerHTML = `
       <div class="modal" style="max-width:380px;">
-        <h2 style="margin-bottom:12px;color:#e94560;">Close Room</h2>
-        <p style="color:#a0a0b0;">Are you sure you want to force-close room <strong style="color:#fff;">${this.escapeHtml(code)}</strong>? All players will be removed.</p>
+        <h2 style="margin-bottom:12px;color:var(--danger);">Close Room</h2>
+        <p style="color:var(--text-dim);">Are you sure you want to force-close room <strong style="color:var(--text);">${this.escapeHtml(code)}</strong>? All players will be removed.</p>
         <div class="modal-actions" style="margin-top:16px;">
           <button class="btn btn-secondary" id="close-cancel">Cancel</button>
           <button class="btn-danger" style="padding:8px 16px;font-size:14px;" id="close-confirm">Close Room</button>

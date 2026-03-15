@@ -52,23 +52,21 @@ export class LobbyUI {
     const user = this.authManager.getUser();
     this.container.innerHTML = `
       <div class="lobby-header">
-        <h1>BlastArena</h1>
-        <div style="display:flex;gap:12px;align-items:center;">
-          <span style="color:#a0a0b0;">Welcome, <strong style="color:#fff;">${user?.username}</strong></span>
-          ${user?.role === 'admin' || user?.role === 'moderator' ? '<button class="btn btn-secondary" id="admin-btn">Admin</button>' : ''}
-          <button class="btn btn-primary" id="create-room-btn">Create Room</button>
-          <button class="btn btn-secondary" id="account-btn">Account</button>
-          <button class="btn btn-secondary" id="settings-btn">Settings</button>
-          <button class="btn btn-secondary" id="help-btn">Help</button>
-          <button class="btn btn-secondary" id="logout-btn">Logout</button>
+        <h1>BLAST<span>ARENA</span></h1>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <span style="color:var(--text-dim);font-size:13px;">Welcome, <strong style="color:var(--text);">${user?.username}</strong></span>
+          ${user?.role === 'admin' || user?.role === 'moderator' ? '<button class="btn btn-ghost" id="admin-btn">Admin</button>' : ''}
+          <button class="btn btn-primary" id="create-room-btn">+ New Room</button>
+          <button class="btn btn-ghost" id="account-btn">Account</button>
+          <button class="btn btn-ghost" id="settings-btn">Settings</button>
+          <button class="btn btn-ghost" id="help-btn">Help</button>
+          <button class="btn btn-ghost" id="logout-btn">Logout</button>
         </div>
       </div>
-      <div id="lobby-banner-area"></div>
-      <div style="margin-bottom:12px;">
-        <span style="color:#a0a0b0;">Available Rooms</span>
-      </div>
+      <div id="lobby-banner-area" style="padding:0 24px;"></div>
+      <div style="padding:16px 24px 0;"><span style="color:var(--text-dim);font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Available Rooms</span></div>
       <div class="room-list" id="room-list">
-        <div style="color:#a0a0b0;text-align:center;padding:40px;">Loading rooms...</div>
+        <div style="color:var(--text-muted);text-align:center;padding:60px 20px;font-size:15px;">Loading rooms...</div>
       </div>
     `;
 
@@ -125,7 +123,7 @@ export class LobbyUI {
   private renderRooms(rooms: RoomListItem[]): void {
     const list = this.container.querySelector('#room-list')!;
     if (rooms.length === 0) {
-      list.innerHTML = '<div style="color:#a0a0b0;text-align:center;padding:40px;">No rooms available. Create one!</div>';
+      list.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:60px 20px;font-size:15px;">No rooms yet — create one to get started!</div>';
       return;
     }
 
@@ -136,9 +134,9 @@ export class LobbyUI {
           <span>${room.playerCount}/${room.maxPlayers} players</span>
           <span class="room-mode">${room.gameMode.replace('_', ' ').toUpperCase()}</span>
         </div>
-        <div class="room-info" style="margin-top:4px;">
+        <div class="room-info" style="margin-top:6px;">
           <span>Host: ${this.escapeHtml(room.host)}</span>
-          <span>${room.status}</span>
+          <span style="color:${room.status === 'playing' ? 'var(--warning)' : 'var(--success)'};">${room.status}</span>
         </div>
       </div>
     `).join('');
@@ -261,27 +259,27 @@ export class LobbyUI {
 
         <div id="friendly-fire-row" style="display:none;gap:12px;margin-top:12px;">
           <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;
-            background:#1a1a2e;border:1px solid #0f3460;border-radius:6px;cursor:pointer;font-size:13px;flex:1;">
-            <input type="checkbox" id="room-friendly-fire" checked style="accent-color:#e94560;">
-            <span style="color:#e94560;font-weight:600;">Friendly Fire</span>
+            background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;flex:1;">
+            <input type="checkbox" id="room-friendly-fire" checked style="accent-color:var(--danger);">
+            <span style="color:var(--danger);font-weight:600;">Friendly Fire</span>
           </label>
         </div>
 
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">
           <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;
-            background:#1a1a2e;border:1px solid #0f3460;border-radius:6px;cursor:pointer;font-size:13px;">
+            background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;">
             <input type="checkbox" id="room-reinforced-walls" style="accent-color:#886633;">
-            <span style="color:#886633;font-weight:600;">Reinforced Walls</span>
+            <span style="color:#b8884d;font-weight:600;">Reinforced Walls</span>
           </label>
           <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;
-            background:#1a1a2e;border:1px solid #0f3460;border-radius:6px;cursor:pointer;font-size:13px;">
-            <input type="checkbox" id="room-map-events" style="accent-color:#ff8800;">
-            <span style="color:#ff8800;font-weight:600;">Map Events</span>
+            background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="room-map-events" style="accent-color:var(--warning);">
+            <span style="color:var(--warning);font-weight:600;">Map Events</span>
           </label>
           <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;
-            background:#1a1a2e;border:1px solid #0f3460;border-radius:6px;cursor:pointer;font-size:13px;">
-            <input type="checkbox" id="room-hazard-tiles" style="accent-color:#44aaff;">
-            <span style="color:#44aaff;font-weight:600;">Hazard Tiles</span>
+            background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="room-hazard-tiles" style="accent-color:var(--info);">
+            <span style="color:var(--info);font-weight:600;">Hazard Tiles</span>
           </label>
         </div>
 
@@ -290,7 +288,7 @@ export class LobbyUI {
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
             ${allPowerUps.map(pu => `
               <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;
-                background:#1a1a2e;border:1px solid #0f3460;border-radius:6px;cursor:pointer;font-size:13px;">
+                background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;">
                 <input type="checkbox" class="powerup-check" value="${pu.type}" checked
                   style="accent-color:${pu.color};">
                 <span style="color:${pu.color};font-weight:600;">${pu.name}</span>
@@ -411,7 +409,7 @@ export class LobbyUI {
         <div class="form-group">
           <label>Username</label>
           <input type="text" id="acct-username" value="${this.escapeHtml(profile.username)}" maxlength="20">
-          <div id="acct-username-hint" style="font-size:11px;color:#a0a0b0;margin-top:4px;">Letters, numbers, underscores, hyphens. 3-20 characters.</div>
+          <div id="acct-username-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Letters, numbers, underscores, hyphens. 3-20 characters.</div>
         </div>
 
         <div id="acct-profile-status" style="margin-bottom:12px;"></div>
@@ -420,16 +418,16 @@ export class LobbyUI {
           <button class="btn btn-primary" id="acct-save-profile">Save</button>
         </div>
 
-        <hr style="border-color:#0f3460;margin:16px 0;">
+        <hr style="border-color:var(--border);margin:16px 0;">
 
         <div class="form-group">
           <label>Email Address</label>
-          <div style="color:#a0a0b0;font-size:13px;margin-bottom:6px;">
-            Current: <strong style="color:#fff;">${this.escapeHtml(profile.email)}</strong>
-            ${profile.emailVerified ? '<span style="color:#44ff44;margin-left:6px;">verified</span>' : '<span style="color:#ff8800;margin-left:6px;">unverified</span>'}
+          <div style="color:var(--text-dim);font-size:13px;margin-bottom:6px;">
+            Current: <strong style="color:var(--text);">${this.escapeHtml(profile.email)}</strong>
+            ${profile.emailVerified ? '<span style="color:var(--success);margin-left:6px;">verified</span>' : '<span style="color:var(--warning);margin-left:6px;">unverified</span>'}
           </div>
           ${!isAdmin && profile.pendingEmail ? `
-            <div style="color:#ff8800;font-size:13px;margin-bottom:8px;padding:8px;background:#1a1a2e;border:1px solid #0f3460;border-radius:6px;">
+            <div style="color:var(--warning);font-size:13px;margin-bottom:8px;padding:10px;background:var(--warning-dim);border:1px solid var(--warning);border-radius:8px;">
               Pending change to <strong>${this.escapeHtml(profile.pendingEmail)}</strong> — check that inbox for the confirmation link.
               <button class="btn btn-secondary" id="acct-cancel-email" style="margin-left:8px;padding:2px 8px;font-size:11px;">Cancel</button>
             </div>
@@ -443,7 +441,7 @@ export class LobbyUI {
           <button class="btn btn-primary" id="acct-change-email">${isAdmin ? 'Change Email' : 'Send Confirmation'}</button>
         </div>
 
-        <hr style="border-color:#0f3460;margin:16px 0;">
+        <hr style="border-color:var(--border);margin:16px 0;">
 
         <div class="modal-actions">
           <button class="btn btn-secondary" id="acct-close">Close</button>
@@ -457,7 +455,7 @@ export class LobbyUI {
       const newUsername = (modal.querySelector('#acct-username') as HTMLInputElement).value.trim();
 
       if (!newUsername) {
-        statusEl.innerHTML = '<span style="color:#e94560;">Username cannot be empty.</span>';
+        statusEl.innerHTML = '<span style="color:var(--danger);">Username cannot be empty.</span>';
         return;
       }
 
@@ -465,7 +463,7 @@ export class LobbyUI {
       if (newUsername !== profile.username) updates.username = newUsername;
 
       if (Object.keys(updates).length === 0) {
-        statusEl.innerHTML = '<span style="color:#a0a0b0;">No changes to save.</span>';
+        statusEl.innerHTML = '<span style="color:var(--text-dim);">No changes to save.</span>';
         return;
       }
 
@@ -475,11 +473,11 @@ export class LobbyUI {
         this.authManager.updateUser({
           username: updated.username,
         });
-        statusEl.innerHTML = '<span style="color:#44ff44;">Profile updated!</span>';
+        statusEl.innerHTML = '<span style="color:var(--success);">Profile updated!</span>';
         // Re-render lobby header to show new name
         this.render();
       } catch (err: any) {
-        statusEl.innerHTML = `<span style="color:#e94560;">${this.escapeHtml(err.message)}</span>`;
+        statusEl.innerHTML = `<span style="color:var(--danger);">${this.escapeHtml(err.message)}</span>`;
       }
     });
 
@@ -489,21 +487,21 @@ export class LobbyUI {
       const newEmail = (modal.querySelector('#acct-new-email') as HTMLInputElement).value.trim();
 
       if (!newEmail) {
-        statusEl.innerHTML = '<span style="color:#e94560;">Enter a new email address.</span>';
+        statusEl.innerHTML = '<span style="color:var(--danger);">Enter a new email address.</span>';
         return;
       }
       if (newEmail === profile.email) {
-        statusEl.innerHTML = '<span style="color:#a0a0b0;">That\'s already your current email.</span>';
+        statusEl.innerHTML = '<span style="color:var(--text-dim);">That\'s already your current email.</span>';
         return;
       }
 
       try {
         const result: any = await ApiClient.post('/user/email', { email: newEmail });
-        statusEl.innerHTML = `<span style="color:#44ff44;">${this.escapeHtml(result.message)}</span>`;
+        statusEl.innerHTML = `<span style="color:var(--success);">${this.escapeHtml(result.message)}</span>`;
         // Clear the input
         (modal.querySelector('#acct-new-email') as HTMLInputElement).value = '';
       } catch (err: any) {
-        statusEl.innerHTML = `<span style="color:#e94560;">${this.escapeHtml(err.message)}</span>`;
+        statusEl.innerHTML = `<span style="color:var(--danger);">${this.escapeHtml(err.message)}</span>`;
       }
     });
 
@@ -637,22 +635,22 @@ export class LobbyUI {
 
         <div class="help-section">
           <div class="help-heading">Game Modes</div>
-          <div class="help-row"><b style="color:#e94560">Free for All</b> — Last player standing wins</div>
-          <div class="help-row"><b style="color:#e94560">Teams</b> — 2 teams, last team standing. Friendly fire is configurable</div>
-          <div class="help-row"><b style="color:#e94560">Battle Royale</b> — A danger zone shrinks from the edges. Stay inside or take damage every tick</div>
-          <div class="help-row"><b style="color:#e94560">Sudden Death</b> — Everyone starts maxed out (8 bombs, 8 range, max speed, kick). No power-ups, one hit kills</div>
-          <div class="help-row"><b style="color:#e94560">Deathmatch</b> — Respawn 3s after death with reset stats. First to 10 kills wins</div>
-          <div class="help-row"><b style="color:#e94560">King of the Hill</b> — Stand in the 3x3 center zone to score. First to 100 points wins</div>
+          <div class="help-row"><b style="color:var(--primary)">Free for All</b> — Last player standing wins</div>
+          <div class="help-row"><b style="color:var(--primary)">Teams</b> — 2 teams, last team standing. Friendly fire is configurable</div>
+          <div class="help-row"><b style="color:var(--primary)">Battle Royale</b> — A danger zone shrinks from the edges. Stay inside or take damage every tick</div>
+          <div class="help-row"><b style="color:var(--primary)">Sudden Death</b> — Everyone starts maxed out (8 bombs, 8 range, max speed, kick). No power-ups, one hit kills</div>
+          <div class="help-row"><b style="color:var(--primary)">Deathmatch</b> — Respawn 3s after death with reset stats. First to 10 kills wins</div>
+          <div class="help-row"><b style="color:var(--primary)">King of the Hill</b> — Stand in the 3x3 center zone to score. First to 100 points wins</div>
         </div>
 
         <div class="help-section">
           <div class="help-heading">Map Features</div>
           <div class="help-tip">Optional — toggled when creating a room.</div>
           <div class="help-row"><b style="color:#886633">Reinforced Walls</b> — Breakable walls take 2 hits. First hit cracks them, second destroys them</div>
-          <div class="help-row" style="margin-top:8px;"><b style="color:#ff8800">Map Events</b></div>
+          <div class="help-row" style="margin-top:8px;"><b style="color:var(--warning)">Map Events</b></div>
           <div class="help-row" style="padding-left:12px;">Meteor strikes hit random tiles with a 2s warning reticle on the ground</div>
           <div class="help-row" style="padding-left:12px;">Power-up rain periodically drops items across the map</div>
-          <div class="help-row" style="margin-top:8px;"><b style="color:#44aaff">Hazard Tiles</b></div>
+          <div class="help-row" style="margin-top:8px;"><b style="color:var(--info)">Hazard Tiles</b></div>
           <div class="help-row" style="padding-left:12px;">
             <span class="help-tile" style="background:radial-gradient(circle, rgba(68,170,255,0.5) 30%, rgba(68,170,255,0.15) 70%, #2a2a3e 100%);"></span>
             <span class="help-tile" style="background:radial-gradient(circle, rgba(255,136,68,0.5) 30%, rgba(255,136,68,0.15) 70%, #2a2a3e 100%);"></span>

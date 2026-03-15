@@ -77,7 +77,7 @@ export class AdminUI {
   private async render(): Promise<void> {
     this.container.innerHTML = `
       <div class="admin-header">
-        <h1 style="color:#e94560;margin:0;">Admin Panel</h1>
+        <h1 style="color:var(--primary);margin:0;">Admin Panel</h1>
         <button class="btn btn-secondary" id="admin-close">Back to Lobby</button>
       </div>
       <div class="admin-tabs" id="admin-tab-bar">

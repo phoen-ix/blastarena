@@ -36,7 +36,7 @@ export class LogsTab {
 
       this.container.innerHTML = `
         <div class="admin-filters">
-          <label style="color:#a0a0b0;font-size:13px;">Filter by action:</label>
+          <label style="color:var(--text-dim);font-size:13px;">Filter by action:</label>
           <select id="action-filter">
             <option value="">All</option>
             <option value="role_change" ${this.actionFilter === 'role_change' ? 'selected' : ''}>Role Change</option>
@@ -70,7 +70,7 @@ export class LogsTab {
                 <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${this.escapeAttr(a.details || '')}">${this.escapeHtml(a.details || '-')}</td>
               </tr>
             `).join('')}
-            ${result.actions.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:#a0a0b0;">No actions found</td></tr>' : ''}
+            ${result.actions.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);">No actions found</td></tr>' : ''}
           </tbody>
         </table>
         <div class="admin-pagination">
@@ -95,7 +95,7 @@ export class LogsTab {
         }
       });
     } catch {
-      this.container.innerHTML = '<div style="color:#e94560;">Failed to load admin actions</div>';
+      this.container.innerHTML = '<div style="color:var(--danger);">Failed to load admin actions</div>';
     }
   }
 

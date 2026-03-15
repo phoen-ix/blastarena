@@ -80,7 +80,7 @@ export class HUDScene extends Phaser.Scene {
       if (isNaN(id)) return;
       e.stopPropagation();
       this.registry.set('spectateTargetId', id);
-      (item as HTMLElement).style.background = 'rgba(233, 69, 96, 0.6)';
+      (item as HTMLElement).style.background = 'rgba(255, 107, 53, 0.6)';
       setTimeout(() => { (item as HTMLElement).style.background = ''; }, 300);
     };
     this.playerListEl.addEventListener('mousedown', this.boundClickHandler);
@@ -161,7 +161,7 @@ export class HUDScene extends Phaser.Scene {
       const mins = Math.floor(remaining / 60);
       const secs = remaining % 60;
       timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-      timerEl.style.color = remaining <= 30 ? '#e94560' : '#fff';
+      timerEl.style.color = remaining <= 30 ? '#ff3355' : '#fff';
     }
 
     // Player stats bar
@@ -206,7 +206,7 @@ export class HUDScene extends Phaser.Scene {
         return (b.alive ? 1 : 0) - (a.alive ? 1 : 0);
       });
 
-      const teamColors = ['#e94560', '#44aaff'];
+      const teamColors = ['#ff4466', '#448aff'];
       let lastTeam = -1;
 
       playersEl.innerHTML = sorted.map((p: any) => {
