@@ -167,15 +167,15 @@ export class LobbyUI {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
-      <div class="modal" style="width:520px;max-height:90vh;overflow-y:auto;">
+      <div class="modal" style="width:760px;max-width:95vw;padding:24px 28px;">
         <h2>Create Room</h2>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div class="form-group">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
             <label>Room Name</label>
             <input type="text" id="room-name" placeholder="My Arena" maxlength="30">
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom:0;">
             <label>Game Mode</label>
             <select id="room-mode">
               <option value="ffa">Free for All</option>
@@ -186,7 +186,7 @@ export class LobbyUI {
               <option value="king_of_the_hill">King of the Hill</option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom:0;">
             <label>Max Players</label>
             <select id="room-max-players">
               <option value="2">2</option>
@@ -195,7 +195,7 @@ export class LobbyUI {
               <option value="8">8</option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom:0;">
             <label>Match Time</label>
             <select id="room-round-time">
               <option value="60">1 min</option>
@@ -205,7 +205,17 @@ export class LobbyUI {
               <option value="600">10 min</option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Map Size</label>
+            <select id="room-map-size">
+              <option value="11">11x11 (Small)</option>
+              <option value="15" selected>15x15 (Normal)</option>
+              <option value="19">19x19 (Large)</option>
+              <option value="25">25x25 (Huge)</option>
+              <option value="31">31x31 (Massive)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
             <label>Wall Density</label>
             <select id="room-wall-density">
               <option value="0.3">Low (30%)</option>
@@ -214,8 +224,8 @@ export class LobbyUI {
               <option value="0.8">Very High (80%)</option>
             </select>
           </div>
-          <div class="form-group">
-            <label>Power-Up Drop Rate</label>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Power-Up Rate</label>
             <select id="room-powerup-rate">
               <option value="0">None (0%)</option>
               <option value="0.15">Low (15%)</option>
@@ -224,7 +234,7 @@ export class LobbyUI {
               <option value="0.8">Very High (80%)</option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom:0;">
             <label>Bots</label>
             <select id="room-bots">
               <option value="0" selected>None</option>
@@ -237,7 +247,7 @@ export class LobbyUI {
               <option value="7">7 Bots</option>
             </select>
           </div>
-          <div class="form-group" id="bot-difficulty-row">
+          <div class="form-group" style="margin-bottom:0;" id="bot-difficulty-row">
             <label>Bot Difficulty</label>
             <select id="room-bot-difficulty" disabled>
               <option value="easy">Easy</option>
@@ -245,50 +255,42 @@ export class LobbyUI {
               <option value="hard">Hard</option>
             </select>
           </div>
-          <div class="form-group">
-            <label>Map Size</label>
-            <select id="room-map-size">
-              <option value="11">11x11 (Small)</option>
-              <option value="15" selected>15x15 (Normal)</option>
-              <option value="19">19x19 (Large)</option>
-              <option value="25">25x25 (Huge)</option>
-              <option value="31">31x31 (Massive)</option>
-            </select>
-          </div>
         </div>
 
-        <div id="friendly-fire-row" style="display:none;gap:12px;margin-top:12px;">
-          <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;
-            background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;flex:1;">
-            <input type="checkbox" id="room-friendly-fire" checked style="accent-color:var(--danger);">
-            <span style="color:var(--danger);font-weight:600;">Friendly Fire</span>
-          </label>
-        </div>
-
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">
-          <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;
-            background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center;">
+          <span style="color:var(--text-dim);font-size:12px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;margin-right:4px;">Options</span>
+          <label style="display:flex;align-items:center;gap:5px;padding:5px 10px;
+            background:var(--bg-deep);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;">
             <input type="checkbox" id="room-reinforced-walls" style="accent-color:#886633;">
             <span style="color:#b8884d;font-weight:600;">Reinforced Walls</span>
           </label>
-          <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;
-            background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;">
+          <label style="display:flex;align-items:center;gap:5px;padding:5px 10px;
+            background:var(--bg-deep);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;">
             <input type="checkbox" id="room-map-events" style="accent-color:var(--warning);">
             <span style="color:var(--warning);font-weight:600;">Map Events</span>
           </label>
-          <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;
-            background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;">
+          <label style="display:flex;align-items:center;gap:5px;padding:5px 10px;
+            background:var(--bg-deep);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;">
             <input type="checkbox" id="room-hazard-tiles" style="accent-color:var(--info);">
             <span style="color:var(--info);font-weight:600;">Hazard Tiles</span>
           </label>
+          <span id="friendly-fire-row" style="display:none;">
+            <label style="display:flex;align-items:center;gap:5px;padding:5px 10px;
+              background:var(--bg-deep);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;">
+              <input type="checkbox" id="room-friendly-fire" checked style="accent-color:var(--danger);">
+              <span style="color:var(--danger);font-weight:600;">Friendly Fire</span>
+            </label>
+          </span>
         </div>
 
-        <div class="form-group" style="margin-top:12px;">
-          <label>Power-Ups</label>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+        <div style="margin-top:12px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span style="color:var(--text-dim);font-size:12px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Power-Ups</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
             ${allPowerUps.map(pu => `
-              <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;
-                background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;">
+              <label style="display:flex;align-items:center;gap:5px;padding:4px 9px;
+                background:var(--bg-deep);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;">
                 <input type="checkbox" class="powerup-check" value="${pu.type}" checked
                   style="accent-color:${pu.color};">
                 <span style="color:${pu.color};font-weight:600;">${pu.name}</span>
@@ -297,7 +299,7 @@ export class LobbyUI {
           </div>
         </div>
 
-        <div class="modal-actions">
+        <div class="modal-actions" style="margin-top:16px;">
           <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
           <button class="btn btn-primary" id="modal-create">Create</button>
         </div>
@@ -308,7 +310,7 @@ export class LobbyUI {
     const modeSelect = modal.querySelector('#room-mode') as HTMLSelectElement;
     const ffRow = modal.querySelector('#friendly-fire-row') as HTMLElement;
     const updateFFVisibility = () => {
-      ffRow.style.display = modeSelect.value === 'teams' ? 'flex' : 'none';
+      ffRow.style.display = modeSelect.value === 'teams' ? 'inline' : 'none';
     };
     modeSelect.addEventListener('change', updateFFVisibility);
     updateFFVisibility();
