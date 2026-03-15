@@ -9,6 +9,7 @@ import { showCreateRoomModal } from './modals/CreateRoomModal';
 import { showAccountModal } from './modals/AccountModal';
 import { showSettingsModal } from './modals/SettingsModal';
 import { showHelpModal } from './modals/HelpModal';
+import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 
 export class LobbyUI {
   private container: HTMLElement;
@@ -42,6 +43,13 @@ export class LobbyUI {
     this.loadBanner();
     this.roomListHandler = (rooms: RoomListItem[]) => this.renderRooms(rooms);
     this.socketClient.on('room:list' as any, this.roomListHandler as any);
+    UIGamepadNavigator.getInstance().pushContext({
+      id: 'lobby',
+      elements: () => [
+        ...this.container.querySelectorAll<HTMLElement>('.lobby-header .btn'),
+        ...this.container.querySelectorAll<HTMLElement>('.room-card'),
+      ],
+    });
   }
 
   hide(): void {
@@ -49,6 +57,7 @@ export class LobbyUI {
       this.socketClient.off('room:list' as any, this.roomListHandler as any);
       this.roomListHandler = null;
     }
+    UIGamepadNavigator.getInstance().popContext('lobby');
     this.container.remove();
   }
 

@@ -6,6 +6,7 @@ import { LobbyUI } from '../ui/LobbyUI';
 import { RoomUI } from '../ui/RoomUI';
 import { Room } from '@blast-arena/shared';
 import { escapeHtml } from '../utils/html';
+import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 
 export class LobbyScene extends Phaser.Scene {
   private authManager!: AuthManager;
@@ -26,6 +27,11 @@ export class LobbyScene extends Phaser.Scene {
     this.authManager = this.registry.get('authManager');
     this.socketClient = this.registry.get('socketClient');
     this.notifications = this.registry.get('notifications');
+
+    // Reset gamepad UI navigator for clean state
+    const gpNav = UIGamepadNavigator.getInstance();
+    gpNav.clearAll();
+    gpNav.setActive(true);
 
     // Clear any leftover DOM overlays (countdown, HUD, etc.)
     const uiOverlay = document.getElementById('ui-overlay');

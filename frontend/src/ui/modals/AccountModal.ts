@@ -3,6 +3,7 @@ import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
 import { escapeHtml } from '../../utils/html';
 import { getErrorMessage } from '@blast-arena/shared';
+import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 
 export interface AccountModalDeps {
   authManager: AuthManager;
@@ -142,7 +143,7 @@ export async function showAccountModal(deps: AccountModalDeps): Promise<void> {
       try {
         await ApiClient.delete('/user/email');
         notifications.success('Pending email change cancelled');
-        modal.remove();
+        closeModal();
         showAccountModal(deps);
       } catch (err: unknown) {
         notifications.error(getErrorMessage(err));
@@ -150,10 +151,26 @@ export async function showAccountModal(deps: AccountModalDeps): Promise<void> {
     });
   }
 
-  modal.querySelector('#acct-close')!.addEventListener('click', () => modal.remove());
+  const closeModal = () => {
+    UIGamepadNavigator.getInstance().popContext('account-modal');
+    modal.remove();
+  };
+
+  modal.querySelector('#acct-close')!.addEventListener('click', closeModal);
   modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.remove();
+    if (e.target === modal) closeModal();
   });
 
   document.getElementById('ui-overlay')!.appendChild(modal);
+
+  UIGamepadNavigator.getInstance().pushContext({
+    id: 'account-modal',
+    elements: () =>
+      [
+        ...modal.querySelectorAll<HTMLElement>(
+          '#acct-username, #acct-save-profile, #acct-new-email, #acct-change-email, #acct-cancel-email, #acct-close',
+        ),
+      ].filter((el) => el !== null),
+    onBack: closeModal,
+  });
 }

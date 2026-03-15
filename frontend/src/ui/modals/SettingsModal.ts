@@ -1,4 +1,5 @@
 import { getSettings, saveSettings, VisualSettings } from '../../game/Settings';
+import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 
 export function showSettingsModal(): void {
   const settings = getSettings();
@@ -34,10 +35,21 @@ export function showSettingsModal(): void {
     saveSettings(current);
   });
 
-  modal.querySelector('#modal-close')!.addEventListener('click', () => modal.remove());
+  const closeModal = () => {
+    UIGamepadNavigator.getInstance().popContext('settings-modal');
+    modal.remove();
+  };
+
+  modal.querySelector('#modal-close')!.addEventListener('click', closeModal);
   modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.remove();
+    if (e.target === modal) closeModal();
   });
 
   document.getElementById('ui-overlay')!.appendChild(modal);
+
+  UIGamepadNavigator.getInstance().pushContext({
+    id: 'settings-modal',
+    elements: () => [...modal.querySelectorAll<HTMLElement>('.settings-option, #modal-close')],
+    onBack: closeModal,
+  });
 }

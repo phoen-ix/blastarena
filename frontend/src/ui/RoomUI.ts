@@ -3,6 +3,7 @@ import { AuthManager } from '../network/AuthManager';
 import { NotificationUI } from './NotificationUI';
 import { Room, RoomPlayer, POWERUP_DEFINITIONS } from '@blast-arena/shared';
 import { escapeHtml } from '../utils/html';
+import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 
 export class RoomUI {
   private container: HTMLElement;
@@ -34,11 +35,30 @@ export class RoomUI {
       uiOverlay.appendChild(this.container);
     }
     this.render();
+    this.pushGamepadContext();
   }
 
   hide(): void {
+    UIGamepadNavigator.getInstance().popContext('room');
     this.container.remove();
     this.removeListeners();
+  }
+
+  private pushGamepadContext(): void {
+    UIGamepadNavigator.getInstance().popContext('room');
+    UIGamepadNavigator.getInstance().pushContext({
+      id: 'room',
+      elements: () => [
+        ...this.container.querySelectorAll<HTMLElement>(
+          '#room-back, .team-select, .bot-team-select, #room-ready, #room-start',
+        ),
+      ],
+      onBack: () => {
+        this.socketClient.emit('room:leave' as any);
+        this.hide();
+        this.onLeave();
+      },
+    });
   }
 
   private setupListeners(): void {

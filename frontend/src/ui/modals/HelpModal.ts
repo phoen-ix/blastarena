@@ -1,3 +1,5 @@
+import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
+
 export function showHelpModal(): void {
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
@@ -20,6 +22,10 @@ export function showHelpModal(): void {
         <div class="help-row"><span class="help-key">A</span> Place bomb</div>
         <div class="help-row"><span class="help-key">B</span> Detonate remote bombs</div>
         <div class="help-row"><span class="help-key">LB / RB</span> Cycle spectate target (when dead)</div>
+        <div class="help-heading" style="margin-top:10px;">Menu Navigation</div>
+        <div class="help-row"><span class="help-key">D-Pad / Left Stick</span> Navigate menus</div>
+        <div class="help-row"><span class="help-key">A</span> Confirm / Select</div>
+        <div class="help-row"><span class="help-key">B</span> Back / Close</div>
       </div>
 
       <div class="help-section">
@@ -104,10 +110,21 @@ export function showHelpModal(): void {
     </div>
   `;
 
-  modal.querySelector('#modal-close')!.addEventListener('click', () => modal.remove());
+  const closeModal = () => {
+    UIGamepadNavigator.getInstance().popContext('help-modal');
+    modal.remove();
+  };
+
+  modal.querySelector('#modal-close')!.addEventListener('click', closeModal);
   modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.remove();
+    if (e.target === modal) closeModal();
   });
 
   document.getElementById('ui-overlay')!.appendChild(modal);
+
+  UIGamepadNavigator.getInstance().pushContext({
+    id: 'help-modal',
+    elements: () => [modal.querySelector<HTMLElement>('#modal-close')!],
+    onBack: closeModal,
+  });
 }

@@ -1,6 +1,7 @@
 import { SocketClient } from '../../network/SocketClient';
 import { NotificationUI } from '../NotificationUI';
 import { PowerUpType, POWERUP_DEFINITIONS, Room } from '@blast-arena/shared';
+import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 
 export interface CreateRoomModalDeps {
   socketClient: SocketClient;
@@ -179,7 +180,12 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
   botsSelect.addEventListener('change', updateBotDiffEnabled);
   updateBotDiffEnabled();
 
-  modal.querySelector('#modal-cancel')!.addEventListener('click', () => modal.remove());
+  const closeModal = () => {
+    UIGamepadNavigator.getInstance().popContext('create-room-modal');
+    modal.remove();
+  };
+
+  modal.querySelector('#modal-cancel')!.addEventListener('click', closeModal);
   modal.querySelector('#modal-create')!.addEventListener('click', () => {
     const name = (modal.querySelector('#room-name') as HTMLInputElement).value.trim();
     const gameMode = (modal.querySelector('#room-mode') as HTMLSelectElement).value as any;
@@ -245,7 +251,7 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
       },
       (response: any) => {
         if (response.success && response.room) {
-          modal.remove();
+          closeModal();
           notifications.success('Room created!');
           onRoomCreated(response.room);
         } else {
@@ -256,7 +262,19 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
   });
 
   modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.remove();
+    if (e.target === modal) closeModal();
   });
   document.getElementById('ui-overlay')!.appendChild(modal);
+
+  UIGamepadNavigator.getInstance().pushContext({
+    id: 'create-room-modal',
+    elements: () => [
+      ...modal.querySelectorAll<HTMLElement>(
+        '.form-group input[type="text"], .form-group select:not([disabled])',
+      ),
+      ...modal.querySelectorAll<HTMLElement>('label:has(input[type="checkbox"])'),
+      ...modal.querySelectorAll<HTMLElement>('#modal-cancel, #modal-create'),
+    ],
+    onBack: closeModal,
+  });
 }

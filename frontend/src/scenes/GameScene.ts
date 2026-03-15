@@ -12,6 +12,7 @@ import { HillZoneRenderer } from '../game/HillZone';
 import { EffectSystem } from '../game/EffectSystem';
 import { CountdownOverlay } from '../game/CountdownOverlay';
 import { GamepadManager } from '../game/GamepadManager';
+import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 
 export class GameScene extends Phaser.Scene {
   private socketClient!: SocketClient;
@@ -58,6 +59,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    UIGamepadNavigator.getInstance().setActive(false);
+
     this.socketClient = this.registry.get('socketClient');
     this.authManager = this.registry.get('authManager');
     this.localPlayerId = this.authManager.getUser()?.id ?? 0;
