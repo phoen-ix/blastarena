@@ -11,7 +11,6 @@ export async function createUser(
   username: string,
   email: string,
   password: string,
-  displayName?: string,
   role?: UserRole
 ): Promise<{ id: number; username: string }> {
   const existing = await query('SELECT id FROM users WHERE username = ? OR email = ?', [username, email]);
@@ -20,12 +19,11 @@ export async function createUser(
   }
 
   const passwordHash = await hashPassword(password);
-  const name = displayName || username;
   const userRole = role || 'user';
 
   const result = await execute(
-    'INSERT INTO users (username, email, password_hash, display_name, role, email_verified) VALUES (?, ?, ?, ?, ?, TRUE)',
-    [username, email, passwordHash, name, userRole]
+    'INSERT INTO users (username, email, password_hash, role, email_verified) VALUES (?, ?, ?, ?, TRUE)',
+    [username, email, passwordHash, userRole]
   );
 
   await execute('INSERT INTO user_stats (user_id) VALUES (?)', [result.insertId]);
@@ -41,8 +39,8 @@ export async function createUser(
 export async function listUsers(page: number = 1, limit: number = 20, search?: string) {
   const offset = (page - 1) * limit;
   let sql = `
-    SELECT u.id, u.username, u.email, u.display_name, u.role, u.email_verified,
-           u.is_banned, u.ban_reason, u.is_deactivated, u.deactivated_at,
+    SELECT u.id, u.username, u.email, u.role, u.email_verified,
+           u.is_deactivated, u.deactivated_at,
            u.last_login, u.created_at,
            COALESCE(s.total_matches, 0) as total_matches,
            COALESCE(s.total_wins, 0) as total_wins
@@ -71,27 +69,6 @@ export async function listUsers(page: number = 1, limit: number = 20, search?: s
   const total = (countRows[0] as any).total;
 
   return { users: rows, total, page, limit };
-}
-
-export async function banUser(adminId: number, userId: number, banned: boolean, reason?: string): Promise<void> {
-  if (adminId === userId) {
-    throw new AppError('Cannot ban yourself', 400, 'SELF_ACTION');
-  }
-
-  await execute(
-    'UPDATE users SET is_banned = ?, ban_reason = ? WHERE id = ?',
-    [banned, banned ? (reason || null) : null, userId]
-  );
-
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, banned ? 'ban' : 'unban', 'user', userId, reason || null]
-  );
-
-  if (banned) {
-    // Revoke all refresh tokens
-    await execute('UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = ?', [userId]);
-  }
 }
 
 export async function changeUserRole(adminId: number, userId: number, role: UserRole): Promise<void> {

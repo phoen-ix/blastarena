@@ -61,7 +61,6 @@ export function createSocketServer(httpServer: HttpServer): Server<ClientToServe
     const currentUser: PublicUser = {
       id: socket.data.userId,
       username: socket.data.username,
-      displayName: socket.data.username,
       role: socket.data.role as any,
     };
 

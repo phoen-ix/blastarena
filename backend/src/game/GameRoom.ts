@@ -47,7 +47,7 @@ export class GameRoom {
       const team = modeConfig.teamsCount
         ? (rp.team !== null && rp.team !== undefined ? rp.team : (playerIndex % modeConfig.teamsCount))
         : null;
-      this.gameState.addPlayer(rp.user.id, rp.user.username, rp.user.displayName, team, false);
+      this.gameState.addPlayer(rp.user.id, rp.user.username, team, false);
       playerIndex++;
     });
 
@@ -62,7 +62,7 @@ export class GameRoom {
       const team = modeConfig.teamsCount
         ? (botTeams[i] !== null && botTeams[i] !== undefined ? botTeams[i]! : (playerIndex % modeConfig.teamsCount))
         : null;
-      this.gameState.addPlayer(botId, `bot_${i}`, botName, team, true);
+      this.gameState.addPlayer(botId, botName, team, true);
       playerIndex++;
     }
 
@@ -85,7 +85,7 @@ export class GameRoom {
     // Log player roster
     for (const p of this.gameState.players.values()) {
       this.gameState.gameLogger.log('player', {
-        id: p.id, name: p.displayName, isBot: p.isBot, team: p.team,
+        id: p.id, name: p.username, isBot: p.isBot, team: p.team,
         spawn: p.position,
       });
     }
@@ -141,7 +141,7 @@ export class GameRoom {
       mode: this.room.config.gameMode,
       mapSize: `${initialState.map.width}x${initialState.map.height}`,
       playerCount: initialState.players.length,
-      players: initialState.players.map(p => ({ id: p.id, name: p.displayName, pos: p.position, alive: p.alive })),
+      players: initialState.players.map(p => ({ id: p.id, name: p.username, pos: p.position, alive: p.alive })),
       hasZone: !!initialState.zone,
       status: initialState.status,
     }, 'Broadcasting game:start');
@@ -192,7 +192,7 @@ export class GameRoom {
     const placements = Array.from(this.gameState.players.values())
       .map(p => ({
         userId: p.id,
-        displayName: p.displayName,
+        username: p.username,
         isBot: p.isBot,
         placement: p.placement || 0,
         kills: p.kills,
@@ -202,7 +202,7 @@ export class GameRoom {
       }))
       .sort((a, b) => b.kills - a.kills || a.placement - b.placement);
 
-    logger.info({ code: this.code, placements: placements.map(p => ({ name: p.displayName, kills: p.kills, selfKills: p.selfKills, placement: p.placement })) }, 'Game over placements');
+    logger.info({ code: this.code, placements: placements.map(p => ({ name: p.username, kills: p.kills, selfKills: p.selfKills, placement: p.placement })) }, 'Game over placements');
 
     this.gameState.gameLogger?.logGameOver(state.winnerId, placements);
 

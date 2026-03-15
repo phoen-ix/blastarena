@@ -18,7 +18,6 @@ export interface Position {
 export interface PlayerState {
   id: number;
   username: string;
-  displayName: string;
   position: Position;
   alive: boolean;
   bombCount: number;

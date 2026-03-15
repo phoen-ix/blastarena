@@ -39,8 +39,6 @@ export class LogsTab {
           <label style="color:#a0a0b0;font-size:13px;">Filter by action:</label>
           <select id="action-filter">
             <option value="">All</option>
-            <option value="ban" ${this.actionFilter === 'ban' ? 'selected' : ''}>Ban</option>
-            <option value="unban" ${this.actionFilter === 'unban' ? 'selected' : ''}>Unban</option>
             <option value="role_change" ${this.actionFilter === 'role_change' ? 'selected' : ''}>Role Change</option>
             <option value="deactivate" ${this.actionFilter === 'deactivate' ? 'selected' : ''}>Deactivate</option>
             <option value="reactivate" ${this.actionFilter === 'reactivate' ? 'selected' : ''}>Reactivate</option>
@@ -102,7 +100,7 @@ export class LogsTab {
   }
 
   private actionBadgeClass(action: string): string {
-    if (action === 'ban' || action === 'delete') return 'banned';
+    if (action === 'delete') return 'banned';
     if (action === 'role_change') return 'moderator';
     if (action === 'deactivate') return 'deactivated';
     return 'user';

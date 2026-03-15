@@ -101,9 +101,6 @@ export class UsersTab {
                 <td>${new Date(u.created_at).toLocaleDateString()}</td>
                 <td>${u.last_login ? new Date(u.last_login).toLocaleDateString() : 'Never'}</td>
                 <td style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
-                  <button class="btn-${u.is_banned ? 'secondary' : 'danger'} btn-sm" data-action="ban" data-id="${u.id}" data-banned="${u.is_banned}" data-username="${this.escapeAttr(u.username)}">
-                    ${u.is_banned ? 'Unban' : 'Ban'}
-                  </button>
                   ${isAdmin ? `
                     <select class="admin-select" data-action="role" data-id="${u.id}">
                       <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
@@ -154,14 +151,7 @@ export class UsersTab {
 
     if (!action || !id) return;
 
-    if (action === 'ban') {
-      const isBanned = target.dataset.banned === '1' || target.dataset.banned === 'true';
-      if (isBanned) {
-        await this.doUnban(parseInt(id));
-      } else {
-        this.showBanModal(parseInt(id), target.dataset.username || '');
-      }
-    } else if (action === 'deactivate') {
+    if (action === 'deactivate') {
       const isDeactivated = target.dataset.deactivated === '1' || target.dataset.deactivated === 'true';
       await this.doDeactivate(parseInt(id), !isDeactivated);
     } else if (action === 'delete') {
@@ -175,30 +165,6 @@ export class UsersTab {
       await this.doRoleChange(parseInt(target.dataset.id), target.value as UserRole);
     }
   };
-
-  private showBanModal(userId: number, username: string): void {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-      <div class="modal" style="max-width:400px;">
-        <h2 style="margin-bottom:12px;">Ban ${this.escapeHtml(username)}</h2>
-        <label style="color:#a0a0b0;font-size:13px;">Reason (optional)</label>
-        <input type="text" class="admin-input" id="ban-reason" placeholder="Ban reason..." style="margin-top:6px;">
-        <div class="modal-actions" style="margin-top:16px;">
-          <button class="btn btn-secondary" id="ban-cancel">Cancel</button>
-          <button class="btn-danger" style="padding:8px 16px;font-size:14px;" id="ban-confirm">Ban</button>
-        </div>
-      </div>
-    `;
-    document.getElementById('ui-overlay')!.appendChild(modal);
-
-    modal.querySelector('#ban-cancel')!.addEventListener('click', () => modal.remove());
-    modal.querySelector('#ban-confirm')!.addEventListener('click', async () => {
-      const reason = (modal.querySelector('#ban-reason') as HTMLInputElement).value;
-      modal.remove();
-      await this.doBan(userId, reason);
-    });
-  }
 
   private showDeleteModal(userId: number, username: string): void {
     const modal = document.createElement('div');
@@ -253,10 +219,6 @@ export class UsersTab {
             <input type="password" class="admin-input" id="cu-password" placeholder="Min 6 characters" style="margin-top:4px;">
           </div>
           <div>
-            <label style="color:#a0a0b0;font-size:13px;">Display Name</label>
-            <input type="text" class="admin-input" id="cu-display" placeholder="Optional" style="margin-top:4px;">
-          </div>
-          <div>
             <label style="color:#a0a0b0;font-size:13px;">Role</label>
             <select class="admin-select" id="cu-role" style="margin-top:4px;width:100%;padding:8px 12px;font-size:14px;">
               <option value="user" selected>user</option>
@@ -279,7 +241,6 @@ export class UsersTab {
       const username = (modal.querySelector('#cu-username') as HTMLInputElement).value.trim();
       const email = (modal.querySelector('#cu-email') as HTMLInputElement).value.trim();
       const password = (modal.querySelector('#cu-password') as HTMLInputElement).value;
-      const displayName = (modal.querySelector('#cu-display') as HTMLInputElement).value.trim();
       const role = (modal.querySelector('#cu-role') as HTMLSelectElement).value;
       const errorEl = modal.querySelector('#cu-error') as HTMLElement;
 
@@ -297,7 +258,6 @@ export class UsersTab {
       try {
         await ApiClient.post('/admin/users', {
           username, email, password,
-          displayName: displayName || undefined,
           role,
         });
         modal.remove();
@@ -308,26 +268,6 @@ export class UsersTab {
         errorEl.style.display = 'block';
       }
     });
-  }
-
-  private async doBan(userId: number, reason: string): Promise<void> {
-    try {
-      await ApiClient.put(`/admin/users/${userId}/ban`, { banned: true, reason: reason || undefined });
-      this.notifications.success('User banned');
-      await this.loadUsers();
-    } catch (err: any) {
-      this.notifications.error(err.message);
-    }
-  }
-
-  private async doUnban(userId: number): Promise<void> {
-    try {
-      await ApiClient.put(`/admin/users/${userId}/ban`, { banned: false });
-      this.notifications.success('User unbanned');
-      await this.loadUsers();
-    } catch (err: any) {
-      this.notifications.error(err.message);
-    }
   }
 
   private async doRoleChange(userId: number, role: UserRole): Promise<void> {
@@ -361,7 +301,6 @@ export class UsersTab {
   }
 
   private statusBadge(u: any): string {
-    if (u.is_banned) return '<span class="badge badge-banned">Banned</span>';
     if (u.is_deactivated) return '<span class="badge badge-deactivated">Deactivated</span>';
     return '<span class="badge badge-active">Active</span>';
   }

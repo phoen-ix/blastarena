@@ -12,7 +12,6 @@ function toPublicUser(row: any): PublicUser {
   return {
     id: row.id,
     username: row.username,
-    displayName: row.display_name,
     role: row.role,
   };
 }
@@ -39,8 +38,7 @@ function parseExpiresIn(expiresIn: string): number {
 export async function register(
   username: string,
   email: string,
-  password: string,
-  displayName?: string
+  password: string
 ): Promise<AuthResponse> {
   // Check existing user
   const existing = await query('SELECT id FROM users WHERE username = ? OR email = ?', [username, email]);
@@ -50,11 +48,10 @@ export async function register(
 
   const passwordHash = await hashPassword(password);
   const verifyToken = generateToken();
-  const name = displayName || username;
 
   const result = await execute(
-    `INSERT INTO users (username, email, password_hash, display_name, email_verify_token) VALUES (?, ?, ?, ?, ?)`,
-    [username, email, passwordHash, name, hashToken(verifyToken)]
+    `INSERT INTO users (username, email, password_hash, email_verify_token) VALUES (?, ?, ?, ?)`,
+    [username, email, passwordHash, hashToken(verifyToken)]
   );
 
   // Create user_stats row
@@ -65,7 +62,7 @@ export async function register(
     logger.error({ err }, 'Failed to send verification email');
   });
 
-  const user: PublicUser = { id: result.insertId, username, displayName: name, role: 'user' };
+  const user: PublicUser = { id: result.insertId, username, role: 'user' };
   const accessToken = generateAccessToken({ userId: user.id, username, role: 'user' });
 
   return { user, accessToken };
@@ -73,7 +70,7 @@ export async function register(
 
 export async function login(username: string, password: string): Promise<{ auth: AuthResponse; refreshToken: string }> {
   const rows = await query(
-    'SELECT id, username, email, password_hash, display_name, role, is_banned, ban_reason, is_deactivated, email_verified FROM users WHERE username = ?',
+    'SELECT id, username, email, password_hash, role, is_deactivated, email_verified FROM users WHERE username = ?',
     [username]
   );
 
@@ -82,10 +79,6 @@ export async function login(username: string, password: string): Promise<{ auth:
   }
 
   const user = rows[0] as any;
-
-  if (user.is_banned) {
-    throw new AppError(`Account banned: ${user.ban_reason || 'No reason provided'}`, 403, 'BANNED');
-  }
 
   if (user.is_deactivated) {
     throw new AppError('Account has been deactivated', 403, 'DEACTIVATED');
@@ -122,7 +115,7 @@ export async function refreshAccessToken(refreshTokenValue: string): Promise<{ a
 
   const rows = await query(
     `SELECT rt.id, rt.user_id, rt.expires_at, rt.revoked,
-            u.username, u.display_name, u.role, u.is_banned, u.is_deactivated
+            u.username, u.role, u.is_deactivated
      FROM refresh_tokens rt
      JOIN users u ON u.id = rt.user_id
      WHERE rt.token_hash = ?`,
@@ -145,10 +138,6 @@ export async function refreshAccessToken(refreshTokenValue: string): Promise<{ a
     throw new AppError('Refresh token expired', 401, 'TOKEN_EXPIRED');
   }
 
-  if (row.is_banned) {
-    throw new AppError('Account is banned', 403, 'BANNED');
-  }
-
   if (row.is_deactivated) {
     throw new AppError('Account has been deactivated', 403, 'DEACTIVATED');
   }
@@ -168,7 +157,7 @@ export async function refreshAccessToken(refreshTokenValue: string): Promise<{ a
     [row.user_id, newHash, expiresAt]
   );
 
-  const publicUser: PublicUser = { id: row.user_id, username: row.username, displayName: row.display_name, role: row.role };
+  const publicUser: PublicUser = { id: row.user_id, username: row.username, role: row.role };
   const accessToken = generateAccessToken({ userId: row.user_id, username: row.username, role: row.role });
 
   return { auth: { user: publicUser, accessToken }, refreshToken: newRefreshToken };

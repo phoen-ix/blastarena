@@ -51,7 +51,7 @@ export class RoomUI {
         this.room.players.push(player);
       }
       this.render();
-      this.notifications.info(`${player.user.displayName} joined`);
+      this.notifications.info(`${player.user.username} joined`);
     }) as any);
 
     this.socketClient.on('room:playerLeft', ((userId: number) => {
@@ -59,7 +59,7 @@ export class RoomUI {
       this.room.players = this.room.players.filter(p => p.user.id !== userId);
       this.render();
       if (player) {
-        this.notifications.info(`${player.user.displayName} left`);
+        this.notifications.info(`${player.user.username} left`);
       }
     }) as any);
 
@@ -181,7 +181,7 @@ export class RoomUI {
             </div>` : ''}
             <div style="display:flex;justify-content:space-between;">
               <span style="color:#a0a0b0;">Host</span>
-              <span style="color:#fff;">${this.escapeHtml(this.room.host.displayName)}</span>
+              <span style="color:#fff;">${this.escapeHtml(this.room.host.username)}</span>
             </div>
             ${this.room.config.enabledPowerUps && this.room.config.enabledPowerUps.length > 0 ? `
               <div style="margin-top:4px;">
@@ -259,11 +259,11 @@ export class RoomUI {
         <div style="width:40px;height:40px;border-radius:6px;background:${color};
           display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:18px;
           color:rgba(0,0,0,0.5);">
-          ${this.escapeHtml(player.user.displayName.charAt(0).toUpperCase())}
+          ${this.escapeHtml(player.user.username.charAt(0).toUpperCase())}
         </div>
         <div style="flex:1;">
           <div style="font-weight:600;color:#fff;">
-            ${this.escapeHtml(player.user.displayName)}
+            ${this.escapeHtml(player.user.username)}
             ${isPlayerHost ? '<span style="color:#e94560;font-size:12px;margin-left:6px;">HOST</span>' : ''}
           </div>
           <div style="font-size:12px;color:#a0a0b0;">

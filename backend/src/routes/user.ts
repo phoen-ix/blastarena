@@ -4,7 +4,6 @@ import { authMiddleware } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import * as userService from '../services/user';
 import {
-  DISPLAY_NAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH,
   validateUsername, validateEmail as validateEmailFn,
 } from '@blast-arena/shared';
@@ -12,7 +11,6 @@ import {
 const router = Router();
 
 const updateProfileSchema = z.object({
-  displayName: z.string().min(1).max(DISPLAY_NAME_MAX_LENGTH).optional(),
   username: z.string().min(USERNAME_MIN_LENGTH).max(USERNAME_MAX_LENGTH).optional(),
 });
 
@@ -31,16 +29,12 @@ router.get('/user/profile', authMiddleware, async (req, res, next) => {
 
 router.put('/user/profile', authMiddleware, validate(updateProfileSchema), async (req, res, next) => {
   try {
-    const { displayName, username } = req.body;
+    const { username } = req.body;
 
     if (username !== undefined) {
       const usernameError = validateUsername(username);
       if (usernameError) return res.status(400).json({ error: usernameError });
       await userService.updateUsername(req.user!.userId, username);
-    }
-
-    if (displayName !== undefined) {
-      await userService.updateDisplayName(req.user!.userId, displayName);
     }
 
     // Return updated profile
@@ -56,8 +50,13 @@ router.post('/user/email', authMiddleware, validate(changeEmailSchema), async (r
     const emailError = validateEmailFn(req.body.email);
     if (emailError) return res.status(400).json({ error: emailError });
 
-    await userService.requestEmailChange(req.user!.userId, req.body.email);
-    res.json({ message: 'Confirmation email sent to your new address. The link expires in 24 hours.' });
+    if (req.user!.role === 'admin') {
+      await userService.updateEmailDirect(req.user!.userId, req.body.email);
+      res.json({ message: 'Email address updated.' });
+    } else {
+      await userService.requestEmailChange(req.user!.userId, req.body.email);
+      res.json({ message: 'Confirmation email sent to your new address. The link expires in 24 hours.' });
+    }
   } catch (err) {
     next(err);
   }

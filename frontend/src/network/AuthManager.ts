@@ -43,12 +43,11 @@ export class AuthManager {
     this.notify();
   }
 
-  async register(username: string, email: string, password: string, displayName?: string): Promise<void> {
+  async register(username: string, email: string, password: string): Promise<void> {
     const response = await ApiClient.post<AuthResponse>('/auth/register', {
       username,
       email,
       password,
-      displayName,
     });
     this.setAuth(response);
   }

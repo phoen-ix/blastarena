@@ -4,11 +4,8 @@ export interface AdminUserListItem {
   id: number;
   username: string;
   email: string;
-  displayName: string;
   role: UserRole;
   emailVerified: boolean;
-  isBanned: boolean;
-  banReason: string | null;
   isDeactivated: boolean;
   deactivatedAt: Date | null;
   lastLogin: Date | null;
@@ -34,11 +31,6 @@ export interface AdminAction {
   targetId: number;
   details: string | null;
   createdAt: Date;
-}
-
-export interface BanRequest {
-  banned: boolean;
-  reason?: string;
 }
 
 export interface RoleChangeRequest {

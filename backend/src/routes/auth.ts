@@ -17,7 +17,6 @@ const registerSchema = z.object({
   username: z.string().min(USERNAME_MIN_LENGTH).max(USERNAME_MAX_LENGTH),
   email: z.string().email().max(255),
   password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
-  displayName: z.string().max(30).optional(),
 });
 
 const loginSchema = z.object({
@@ -39,7 +38,7 @@ router.post('/auth/register',
   validate(registerSchema),
   async (req, res, next) => {
     try {
-      const { username, email, password, displayName } = req.body;
+      const { username, email, password } = req.body;
 
       const usernameError = validateUsername(username);
       if (usernameError) return res.status(400).json({ error: usernameError });
@@ -50,7 +49,7 @@ router.post('/auth/register',
       const emailError = validateEmail(email);
       if (emailError) return res.status(400).json({ error: emailError });
 
-      const result = await authService.register(username, email, password, displayName);
+      const result = await authService.register(username, email, password);
       res.status(201).json(result);
     } catch (err) {
       next(err);

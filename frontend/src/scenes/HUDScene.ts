@@ -111,9 +111,9 @@ export class HUDScene extends Phaser.Scene {
 
     let text: string;
     if (killer && killer.id !== data.playerId) {
-      text = `${killer.displayName} eliminated ${victim?.displayName || '???'}`;
+      text = `${killer.username} eliminated ${victim?.username || '???'}`;
     } else {
-      text = `${victim?.displayName || '???'} was eliminated`;
+      text = `${victim?.username || '???'} was eliminated`;
     }
 
     this.killFeedEntries.push({ text, time: Date.now() });
@@ -220,7 +220,7 @@ export class HUDScene extends Phaser.Scene {
         }
         const teamDot = isTeamMode ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${teamColors[p.team]};margin-right:4px;vertical-align:middle;"></span>` : '';
         return `${teamHeader}<div class="hud-player-item${dead ? ' dead' : ''}${clickable ? ' clickable' : ''}" data-player-id="${p.id}">
-          <span>${teamDot}${p.isBot ? '🤖 ' : ''}${p.displayName}</span>
+          <span>${teamDot}${p.isBot ? '🤖 ' : ''}${p.username}</span>
         </div>`;
       }).join('');
     }

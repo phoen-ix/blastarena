@@ -4,7 +4,6 @@ import { DEFAULT_SPEED, DEFAULT_MAX_BOMBS, DEFAULT_FIRE_RANGE, MAX_SPEED, MAX_BO
 export class Player {
   public readonly id: number;
   public readonly username: string;
-  public readonly displayName: string;
   public position: Position;
   public alive: boolean = true;
   public bombCount: number = 0;
@@ -33,10 +32,9 @@ export class Player {
   // Deathmatch respawn
   public respawnTick: number | null = null;
 
-  constructor(id: number, username: string, displayName: string, spawnPosition: Position, team: number | null = null, isBot: boolean = false) {
+  constructor(id: number, username: string, spawnPosition: Position, team: number | null = null, isBot: boolean = false) {
     this.id = id;
     this.username = username;
-    this.displayName = displayName;
     this.position = { ...spawnPosition };
     this.team = team;
     this.isBot = isBot;
@@ -123,7 +121,6 @@ export class Player {
     return {
       id: this.id,
       username: this.username,
-      displayName: this.displayName,
       position: { ...this.position },
       alive: this.alive,
       bombCount: this.bombCount,

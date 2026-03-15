@@ -124,7 +124,7 @@ export class BotAI {
     const amInDanger = danger.has(`${pos.x},${pos.y}`);
 
     const logDecision = (decision: string, details?: any) => {
-      logger?.logBotDecision(player.id, player.displayName, decision, { pos, ...details });
+      logger?.logBotDecision(player.id, player.username, decision, { pos, ...details });
     };
 
     // === PRIORITY 1: Kick threatening bomb (only when able to move) ===

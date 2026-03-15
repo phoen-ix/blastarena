@@ -36,7 +36,7 @@ export interface ServerToClientEvents {
   'game:powerupCollected': (data: { id: string; playerId: number }) => void;
   'game:playerDied': (data: { playerId: number; killerId: number | null }) => void;
   'game:zoneUpdate': (data: { currentRadius: number; targetRadius: number; nextShrinkTick: number }) => void;
-  'game:over': (data: { winnerId: number | null; winnerTeam: number | null; placements: { userId: number; displayName: string; isBot: boolean; placement: number; kills: number; selfKills: number; team: number | null; alive: boolean }[] }) => void;
+  'game:over': (data: { winnerId: number | null; winnerTeam: number | null; placements: { userId: number; username: string; isBot: boolean; placement: number; kills: number; selfKills: number; team: number | null; alive: boolean }[] }) => void;
   'chat:message': (data: { user: PublicUser; message: string; timestamp: number }) => void;
   'error': (data: { message: string; code?: string }) => void;
   'admin:toast': (data: { message: string }) => void;

@@ -59,7 +59,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - **Top-tab navigation**: Dashboard, Users, Matches, Rooms, Logs, Announcements (role-filtered)
 - **Permission matrix**: Admin sees all 6 tabs; Moderator sees Users, Matches, Rooms, Announcements only
 - **Dashboard**: 5 stat cards (total users, active 24h, total matches, active rooms, online players) with 30s auto-refresh
-- **Users**: Paginated table with search, ban/unban (with reason), role change dropdown, deactivate (soft delete), delete permanently (type-username confirmation), create user modal
+- **Users**: Paginated table with search, role change dropdown, deactivate (soft delete), delete permanently (type-username confirmation), create user modal
 - **Matches**: Paginated table, click row for detail modal with per-player stats
 - **Rooms**: Active rooms with 5s auto-refresh, kick player, force close (admin only), spectate, send message — all via socket events
 - **Logs**: Admin action audit trail with action type filter, paginated
@@ -69,14 +69,15 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - Admin socket events: `admin:kick`, `admin:closeRoom`, `admin:spectate`, `admin:roomMessage`, `admin:toast`, `admin:banner`, `admin:kicked`
 - All admin actions logged to `admin_actions` table for audit
 - Deactivated users blocked from login and token refresh
-- Self-protection: admins cannot ban/deactivate/delete themselves
+- Self-protection: admins cannot deactivate/delete themselves
 - Public endpoint `GET /admin/announcements/banner` for lobby banner display (no auth required)
 
 ## Account Management
-- **Account modal** in lobby header lets users edit their username, display name, and email
+- **Account modal** in lobby header lets users edit their username and email
+- Username is the single player name shown everywhere (no separate display name)
 - Username change: server validates format (3-20 chars, alphanumeric + underscore/hyphen) and checks uniqueness; returns 409 CONFLICT if taken
-- Display name change: immediate update, reflected in lobby header
 - Email change: two-step confirmation flow — user submits new email, server sends a confirmation link to the new address (24h expiry), email only swaps when the link is clicked
+- Admins skip email verification — email changes take effect immediately
 - Pending email changes visible in Account modal with a cancel option
 - Email change confirmation endpoint: `GET /api/user/confirm-email/:token`
 - Migration `003_user_profile.sql` adds `pending_email`, `email_change_token`, `email_change_expires` columns to users table

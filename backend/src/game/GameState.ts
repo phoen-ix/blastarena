@@ -108,10 +108,10 @@ export class GameStateManager {
     }
   }
 
-  addPlayer(id: number, username: string, displayName: string, team: number | null = null, isBot: boolean = false): Player {
+  addPlayer(id: number, username: string, team: number | null = null, isBot: boolean = false): Player {
     const spawnIndex = this.players.size % this.map.spawnPoints.length;
     const spawnPos = this.map.spawnPoints[spawnIndex];
-    const player = new Player(id, username, displayName, spawnPos, team, isBot);
+    const player = new Player(id, username, spawnPos, team, isBot);
     this.players.set(id, player);
     this.placementCounter++;
     if (isBot) {
@@ -249,12 +249,12 @@ export class GameStateManager {
             // Credit kill or track self-kill (self-kills subtract 1 from score)
             if (owner && owner.id !== player.id) {
               owner.kills++;
-              this.gameLogger?.logKill(owner.id, owner.displayName, player.id, player.displayName, false);
+              this.gameLogger?.logKill(owner.id, owner.username, player.id, player.username, false);
               this.tickEvents.playerDied.push({ playerId: player.id, killerId: owner.id });
             } else if (owner && owner.id === player.id) {
               owner.selfKills++;
               owner.kills--;
-              this.gameLogger?.logKill(owner.id, owner.displayName, player.id, player.displayName, true);
+              this.gameLogger?.logKill(owner.id, owner.username, player.id, player.username, true);
               this.tickEvents.playerDied.push({ playerId: player.id, killerId: owner.id });
             } else {
               this.tickEvents.playerDied.push({ playerId: player.id, killerId: null });
@@ -299,7 +299,7 @@ export class GameStateManager {
           this.winnerId = controllerId;
           playersInZone[0].placement = 1;
           this.finishTick = this.tick;
-          this.finishReason = `${playersInZone[0].displayName} controls the hill!`;
+          this.finishReason = `${playersInZone[0].username} controls the hill!`;
         }
       }
     }
@@ -499,7 +499,7 @@ export class GameStateManager {
           this.bombs.set(bomb.id, bomb);
           player.bombCount++;
           player.bombsPlaced++;
-          this.gameLogger?.logBomb('place', player.id, player.displayName, player.position, player.fireRange);
+          this.gameLogger?.logBomb('place', player.id, player.username, player.position, player.fireRange);
         }
 
         // Then place bombs in the facing direction
@@ -522,7 +522,7 @@ export class GameStateManager {
           this.bombs.set(bomb.id, bomb);
           player.bombCount++;
           player.bombsPlaced++;
-          this.gameLogger?.logBomb('place', player.id, player.displayName, pos, player.fireRange);
+          this.gameLogger?.logBomb('place', player.id, player.username, pos, player.fireRange);
 
           cx += dx;
           cy += dy;
@@ -538,7 +538,7 @@ export class GameStateManager {
           this.bombs.set(bomb.id, bomb);
           player.bombCount++;
           player.bombsPlaced++;
-          this.gameLogger?.logBomb('place', player.id, player.displayName, player.position, player.fireRange);
+          this.gameLogger?.logBomb('place', player.id, player.username, player.position, player.fireRange);
         }
       }
     }
@@ -552,7 +552,7 @@ export class GameStateManager {
     if (owner) {
       owner.bombCount = Math.max(0, owner.bombCount - 1);
     }
-    this.gameLogger?.logBomb('detonate', bomb.ownerId, owner?.displayName || '?', bomb.position, bomb.fireRange);
+    this.gameLogger?.logBomb('detonate', bomb.ownerId, owner?.username || '?', bomb.position, bomb.fireRange);
 
     // Calculate explosion cells (pass pierce flag)
     // Use tile snapshot if provided to prevent chain reactions blasting through already-destroyed walls
@@ -604,7 +604,7 @@ export class GameStateManager {
           this.winnerId = player.id;
           player.placement = 1;
           this.finishTick = this.tick;
-          this.finishReason = `${player.displayName} reached ${DEATHMATCH_KILL_TARGET} kills!`;
+          this.finishReason = `${player.username} reached ${DEATHMATCH_KILL_TARGET} kills!`;
           return;
         }
       }
@@ -629,7 +629,7 @@ export class GameStateManager {
         if (alivePlayers.length === 1) {
           this.winnerId = alivePlayers[0].id;
           alivePlayers[0].placement = 1;
-          this.finishReason = `${alivePlayers[0].displayName} is the last survivor!`;
+          this.finishReason = `${alivePlayers[0].username} is the last survivor!`;
         } else {
           this.finishReason = 'Draw — no survivors!';
         }

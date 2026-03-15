@@ -54,7 +54,7 @@ export class ChatUI {
 
   private setupListener(): void {
     this.socketClient.on('chat:message', (data: { user: PublicUser; message: string; timestamp: number }) => {
-      this.addMessage(data.user.displayName, data.message);
+      this.addMessage(data.user.username, data.message);
     });
   }
 

@@ -54,7 +54,7 @@ export class LobbyUI {
       <div class="lobby-header">
         <h1>BlastArena</h1>
         <div style="display:flex;gap:12px;align-items:center;">
-          <span style="color:#a0a0b0;">Welcome, <strong style="color:#fff;">${user?.displayName || user?.username}</strong></span>
+          <span style="color:#a0a0b0;">Welcome, <strong style="color:#fff;">${user?.username}</strong></span>
           ${user?.role === 'admin' || user?.role === 'moderator' ? '<button class="btn btn-secondary" id="admin-btn">Admin</button>' : ''}
           <button class="btn btn-primary" id="create-room-btn">Create Room</button>
           <button class="btn btn-secondary" id="account-btn">Account</button>
@@ -399,6 +399,9 @@ export class LobbyUI {
       return;
     }
 
+    const user = this.authManager.getUser();
+    const isAdmin = user?.role === 'admin';
+
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
@@ -409,11 +412,6 @@ export class LobbyUI {
           <label>Username</label>
           <input type="text" id="acct-username" value="${this.escapeHtml(profile.username)}" maxlength="20">
           <div id="acct-username-hint" style="font-size:11px;color:#a0a0b0;margin-top:4px;">Letters, numbers, underscores, hyphens. 3-20 characters.</div>
-        </div>
-
-        <div class="form-group">
-          <label>Display Name</label>
-          <input type="text" id="acct-displayname" value="${this.escapeHtml(profile.displayName)}" maxlength="30">
         </div>
 
         <div id="acct-profile-status" style="margin-bottom:12px;"></div>
@@ -430,7 +428,7 @@ export class LobbyUI {
             Current: <strong style="color:#fff;">${this.escapeHtml(profile.email)}</strong>
             ${profile.emailVerified ? '<span style="color:#44ff44;margin-left:6px;">verified</span>' : '<span style="color:#ff8800;margin-left:6px;">unverified</span>'}
           </div>
-          ${profile.pendingEmail ? `
+          ${!isAdmin && profile.pendingEmail ? `
             <div style="color:#ff8800;font-size:13px;margin-bottom:8px;padding:8px;background:#1a1a2e;border:1px solid #0f3460;border-radius:6px;">
               Pending change to <strong>${this.escapeHtml(profile.pendingEmail)}</strong> — check that inbox for the confirmation link.
               <button class="btn btn-secondary" id="acct-cancel-email" style="margin-left:8px;padding:2px 8px;font-size:11px;">Cancel</button>
@@ -442,7 +440,7 @@ export class LobbyUI {
         <div id="acct-email-status" style="margin-bottom:12px;"></div>
 
         <div class="modal-actions" style="margin-bottom:8px;">
-          <button class="btn btn-primary" id="acct-change-email">Send Confirmation</button>
+          <button class="btn btn-primary" id="acct-change-email">${isAdmin ? 'Change Email' : 'Send Confirmation'}</button>
         </div>
 
         <hr style="border-color:#0f3460;margin:16px 0;">
@@ -453,24 +451,18 @@ export class LobbyUI {
       </div>
     `;
 
-    // Save profile (username + display name)
+    // Save profile (username)
     modal.querySelector('#acct-save-profile')!.addEventListener('click', async () => {
       const statusEl = modal.querySelector('#acct-profile-status')!;
       const newUsername = (modal.querySelector('#acct-username') as HTMLInputElement).value.trim();
-      const newDisplayName = (modal.querySelector('#acct-displayname') as HTMLInputElement).value.trim();
 
       if (!newUsername) {
         statusEl.innerHTML = '<span style="color:#e94560;">Username cannot be empty.</span>';
         return;
       }
-      if (!newDisplayName) {
-        statusEl.innerHTML = '<span style="color:#e94560;">Display name cannot be empty.</span>';
-        return;
-      }
 
       const updates: any = {};
       if (newUsername !== profile.username) updates.username = newUsername;
-      if (newDisplayName !== profile.displayName) updates.displayName = newDisplayName;
 
       if (Object.keys(updates).length === 0) {
         statusEl.innerHTML = '<span style="color:#a0a0b0;">No changes to save.</span>';
@@ -482,7 +474,6 @@ export class LobbyUI {
         profile = updated;
         this.authManager.updateUser({
           username: updated.username,
-          displayName: updated.displayName,
         });
         statusEl.innerHTML = '<span style="color:#44ff44;">Profile updated!</span>';
         // Re-render lobby header to show new name

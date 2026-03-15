@@ -113,7 +113,7 @@ export class GameOverScene extends Phaser.Scene {
         const medalColor = i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : '#707080';
         const dead = p.alive === false;
         const botTag = p.isBot ? ' [BOT]' : '';
-        const name = (p.displayName || `Player ${p.userId}`) + botTag;
+        const name = (p.username || `Player ${p.userId}`) + botTag;
         const kills = p.kills ?? 0;
 
         const nameText = this.add.text(colName, y, name, { fontSize: '16px', color: dead ? '#555' : medalColor }).setOrigin(0.5);

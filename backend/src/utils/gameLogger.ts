@@ -33,7 +33,7 @@ export class GameLogger {
       event: 'tick',
       tick,
       players: players.map(p => ({
-        id: p.id, name: p.displayName, pos: p.position,
+        id: p.id, name: p.username, pos: p.position,
         alive: p.alive, kills: p.kills, selfKills: p.selfKills,
         dir: p.direction, shield: p.hasShield, kick: p.hasKick,
         fireRange: p.fireRange, speed: p.speed, cooldown: p.moveCooldown,

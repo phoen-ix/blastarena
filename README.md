@@ -60,7 +60,7 @@ Open `http://localhost:8080` in your browser.
 - **Match history**: Stats tracked per player (kills, deaths, bombs placed, power-ups collected, placements)
 - **Game logging**: Detailed JSONL game logs for analysis and debugging
 - **Account management**: Users can change their username (uniqueness-checked), display name, and email address from the lobby. Email changes require clicking a confirmation link sent to the new address (24h expiry).
-- **Admin panel**: Full-screen admin panel with dashboard stats, user management (ban/unban, role change, deactivate, delete, create), match history browser, active room control (kick/close/spectate/message), admin action audit log, and announcements (toast broadcast + persistent lobby banner). Moderators get limited access.
+- **Admin panel**: Full-screen admin panel with dashboard stats, user management (role change, deactivate, delete, create), match history browser, active room control (kick/close/spectate/message), admin action audit log, and announcements (toast broadcast + persistent lobby banner). Moderators get limited access.
 
 ## Architecture
 

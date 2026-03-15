@@ -7,11 +7,6 @@ import * as adminService from '../services/admin';
 
 const router = Router();
 
-const banSchema = z.object({
-  banned: z.boolean(),
-  reason: z.string().max(500).optional(),
-});
-
 const roleSchema = z.object({
   role: z.enum(['user', 'moderator', 'admin']),
 });
@@ -32,7 +27,6 @@ const createUserSchema = z.object({
   username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9_-]+$/),
   email: z.string().email().max(255),
   password: z.string().min(6).max(128),
-  displayName: z.string().max(30).optional(),
   role: z.enum(['user', 'moderator', 'admin']).optional(),
 });
 
@@ -58,7 +52,6 @@ router.post('/admin/users', adminOnlyMiddleware, validate(createUserSchema), asy
       req.body.username,
       req.body.email,
       req.body.password,
-      req.body.displayName,
       req.body.role
     );
     res.status(201).json(user);
@@ -74,16 +67,6 @@ router.get('/admin/users', async (req, res, next) => {
     const search = req.query.search as string | undefined;
     const result = await adminService.listUsers(page, limit, search);
     res.json(result);
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.put('/admin/users/:id/ban', validate(banSchema), async (req, res, next) => {
-  try {
-    const userId = parseInt(req.params.id);
-    await adminService.banUser(req.user!.userId, userId, req.body.banned, req.body.reason);
-    res.json({ message: req.body.banned ? 'User banned' : 'User unbanned' });
   } catch (err) {
     next(err);
   }

@@ -170,7 +170,7 @@ export class PlayerSpriteRenderer {
         const isTeamMode = player.team !== null && player.team !== undefined;
         const teamLabelColors = ['#ff6b7f', '#6bb8ff'];
         const labelColor = isTeamMode ? teamLabelColors[player.team!] : '#ffffff';
-        const label = this.scene.add.text(targetX, targetY - TILE_SIZE / 2 - 2, player.displayName, {
+        const label = this.scene.add.text(targetX, targetY - TILE_SIZE / 2 - 2, player.username, {
           fontSize: '11px',
           color: labelColor,
           stroke: '#000000',

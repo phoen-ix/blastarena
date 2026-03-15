@@ -95,10 +95,6 @@ export class AuthUI {
           <label>Password</label>
           <input type="password" id="reg-password" placeholder="Min 8 characters" autocomplete="new-password">
         </div>
-        <div class="form-group">
-          <label>Display Name (optional)</label>
-          <input type="text" id="reg-display" placeholder="How others see you">
-        </div>
         <div class="form-error" id="reg-error"></div>
         <button class="btn btn-primary" id="reg-btn">Register</button>
         <div class="auth-switch">
@@ -172,7 +168,6 @@ export class AuthUI {
     const username = (document.getElementById('reg-username') as HTMLInputElement).value.trim();
     const email = (document.getElementById('reg-email') as HTMLInputElement).value.trim();
     const password = (document.getElementById('reg-password') as HTMLInputElement).value;
-    const displayName = (document.getElementById('reg-display') as HTMLInputElement).value.trim();
     const errorEl = document.getElementById('reg-error')!;
     const btn = document.getElementById('reg-btn') as HTMLButtonElement;
 
@@ -186,7 +181,7 @@ export class AuthUI {
     errorEl.textContent = '';
 
     try {
-      await this.authManager.register(username, email, password, displayName || undefined);
+      await this.authManager.register(username, email, password);
       this.notifications.success('Account created! Check your email to verify.');
       this.hide();
       this.onAuthenticated();

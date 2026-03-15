@@ -5,8 +5,6 @@ export const USERNAME_REGEX = /^[a-zA-Z0-9_-]+$/;
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
 
-export const DISPLAY_NAME_MAX_LENGTH = 30;
-
 export const ROOM_NAME_MIN_LENGTH = 3;
 export const ROOM_NAME_MAX_LENGTH = 30;
 export const ROOM_NAME_REGEX = /^[a-zA-Z0-9 _-]+$/;
@@ -58,9 +56,3 @@ export function validateEmail(email: string): string | null {
   return null;
 }
 
-export function validateDisplayName(name: string): string | null {
-  if (name.length > DISPLAY_NAME_MAX_LENGTH) {
-    return `Display name must be at most ${DISPLAY_NAME_MAX_LENGTH} characters`;
-  }
-  return null;
-}

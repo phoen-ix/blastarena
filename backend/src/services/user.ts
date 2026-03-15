@@ -6,7 +6,7 @@ import { logger } from '../utils/logger';
 
 export async function getUserProfile(userId: number) {
   const rows = await query(
-    `SELECT u.id, u.username, u.email, u.display_name, u.role, u.email_verified,
+    `SELECT u.id, u.username, u.email, u.role, u.email_verified,
             u.pending_email, u.created_at,
             s.total_matches, s.total_wins, s.total_kills, s.total_deaths,
             s.total_bombs, s.total_powerups, s.total_playtime,
@@ -26,7 +26,6 @@ export async function getUserProfile(userId: number) {
     id: row.id,
     username: row.username,
     email: row.email,
-    displayName: row.display_name,
     role: row.role,
     emailVerified: row.email_verified,
     pendingEmail: row.pending_email || null,
@@ -46,10 +45,6 @@ export async function getUserProfile(userId: number) {
   };
 }
 
-export async function updateDisplayName(userId: number, displayName: string): Promise<void> {
-  await execute('UPDATE users SET display_name = ? WHERE id = ?', [displayName, userId]);
-}
-
 export async function updateUsername(userId: number, newUsername: string): Promise<void> {
   // Check if username is already taken by another user
   const existing = await query('SELECT id FROM users WHERE username = ? AND id != ?', [newUsername, userId]);
@@ -58,6 +53,18 @@ export async function updateUsername(userId: number, newUsername: string): Promi
   }
 
   await execute('UPDATE users SET username = ? WHERE id = ?', [newUsername, userId]);
+}
+
+export async function updateEmailDirect(userId: number, newEmail: string): Promise<void> {
+  const existing = await query('SELECT id FROM users WHERE email = ? AND id != ?', [newEmail, userId]);
+  if (existing.length > 0) {
+    throw new AppError('Email is already in use', 409, 'CONFLICT');
+  }
+
+  await execute(
+    'UPDATE users SET email = ?, email_verified = TRUE, pending_email = NULL, email_change_token = NULL, email_change_expires = NULL WHERE id = ?',
+    [newEmail, userId]
+  );
 }
 
 export async function requestEmailChange(userId: number, newEmail: string): Promise<void> {
