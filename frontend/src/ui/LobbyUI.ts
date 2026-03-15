@@ -386,6 +386,7 @@ export class LobbyUI {
       });
     });
 
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     document.getElementById('ui-overlay')!.appendChild(modal);
   }
 
@@ -523,6 +524,7 @@ export class LobbyUI {
     }
 
     modal.querySelector('#acct-close')!.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
 
     document.getElementById('ui-overlay')!.appendChild(modal);
   }

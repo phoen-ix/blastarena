@@ -117,6 +117,7 @@ export class RoomsTab {
     document.getElementById('ui-overlay')!.appendChild(modal);
 
     modal.querySelector('#msg-cancel')!.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     modal.querySelector('#msg-send')!.addEventListener('click', () => {
       const input = modal.querySelector('#room-message-input') as HTMLInputElement;
       if (input.value.trim()) {
@@ -164,6 +165,7 @@ export class RoomsTab {
     document.getElementById('ui-overlay')!.appendChild(modal);
 
     modal.querySelector('#kick-cancel')!.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     modal.querySelector('#kick-confirm')!.addEventListener('click', () => {
       const userId = parseInt((modal.querySelector('#kick-user-id') as HTMLInputElement).value);
       const reason = (modal.querySelector('#kick-reason') as HTMLInputElement).value;
@@ -199,6 +201,7 @@ export class RoomsTab {
     document.getElementById('ui-overlay')!.appendChild(modal);
 
     modal.querySelector('#close-cancel')!.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     modal.querySelector('#close-confirm')!.addEventListener('click', () => {
       modal.remove();
       this.socketClient.emit('admin:closeRoom' as any, { roomCode: code }, (res: any) => {

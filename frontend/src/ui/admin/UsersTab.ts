@@ -193,6 +193,7 @@ export class UsersTab {
     });
 
     modal.querySelector('#delete-cancel')!.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     confirmBtn.addEventListener('click', async () => {
       modal.remove();
       await this.doDelete(userId);
@@ -237,6 +238,7 @@ export class UsersTab {
     document.getElementById('ui-overlay')!.appendChild(modal);
 
     modal.querySelector('#cu-cancel')!.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     modal.querySelector('#cu-submit')!.addEventListener('click', async () => {
       const username = (modal.querySelector('#cu-username') as HTMLInputElement).value.trim();
       const email = (modal.querySelector('#cu-email') as HTMLInputElement).value.trim();

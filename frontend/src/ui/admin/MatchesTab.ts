@@ -142,6 +142,7 @@ export class MatchesTab {
       `;
       document.getElementById('ui-overlay')!.appendChild(modal);
       modal.querySelector('#match-detail-close')!.addEventListener('click', () => modal.remove());
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     } catch {
       this.notifications.error('Failed to load match details');
     }
