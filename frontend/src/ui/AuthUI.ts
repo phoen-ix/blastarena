@@ -50,7 +50,7 @@ export class AuthUI {
   private renderLogin(): void {
     this.overlay.innerHTML = `
       <div class="auth-form">
-        <h2>BLAST<span>ARENA</span></h2>
+        <h2><span>BLAST</span>ARENA</h2>
         <div class="form-group">
           <label>Username</label>
           <input type="text" id="login-username" placeholder="Enter username" autocomplete="username">

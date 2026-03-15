@@ -130,15 +130,16 @@ export class GameScene extends Phaser.Scene {
 
     // Camera setup
     if (initialState) {
-      const worldW = initialState.map.width * TILE_SIZE;
-      const worldH = initialState.map.height * TILE_SIZE;
-      this.cameras.main.setBounds(0, 0, worldW, worldH);
-
-      const cam = this.cameras.main;
-      if (worldW <= cam.width && worldH <= cam.height) {
-        cam.centerOn(worldW / 2, worldH / 2);
-      }
+      this.applyCameraBounds(initialState.map.width, initialState.map.height);
     }
+
+    // Re-apply camera bounds when viewport resizes
+    this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
+      this.cameras.main.setSize(gameSize.width, gameSize.height);
+      if (this.lastGameState) {
+        this.applyCameraBounds(this.lastGameState.map.width, this.lastGameState.map.height);
+      }
+    });
 
     this.registry.set('spectateTargetId', null);
   }
@@ -204,6 +205,22 @@ export class GameScene extends Phaser.Scene {
 
     this.processInput();
     this.updateCamera();
+  }
+
+  private applyCameraBounds(mapW: number, mapH: number): void {
+    const cam = this.cameras.main;
+    const worldW = mapW * TILE_SIZE;
+    const worldH = mapH * TILE_SIZE;
+
+    // When the world is smaller than the viewport, expand bounds so the camera
+    // can center the world instead of being clamped to (0,0)
+    const boundsX = Math.min(0, (worldW - cam.width) / 2);
+    const boundsY = Math.min(0, (worldH - cam.height) / 2);
+    const boundsW = Math.max(worldW, cam.width);
+    const boundsH = Math.max(worldH, cam.height);
+
+    cam.setBounds(boundsX, boundsY, boundsW, boundsH);
+    cam.centerOn(worldW / 2, worldH / 2);
   }
 
   private updateCamera(): void {

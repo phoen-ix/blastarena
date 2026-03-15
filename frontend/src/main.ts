@@ -9,11 +9,11 @@ import { GameOverScene } from './scenes/GameOverScene';
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: 'game-container',
-  width: 960,
-  height: 640,
+  width: window.innerWidth,
+  height: window.innerHeight,
   backgroundColor: '#080810',
   scale: {
-    mode: Phaser.Scale.FIT,
+    mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   physics: {

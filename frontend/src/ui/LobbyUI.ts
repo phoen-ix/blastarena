@@ -56,7 +56,7 @@ export class LobbyUI {
     const user = this.authManager.getUser();
     this.container.innerHTML = `
       <div class="lobby-header">
-        <h1>BLAST<span>ARENA</span></h1>
+        <h1><span>BLAST</span>ARENA</h1>
         <div style="display:flex;gap:10px;align-items:center;">
           <span style="color:var(--text-dim);font-size:13px;">Welcome, <strong style="color:var(--text);">${user?.username}</strong></span>
           ${user?.role === 'admin' || user?.role === 'moderator' ? '<button class="btn btn-ghost" id="admin-btn">Admin</button>' : ''}

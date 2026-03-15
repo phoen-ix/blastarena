@@ -83,7 +83,7 @@ All optional — toggled per-room when creating:
 
 When creating a room, the host can configure:
 
-- Game mode, max players (2-8), map size (11x11 to 31x31)
+- Game mode, max players (2-8), map size (21x21 to 61x61)
 - Match time (1-10 min), wall density (30-80%), power-up drop rate (0-80%)
 - Which of the 8 power-up types are enabled
 - Bot count (0-7) and difficulty (Easy / Normal / Hard)

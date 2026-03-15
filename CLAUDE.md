@@ -32,6 +32,10 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - Singleplayer: 1 human + 1+ bots is enough to start a game
 - Friendly fire config: when OFF, same-team explosions don't damage teammates (self-damage still applies)
 - Map dimensions should be odd numbers for proper indestructible wall grid pattern
+- Branding: "BLAST" in white, "ARENA" in orange (`--primary`). In HTML use `<span>BLAST</span>ARENA` where parent is `color: var(--primary)` and `span` is `color: var(--text)`. In Phaser canvas (MenuScene) use two separate text objects side by side
+- Game canvas uses `Phaser.Scale.RESIZE` mode to fill the full browser viewport. Camera bounds auto-adjust: small maps are centered, large maps scroll with the player via smooth lerp
+- Player sprite interpolation factor is 0.45 (snappy grid movement, not floaty)
+- Modal overlay uses `position: fixed` to prevent backdrop-filter repaint flashes from sibling DOM mutations
 
 ## Frontend Architecture
 - **Design System ("INFERNO")**: All CSS in `frontend/index.html` using CSS custom properties (`:root` vars). Colors: `--primary` (#ff6b35 hot orange), `--accent` (#00d4aa teal), `--danger` (#ff3355), `--success` (#00e676), `--warning` (#ffaa22), `--info` (#448aff). Backgrounds: `--bg-deep` (#080810) through `--bg-hover` (#24243e). Typography: Chakra Petch (display/headings) + DM Sans (body) via Google Fonts. Team colors: `--team-red` (#ff4466), `--team-blue` (#448aff). Always use CSS variables in inline styles (e.g. `var(--primary)` not hardcoded hex) for consistency.

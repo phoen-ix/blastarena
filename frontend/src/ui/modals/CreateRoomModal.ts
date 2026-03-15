@@ -57,11 +57,11 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
         <div class="form-group" style="margin-bottom:0;">
           <label>Map Size</label>
           <select id="room-map-size">
-            <option value="11">11x11 (Small)</option>
-            <option value="15" selected>15x15 (Normal)</option>
-            <option value="19">19x19 (Large)</option>
-            <option value="25">25x25 (Huge)</option>
-            <option value="31">31x31 (Massive)</option>
+            <option value="21">21x21 (Small)</option>
+            <option value="31" selected>31x31 (Normal)</option>
+            <option value="39">39x39 (Large)</option>
+            <option value="51">51x51 (Huge)</option>
+            <option value="61">61x61 (Massive)</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0;">

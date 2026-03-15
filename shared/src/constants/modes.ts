@@ -1,4 +1,10 @@
-export type GameMode = 'ffa' | 'teams' | 'battle_royale' | 'sudden_death' | 'deathmatch' | 'king_of_the_hill';
+export type GameMode =
+  | 'ffa'
+  | 'teams'
+  | 'battle_royale'
+  | 'sudden_death'
+  | 'deathmatch'
+  | 'king_of_the_hill';
 
 export interface GameModeConfig {
   mode: GameMode;
@@ -22,8 +28,8 @@ export const GAME_MODES: Record<GameMode, GameModeConfig> = {
     description: 'Last player standing wins',
     minPlayers: 2,
     maxPlayers: 8,
-    defaultMapWidth: 15,
-    defaultMapHeight: 13,
+    defaultMapWidth: 31,
+    defaultMapHeight: 25,
     roundTimeSeconds: 180,
   },
   teams: {
@@ -32,8 +38,8 @@ export const GAME_MODES: Record<GameMode, GameModeConfig> = {
     description: 'Two teams compete - last team standing wins',
     minPlayers: 4,
     maxPlayers: 8,
-    defaultMapWidth: 17,
-    defaultMapHeight: 13,
+    defaultMapWidth: 35,
+    defaultMapHeight: 25,
     roundTimeSeconds: 240,
     teamsCount: 2,
   },
@@ -43,8 +49,8 @@ export const GAME_MODES: Record<GameMode, GameModeConfig> = {
     description: 'Shrinking zone forces players together',
     minPlayers: 4,
     maxPlayers: 8,
-    defaultMapWidth: 19,
-    defaultMapHeight: 15,
+    defaultMapWidth: 39,
+    defaultMapHeight: 31,
     roundTimeSeconds: 300,
     hasZone: true,
   },
@@ -54,8 +60,8 @@ export const GAME_MODES: Record<GameMode, GameModeConfig> = {
     description: 'All maxed out, one hit kills - pure skill',
     minPlayers: 2,
     maxPlayers: 8,
-    defaultMapWidth: 13,
-    defaultMapHeight: 11,
+    defaultMapWidth: 25,
+    defaultMapHeight: 21,
     roundTimeSeconds: 120,
   },
   deathmatch: {
@@ -64,8 +70,8 @@ export const GAME_MODES: Record<GameMode, GameModeConfig> = {
     description: 'Most kills wins - respawn after death',
     minPlayers: 2,
     maxPlayers: 8,
-    defaultMapWidth: 17,
-    defaultMapHeight: 13,
+    defaultMapWidth: 35,
+    defaultMapHeight: 25,
     roundTimeSeconds: 300,
     hasRespawn: true,
   },
@@ -75,8 +81,8 @@ export const GAME_MODES: Record<GameMode, GameModeConfig> = {
     description: 'Control the center zone to score points',
     minPlayers: 2,
     maxPlayers: 8,
-    defaultMapWidth: 17,
-    defaultMapHeight: 15,
+    defaultMapWidth: 35,
+    defaultMapHeight: 31,
     roundTimeSeconds: 240,
     hasHill: true,
   },
