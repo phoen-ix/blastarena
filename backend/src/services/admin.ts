@@ -3,6 +3,7 @@ import { AppError } from '../middleware/errorHandler';
 import { UserRole, RoomListItem } from '@blast-arena/shared';
 import { getRoomManager, getIO } from '../game/registry';
 import { hashPassword } from '../utils/crypto';
+import { hasReplay, getReplayPlacements } from './replay';
 import * as lobbyService from './lobby';
 import {
   CountRow,
@@ -222,6 +223,14 @@ export async function getMatchDetail(matchId: number) {
     [matchId],
   );
 
+  const replayExists = hasReplay(match.id);
+
+  // If replay exists, use its placements (includes bots + more stats)
+  let allPlayers: any[] | null = null;
+  if (replayExists) {
+    allPlayers = await getReplayPlacements(match.id);
+  }
+
   return {
     id: match.id,
     roomCode: match.room_code,
@@ -235,6 +244,8 @@ export async function getMatchDetail(matchId: number) {
     winnerId: match.winner_id,
     startedAt: match.started_at,
     finishedAt: match.finished_at,
+    hasReplay: replayExists,
+    allPlayers: allPlayers,
     players: players.map((p) => ({
       userId: p.user_id,
       username: p.username,

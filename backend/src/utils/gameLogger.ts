@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { LogVerbosity } from '@blast-arena/shared';
+import type { ReplayRecorder } from './replayRecorder';
 
 const LOG_DIR = process.env.GAME_LOG_DIR || '/app/gamelogs';
 
@@ -15,6 +16,7 @@ export class GameLogger {
   private roomCode: string;
   private filename: string;
   private verbosity: LogVerbosity;
+  public replayRecorder: ReplayRecorder | null = null;
 
   constructor(
     roomCode: string,
@@ -96,6 +98,12 @@ export class GameLogger {
         ...details,
       }) + '\n',
     );
+    this.replayRecorder?.addLogEntry('bot_decision', {
+      botId,
+      botName,
+      decision,
+      ...details,
+    });
   }
 
   logKill(
@@ -116,6 +124,13 @@ export class GameLogger {
         selfKill,
       }) + '\n',
     );
+    this.replayRecorder?.addLogEntry('kill', {
+      killerId,
+      killerName,
+      victimId,
+      victimName,
+      selfKill,
+    });
   }
 
   logBomb(
@@ -135,6 +150,12 @@ export class GameLogger {
         fireRange,
       }) + '\n',
     );
+    this.replayRecorder?.addLogEntry(event === 'place' ? 'bomb_place' : 'bomb_detonate', {
+      ownerId,
+      ownerName,
+      pos,
+      fireRange,
+    });
   }
 
   logMovement(
@@ -144,6 +165,14 @@ export class GameLogger {
     to: { x: number; y: number },
     direction: string,
   ): void {
+    // Always record movement in replay log regardless of verbosity
+    this.replayRecorder?.addLogEntry('movement', {
+      playerId,
+      playerName,
+      from,
+      to,
+      direction,
+    });
     if (this.verbosity === 'normal') return;
     this.stream.write(
       JSON.stringify({
@@ -164,6 +193,12 @@ export class GameLogger {
     type: string,
     position: { x: number; y: number },
   ): void {
+    this.replayRecorder?.addLogEntry('powerup_pickup', {
+      playerId,
+      playerName,
+      type,
+      position,
+    });
     if (this.verbosity === 'normal') return;
     this.stream.write(
       JSON.stringify({
@@ -185,6 +220,14 @@ export class GameLogger {
     destroyedWalls: number,
     chainedBombs: number,
   ): void {
+    this.replayRecorder?.addLogEntry('explosion_detail', {
+      ownerId,
+      ownerName,
+      pos,
+      cellCount: cells.length,
+      destroyedWalls,
+      chainedBombs,
+    });
     if (this.verbosity !== 'full') return;
     this.stream.write(
       JSON.stringify({

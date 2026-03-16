@@ -21,7 +21,10 @@ import { GameLoop } from './GameLoop';
 import { execute } from '../db/connection';
 import { logger } from '../utils/logger';
 import { GameLogger } from '../utils/gameLogger';
+import { ReplayRecorder } from '../utils/replayRecorder';
 import * as lobbyService from '../services/lobby';
+
+const DISCONNECT_GRACE_TICKS = 200; // 10 seconds at 20 tps
 
 export class GameRoom {
   public readonly code: string;
@@ -30,6 +33,8 @@ export class GameRoom {
   private gameState: GameStateManager;
   private gameLoop: GameLoop;
   private matchId: number | null = null;
+  private replayRecorder: ReplayRecorder;
+  private disconnectedPlayers: Map<number, number> = new Map(); // playerId -> tick when disconnected
 
   constructor(io: TypedServer, room: Room) {
     this.code = room.code;
@@ -97,12 +102,20 @@ export class GameRoom {
       }
     }
 
+    // Replay recorder for game replay
+    this.replayRecorder = new ReplayRecorder(
+      room.code,
+      room.config.gameMode,
+      this.gameState.toState(),
+    );
+
     // Game logger for detailed analysis
     this.gameState.gameLogger = new GameLogger(
       room.code,
       room.config.gameMode,
       room.players.length + botCount,
     );
+    this.gameState.gameLogger.replayRecorder = this.replayRecorder;
     // Log player roster
     for (const p of this.gameState.players.values()) {
       this.gameState.gameLogger.log('player', {
@@ -145,6 +158,7 @@ export class GameRoom {
         ],
       );
       this.matchId = result.insertId;
+      this.replayRecorder.setMatchId(this.matchId);
 
       // Insert match_players (skip bots)
       for (const player of this.gameState.players.values()) {
@@ -196,12 +210,52 @@ export class GameRoom {
 
   handlePlayerDisconnect(playerId: number): void {
     const player = this.gameState.players.get(playerId);
-    if (player?.alive) {
-      player.die();
+    if (!player?.alive) return;
+
+    // Start grace period instead of instant death
+    this.disconnectedPlayers.set(playerId, this.gameState.tick);
+    logger.info(
+      { code: this.code, playerId, username: player.username },
+      'Player disconnected during game, starting grace period',
+    );
+  }
+
+  handlePlayerReconnect(playerId: number): boolean {
+    if (!this.disconnectedPlayers.has(playerId)) return false;
+    const player = this.gameState.players.get(playerId);
+    if (!player?.alive) return false;
+
+    this.disconnectedPlayers.delete(playerId);
+    logger.info(
+      { code: this.code, playerId, username: player.username },
+      'Player reconnected during grace period',
+    );
+    return true;
+  }
+
+  /** Called each tick from broadcastState to expire disconnect grace periods */
+  private checkDisconnectGracePeriods(): void {
+    const currentTick = this.gameState.tick;
+    for (const [playerId, disconnectTick] of this.disconnectedPlayers) {
+      if (currentTick - disconnectTick >= DISCONNECT_GRACE_TICKS) {
+        this.gameState.killPlayer(playerId, null);
+        logger.info(
+          { code: this.code, playerId },
+          'Player killed after disconnect grace period expired',
+        );
+        this.disconnectedPlayers.delete(playerId);
+      }
     }
   }
 
+  isPlayerDisconnected(playerId: number): boolean {
+    return this.disconnectedPlayers.has(playerId);
+  }
+
   private broadcastState(state: GameState): void {
+    // Check disconnect grace periods before broadcasting
+    this.checkDisconnectGracePeriods();
+
     const room = `room:${this.code}`;
     this.io.to(room).emit('game:state', state);
 
@@ -216,6 +270,9 @@ export class GameRoom {
     for (const pickup of events.powerupCollected) {
       this.io.to(room).emit('game:powerupCollected', pickup);
     }
+
+    // Record frame for replay
+    this.replayRecorder.recordTick(state, events);
   }
 
   private async onGameOver(): Promise<void> {
@@ -250,12 +307,17 @@ export class GameRoom {
 
     this.gameState.gameLogger?.logGameOver(state.winnerId, placements);
 
-    this.io.to(`room:${this.code}`).emit('game:over', {
+    const gameOverData = {
       winnerId: state.winnerId,
       winnerTeam: state.winnerTeam,
       placements,
       reason: this.gameState.finishReason || '',
-    });
+    };
+
+    this.io.to(`room:${this.code}`).emit('game:over', gameOverData);
+
+    // Save replay
+    this.replayRecorder.finalize(gameOverData);
 
     // Save match results
     if (this.matchId) {

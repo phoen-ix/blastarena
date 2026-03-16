@@ -269,9 +269,22 @@ The UI uses the **INFERNO** design system — a high-energy arcade-industrial ae
 - "3, 2, 1, GO!" countdown overlay synced between server and client
 - Power-up float animation + collection popup particles
 
+## Game Replay System
+
+Every completed game is automatically recorded for admin review:
+
+- **Full recording**: Every tick's game state saved as gzipped JSON in `./data/replays/`
+- **Video player controls**: Play/pause (click canvas or Space), seek slider, speed (0.5x / 1x / 2x / 4x), skip forward/back (arrow keys)
+- **Live game log panel**: Collapsible side panel showing kills, bombs, bot decisions, power-ups in sync with replay playback. Filter by event type, click any entry to seek to that moment
+- **Admin access**: Matches tab → click match → "Watch Replay" button. Shows all players including bots
+- **Space efficient**: Tile diffs instead of full map per frame, gzip compression (~400-700KB per game)
+- **Replay API**: `GET /admin/replays` (list), `GET /admin/replays/:matchId` (fetch), `DELETE /admin/replays/:matchId` (delete)
+
 ## Connection Resilience
 
 - Socket.io reconnects indefinitely (1-5s backoff) with a "Reconnecting..." overlay
+- **Disconnect grace period**: Players get 10 seconds to reconnect during a game before being killed — prevents unfair deaths from brief network blips
+- On reconnect, server auto-detects active game and rejoins the player seamlessly
 - On reconnect, client checks server `buildId` — auto-refreshes if the server restarted
 - Nginx serves a custom 502 page during container rebuilds that auto-polls and refreshes when the app is back
 - Persistent sessions via httpOnly refresh cookies survive server restarts
@@ -298,7 +311,7 @@ All settings via `.env` (copy `.env.example` to get started):
 
 - **Production**: `docker compose up --build -d` — only Nginx exposes a port
 - **Development**: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build` — hot reload, DB/Redis ports exposed
-- **Data**: Persists in `./data/` via bind mounts (database, game logs, simulation logs)
+- **Data**: Persists in `./data/` via bind mounts (database, game logs, simulation logs, replays)
 - **Services**: MariaDB 11, Redis 7, Node.js backend, Nginx (static + proxy)
 - Nginx serves `no-cache` headers for `index.html` to prevent stale frontend after deploys
 

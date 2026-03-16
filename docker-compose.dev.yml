@@ -25,6 +25,7 @@ services:
       - /app/shared/node_modules
       - ./data/gamelogs:/app/gamelogs
       - ./data/simulations:/app/simulations
+      - ./data/replays:/app/replays
     healthcheck:
       start_period: 10s
 

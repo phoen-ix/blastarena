@@ -87,6 +87,7 @@ services:
     volumes:
       - ./data/gamelogs:/app/gamelogs
       - ./data/simulations:/app/simulations
+      - ./data/replays:/app/replays
     networks:
       - internal
     healthcheck:

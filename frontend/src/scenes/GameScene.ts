@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { SocketClient } from '../network/SocketClient';
 import { AuthManager } from '../network/AuthManager';
-import { GameState, TILE_SIZE, TICK_MS } from '@blast-arena/shared';
+import { GameState, ReplayData, ReplayTickEvents, TILE_SIZE, TICK_MS } from '@blast-arena/shared';
 import { TileMapRenderer } from '../game/TileMap';
 import { PlayerSpriteRenderer } from '../game/PlayerSprite';
 import { BombSpriteRenderer } from '../game/BombSprite';
@@ -13,6 +13,9 @@ import { EffectSystem } from '../game/EffectSystem';
 import { CountdownOverlay } from '../game/CountdownOverlay';
 import { GamepadManager } from '../game/GamepadManager';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
+import { ReplayPlayer } from '../game/ReplayPlayer';
+import { ReplayControls } from '../game/ReplayControls';
+import { ReplayLogPanel } from '../game/ReplayLogPanel';
 
 export class GameScene extends Phaser.Scene {
   private socketClient!: SocketClient;
@@ -44,6 +47,11 @@ export class GameScene extends Phaser.Scene {
   private lastGameState: GameState | null = null;
   private localPlayerDead: boolean = false;
   private hasShownCountdown: boolean = false;
+
+  // Replay mode
+  private replayPlayer: ReplayPlayer | null = null;
+  private replayControls: ReplayControls | null = null;
+  private replayLogPanel: ReplayLogPanel | null = null;
 
   // Spectator mode
   private freeCamX: number = 0;
@@ -121,8 +129,54 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Listen for state updates
+    const replayMode = this.registry.get('replayMode');
     const simSpectate = this.registry.get('simulationSpectate');
-    if (simSpectate) {
+    if (replayMode) {
+      // Replay mode: play back recorded game data
+      this.localPlayerDead = true; // Force spectator camera
+      const replayData: ReplayData = this.registry.get('replayData');
+
+      this.replayPlayer = new ReplayPlayer(replayData, {
+        onFrame: (state: GameState) => this.updateState(state),
+        onTickEvents: (events: ReplayTickEvents) =>
+          this.handleReplayTickEvents(events),
+        onLogUpdate: (tick: number) => this.replayLogPanel?.updateTick(tick),
+        onComplete: () => {
+          /* pause at last frame */
+        },
+        onStateChange: () => {
+          this.replayControls?.update();
+        },
+      });
+
+      const matchInfo = {
+        matchId: replayData.matchId,
+        gameMode: replayData.gameMode,
+        playerCount: replayData.gameOver.placements.length,
+      };
+
+      this.replayControls = new ReplayControls(
+        this.replayPlayer,
+        matchInfo,
+        () => this.exitReplay(),
+      );
+      this.replayControls.mount();
+
+      this.replayLogPanel = new ReplayLogPanel(replayData.log, (tick: number) => {
+        this.replayPlayer?.seekTo(tick);
+        this.replayControls?.update();
+      });
+      this.replayLogPanel.mount();
+
+      // Click on game canvas to toggle play/pause
+      this.input.on('pointerdown', () => {
+        this.replayPlayer?.togglePlayPause();
+        this.replayControls?.update();
+      });
+
+      // Emit first frame
+      this.replayPlayer.seekTo(0);
+    } else if (simSpectate) {
       // Simulation spectate mode: listen on sim:state, no input sending
       this.localPlayerDead = true; // Force spectator mode
       this.socketClient.on(
@@ -254,6 +308,7 @@ export class GameScene extends Phaser.Scene {
 
     this.processInput();
     this.updateCamera();
+    this.replayControls?.update();
   }
 
   private applyCameraBounds(mapW: number, mapH: number): void {
@@ -270,6 +325,29 @@ export class GameScene extends Phaser.Scene {
 
     cam.setBounds(boundsX, boundsY, boundsW, boundsH);
     cam.centerOn(worldW / 2, worldH / 2);
+  }
+
+  private handleReplayTickEvents(events: ReplayTickEvents): void {
+    for (const explosion of events.explosions) {
+      this.effectSystem.triggerExplosion(explosion);
+    }
+    for (const death of events.playerDied) {
+      this.effectSystem.triggerPlayerDied(death);
+    }
+  }
+
+  private exitReplay(): void {
+    this.replayPlayer?.destroy();
+    this.replayControls?.destroy();
+    this.replayLogPanel?.destroy();
+    this.replayPlayer = null;
+    this.replayControls = null;
+    this.replayLogPanel = null;
+    this.registry.remove('replayMode');
+    this.registry.remove('replayData');
+    this.registry.remove('initialGameState');
+    this.scene.stop('HUDScene');
+    this.scene.start('LobbyScene');
   }
 
   private updateCamera(): void {
@@ -478,6 +556,12 @@ export class GameScene extends Phaser.Scene {
     this.socketClient.off('sim:state' as any);
     this.socketClient.off('sim:gameTransition' as any);
     this.socketClient.off('sim:completed' as any);
+    this.replayPlayer?.destroy();
+    this.replayControls?.destroy();
+    this.replayLogPanel?.destroy();
+    this.replayPlayer = null;
+    this.replayControls = null;
+    this.replayLogPanel = null;
     this.removeSpectatorListeners();
     this.cleanupRenderers();
   }

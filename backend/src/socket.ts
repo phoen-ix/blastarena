@@ -74,7 +74,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     }
   }
 
-  io.on('connection', (socket) => {
+  io.on('connection', async (socket) => {
     logger.info({ userId: socket.data.userId, username: socket.data.username }, 'Socket connected');
 
     const currentUser: PublicUser = {
@@ -82,6 +82,22 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       username: socket.data.username,
       role: socket.data.role,
     };
+
+    // Check if player was in an active game (reconnection after disconnect)
+    const existingRoomCode = await lobbyService.getPlayerRoom(socket.data.userId);
+    if (existingRoomCode) {
+      const gameRoom = roomManager.getRoom(existingRoomCode);
+      if (gameRoom && gameRoom.isRunning() && gameRoom.isPlayerDisconnected(socket.data.userId)) {
+        // Rejoin socket room and resume game
+        socket.join(`room:${existingRoomCode}`);
+        gameRoom.handlePlayerReconnect(socket.data.userId);
+        // Send current game state so client can resume
+        logger.info(
+          { userId: socket.data.userId, roomCode: existingRoomCode },
+          'Player reconnected to active game',
+        );
+      }
+    }
 
     // Room creation
     socket.on('room:create', async (data, callback) => {
@@ -462,18 +478,20 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
       const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
       if (roomCode) {
-        // If game is running, notify game room
         const gameRoom = roomManager.getRoom(roomCode);
-        if (gameRoom) {
+        if (gameRoom && gameRoom.isRunning()) {
+          // Game is running — start grace period, do NOT remove from room yet
+          // Player stays in lobby room list so they can reconnect
           gameRoom.handlePlayerDisconnect(socket.data.userId);
+        } else {
+          // No active game — leave room normally
+          const room = await lobbyService.leaveRoom(roomCode, socket.data.userId);
+          if (room) {
+            io.to(`room:${roomCode}`).emit('room:playerLeft', socket.data.userId);
+            io.to(`room:${roomCode}`).emit('room:state', room);
+          }
+          broadcastRoomList();
         }
-
-        const room = await lobbyService.leaveRoom(roomCode, socket.data.userId);
-        if (room) {
-          io.to(`room:${roomCode}`).emit('room:playerLeft', socket.data.userId);
-          io.to(`room:${roomCode}`).emit('room:state', room);
-        }
-        broadcastRoomList();
       }
     });
   });

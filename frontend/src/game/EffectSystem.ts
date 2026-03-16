@@ -162,6 +162,16 @@ export class EffectSystem {
     }
   }
 
+  /** Direct trigger for replay mode (no socket events) */
+  triggerExplosion(data: { cells: { x: number; y: number }[]; ownerId: number }): void {
+    this.onExplosion(data.cells);
+  }
+
+  /** Direct trigger for replay mode (no socket events) */
+  triggerPlayerDied(data: { playerId: number; killerId: number | null }): void {
+    this.onPlayerDied(data.playerId);
+  }
+
   destroy(): void {
     if (this.explosionHandler) {
       this.socketClient.off('game:explosion', this.explosionHandler as any);

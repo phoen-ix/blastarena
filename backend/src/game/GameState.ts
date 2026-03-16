@@ -773,6 +773,24 @@ export class GameStateManager {
     return Array.from(this.players.values()).filter((p) => p.alive);
   }
 
+  /** Kill a player externally (e.g. disconnect timeout). Handles placement and logging. */
+  killPlayer(playerId: number, killerId: number | null): void {
+    const player = this.players.get(playerId);
+    if (!player?.alive) return;
+
+    player.die();
+    this.placementCounter--;
+    player.placement = this.getAlivePlayers().length + 1;
+    this.tickEvents.playerDied.push({ playerId, killerId });
+    this.gameLogger?.logKill(
+      killerId ?? playerId,
+      killerId ? (this.players.get(killerId)?.username ?? '') : player.username,
+      playerId,
+      player.username,
+      killerId === null || killerId === playerId,
+    );
+  }
+
   toState(): GameStateType {
     return {
       tick: this.tick,

@@ -189,6 +189,23 @@ MatchConfig includes: gameMode, maxPlayers, mapWidth/Height, mapSeed, roundTime,
 - `GameLogger` supports 3 verbosity levels: normal (tick every 5), detailed (tick every 2 + movements/pickups), full (every tick + explosion detail + bot pathfinding)
 - Simulation logs written to `./data/simulations/{gameMode}/batch_*/` with separate directory per game mode
 
+## Game Replay System
+- Every completed game is recorded as a gzipped JSON replay file in `./data/replays/`
+- `ReplayRecorder` (backend) captures full GameState every tick, with tile diffs (not full map per frame) for space efficiency
+- `GameLogger` forwards log events (kills, bombs, bot decisions, movements, powerups) to ReplayRecorder with tick numbers for synchronized display
+- Replay files: `{matchId}_{roomCode}_{gameMode}.replay.json.gz` (~400-700KB per game)
+- Admin API: `GET /admin/replays` (list), `GET /admin/replays/:matchId` (fetch), `DELETE /admin/replays/:matchId` (delete)
+- Match detail modal shows "Watch Replay" button when `hasReplay: true`
+- `ReplayPlayer` (frontend) manages playback: play/pause, speed (0.5x/1x/2x/4x), seek to any frame
+- `ReplayControls` — video-player-like bottom bar with slider, time display, speed selector, keyboard shortcuts (Space=play/pause, arrows=skip)
+- `ReplayLogPanel` — collapsible right-side panel showing game events synced to replay time, with filters by event type (kills, bombs, bot AI, powerups, movement), clickable timestamps for seeking
+- GameScene detects `registry.get('replayMode')` and uses ReplayPlayer instead of socket events; clicking the game canvas toggles play/pause
+- EffectSystem has `triggerExplosion()`/`triggerPlayerDied()` public methods for replay mode (bypasses socket listeners)
+- `ReplayRecorder` deep-copies `initialState.map.tiles` in constructor (game engine mutates tiles in-place as walls are destroyed)
+- Tile state reconstruction: initial tiles stored once, diffs applied forward; seeking backward rebuilds from initial
+- Match detail modal shows all players (including bots) when replay exists via `allPlayers` field from `getReplayPlacements()`
+- Docker volume: `./data/replays:/app/replays`
+
 ## Code Quality & Tooling
 - ESLint v10 + `@typescript-eslint/recommended` via flat config (`eslint.config.mjs`); `no-explicit-any` as warning, `no-unused-vars` as error
 - Prettier with single quotes, trailing commas, 100 char width
@@ -214,6 +231,10 @@ npx jest --config tests/backend/jest.config.ts  # Run from project root
 
 ## Connection Resilience
 - Socket.io reconnects indefinitely (1-5s backoff) with a "Reconnecting..." overlay when disconnected
+- **Disconnect grace period**: when a player's socket disconnects during a game, they get 10 seconds (200 ticks) to reconnect before being killed. `GameRoom.disconnectedPlayers` tracks pending disconnects; `checkDisconnectGracePeriods()` runs each tick. On reconnect, `handlePlayerReconnect()` cancels the grace timer and the player resumes playing.
+- During disconnect grace period, the player is NOT removed from the lobby room — only on grace expiry or game end
+- On reconnect, server auto-detects if player was in an active game (`isPlayerDisconnected()`) and rejoins them to the socket room
+- `GameState.killPlayer()` handles disconnect-timeout deaths with proper placement tracking, kill logging, and tickEvents emission
 - On reconnect, client fetches `/api/health` and compares `buildId` (server start timestamp). If different, the page auto-refreshes to load new frontend.
 - Nginx serves a custom 502 page (`docker/nginx/502.html`) during container rebuilds that auto-polls and refreshes when the app is back
 - The 502 page detects the real app by checking for `game-container` in the response body

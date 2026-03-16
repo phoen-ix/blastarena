@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth';
 import { staffMiddleware, adminOnlyMiddleware } from '../middleware/admin';
 import { validate } from '../middleware/validation';
 import * as adminService from '../services/admin';
+import * as replayService from '../services/replay';
 import { getSimulationManager } from '../game/registry';
 import { SimulationConfig } from '@blast-arena/shared';
 
@@ -211,6 +212,47 @@ router.delete('/admin/announcements/banner', adminOnlyMiddleware, async (req, re
   try {
     await adminService.clearBanner(req.user!.userId);
     res.json({ message: 'Banner cleared' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Replays ---
+
+router.get('/admin/replays', async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const result = await replayService.listReplays(page, limit);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/admin/replays/:matchId', async (req, res, next) => {
+  try {
+    const matchId = parseInt(req.params.matchId);
+    const replay = await replayService.getReplay(matchId);
+    if (!replay) {
+      res.status(404).json({ error: 'Replay not found' });
+      return;
+    }
+    res.json(replay);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/admin/replays/:matchId', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const matchId = parseInt(req.params.matchId);
+    const deleted = replayService.deleteReplay(matchId);
+    if (!deleted) {
+      res.status(404).json({ error: 'Replay not found' });
+      return;
+    }
+    res.json({ message: 'Replay deleted' });
   } catch (err) {
     next(err);
   }
