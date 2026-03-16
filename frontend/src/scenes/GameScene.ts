@@ -287,7 +287,7 @@ export class GameScene extends Phaser.Scene {
     this.events.emit('stateUpdate', state);
   }
 
-  update(): void {
+  update(_time: number, delta: number): void {
     // Detect local player death
     if (!this.localPlayerDead && this.lastGameState) {
       const me = this.lastGameState.players.find((p) => p.id === this.localPlayerId);
@@ -308,7 +308,14 @@ export class GameScene extends Phaser.Scene {
 
     this.processInput();
     this.updateCamera();
-    this.replayControls?.update();
+
+    // Drive replay playback from Phaser's frame loop
+    if (this.replayPlayer) {
+      const advanced = this.replayPlayer.tick(delta);
+      if (advanced) {
+        this.replayControls?.update();
+      }
+    }
   }
 
   private applyCameraBounds(mapW: number, mapH: number): void {

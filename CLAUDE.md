@@ -196,7 +196,7 @@ MatchConfig includes: gameMode, maxPlayers, mapWidth/Height, mapSeed, roundTime,
 - Replay files: `{matchId}_{roomCode}_{gameMode}.replay.json.gz` (~400-700KB per game)
 - Admin API: `GET /admin/replays` (list), `GET /admin/replays/:matchId` (fetch), `DELETE /admin/replays/:matchId` (delete)
 - Match detail modal shows "Watch Replay" button when `hasReplay: true`
-- `ReplayPlayer` (frontend) manages playback: play/pause, speed (0.5x/1x/2x/4x), seek to any frame
+- `ReplayPlayer` (frontend) manages playback: play/pause, speed (0.5x/1x/2x/4x), seek to any frame. Uses Phaser-synced time accumulator (`tick(deltaMs)`) instead of `setInterval` to prevent drift/fast-forward; frame bounds-checked before access
 - `ReplayControls` — video-player-like bottom bar with slider, time display, speed selector, keyboard shortcuts (Space=play/pause, arrows=skip)
 - `ReplayLogPanel` — collapsible right-side panel showing game events synced to replay time, with filters by event type (kills, bombs, bot AI, powerups, movement), clickable timestamps for seeking
 - GameScene detects `registry.get('replayMode')` and uses ReplayPlayer instead of socket events; clicking the game canvas toggles play/pause

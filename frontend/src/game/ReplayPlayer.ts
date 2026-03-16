@@ -2,7 +2,7 @@ import {
   GameState,
   TileType,
   ReplayData,
-  ReplayFrame,
+
   ReplayTickEvents,
   TICK_RATE,
 } from '@blast-arena/shared';
@@ -22,7 +22,7 @@ export class ReplayPlayer {
   private currentFrame: number = 0;
   private _isPlaying: boolean = false;
   private _speed: number = 1;
-  private playbackInterval: number | null = null;
+  private timeAccumulator: number = 0;
   private callbacks: ReplayCallbacks;
 
   // Tile state for reconstruction
@@ -62,14 +62,14 @@ export class ReplayPlayer {
     if (this.currentFrame >= this.getTotalFrames() - 1) return;
 
     this._isPlaying = true;
-    this.startInterval();
+    this.timeAccumulator = 0;
     this.callbacks.onStateChange(true, this._speed);
   }
 
   pause(): void {
     if (!this._isPlaying) return;
     this._isPlaying = false;
-    this.stopInterval();
+    this.timeAccumulator = 0;
     this.callbacks.onStateChange(false, this._speed);
   }
 
@@ -83,10 +83,6 @@ export class ReplayPlayer {
 
   setSpeed(speed: number): void {
     this._speed = speed;
-    if (this._isPlaying) {
-      this.stopInterval();
-      this.startInterval();
-    }
     this.callbacks.onStateChange(this._isPlaying, this._speed);
   }
 
@@ -144,34 +140,29 @@ export class ReplayPlayer {
     return this.replayData;
   }
 
+  /** Call from Phaser's update() with delta in ms. Returns true if frame changed. */
+  tick(deltaMs: number): boolean {
+    if (!this._isPlaying) return false;
+
+    this.timeAccumulator += deltaMs * this._speed;
+    let advanced = false;
+    while (this.timeAccumulator >= TICK_MS) {
+      this.timeAccumulator -= TICK_MS;
+      if (this.currentFrame >= this.getTotalFrames() - 1) {
+        this.pause();
+        this.callbacks.onComplete();
+        return advanced;
+      }
+      this.currentFrame++;
+      this.applyTileDiffs(this.currentFrame);
+      this.emitCurrentFrame();
+      advanced = true;
+    }
+    return advanced;
+  }
+
   destroy(): void {
-    this.stopInterval();
-  }
-
-  private startInterval(): void {
-    const intervalMs = TICK_MS / this._speed;
-    this.playbackInterval = window.setInterval(() => {
-      this.advanceFrame();
-    }, intervalMs);
-  }
-
-  private stopInterval(): void {
-    if (this.playbackInterval !== null) {
-      clearInterval(this.playbackInterval);
-      this.playbackInterval = null;
-    }
-  }
-
-  private advanceFrame(): void {
-    if (this.currentFrame >= this.getTotalFrames() - 1) {
-      this.pause();
-      this.callbacks.onComplete();
-      return;
-    }
-
-    this.currentFrame++;
-    this.applyTileDiffs(this.currentFrame);
-    this.emitCurrentFrame();
+    this._isPlaying = false;
   }
 
   private applyTileDiffs(frameIndex: number): void {
@@ -184,6 +175,7 @@ export class ReplayPlayer {
   }
 
   private emitCurrentFrame(): void {
+    if (this.currentFrame < 0 || this.currentFrame >= this.replayData.frames.length) return;
     const frame = this.replayData.frames[this.currentFrame];
 
     // Reconstruct full GameState by injecting current tiles into stored map

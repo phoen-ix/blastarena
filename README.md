@@ -274,7 +274,7 @@ The UI uses the **INFERNO** design system — a high-energy arcade-industrial ae
 Every completed game is automatically recorded for admin review:
 
 - **Full recording**: Every tick's game state saved as gzipped JSON in `./data/replays/`
-- **Video player controls**: Play/pause (click canvas or Space), seek slider, speed (0.5x / 1x / 2x / 4x), skip forward/back (arrow keys)
+- **Video player controls**: Play/pause (click canvas or Space), seek slider, speed (0.5x / 1x / 2x / 4x), skip forward/back (arrow keys). Playback synced to Phaser's render loop for accurate timing
 - **Live game log panel**: Collapsible side panel showing kills, bombs, bot decisions, power-ups in sync with replay playback. Filter by event type, click any entry to seek to that moment
 - **Admin access**: Matches tab → click match → "Watch Replay" button. Shows all players including bots
 - **Space efficient**: Tile diffs instead of full map per frame, gzip compression (~400-700KB per game)
