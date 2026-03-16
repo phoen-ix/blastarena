@@ -8,7 +8,11 @@ class ApiClientClass {
     this.authManager = manager;
   }
 
-  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(
+    path: string,
+    options: RequestInit = {},
+    skipAuthRetry = false,
+  ): Promise<T> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string> || {}),
@@ -24,7 +28,7 @@ class ApiClientClass {
       credentials: 'include',
     });
 
-    if (response.status === 401 && this.authManager) {
+    if (response.status === 401 && this.authManager && !skipAuthRetry) {
       // Try to refresh
       const refreshed = await this.authManager.refresh();
       if (refreshed) {
@@ -58,11 +62,15 @@ class ApiClientClass {
     return this.request<T>(path);
   }
 
-  async post<T>(path: string, body?: unknown): Promise<T> {
-    return this.request<T>(path, {
-      method: 'POST',
-      body: body ? JSON.stringify(body) : undefined,
-    });
+  async post<T>(path: string, body?: unknown, skipAuthRetry = false): Promise<T> {
+    return this.request<T>(
+      path,
+      {
+        method: 'POST',
+        body: body ? JSON.stringify(body) : undefined,
+      },
+      skipAuthRetry,
+    );
   }
 
   async put<T>(path: string, body?: unknown): Promise<T> {

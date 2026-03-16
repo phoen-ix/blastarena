@@ -48,7 +48,7 @@ export class AuthManager {
       username,
       email,
       password,
-    });
+    }, true);
     this.setAuth(response);
   }
 
@@ -56,7 +56,7 @@ export class AuthManager {
     const response = await ApiClient.post<AuthResponse>('/auth/login', {
       username,
       password,
-    });
+    }, true);
     this.setAuth(response);
   }
 

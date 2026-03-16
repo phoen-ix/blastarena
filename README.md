@@ -299,7 +299,7 @@ All settings via `.env` (copy `.env.example` to get started):
 | `DB_PASSWORD` | `change_me_in_production` | MariaDB user password |
 | `DB_ROOT_PASSWORD` | `change_root_password` | MariaDB root password |
 | `APP_EXTERNAL_PORT` | `8080` | Port Nginx listens on |
-| `APP_URL` | `http://localhost:8080` | Public URL (controls secure cookie flag) |
+| `APP_URL` | `http://localhost:8080` | Public URL (controls secure cookie flag + Vite allowed host) |
 | `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` | — | SMTP for email verification (optional) |
 | `GAME_TICK_RATE` | `20` | Server game loop ticks per second |
 | `MAX_ROOMS` | `50` | Maximum concurrent rooms |

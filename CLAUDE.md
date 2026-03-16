@@ -24,6 +24,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - Movement cooldown system (MOVE_COOLDOWN_BASE ticks, reduced by speed power-ups)
 - JWT (access token in memory) + httpOnly cookie (refresh token) auth
 - Cookie `secure` flag derived from APP_URL (not NODE_ENV) for HTTP/HTTPS compatibility
+- ApiClient 401 interceptor: auto-refreshes token and retries, but auth endpoints (login/register) use `skipAuthRetry` to pass 401 errors through directly — prevents logout side effects from corrupting session state
+- Vite `allowedHosts` derived from `APP_URL` env var (hostname extracted at config load time), passed via docker-compose `environment`
 - Zod for request validation
 - All game constants in shared/src/constants/
 - Socket.io listeners use one-shot pattern for game:start to prevent leaks across scene transitions

@@ -35,6 +35,8 @@ services:
       dockerfile: docker/nginx/Dockerfile
       target: frontend-dev
     container_name: ${COMPOSE_PROJECT_NAME:-blast-arena}-frontend
+    environment:
+      APP_URL: ${APP_URL:-http://localhost:8080}
     ports:
       - "127.0.0.1:5173:5173"
     volumes:
