@@ -13,12 +13,12 @@ export const SPAWN_CLEAR_RADIUS = 2;
 export const DEFAULT_SPEED = 1;
 export const DEFAULT_MAX_BOMBS = 1;
 export const DEFAULT_FIRE_RANGE = 1;
-export const MAX_SPEED = 5;
+export const MAX_SPEED = 2;
 export const MAX_BOMBS = 8;
 export const MAX_FIRE_RANGE = 8;
 
 // Movement cooldown (in ticks) - higher = slower
-// At speed 1: 5 ticks (4 moves/sec), speed 5: 1 tick (20 moves/sec)
+// At speed 1: 5 ticks (4 moves/sec), speed 2 (max): 4 ticks (5 moves/sec)
 export const MOVE_COOLDOWN_BASE = 5;
 
 // Timings (in ticks at 20 tps)

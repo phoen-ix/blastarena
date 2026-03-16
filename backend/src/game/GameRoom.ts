@@ -8,7 +8,7 @@ import {
   InterServerEvents,
   SocketData,
 } from '@blast-arena/shared';
-import { GAME_MODES } from '@blast-arena/shared';
+import { GAME_MODES, MAX_SPEED } from '@blast-arena/shared';
 
 type TypedServer = Server<
   ClientToServerEvents,
@@ -97,7 +97,7 @@ export class GameRoom {
       for (const player of this.gameState.players.values()) {
         player.maxBombs = 8;
         player.fireRange = 8;
-        player.speed = 5;
+        player.speed = MAX_SPEED;
         player.hasKick = true;
       }
     }

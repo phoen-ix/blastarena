@@ -164,7 +164,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - **Free for All (FFA)**: 2-8 players, last player standing wins, 3 min
 - **Teams**: 4-8 players, 2 teams, last team standing wins, friendly fire toggle, 4 min
 - **Battle Royale**: 4-8 players, shrinking circular zone, 5 min
-- **Sudden Death**: 2-8 players, all start maxed (8 bombs, 8 range, 5 speed, kick), no power-ups, one hit kills, 2 min
+- **Sudden Death**: 2-8 players, all start maxed (8 bombs, 8 range, max speed, kick), no power-ups, one hit kills, 2 min
 - **Deathmatch**: 2-8 players, respawn after 3s with reset stats, first to 10 kills or most kills at time wins, 5 min
 - **King of the Hill**: 2-8 players, control 3x3 center zone for points, first to 100 wins, 4 min
 

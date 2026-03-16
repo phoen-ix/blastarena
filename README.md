@@ -62,7 +62,7 @@ Power-ups drop when destructible walls are destroyed. Walk over the floating til
 |------|------|--------|--------|
 | 💣 | **Bomb Up** | +1 max bombs (up to 8) | Common |
 | 🔥 | **Fire Up** | +1 explosion range (up to 8) | Common |
-| ⚡ | **Speed Up** | Faster movement (up to 5 levels) | Common |
+| ⚡ | **Speed Up** | Faster movement (up to 2 levels) | Common |
 | 🛡️ | **Shield** | Absorbs one explosion hit. No time limit, doesn't stack | Uncommon |
 | 👢 | **Kick** | Walk into bombs to kick them across the map | Rare |
 | 💥 | **Pierce Bomb** | Explosions pass through destructible walls (still destroys them) | Rare |

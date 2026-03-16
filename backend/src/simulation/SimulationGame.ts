@@ -1,4 +1,4 @@
-import { GAME_MODES, TICK_RATE, SimulationConfig, SimulationGameResult } from '@blast-arena/shared';
+import { GAME_MODES, TICK_RATE, MAX_SPEED, SimulationConfig, SimulationGameResult } from '@blast-arena/shared';
 import { GameStateManager } from '../game/GameState';
 import { GameLogger } from '../utils/gameLogger';
 import { logger } from '../utils/logger';
@@ -77,7 +77,7 @@ export class SimulationGame {
       for (const player of this.gameState.players.values()) {
         player.maxBombs = 8;
         player.fireRange = 8;
-        player.speed = 5;
+        player.speed = MAX_SPEED;
         player.hasKick = true;
       }
     }
