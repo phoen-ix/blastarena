@@ -148,7 +148,8 @@ Admins can run batch bot-only game simulations to collect AI behavior data for a
 - **Two speed modes**: Fast (ticks as fast as possible) or Real-time (20 tps with live spectating in-browser)
 - **Log verbosity**: Normal (5-tick snapshots), Detailed (2-tick + movements/pickups), Full (every tick + pathfinding)
 - **Results**: Paginated table with sortable columns, win distribution chart, per-game stats
-- **Management**: Cancel running batches, delete completed batches (removes logs from disk)
+- **Queue system**: Start a new simulation while one is running — it queues (up to 10) and auto-starts when the current batch finishes. Queue position shown in the UI with a "Remove" option
+- **Management**: Cancel running batches (queue auto-advances), delete completed batches (removes logs from disk)
 - **Logs**: JSONL files in `data/simulations/{gameMode}/batch_*/` with `batch_config.json` and `batch_summary.json`
 - **Live spectating**: Real-time simulations play in the browser like a normal game in spectator mode, with automatic game-to-game transitions
 

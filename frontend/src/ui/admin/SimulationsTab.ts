@@ -43,6 +43,7 @@ export class SimulationsTab {
     this.socketClient.on('sim:progress' as any, this.handleProgress);
     this.socketClient.on('sim:gameResult' as any, this.handleGameResult);
     this.socketClient.on('sim:completed' as any, this.handleCompleted);
+    this.socketClient.on('sim:queueUpdate' as any, this.handleQueueUpdate);
 
     await this.loadBatchList();
     this.refreshInterval = setInterval(() => {
@@ -58,6 +59,7 @@ export class SimulationsTab {
     this.socketClient.off('sim:progress' as any, this.handleProgress);
     this.socketClient.off('sim:gameResult' as any, this.handleGameResult);
     this.socketClient.off('sim:completed' as any, this.handleCompleted);
+    this.socketClient.off('sim:queueUpdate' as any, this.handleQueueUpdate);
     this.container?.remove();
     this.container = null;
     this.viewMode = 'list';
@@ -81,6 +83,12 @@ export class SimulationsTab {
       if (this.activeBatch) {
         this.renderDetailView(this.activeBatch);
       }
+    }
+  };
+
+  private handleQueueUpdate = () => {
+    if (this.viewMode === 'list') {
+      this.loadBatchList();
     }
   };
 
@@ -142,13 +150,15 @@ export class SimulationsTab {
   private renderBatchRow(b: SimulationBatchStatus): string {
     const pct = b.totalGames > 0 ? Math.round((b.gamesCompleted / b.totalGames) * 100) : 0;
     const statusColor =
-      b.status === 'running'
-        ? 'var(--accent)'
-        : b.status === 'completed'
-          ? 'var(--success)'
-          : b.status === 'cancelled'
-            ? 'var(--warning)'
-            : 'var(--danger)';
+      b.status === 'queued'
+        ? 'var(--info)'
+        : b.status === 'running'
+          ? 'var(--accent)'
+          : b.status === 'completed'
+            ? 'var(--success)'
+            : b.status === 'cancelled'
+              ? 'var(--warning)'
+              : 'var(--danger)';
     const modeLabel = GAME_MODES[b.config.gameMode]?.name || b.config.gameMode;
 
     return `
@@ -172,21 +182,27 @@ export class SimulationsTab {
           </div>
         </td>
         <td>${b.config.speed === 'fast' ? 'Fast' : 'Real-time'}</td>
-        <td><span style="color:${statusColor};font-weight:600;text-transform:capitalize;">${b.status}</span></td>
+        <td><span style="color:${statusColor};font-weight:600;text-transform:capitalize;">${b.status === 'queued' ? `Queued (#${b.queuePosition})` : b.status}</span></td>
         <td style="display:flex;gap:4px;">
-          <button class="btn btn-secondary btn-sm" data-action="view" data-batch="${escapeHtml(b.batchId)}">View</button>
           ${
-            b.status !== 'running'
-              ? `<button class="btn-warn btn-sm" data-action="delete" data-batch="${escapeHtml(b.batchId)}">Delete</button>`
-              : ''
-          }
-          ${
-            b.status === 'running'
-              ? `
-            ${b.config.speed === 'realtime' ? `<button class="btn btn-secondary btn-sm" data-action="spectate" data-batch="${escapeHtml(b.batchId)}">Spectate</button>` : ''}
-            <button class="btn-warn btn-sm" data-action="cancel" data-batch="${escapeHtml(b.batchId)}">Cancel</button>
+            b.status === 'queued'
+              ? `<button class="btn-warn btn-sm" data-action="dequeue" data-batch="${escapeHtml(b.batchId)}">Remove</button>`
+              : `
+            <button class="btn btn-secondary btn-sm" data-action="view" data-batch="${escapeHtml(b.batchId)}">View</button>
+            ${
+              b.status !== 'running'
+                ? `<button class="btn-warn btn-sm" data-action="delete" data-batch="${escapeHtml(b.batchId)}">Delete</button>`
+                : ''
+            }
+            ${
+              b.status === 'running'
+                ? `
+              ${b.config.speed === 'realtime' ? `<button class="btn btn-secondary btn-sm" data-action="spectate" data-batch="${escapeHtml(b.batchId)}">Spectate</button>` : ''}
+              <button class="btn-warn btn-sm" data-action="cancel" data-batch="${escapeHtml(b.batchId)}">Cancel</button>
+            `
+                : ''
+            }
           `
-              : ''
           }
         </td>
       </tr>
@@ -211,6 +227,15 @@ export class SimulationsTab {
       });
     } else if (action === 'spectate') {
       this.startSpectating(batchId);
+    } else if (action === 'dequeue') {
+      this.socketClient.emit('sim:cancel' as any, { batchId }, (res: any) => {
+        if (res.success) {
+          this.notifications.success('Simulation removed from queue');
+          this.loadBatchList();
+        } else {
+          this.notifications.error(res.error || 'Failed to remove from queue');
+        }
+      });
     } else if (action === 'delete') {
       if (confirm(`Delete simulation batch and all its logs?`)) {
         try {
@@ -765,14 +790,22 @@ export class SimulationsTab {
         }
 
         const batchId = res.batchId;
-        this.notifications.success(`Simulation batch started (${config.totalGames} games)`);
 
-        if (speed === 'realtime') {
-          // For realtime: immediately spectate so the game plays in the browser
-          this.startSpectating(batchId);
+        if (res.queued) {
+          this.notifications.success(
+            `Simulation queued (position #${res.queuePosition}, ${config.totalGames} games)`,
+          );
+          this.loadBatchList();
         } else {
-          // For fast mode: show detail view with progress
-          this.showBatchDetail(batchId);
+          this.notifications.success(`Simulation batch started (${config.totalGames} games)`);
+
+          if (speed === 'realtime') {
+            // For realtime: immediately spectate so the game plays in the browser
+            this.startSpectating(batchId);
+          } else {
+            // For fast mode: show detail view with progress
+            this.showBatchDetail(batchId);
+          }
         }
       });
     });

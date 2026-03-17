@@ -83,6 +83,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       role: socket.data.role,
     };
 
+    // Auto-join admin room for simulation broadcasts
+    if (socket.data.role === 'admin') {
+      socket.join('sim:admin');
+    }
+
     // Check if player was in an active game (reconnection after disconnect)
     const existingRoomCode = await lobbyService.getPlayerRoom(socket.data.userId);
     if (existingRoomCode) {
@@ -413,22 +418,40 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         return callback({ success: false, error: result.error });
       }
 
-      const runner = mgr.getBatch(result.batchId)!;
+      if (result.queued) {
+        logger.info(
+          {
+            admin: socket.data.username,
+            batchId: result.batchId,
+            queuePosition: result.queuePosition,
+            totalGames: config.totalGames,
+          },
+          'Admin queued simulation batch',
+        );
+        callback({
+          success: true,
+          batchId: result.batchId,
+          queued: true,
+          queuePosition: result.queuePosition,
+        });
+      } else {
+        const runner = mgr.getBatch(result.batchId)!;
 
-      // Forward events to the admin socket
-      runner.on('progress', (status: any) => socket.emit('sim:progress', status));
-      runner.on('gameResult', (gameResult: any) =>
-        socket.emit('sim:gameResult', { batchId: result.batchId, result: gameResult }),
-      );
-      runner.on('completed', (status: any) =>
-        socket.emit('sim:completed', { batchId: result.batchId, status }),
-      );
+        // Forward events to the requesting admin socket
+        runner.on('progress', (status: any) => socket.emit('sim:progress', status));
+        runner.on('gameResult', (gameResult: any) =>
+          socket.emit('sim:gameResult', { batchId: result.batchId, result: gameResult }),
+        );
+        runner.on('completed', (status: any) =>
+          socket.emit('sim:completed', { batchId: result.batchId, status }),
+        );
 
-      logger.info(
-        { admin: socket.data.username, batchId: result.batchId, totalGames: config.totalGames },
-        'Admin started simulation batch',
-      );
-      callback({ success: true, batchId: result.batchId });
+        logger.info(
+          { admin: socket.data.username, batchId: result.batchId, totalGames: config.totalGames },
+          'Admin started simulation batch',
+        );
+        callback({ success: true, batchId: result.batchId });
+      }
     });
 
     // Simulation: cancel batch

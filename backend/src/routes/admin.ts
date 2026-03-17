@@ -321,7 +321,7 @@ router.post(
     const mgr = getSimulationManager();
     const result = mgr.startBatch(req.body as SimulationConfig, req.user!.userId);
     if ('error' in result) {
-      res.status(409).json(result);
+      res.status(429).json(result);
       return;
     }
     res.status(201).json(result);

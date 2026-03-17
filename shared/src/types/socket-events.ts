@@ -38,7 +38,13 @@ export interface ClientToServerEvents {
   'admin:roomMessage': (data: { roomCode: string; message: string }) => void;
   'sim:start': (
     config: SimulationConfig,
-    callback: (response: { success: boolean; batchId?: string; error?: string }) => void,
+    callback: (response: {
+      success: boolean;
+      batchId?: string;
+      queued?: boolean;
+      queuePosition?: number;
+      error?: string;
+    }) => void,
   ) => void;
   'sim:cancel': (
     data: { batchId: string },

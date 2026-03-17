@@ -90,8 +90,9 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - **Log directory structure**: `data/simulations/{gameMode}/batch_{timestamp}_{batchId}/` with per-game `sim_NNN.jsonl` files, `batch_config.json`, and `batch_summary.json`
 - **Log verbosity levels**: Normal (5-tick snapshots), Detailed (2-tick + movements + pickups), Full (every tick + explosion detail + bot pathfinding)
 - `GameLogger` enhanced with `shouldLogTick()`, `logMovement()`, `logPowerupPickup()`, `logExplosionDetail()`, `logBotPathfinding()` — all backward-compatible
-- Backend: `SimulationGame.ts` (headless game runner), `SimulationRunner.ts` (batch orchestrator, EventEmitter), `SimulationManager.ts` (singleton, max 1 concurrent batch)
-- Socket events: `sim:start`, `sim:cancel`, `sim:spectate`, `sim:unspectate` (C→S); `sim:progress`, `sim:gameResult`, `sim:state`, `sim:gameTransition`, `sim:completed` (S→C)
+- Backend: `SimulationGame.ts` (headless game runner), `SimulationRunner.ts` (batch orchestrator, EventEmitter), `SimulationManager.ts` (singleton, 1 concurrent + queue up to 10)
+- **Simulation queue**: when a batch is already running, new batches are queued (max 10) and auto-start when the current one finishes. Cancelling the running batch advances the queue. Queued entries show position in UI with a "Remove" button. Admin sockets auto-join `sim:admin` room for queue-started batch broadcasts.
+- Socket events: `sim:start`, `sim:cancel`, `sim:spectate`, `sim:unspectate` (C→S); `sim:progress`, `sim:gameResult`, `sim:state`, `sim:gameTransition`, `sim:completed`, `sim:queueUpdate` (S→C)
 - REST endpoints: `GET/POST /admin/simulations`, `GET/DELETE /admin/simulations/:batchId`
 - Bot names pool: AlphaBot through PulseBot (16 distinct names)
 - Cancellation preserves completed game logs; 3s pause between realtime games, 0.5s for fast

@@ -27,7 +27,8 @@ export interface SimulationConfig {
 export interface SimulationBatchStatus {
   batchId: string;
   config: SimulationConfig;
-  status: 'running' | 'completed' | 'cancelled' | 'error';
+  status: 'queued' | 'running' | 'completed' | 'cancelled' | 'error';
+  queuePosition?: number | null;
   gamesCompleted: number;
   totalGames: number;
   currentGameTick: number | null;

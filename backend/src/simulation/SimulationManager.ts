@@ -2,48 +2,101 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { SimulationConfig, SimulationBatchStatus } from '@blast-arena/shared';
 import { SimulationRunner } from './SimulationRunner';
+import { getIO } from '../game/registry';
 import { logger } from '../utils/logger';
 
 const SIM_LOG_DIR = process.env.SIMULATION_LOG_DIR || '/app/simulations';
+const MAX_QUEUE_SIZE = 10;
+
+interface QueueEntry {
+  batchId: string;
+  config: SimulationConfig;
+  adminId: number;
+  queuedAt: Date;
+}
 
 export class SimulationManager {
   private runners: Map<string, SimulationRunner> = new Map();
   private batchCounter: number = 0;
+  private queue: QueueEntry[] = [];
 
-  startBatch(config: SimulationConfig, adminId: number): { batchId: string } | { error: string } {
-    // Guard: max 1 active batch
+  startBatch(
+    config: SimulationConfig,
+    adminId: number,
+  ): { batchId: string; queued?: boolean; queuePosition?: number } | { error: string } {
+    const batchId = `sim_${Date.now()}_${++this.batchCounter}`;
+
+    // Check if a batch is already running
+    let hasActive = false;
     for (const runner of this.runners.values()) {
       if (runner.isActive()) {
-        return { error: 'A simulation batch is already running. Cancel it first.' };
+        hasActive = true;
+        break;
       }
     }
 
-    const batchId = `sim_${Date.now()}_${++this.batchCounter}`;
-    const runner = new SimulationRunner(config, batchId);
-    this.runners.set(batchId, runner);
+    if (!hasActive) {
+      // Start immediately
+      const runner = new SimulationRunner(config, batchId);
+      this.runners.set(batchId, runner);
+      this.setupRunnerAutoAdvance(runner);
+
+      logger.info(
+        { batchId, adminId, config: config.gameMode, totalGames: config.totalGames },
+        'Simulation batch created',
+      );
+
+      runner.run().catch((err) => {
+        logger.error({ err, batchId }, 'Simulation runner crashed');
+      });
+
+      return { batchId };
+    }
+
+    // Queue it
+    if (this.queue.length >= MAX_QUEUE_SIZE) {
+      return { error: `Queue is full (max ${MAX_QUEUE_SIZE}). Wait for a batch to finish.` };
+    }
+
+    this.queue.push({ batchId, config, adminId, queuedAt: new Date() });
+    const queuePosition = this.queue.length;
 
     logger.info(
-      { batchId, adminId, config: config.gameMode, totalGames: config.totalGames },
-      'Simulation batch created',
+      { batchId, adminId, queuePosition, config: config.gameMode, totalGames: config.totalGames },
+      'Simulation batch queued',
     );
 
-    // Run asynchronously (don't await)
-    runner.run().catch((err) => {
-      logger.error({ err, batchId }, 'Simulation runner crashed');
-    });
-
-    return { batchId };
+    this.broadcastQueueUpdate();
+    return { batchId, queued: true, queuePosition };
   }
 
   cancelBatch(batchId: string): boolean {
+    // Check queue first
+    if (this.removeFromQueue(batchId)) {
+      return true;
+    }
+    // Cancel running batch
     const runner = this.runners.get(batchId);
     if (!runner || !runner.isActive()) return false;
     runner.cancel();
     return true;
   }
 
+  removeFromQueue(batchId: string): boolean {
+    const idx = this.queue.findIndex((e) => e.batchId === batchId);
+    if (idx === -1) return false;
+    this.queue.splice(idx, 1);
+    logger.info({ batchId }, 'Simulation batch removed from queue');
+    this.broadcastQueueUpdate();
+    return true;
+  }
+
   getBatch(batchId: string): SimulationRunner | undefined {
     return this.runners.get(batchId);
+  }
+
+  isQueued(batchId: string): boolean {
+    return this.queue.some((e) => e.batchId === batchId);
   }
 
   getActiveBatches(): SimulationBatchStatus[] {
@@ -57,15 +110,37 @@ export class SimulationManager {
   getHistory(): SimulationBatchStatus[] {
     const history: SimulationBatchStatus[] = [];
 
+    // Include queued entries
+    for (let i = 0; i < this.queue.length; i++) {
+      const entry = this.queue[i];
+      history.push({
+        batchId: entry.batchId,
+        config: entry.config,
+        status: 'queued',
+        queuePosition: i + 1,
+        gamesCompleted: 0,
+        totalGames: entry.config.totalGames,
+        currentGameTick: null,
+        currentGameMaxTicks: null,
+        startedAt: entry.queuedAt.toISOString(),
+        completedAt: null,
+      });
+    }
+
     // Include in-memory batches
     for (const runner of this.runners.values()) {
       history.push(runner.getStatus());
     }
 
     // Scan disk for past batches not in memory
-    const memoryBatchIds = new Set(this.runners.keys());
+    const memoryBatchIds = new Set([...this.runners.keys(), ...this.queue.map((e) => e.batchId)]);
     try {
-      if (!fs.existsSync(SIM_LOG_DIR)) return history;
+      if (!fs.existsSync(SIM_LOG_DIR)) {
+        history.sort(
+          (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+        );
+        return history;
+      }
 
       const gameModes = fs.readdirSync(SIM_LOG_DIR, { withFileTypes: true });
       for (const modeDir of gameModes) {
@@ -82,10 +157,10 @@ export class SimulationManager {
 
           try {
             const configData = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-            const batchId = configData.batchId;
+            const diskBatchId = configData.batchId;
 
             // Skip if already in memory
-            if (memoryBatchIds.has(batchId)) continue;
+            if (memoryBatchIds.has(diskBatchId)) continue;
 
             let status: SimulationBatchStatus['status'] = 'error';
             let gamesCompleted = 0;
@@ -99,7 +174,7 @@ export class SimulationManager {
             }
 
             history.push({
-              batchId,
+              batchId: diskBatchId,
               config: configData.config,
               status,
               gamesCompleted,
@@ -118,8 +193,17 @@ export class SimulationManager {
       logger.error({ err }, 'Failed to scan simulation history');
     }
 
-    // Sort by startedAt descending
-    history.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+    // Sort: queued first (by position), running next, then by startedAt descending
+    history.sort((a, b) => {
+      const order = { queued: 0, running: 1, completed: 2, cancelled: 2, error: 2 };
+      const ao = order[a.status] ?? 2;
+      const bo = order[b.status] ?? 2;
+      if (ao !== bo) return ao - bo;
+      if (a.status === 'queued' && b.status === 'queued') {
+        return (a.queuePosition ?? 0) - (b.queuePosition ?? 0);
+      }
+      return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
+    });
 
     return history;
   }
@@ -164,6 +248,11 @@ export class SimulationManager {
   }
 
   deleteBatch(batchId: string): boolean {
+    // Check queue first — no disk cleanup needed
+    if (this.removeFromQueue(batchId)) {
+      return true;
+    }
+
     // Remove from memory
     this.runners.delete(batchId);
 
@@ -211,6 +300,78 @@ export class SimulationManager {
       for (const [id] of toRemove) {
         this.runners.delete(id);
       }
+    }
+  }
+
+  private setupRunnerAutoAdvance(runner: SimulationRunner): void {
+    runner.on('completed', () => {
+      this.processQueue();
+    });
+  }
+
+  private processQueue(): void {
+    if (this.queue.length === 0) return;
+
+    // Ensure no runner is still active
+    for (const runner of this.runners.values()) {
+      if (runner.isActive()) return;
+    }
+
+    const entry = this.queue.shift()!;
+    const runner = new SimulationRunner(entry.config, entry.batchId);
+    this.runners.set(entry.batchId, runner);
+    this.setupRunnerAutoAdvance(runner);
+
+    // Broadcast events to all admin sockets
+    this.setupRunnerBroadcast(runner, entry.batchId);
+
+    logger.info(
+      {
+        batchId: entry.batchId,
+        adminId: entry.adminId,
+        config: entry.config.gameMode,
+        totalGames: entry.config.totalGames,
+        remainingQueue: this.queue.length,
+      },
+      'Queued simulation batch started',
+    );
+
+    this.broadcastQueueUpdate();
+
+    runner.run().catch((err) => {
+      logger.error({ err, batchId: entry.batchId }, 'Queued simulation runner crashed');
+    });
+  }
+
+  private setupRunnerBroadcast(runner: SimulationRunner, batchId: string): void {
+    try {
+      const io = getIO();
+      runner.on('progress', (status: SimulationBatchStatus) => {
+        io.to('sim:admin').emit('sim:progress', status);
+      });
+      runner.on('gameResult', (gameResult: any) => {
+        io.to('sim:admin').emit('sim:gameResult', { batchId, result: gameResult });
+      });
+      runner.on('completed', (status: SimulationBatchStatus) => {
+        io.to('sim:admin').emit('sim:completed', { batchId, status });
+      });
+    } catch {
+      // IO not available yet
+    }
+  }
+
+  private broadcastQueueUpdate(): void {
+    try {
+      const io = getIO();
+      const queueStatus = this.queue.map((e, i) => ({
+        batchId: e.batchId,
+        queuePosition: i + 1,
+        config: e.config,
+        queuedAt: e.queuedAt.toISOString(),
+      }));
+      io.to('sim:admin').emit('sim:queueUpdate' as any, { queue: queueStatus });
+    } catch {
+      // IO not available yet
     }
   }
 }
