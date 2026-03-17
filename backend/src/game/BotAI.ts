@@ -195,7 +195,7 @@ export class BotAI {
       player.canMove() &&
       this.kickCooldown <= 0
     ) {
-      const kickDir = this.findKickableBomb(pos, state);
+      const kickDir = this.findKickableBomb(pos, state, player);
       if (kickDir) {
         this.kickCooldown = 3;
         logDecision('kick', { dir: kickDir });
@@ -332,9 +332,38 @@ export class BotAI {
           }
           if (enemyInBlast) break;
         }
-        const shouldDetonate = enemyInBlast || ownRemoteBombs.length >= player.maxBombs;
+        // Self-damage check: don't detonate if the bot is in its own blast zone
+        let selfInBlast = false;
+        if (!player.hasShield) {
+          for (const bomb of ownRemoteBombs) {
+            if (selfInBlast) break;
+            // Check bomb center
+            if (bomb.position.x === pos.x && bomb.position.y === pos.y) {
+              selfInBlast = true;
+              break;
+            }
+            for (const { dx, dy } of Object.values(DIR_DELTA)) {
+              for (let i = 1; i <= bomb.fireRange; i++) {
+                const cx = bomb.position.x + dx * i;
+                const cy = bomb.position.y + dy * i;
+                const tile = state.collisionSystem.getTileAt(cx, cy);
+                if (tile === 'wall') break;
+                if (isDestructibleTile(tile) && !bomb.isPierce) break;
+                if (cx === pos.x && cy === pos.y) {
+                  selfInBlast = true;
+                  break;
+                }
+              }
+              if (selfInBlast) break;
+            }
+          }
+        }
+
+        const shouldDetonate =
+          (enemyInBlast && !selfInBlast) ||
+          (ownRemoteBombs.length >= player.maxBombs && !selfInBlast);
         if (shouldDetonate) {
-          logDecision('detonate_remote', { count: ownRemoteBombs.length });
+          logDecision('detonate_remote', { count: ownRemoteBombs.length, enemyInBlast });
           return { seq: this.seq, direction: null, action: 'detonate', tick: state.tick };
         }
       }
@@ -1373,13 +1402,19 @@ export class BotAI {
     return shuffled[0].dir;
   }
 
-  private findKickableBomb(pos: Position, state: GameStateManager): Direction | null {
+  private findKickableBomb(
+    pos: Position,
+    state: GameStateManager,
+    player: Player,
+  ): Direction | null {
     for (const dir of DIRECTIONS) {
       const { dx, dy } = DIR_DELTA[dir];
       const adjX = pos.x + dx;
       const adjY = pos.y + dy;
 
       for (const bomb of state.bombs.values()) {
+        // Skip own bombs — kicking them away defeats the bot's own bomb placement strategy
+        if (bomb.ownerId === player.id) continue;
         if (bomb.position.x === adjX && bomb.position.y === adjY && !bomb.sliding) {
           const behindX = adjX + dx;
           const behindY = adjY + dy;

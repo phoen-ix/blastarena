@@ -125,7 +125,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - GameState.processTick(): bot AI -> inputs -> movement -> bomb slide -> bomb timers -> explosions -> collisions -> power-ups -> KOTH scoring -> map events -> zone -> deathmatch respawns -> time check -> win check
 - Bomb kick: player with hasKick walking into a bomb sets bomb.sliding direction; sliding bombs advance 1 tile/tick until blocked; kicking applies movement cooldown
 - BotAI: difficulty-aware (easy/normal/hard) with configurable awareness, aggression, escape depth, reaction delay, and kick usage
-- BotAI kick decisions gated on canMove() + kickCooldown to prevent kick spam (standing still retrying kicks for multiple ticks)
+- BotAI kick decisions gated on canMove() + kickCooldown to prevent kick spam (standing still retrying kicks for multiple ticks); `findKickableBomb()` skips the bot's own bombs to prevent kicking away intentional bomb_wall placements
 - Bot difficulty set per-room via MatchConfig.botDifficulty; defaults to 'normal'; UI dropdown always visible but disabled when bots = 0
 - BotAI escape logic: BFS through danger cells to find nearest safe cell; active explosion cells (ticksRemaining > 3) are treated as impassable — never pathed through; canEscapeAfterBomb verifies immediate walkable+non-explosion neighbor AND BFS escape path with full danger awareness (ignoreDangerThreshold=true)
 - BotAI escape depth: dynamic `max(config.escapeSearchDepth, maxFireRangeOnMap + 2)` so high-range scenarios (Sudden Death) get adequate search depth
@@ -160,7 +160,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - `tickEvents` buffer on GameStateManager accumulates per-tick events (explosions, deaths, power-up pickups) for fine-grained socket emission in GameRoom
 - Chain reaction tile snapshot: before processing detonations, tiles are snapshotted so chained bombs calculate blast cells against original wall layout (prevents blasts going through walls destroyed by earlier bombs in the same tick)
 - Shield has no time limit — lasts until consumed by an explosion. After shield breaks, player gets 10 ticks of invulnerability to escape the explosion area. Extra shield pickups are consumed but don't stack.
-- BotAI detonates remote bombs when an enemy is in their blast zone, or when all bomb slots are full (priority 2.5 in decision tree)
+- BotAI detonates remote bombs when an enemy is in their blast zone, or when all bomb slots are full (priority 2.5 in decision tree); self-damage safety check prevents detonation when bot is in its own bombs' blast zone (skipped if bot has shield)
 - Game over screen shows context message (e.g., "Time's up!", "PlayerX is the last survivor!", "Draw — no survivors!")
 - Game start transitions instantly to game scene; room:start guard checks both GameRoom existence and room status to prevent duplicate starts
 - "Back to Lobby" from game over clears currentRoom registry to prevent stale room UI
