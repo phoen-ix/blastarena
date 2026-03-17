@@ -29,6 +29,7 @@ function getErrorMessage(err: unknown): string {
 }
 
 export function createSocketServer(httpServer: HttpServer): TypedServer {
+  const allowedOrigin = new URL(getConfig().APP_URL).origin;
   const io: TypedServer = new Server<
     ClientToServerEvents,
     ServerToClientEvents,
@@ -36,7 +37,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     SocketData
   >(httpServer, {
     cors: {
-      origin: true,
+      origin: allowedOrigin,
       credentials: true,
     },
     pingInterval: 25000,
@@ -45,7 +46,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
   const roomManager = new RoomManager(io);
   setRegistry(roomManager, io);
-  const { inputLimiter, createLimiter, joinLimiter } = createRateLimiters();
+  const { inputLimiter, createLimiter, joinLimiter, removeSocket } = createRateLimiters();
 
   // Auth middleware
   io.use((socket, next) => {
@@ -304,6 +305,22 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     socket.on('game:input', async (input) => {
       if (!inputLimiter(socket.id)) return;
 
+      // Runtime validation — TypeScript types are compile-time only
+      if (
+        typeof input !== 'object' ||
+        input === null ||
+        typeof input.seq !== 'number' ||
+        typeof input.tick !== 'number' ||
+        (input.direction !== null &&
+          input.direction !== 'up' &&
+          input.direction !== 'down' &&
+          input.direction !== 'left' &&
+          input.direction !== 'right') ||
+        (input.action !== null && input.action !== 'bomb' && input.action !== 'detonate')
+      ) {
+        return;
+      }
+
       const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
       if (!roomCode) return;
 
@@ -395,8 +412,12 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     socket.on('admin:roomMessage', (data) => {
       if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') return;
 
+      // Validate and sanitize message
+      if (typeof data.message !== 'string' || !data.message.trim()) return;
+      const sanitizedMessage = data.message.trim().substring(0, 500);
+
       io.to(`room:${data.roomCode}`).emit('admin:roomMessage', {
-        message: data.message,
+        message: sanitizedMessage,
         from: socket.data.username,
       });
 
@@ -498,6 +519,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     // Disconnect
     socket.on('disconnect', async () => {
       logger.info({ userId: socket.data.userId }, 'Socket disconnected');
+      removeSocket(socket.id);
 
       const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
       if (roomCode) {

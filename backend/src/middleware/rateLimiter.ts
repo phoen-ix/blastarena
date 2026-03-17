@@ -1,10 +1,37 @@
 import { Request, Response, NextFunction } from 'express';
 import { getRedis } from '../db/redis';
+import { logger } from '../utils/logger';
 
 interface RateLimitConfig {
   windowMs: number;
   maxRequests: number;
 }
+
+/** In-memory fallback when Redis is unavailable */
+const fallbackWindows = new Map<string, { count: number; resetAt: number }>();
+
+function fallbackCheck(key: string, config: RateLimitConfig): boolean {
+  const now = Date.now();
+  const entry = fallbackWindows.get(key);
+
+  if (!entry || now >= entry.resetAt) {
+    fallbackWindows.set(key, { count: 1, resetAt: now + config.windowMs });
+    return true;
+  }
+
+  entry.count++;
+  return entry.count <= config.maxRequests;
+}
+
+// Periodic cleanup of stale fallback entries
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of fallbackWindows) {
+    if (now >= entry.resetAt) {
+      fallbackWindows.delete(key);
+    }
+  }
+}, 60000).unref();
 
 export function rateLimiter(config: RateLimitConfig) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -32,8 +59,16 @@ export function rateLimiter(config: RateLimitConfig) {
 
       next();
     } catch {
-      // If Redis fails, allow the request
-      next();
+      // Redis unavailable — fall back to in-memory rate limiting
+      logger.warn({ ip, path: req.path }, 'Redis unavailable for rate limiting, using in-memory fallback');
+      if (fallbackCheck(key, config)) {
+        next();
+      } else {
+        res.status(429).json({
+          error: 'Too many requests',
+          code: 'RATE_LIMITED',
+        });
+      }
     }
   };
 }

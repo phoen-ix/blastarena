@@ -60,7 +60,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - Help modal covers: controls (keyboard + gamepad), all 8 power-ups (with in-game tile preview + HUD emoji), all 6 game modes, map features (reinforced walls, map events, hazard tiles with visual previews), and core mechanics
 - Countdown synced between server and client: GameLoop holds `status: 'countdown'` for 36 ticks (1.8s) while CountdownOverlay plays "3, 2, 1" — gameplay starts on "GO!". Both client and server block inputs during countdown.
 - **Gamepad support**: Xbox/standard gamepad via Phaser gamepad plugin (`input: { gamepad: true }` in config). D-pad/left stick for movement (0.3 deadzone, dominant-axis), A=bomb, B=detonate, LB/RB=cycle spectate. GamepadManager polls each frame; actions latched in `pendingGamepadAction` to survive 50ms tick throttle. Keyboard takes priority when both active.
-- **Gamepad UI navigation**: `UIGamepadNavigator` singleton (`frontend/src/game/UIGamepadNavigator.ts`) enables full controller navigation of all DOM menus. Uses browser `navigator.getGamepads()` (not Phaser plugin) with its own rAF polling loop. D-pad/stick navigates between focusable elements, A=confirm, B=back/close. Spatial navigation via `getBoundingClientRect()` with heavy cross-axis penalty (5x) so same-row/column neighbors always win over diagonal ones. Focus context stack handles nested UI (lobby → modal): each screen pushes a context on show and pops on hide. Custom dropdown overlay (`.gp-dropdown`) for `<select>` elements — A opens, up/down navigates options, A confirms, B cancels. Mouse movement auto-hides the `.gp-focus` ring; next D-pad input restores it. Disabled during gameplay (`setActive(false)` in GameScene) to avoid conflict with GamepadManager. GameOverScene has its own inline gamepad polling (Phaser text objects, not DOM). Out of scope: AdminUI, AuthUI, ChatUI (keyboard-dependent).
+- **Gamepad UI navigation**: `UIGamepadNavigator` singleton (`frontend/src/game/UIGamepadNavigator.ts`) enables full controller navigation of all DOM menus. Uses browser `navigator.getGamepads()` (not Phaser plugin) with its own rAF polling loop. D-pad/stick navigates between focusable elements, A=confirm, B=back/close. Spatial navigation via `getBoundingClientRect()` with heavy cross-axis penalty (5x) so same-row/column neighbors always win over diagonal ones. Focus context stack handles nested UI (lobby → modal): each screen pushes a context on show and pops on hide. Custom dropdown overlay (`.gp-dropdown`) for `<select>` elements — A opens, up/down navigates options, A confirms, B cancels. Mouse movement auto-hides the `.gp-focus` ring; next D-pad input restores it. Disabled during gameplay (`setActive(false)` in GameScene) to avoid conflict with GamepadManager. GameOverScene has its own inline gamepad polling (Phaser text objects, not DOM). Out of scope: AdminUI, AuthUI (keyboard-dependent).
 - **Real-time lobby**: Room list auto-updates via `room:list` socket broadcast on every room mutation (create/join/leave/start/restart/disconnect) — no manual refresh needed
 
 ## Admin Panel
@@ -221,12 +221,28 @@ MatchConfig includes: gameMode, maxPlayers, mapWidth/Height, mapSeed, roundTime,
 - Match detail modal shows all players (including bots) when replay exists via `allPlayers` field from `getReplayPlacements()`
 - Docker volume: `./data/replays:/app/replays`
 
+## Security
+- CORS restricted to `APP_URL` origin for both Express and Socket.io (not `origin: true`)
+- Content-Security-Policy header in nginx: `default-src 'self'`, inline scripts/styles allowed, fonts from Google, WebSocket connections
+- XSS defense-in-depth: all user-generated content (usernames) escaped via `escapeHtml()` before innerHTML insertion (HUD kill feed, player list)
+- No inline `onclick` handlers — all event handlers use `addEventListener` for CSP compatibility
+- Socket rate limiter cleanup: entries removed on socket disconnect + periodic 60s sweep of stale entries (prevents memory leak from disconnected sockets)
+- HTTP rate limiter in-memory fallback: when Redis is unavailable, rate limiting continues via in-memory sliding window instead of failing open
+- Runtime validation on `game:input` socket payload: direction, action, seq, tick fields validated at runtime (TypeScript types are compile-time only)
+- Admin `roomMessage` server-side sanitization: type check, empty check, 500-char length limit before broadcast
+- SQL injection: all queries use parameterized statements via mysql2
+- Password hashing: bcrypt with 12 salt rounds
+- Token storage: access token in-memory only, refresh token in httpOnly sameSite:strict cookie with secure flag derived from APP_URL
+- Refresh token rotation with reuse detection
+- JWT_SECRET minimum 16 chars enforced via Zod config validation
+- Admin audit trail: all admin actions logged to `admin_actions` table
+
 ## Code Quality & Tooling
 - ESLint v10 + `@typescript-eslint/recommended` via flat config (`eslint.config.mjs`); `no-explicit-any` as warning, `no-unused-vars` as error
 - Prettier with single quotes, trailing commas, 100 char width
 - Husky + lint-staged pre-commit hook runs ESLint `--fix` + Prettier on staged `.ts` files
 - `prepare` script uses `husky || true` to avoid failures in Docker builds where husky isn't installed
-- Socket rate limiting: `backend/src/utils/socketRateLimit.ts` — in-memory sliding window per socket ID (game:input 30/sec, room:create 2/sec, room:join 5/sec)
+- Socket rate limiting: `backend/src/utils/socketRateLimit.ts` — in-memory sliding window per socket ID (game:input 30/sec, room:create 2/sec, room:join 5/sec), with disconnect cleanup and periodic sweep
 - All Socket.io server types fully parameterized: `RoomManager`, `registry.ts`, `GameRoom` use `Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>` — no `as any` casts on socket events
 - DB row types in `backend/src/db/types.ts`: `UserRow`, `CountRow`, `IdRow`, `MatchRow`, `MatchPlayerRow`, `AdminActionRow`, etc. — all service queries use typed `query<T>()` calls
 - `shared/src/utils/error.ts`: `getErrorMessage(err: unknown)` helper used in all `catch` blocks instead of `catch (err: any)`

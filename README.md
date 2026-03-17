@@ -194,6 +194,17 @@ Users can manage their account from the lobby Account modal:
 - **Real-time**: Socket.io for game state, room events, admin actions
 - **Auth**: JWT access tokens (in memory) + httpOnly refresh cookies (survive restarts)
 
+## Security
+
+- **CORS**: Restricted to `APP_URL` origin (both Express and Socket.io)
+- **CSP**: Content-Security-Policy header via Nginx — limits scripts, styles, fonts, and connections
+- **XSS**: All user-generated content escaped via `escapeHtml()` before DOM insertion; no inline `onclick` handlers
+- **Rate limiting**: Redis-backed HTTP rate limiting with in-memory fallback when Redis is unavailable; per-socket sliding window rate limiting with disconnect cleanup
+- **Input validation**: Zod schemas on all HTTP routes + runtime validation on `game:input` socket payloads
+- **Auth**: JWT access tokens (in-memory only) + httpOnly sameSite:strict refresh cookies with secure flag; bcrypt password hashing (12 rounds); refresh token rotation with reuse detection
+- **SQL injection**: All queries parameterized via mysql2
+- **Admin**: All admin actions audit-logged; admin messages sanitized + length-limited server-side
+
 ## Tech Stack
 
 | Layer | Technology |

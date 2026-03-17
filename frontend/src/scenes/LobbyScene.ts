@@ -72,12 +72,18 @@ export class LobbyScene extends Phaser.Scene {
       const area = document.getElementById('lobby-banner-area');
       if (area) {
         if (data.message) {
-          area.innerHTML = `
-            <div class="admin-banner">
-              <span>${escapeHtml(data.message)}</span>
-              <button class="banner-close" onclick="this.parentElement.remove()">&times;</button>
-            </div>
-          `;
+          area.innerHTML = '';
+          const banner = document.createElement('div');
+          banner.className = 'admin-banner';
+          const span = document.createElement('span');
+          span.textContent = data.message;
+          const closeBtn = document.createElement('button');
+          closeBtn.className = 'banner-close';
+          closeBtn.textContent = '\u00d7';
+          closeBtn.addEventListener('click', () => banner.remove());
+          banner.appendChild(span);
+          banner.appendChild(closeBtn);
+          area.appendChild(banner);
         } else {
           area.innerHTML = '';
         }

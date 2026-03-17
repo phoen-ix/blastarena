@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { GameState } from '@blast-arena/shared';
+import { GameState, PlayerState } from '@blast-arena/shared';
+import { escapeHtml } from '../utils/html';
 
 export class HUDScene extends Phaser.Scene {
   private hudContainer!: HTMLElement;
@@ -9,11 +10,12 @@ export class HUDScene extends Phaser.Scene {
   private localPlayerDead: boolean = false;
   private localPlayerId!: number;
   private boundClickHandler: ((e: MouseEvent) => void) | null = null;
-  private socketClient: any = null;
+  private socketClient: { on: (event: string, handler: (...args: any[]) => void) => void; off: (event: string, handler: (...args: any[]) => void) => void } | null = null;
   private playerDiedHandler:
     | ((data: { playerId: number; killerId: number | null }) => void)
     | null = null;
   private killFeedEntries: { text: string; time: number }[] = [];
+  private stateUpdateHandler: ((state: GameState) => void) | null = null;
   private previousStats: {
     maxBombs: number;
     fireRange: number;
@@ -105,9 +107,10 @@ export class HUDScene extends Phaser.Scene {
 
     // Listen for state updates from GameScene
     const gameScene = this.scene.get('GameScene');
-    gameScene.events.on('stateUpdate', (state: GameState) => {
+    this.stateUpdateHandler = (state: GameState) => {
       this.updateHUD(state);
-    });
+    };
+    gameScene.events.on('stateUpdate', this.stateUpdateHandler);
   }
 
   private onPlayerDied(data: { playerId: number; killerId: number | null }): void {
@@ -123,9 +126,9 @@ export class HUDScene extends Phaser.Scene {
 
     let text: string;
     if (killer && killer.id !== data.playerId) {
-      text = `${killer.username} eliminated ${victim?.username || '???'}`;
+      text = `${escapeHtml(killer.username)} eliminated ${escapeHtml(victim?.username || '???')}`;
     } else {
-      text = `${victim?.username || '???'} was eliminated`;
+      text = `${escapeHtml(victim?.username || '???')} was eliminated`;
     }
 
     this.killFeedEntries.push({ text, time: Date.now() });
@@ -135,7 +138,7 @@ export class HUDScene extends Phaser.Scene {
     this.renderKillFeed();
   }
 
-  private lastKnownPlayers: any[] = [];
+  private lastKnownPlayers: PlayerState[] = [];
 
   private renderKillFeed(): void {
     const now = Date.now();
@@ -157,7 +160,7 @@ export class HUDScene extends Phaser.Scene {
     this.lastKnownPlayers = state.players;
 
     // Track local player death
-    const me = state.players.find((p: any) => p.id === this.localPlayerId);
+    const me = state.players.find((p) => p.id === this.localPlayerId);
     if (!this.localPlayerDead && me && !me.alive) {
       this.localPlayerDead = true;
     }
@@ -182,10 +185,10 @@ export class HUDScene extends Phaser.Scene {
     if (me && me.alive) {
       const statsEl = document.getElementById('hud-stats');
       if (statsEl) {
-        const changed = (key: string) => {
+        const changed = (key: 'maxBombs' | 'fireRange' | 'speed' | 'hasShield' | 'hasKick') => {
           if (!this.previousStats) return '';
-          const prev = (this.previousStats as any)[key];
-          const curr = (me as any)[key];
+          const prev = this.previousStats[key];
+          const curr = me[key];
           if (prev !== undefined && curr !== undefined && prev !== curr) {
             return ' stat-changed';
           }
@@ -213,8 +216,8 @@ export class HUDScene extends Phaser.Scene {
     // Player list
     const playersEl = document.getElementById('hud-players');
     if (playersEl) {
-      const isTeamMode = state.players.some((p: any) => p.team !== null && p.team !== undefined);
-      const sorted = [...state.players].sort((a: any, b: any) => {
+      const isTeamMode = state.players.some((p) => p.team !== null && p.team !== undefined);
+      const sorted = [...state.players].sort((a, b) => {
         // In team mode, group by team first, then alive status
         if (isTeamMode && a.team !== b.team) return (a.team ?? 99) - (b.team ?? 99);
         return (b.alive ? 1 : 0) - (a.alive ? 1 : 0);
@@ -227,7 +230,7 @@ export class HUDScene extends Phaser.Scene {
 
       // In KOTH, sort by score descending
       if (isKOTH) {
-        sorted.sort((a: any, b: any) => {
+        sorted.sort((a, b) => {
           const sa = state.kothScores?.[a.id] ?? 0;
           const sb = state.kothScores?.[b.id] ?? 0;
           return sb - sa || (b.alive ? 1 : 0) - (a.alive ? 1 : 0);
@@ -235,7 +238,7 @@ export class HUDScene extends Phaser.Scene {
       }
 
       playersEl.innerHTML = sorted
-        .map((p: any) => {
+        .map((p) => {
           const dead = !p.alive;
           const clickable = p.alive && this.localPlayerDead;
           let teamHeader = '';
@@ -258,7 +261,7 @@ export class HUDScene extends Phaser.Scene {
           }
 
           return `${teamHeader}<div class="hud-player-item${dead ? ' dead' : ''}${clickable ? ' clickable' : ''}" data-player-id="${p.id}" style="${isKOTH ? 'display:flex;align-items:center;gap:4px;' : ''}">
-          <span>${teamDot}${p.isBot ? '🤖 ' : ''}${p.username}</span>
+          <span>${teamDot}${p.isBot ? '🤖 ' : ''}${escapeHtml(p.username)}</span>
           ${scoreBadge}
         </div>`;
         })
@@ -273,6 +276,11 @@ export class HUDScene extends Phaser.Scene {
     if (this.boundClickHandler) {
       this.playerListEl?.removeEventListener('mousedown', this.boundClickHandler);
       this.boundClickHandler = null;
+    }
+    if (this.stateUpdateHandler) {
+      const gameScene = this.scene.get('GameScene');
+      gameScene?.events.off('stateUpdate', this.stateUpdateHandler);
+      this.stateUpdateHandler = null;
     }
     if (this.playerDiedHandler && this.socketClient) {
       this.socketClient.off('game:playerDied', this.playerDiedHandler);
