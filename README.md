@@ -305,7 +305,7 @@ Every completed game is automatically recorded for admin review:
 
 ## Connection Resilience
 
-- Socket.io reconnects indefinitely (1-5s backoff) with a "Reconnecting..." overlay
+- Socket.io reconnects indefinitely (1-5s backoff) with a "Reconnecting..." overlay that also polls `/api/health` every 3s — auto-reloads the page as soon as the backend is back
 - **Disconnect grace period**: Players get 10 seconds to reconnect during a game before being killed — prevents unfair deaths from brief network blips
 - On reconnect, server auto-detects active game and rejoins the player seamlessly
 - On reconnect, client checks server `buildId` — auto-refreshes if the server restarted

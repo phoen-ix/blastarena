@@ -8,6 +8,7 @@ export class SocketClient {
   private authManager: AuthManager;
   private overlay: HTMLElement | null = null;
   private knownBuildId: string | null = null;
+  private healthPollTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(authManager: AuthManager) {
     this.authManager = authManager;
@@ -102,6 +103,31 @@ export class SocketClient {
     }
   }
 
+  private startHealthPoll(): void {
+    if (this.healthPollTimer) return;
+    this.healthPollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_URL}/health`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.buildId) {
+          console.log('Backend is back, reloading page...');
+          this.stopHealthPoll();
+          window.location.reload();
+        }
+      } catch {
+        // Still down, keep polling
+      }
+    }, 3000);
+  }
+
+  private stopHealthPoll(): void {
+    if (this.healthPollTimer) {
+      clearInterval(this.healthPollTimer);
+      this.healthPollTimer = null;
+    }
+  }
+
   private showOverlay(): void {
     if (this.overlay) return;
     this.overlay = document.createElement('div');
@@ -113,9 +139,11 @@ export class SocketClient {
       </div>
     `;
     document.body.appendChild(this.overlay);
+    this.startHealthPoll();
   }
 
   private hideOverlay(): void {
+    this.stopHealthPoll();
     if (this.overlay) {
       this.overlay.remove();
       this.overlay = null;

@@ -267,7 +267,7 @@ npx jest --config tests/backend/jest.config.ts  # Run from project root
 - GameState tests cover: lifecycle, movement, bombs, explosions, death, self-kills, shield, chain reactions, win conditions, grace period, power-ups, remote bombs, bomb kick, teams, deathmatch, KOTH, line/pierce bombs, reinforced walls, battle royale zone
 
 ## Connection Resilience
-- Socket.io reconnects indefinitely (1-5s backoff) with a "Reconnecting..." overlay when disconnected
+- Socket.io reconnects indefinitely (1-5s backoff) with a "Reconnecting..." overlay when disconnected; overlay also starts health polling (`/api/health` every 3s) — when backend responds, page auto-reloads (handles stale Socket.io state, expired tokens, nginx DNS cache)
 - **Disconnect grace period**: when a player's socket disconnects during a game, they get 10 seconds (200 ticks) to reconnect before being killed. `GameRoom.disconnectedPlayers` tracks pending disconnects; `checkDisconnectGracePeriods()` runs each tick. On reconnect, `handlePlayerReconnect()` cancels the grace timer and the player resumes playing.
 - During disconnect grace period, the player is NOT removed from the lobby room — only on grace expiry or game end
 - On reconnect, server auto-detects if player was in an active game (`isPlayerDisconnected()`) and rejoins them to the socket room
