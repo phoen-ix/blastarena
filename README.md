@@ -83,7 +83,7 @@ All optional — toggled per-room when creating:
 
 When creating a room, the host can configure:
 
-- Game mode, max players (2-8), map size (21x21 to 61x61)
+- Game mode, max players (2-8), map size (21x21 / 31x31 / 39x39 / 51x51 / 61x61)
 - Match time (1-10 min), wall density (30-80%), power-up drop rate (0-80%)
 - Which of the 8 power-up types are enabled
 - Bot count (0-7) and difficulty (Easy / Normal / Hard)
@@ -99,7 +99,7 @@ AI bots fill empty slots and provide singleplayer/practice options. Three strong
 - **Normal**: BFS pathfinding, directional wall breaking, 90% hunt chance, dynamic danger assessment, roaming after 3s idle — competitive opponent
 - **Hard**: Deep escape search (depth 15), near-always hunts (95%), chain reaction awareness, shield-based aggression (ignores escape checks when shielded), near-zero late-game bomb cooldown (3-6 ticks) — dominant and oppressive
 
-Bots use BFS for escape routes, power-up seeking, and enemy hunting with configurable search depth. Optimized through data-driven analysis of 5000+ simulation games:
+Bots use BFS for escape routes, power-up seeking, and enemy hunting with configurable search depth. Optimized through data-driven analysis of 20,000+ simulation games:
 
 - **Bomb safety**: Dead-end detection (3+ walkable dirs required at high fire range), sandwich prevention, time-to-safety check (verifies bot can physically reach safe cell before bomb detonates), chain reaction danger in escape planning, remote bomb self-damage check
 - **Offensive kick**: Priority 3.5 — bots kick bombs toward enemies in line-of-sight; defensive kick allows kicking own bombs when about to explode (<=15 ticks)
@@ -174,6 +174,7 @@ Users can manage their account from the lobby Account modal:
 - **Username**: Change anytime. Validated (3-20 chars, alphanumeric + underscore/hyphen), uniqueness-checked (409 if taken)
 - **Email**: Two-step flow — submit new address, click confirmation link sent to the new email (24h expiry). Admins skip verification
 - **Password**: Change from the Account modal. Requires current password verification before updating. Minimum 8 characters, confirmation field must match
+- **Forgot Password**: "Forgot password?" link on the login screen. Enter your email to receive a reset link. Token-based reset flow; response is intentionally vague to prevent email enumeration
 - **Admin Password Reset**: Admins can reset any user's password from the Users tab. Sets a new password directly (min 6 chars), revokes all sessions (forces re-login), and logs the action to the audit trail
 
 ## Architecture
@@ -254,21 +255,25 @@ blast-arena/
 │       │   ├── Bomb.ts      # Bomb placement, timers, kicking, sliding
 │       │   ├── Explosion.ts # Blast calculation, chain reactions
 │       │   ├── PowerUp.ts   # Power-up drops and collection
+│       │   ├── CollisionSystem.ts # Collision detection helpers
+│       │   ├── BattleRoyale.ts    # BR shrinking zone logic
+│       │   ├── InputBuffer.ts     # Input queuing
 │       │   └── RoomManager.ts # Room creation, joining, cleanup
 │       ├── simulation/      # Bot simulation system
 │       │   ├── SimulationGame.ts    # Headless single-game runner
 │       │   ├── SimulationRunner.ts  # Batch orchestrator
 │       │   └── SimulationManager.ts # Singleton manager
-│       ├── db/              # MariaDB connection + migrations
-│       ├── services/        # Auth, user, match, admin services
+│       ├── db/              # MariaDB connection, migrations, redis
+│       ├── services/        # Auth, user, admin, lobby, email, replay, settings
 │       ├── middleware/       # Auth, rate limiting, staff checks
 │       └── socket.ts        # Socket.io event routing
 ├── frontend/
 │   ├── index.html           # HTML + full CSS design system (INFERNO theme)
 │   └── src/
 │       ├── scenes/          # Phaser scenes (Boot, Menu, Lobby, Game, HUD, GameOver)
-│       ├── ui/              # DOM-based UI (Auth, Lobby, Room, Admin + 6 admin tabs, extracted modals)
-│       ├── game/            # Client renderers (players, bombs, explosions, effects, etc.)
+│       ├── ui/              # DOM-based UI (Auth, Lobby, Room, Notifications, Admin + 6 admin tabs)
+│       │   └── modals/      # AccountModal, CreateRoomModal, SettingsModal, HelpModal
+│       ├── game/            # Client renderers (players, bombs, explosions, effects, replay, gamepad)
 │       └── network/         # ApiClient, SocketClient, AuthManager
 ├── docker-compose.yml       # Production orchestration
 ├── docker-compose.dev.yml   # Development overrides (hot reload, exposed ports)
@@ -336,7 +341,16 @@ All settings via `.env` (copy `.env.example` to get started):
 | `MAX_ROOMS` | `50` | Maximum concurrent rooms |
 | `POWERUP_DROP_CHANCE` | `0.3` | Default power-up drop rate (0-1) |
 | `LOG_LEVEL` | `info` | Server log verbosity |
+| `NODE_ENV` | `development` | Environment mode |
 | `RATE_LIMIT_LOGIN` | `5` | Login attempts per window |
+| `RATE_LIMIT_REGISTER` | `3` | Registration attempts per window |
+| `RATE_LIMIT_API` | `100` | General API requests per window |
+| `MAX_PLAYERS_PER_ROOM` | `8` | Maximum players per room |
+| `BOMB_TIMER_SECONDS` | `3` | Default bomb fuse time |
+| `JWT_EXPIRES_IN` | `15m` | Access token lifetime |
+| `JWT_REFRESH_EXPIRES_IN` | `7d` | Refresh token lifetime |
+
+See `.env.example` for the complete list including SMTP and dev-only port variables.
 
 ## Docker
 
@@ -371,20 +385,20 @@ The game loop and rendering pipeline are optimized for low-latency multiplayer w
 ## Testing & Linting
 
 ```bash
-npm test                    # Run all test suites (92 tests)
+npm test                    # Run all test suites (117 tests)
 npm run lint                # ESLint across all workspaces
 npm run format:check        # Prettier format check
 ```
 
-92 tests across 6 suites covering game state lifecycle, movement, bombs, explosions, death mechanics, shield, chain reactions, win conditions, power-ups, teams, deathmatch, KOTH, and more.
+117 tests across 8 suites covering game state lifecycle, movement, bombs, explosions, death mechanics, shield, chain reactions, win conditions, power-ups, teams, deathmatch, KOTH, auth, input validation, grid utilities, and more.
 
 ## Database Migrations
 
 Migrations in `backend/src/db/migrations/` run automatically on server start:
 
-1. `001_initial.sql` — Users, matches, match_players tables
-2. `002_admin_panel.sql` — Admin actions audit table
+1. `001_initial.sql` — Users, refresh_tokens, login_attempts, matches, match_players, user_stats, admin_actions tables
+2. `002_admin_panel.sql` — User soft-delete columns, game_mode ENUM expansion (6 modes), announcements table
 3. `003_user_profile.sql` — Pending email change columns
-4. `004_remove_ban.sql` — Schema cleanup
+4. `004_remove_ban.sql` — Drop legacy ban/display_name columns
 5. `005_server_settings.sql` — Server settings key-value table (recordings toggle)
 6. `006_default_settings.sql` — Game creation and simulation default settings

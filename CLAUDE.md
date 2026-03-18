@@ -118,6 +118,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - Migration `003_user_profile.sql` adds `pending_email`, `email_change_token`, `email_change_expires` columns to users table
 - Password change: `POST /api/user/password` with `currentPassword` and `newPassword`; server verifies current password via bcrypt compare before hashing and updating; Zod validation enforces min/max length; client-side confirms new password match
 - Admin password reset: `PUT /admin/users/:id/password` (admin-only) sets a new password directly; revokes all refresh tokens (forces re-login); logged to audit trail as `reset_password`. Frontend: "Reset PW" button in UsersTab actions column opens modal with new password + confirm fields (min 6 chars)
+- Forgot password: `POST /api/auth/forgot-password` sends reset link to email (rate limited: 3/15min); response intentionally vague ("If the email exists…") to prevent email enumeration. `POST /api/auth/reset-password` accepts token + new password. Tokens stored in `users.password_reset_token` / `users.password_reset_expires` (001_initial.sql). AuthUI `forgot` mode: email input → POST → returns to login with success message
 - `AuthManager.updateUser()` patches in-memory user state after profile edits so the lobby header updates without a page refresh
 
 ## Teams
@@ -169,7 +170,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - BotAI trapped behavior: when completely stuck in danger with no movement options, bots accept their fate instead of placing bombs to blow open walls (removed `stuck_bomb` — unfair escape from player traps)
 - BotAI easy difficulty: huntChance=0.15, bombCooldown=45-80, escapeSearchDepth=2, reactionDelay=5, wrongMoveChance=0.25, randomBombChance=0.12, enableReachabilityFilter=false, duelStalemateThresholdTicks=0
 - BotAI normal difficulty: huntChance=0.90, bombCooldown=15-25, escapeSearchDepth=8, dangerTimerThreshold=40, roamAfterIdleTicks=60, huntStuckThreshold=3, huntStuckMaxTicks=60, stalemateThresholdTicks=100, remoteHoldThreshold=40, optimalMoveChance=0.8, enableReachabilityFilter=true, duelStalemateThresholdTicks=200
-- BotAI hard difficulty: huntChance=0.95, bombCooldown=5-12, escapeSearchDepth=15, chainReactionAwareness=true, shieldAggression=true, lateGameBombCooldown=3-6, huntSearchDepth=40, huntStuckMaxTicks=40, stalemateThresholdTicks=60, remoteHoldThreshold=60, enableReachabilityFilter=true, duelStalemateThresholdTicks=120
+- BotAI hard difficulty: huntChance=0.95, bombCooldown=5-12, escapeSearchDepth=15, dangerTimerThreshold=50, chainReactionAwareness=true, shieldAggression=true, lateGameBombCooldown=3-6, huntSearchDepth=40, huntStuckMaxTicks=40, stalemateThresholdTicks=60, remoteHoldThreshold=60, enableReachabilityFilter=true, duelStalemateThresholdTicks=120
+- BotAI complete config: see `DIFFICULTY_PRESETS` in `backend/src/game/BotAI.ts` — above lists key differentiators only
 - Spawn position randomization: `GameStateManager` shuffles spawn point indices via Fisher-Yates using seeded RNG in constructor (`shuffledSpawnIndices`), so player-to-spawn mapping varies per game seed while remaining deterministic for replays
 - Self-kills subtract 1 from kill score (owner.kills decremented, owner.selfKills incremented)
 - Game over placements sorted by kills descending, tiebreak by survival placement
@@ -298,7 +300,7 @@ MatchConfig includes: gameMode, maxPlayers, mapWidth/Height, mapSeed, roundTime,
 npm test                    # Run all test suites
 npx jest --config tests/backend/jest.config.ts  # Run from project root
 ```
-- 92 tests across 6 suites (GameState integration, GameLoop, Bomb, Map, CollisionSystem, validation/grid)
+- 117 tests across 8 suites (GameState integration, GameLoop, Bomb, Map, CollisionSystem, Auth, validation, grid)
 - GameState tests cover: lifecycle, movement, bombs, explosions, death, self-kills, shield, chain reactions, win conditions, grace period, power-ups, remote bombs, bomb kick, teams, deathmatch, KOTH, line/pierce bombs, reinforced walls, battle royale zone
 
 ## Connection Resilience
