@@ -73,6 +73,21 @@ export async function showAccountModal(deps: AccountModalDeps): Promise<void> {
 
       <hr style="border-color:var(--border);margin:16px 0;">
 
+      <div class="form-group">
+        <label>Change Password</label>
+        <input type="password" id="acct-current-password" placeholder="Current password" autocomplete="current-password" style="margin-bottom:8px;">
+        <input type="password" id="acct-new-password" placeholder="New password (min 8 characters)" autocomplete="new-password" style="margin-bottom:8px;">
+        <input type="password" id="acct-confirm-password" placeholder="Confirm new password" autocomplete="new-password">
+      </div>
+
+      <div id="acct-password-status" style="margin-bottom:12px;"></div>
+
+      <div class="modal-actions" style="margin-bottom:20px;">
+        <button class="btn btn-primary" id="acct-change-password">Change Password</button>
+      </div>
+
+      <hr style="border-color:var(--border);margin:16px 0;">
+
       <div class="modal-actions">
         <button class="btn btn-secondary" id="acct-close">Close</button>
       </div>
@@ -136,6 +151,37 @@ export async function showAccountModal(deps: AccountModalDeps): Promise<void> {
     }
   });
 
+  // Change password
+  modal.querySelector('#acct-change-password')!.addEventListener('click', async () => {
+    const statusEl = modal.querySelector('#acct-password-status')!;
+    const currentPassword = (modal.querySelector('#acct-current-password') as HTMLInputElement).value;
+    const newPassword = (modal.querySelector('#acct-new-password') as HTMLInputElement).value;
+    const confirmPassword = (modal.querySelector('#acct-confirm-password') as HTMLInputElement).value;
+
+    if (!currentPassword || !newPassword) {
+      statusEl.innerHTML = '<span style="color:var(--danger);">Please fill in both password fields.</span>';
+      return;
+    }
+    if (newPassword.length < 8) {
+      statusEl.innerHTML = '<span style="color:var(--danger);">New password must be at least 8 characters.</span>';
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      statusEl.innerHTML = '<span style="color:var(--danger);">New passwords do not match.</span>';
+      return;
+    }
+
+    try {
+      const result: any = await ApiClient.post('/user/password', { currentPassword, newPassword });
+      statusEl.innerHTML = `<span style="color:var(--success);">${escapeHtml(result.message)}</span>`;
+      (modal.querySelector('#acct-current-password') as HTMLInputElement).value = '';
+      (modal.querySelector('#acct-new-password') as HTMLInputElement).value = '';
+      (modal.querySelector('#acct-confirm-password') as HTMLInputElement).value = '';
+    } catch (err: unknown) {
+      statusEl.innerHTML = `<span style="color:var(--danger);">${escapeHtml(getErrorMessage(err))}</span>`;
+    }
+  });
+
   // Cancel pending email change
   const cancelEmailBtn = modal.querySelector('#acct-cancel-email');
   if (cancelEmailBtn) {
@@ -168,7 +214,7 @@ export async function showAccountModal(deps: AccountModalDeps): Promise<void> {
     elements: () =>
       [
         ...modal.querySelectorAll<HTMLElement>(
-          '#acct-username, #acct-save-profile, #acct-new-email, #acct-change-email, #acct-cancel-email, #acct-close',
+          '#acct-username, #acct-save-profile, #acct-new-email, #acct-change-email, #acct-current-password, #acct-new-password, #acct-confirm-password, #acct-change-password, #acct-cancel-email, #acct-close',
         ),
       ].filter((el) => el !== null),
     onBack: closeModal,

@@ -1,9 +1,9 @@
 import { query, execute } from '../db/connection';
 import { AppError } from '../middleware/errorHandler';
-import { generateToken, hashToken } from '../utils/crypto';
+import { comparePassword, hashPassword, generateToken, hashToken } from '../utils/crypto';
 import { sendEmailChangeEmail } from './email';
 import { logger } from '../utils/logger';
-import { UserProfileRow, UserEmailChangeRow, IdRow } from '../db/types';
+import { UserRow, UserProfileRow, UserEmailChangeRow, IdRow } from '../db/types';
 
 export async function getUserProfile(userId: number) {
   const rows = await query<UserProfileRow[]>(
@@ -147,6 +147,29 @@ export async function confirmEmailChange(token: string): Promise<void> {
     'UPDATE users SET email = ?, email_verified = TRUE, pending_email = NULL, email_change_token = NULL, email_change_expires = NULL WHERE id = ?',
     [row.pending_email, row.id],
   );
+}
+
+export async function changePassword(
+  userId: number,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const rows = await query<UserRow[]>(
+    'SELECT password_hash FROM users WHERE id = ?',
+    [userId],
+  );
+
+  if (rows.length === 0) {
+    throw new AppError('User not found', 404, 'NOT_FOUND');
+  }
+
+  const valid = await comparePassword(currentPassword, rows[0].password_hash);
+  if (!valid) {
+    throw new AppError('Current password is incorrect', 401, 'INVALID_PASSWORD');
+  }
+
+  const newHash = await hashPassword(newPassword);
+  await execute('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, userId]);
 }
 
 export async function cancelEmailChange(userId: number): Promise<void> {

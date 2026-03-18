@@ -5,7 +5,9 @@ import { validate } from '../middleware/validation';
 import * as userService from '../services/user';
 import {
   USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH,
   validateUsername, validateEmail as validateEmailFn,
+  validatePassword,
 } from '@blast-arena/shared';
 
 const router = Router();
@@ -16,6 +18,11 @@ const updateProfileSchema = z.object({
 
 const changeEmailSchema = z.object({
   email: z.string().email().max(255),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+  newPassword: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
 });
 
 router.get('/user/profile', authMiddleware, async (req, res, next) => {
@@ -61,6 +68,29 @@ router.post('/user/email', authMiddleware, validate(changeEmailSchema), async (r
     next(err);
   }
 });
+
+router.post(
+  '/user/password',
+  authMiddleware,
+  validate(changePasswordSchema),
+  async (req, res, next) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+
+      const passwordError = validatePassword(newPassword);
+      if (passwordError) return res.status(400).json({ error: passwordError });
+
+      if (currentPassword === newPassword) {
+        return res.status(400).json({ error: 'New password must be different from current password' });
+      }
+
+      await userService.changePassword(req.user!.userId, currentPassword, newPassword);
+      res.json({ message: 'Password updated successfully' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.delete('/user/email', authMiddleware, async (req, res, next) => {
   try {
