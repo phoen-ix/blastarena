@@ -187,7 +187,14 @@ export class LobbyUI {
     });
   }
 
-  private showCreateRoomModal(): void {
+  private async showCreateRoomModal(): Promise<void> {
+    let recordingsEnabled = false;
+    try {
+      const resp = await ApiClient.get<{ enabled: boolean }>('/admin/settings/recordings_enabled');
+      recordingsEnabled = resp.enabled;
+    } catch {
+      // Default to false on fetch failure
+    }
     showCreateRoomModal({
       socketClient: this.socketClient,
       notifications: this.notifications,
@@ -196,6 +203,7 @@ export class LobbyUI {
         this.onJoinRoom(room);
       },
       generateRoomName: () => this.generateRoomName(),
+      recordingsEnabled,
     });
   }
 

@@ -20,6 +20,7 @@ export interface MatchConfig {
   hazardTiles?: boolean;
   enableMapEvents?: boolean;
   reinforcedWalls?: boolean;
+  recordGame?: boolean;
 }
 
 export interface RoomPlayer {

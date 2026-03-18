@@ -33,7 +33,7 @@ export class GameRoom {
   private gameState: GameStateManager;
   private gameLoop: GameLoop;
   private matchId: number | null = null;
-  private replayRecorder: ReplayRecorder;
+  private replayRecorder: ReplayRecorder | null = null;
   private disconnectedPlayers: Map<number, number> = new Map(); // playerId -> tick when disconnected
 
   constructor(io: TypedServer, room: Room) {
@@ -102,12 +102,14 @@ export class GameRoom {
       }
     }
 
-    // Replay recorder for game replay
-    this.replayRecorder = new ReplayRecorder(
-      room.code,
-      room.config.gameMode,
-      this.gameState.toState(),
-    );
+    // Replay recorder for game replay (conditional on room config)
+    if (room.config.recordGame !== false) {
+      this.replayRecorder = new ReplayRecorder(
+        room.code,
+        room.config.gameMode,
+        this.gameState.toState(),
+      );
+    }
 
     // Game logger for detailed analysis
     this.gameState.gameLogger = new GameLogger(
@@ -115,7 +117,9 @@ export class GameRoom {
       room.config.gameMode,
       room.players.length + botCount,
     );
-    this.gameState.gameLogger.replayRecorder = this.replayRecorder;
+    if (this.replayRecorder) {
+      this.gameState.gameLogger.replayRecorder = this.replayRecorder;
+    }
     // Log player roster
     for (const p of this.gameState.players.values()) {
       this.gameState.gameLogger.log('player', {
@@ -158,7 +162,7 @@ export class GameRoom {
         ],
       );
       this.matchId = result.insertId;
-      this.replayRecorder.setMatchId(this.matchId);
+      this.replayRecorder?.setMatchId(this.matchId);
 
       // Insert match_players (skip bots)
       for (const player of this.gameState.players.values()) {
@@ -272,7 +276,7 @@ export class GameRoom {
     }
 
     // Record frame for replay
-    this.replayRecorder.recordTick(state, events);
+    this.replayRecorder?.recordTick(state, events);
   }
 
   private async onGameOver(): Promise<void> {
@@ -317,7 +321,7 @@ export class GameRoom {
     this.io.to(`room:${this.code}`).emit('game:over', gameOverData);
 
     // Save replay
-    this.replayRecorder.finalize(gameOverData);
+    this.replayRecorder?.finalize(gameOverData);
 
     // Save match results
     if (this.matchId) {

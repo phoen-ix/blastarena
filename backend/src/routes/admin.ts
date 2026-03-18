@@ -5,7 +5,9 @@ import { staffMiddleware, adminOnlyMiddleware } from '../middleware/admin';
 import { validate } from '../middleware/validation';
 import * as adminService from '../services/admin';
 import * as replayService from '../services/replay';
-import { getSimulationManager } from '../game/registry';
+import * as settingsService from '../services/settings';
+import { getSimulationManager, getIO } from '../game/registry';
+import { execute } from '../db/connection';
 import { SimulationConfig } from '@blast-arena/shared';
 
 const router = Router();
@@ -37,6 +39,16 @@ const createUserSchema = z.object({
   role: z.enum(['user', 'moderator', 'admin']).optional(),
 });
 
+// Public: get recordings enabled setting (no auth required, like banner)
+router.get('/admin/settings/recordings_enabled', async (_req, res, next) => {
+  try {
+    const enabled = await settingsService.isRecordingEnabled();
+    res.json({ enabled });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Public: get active banner (no auth required)
 router.get('/admin/announcements/banner', async (_req, res, next) => {
   try {
@@ -49,6 +61,36 @@ router.get('/admin/announcements/banner', async (_req, res, next) => {
 
 // All other admin routes require auth + staff role (admin or moderator)
 router.use(authMiddleware, staffMiddleware);
+
+// --- Settings ---
+
+const recordingsSchema = z.object({
+  enabled: z.boolean(),
+});
+
+router.put(
+  '/admin/settings/recordings_enabled',
+  adminOnlyMiddleware,
+  validate(recordingsSchema),
+  async (req, res, next) => {
+    try {
+      await settingsService.setSetting('recordings_enabled', String(req.body.enabled));
+      await execute(
+        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user!.userId, 'update_setting', 'setting', 0, JSON.stringify({ key: 'recordings_enabled', value: req.body.enabled })],
+      );
+      // Broadcast to all connected clients
+      const io = getIO();
+      io.emit('admin:settingsChanged' as any, {
+        key: 'recordings_enabled',
+        value: req.body.enabled,
+      });
+      res.json({ message: 'Setting updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // --- Users ---
 
@@ -296,6 +338,7 @@ const simulationConfigSchema = z.object({
   speed: z.enum(['fast', 'realtime']),
   logVerbosity: z.enum(['normal', 'detailed', 'full']),
   botTeams: z.array(z.number().nullable()).optional(),
+  recordReplays: z.boolean().optional(),
 });
 
 router.get('/admin/simulations', adminOnlyMiddleware, (_req, res) => {

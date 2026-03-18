@@ -22,6 +22,7 @@ export interface SimulationConfig {
   speed: SimulationSpeed;
   logVerbosity: LogVerbosity;
   botTeams?: (number | null)[];
+  recordReplays?: boolean;
 }
 
 export interface SimulationBatchStatus {

@@ -763,6 +763,10 @@ export class SimulationsTab {
           <label style="display:flex;align-items:center;gap:6px;color:var(--text-dim);cursor:pointer;" id="sim-ff-label">
             <input type="checkbox" id="sim-friendly-fire" checked> Friendly Fire
           </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="checkbox" id="sim-record-replays" checked style="accent-color:var(--accent);">
+            <span style="color:var(--accent);font-weight:600;">Record Replays</span>
+          </label>
         </div>
 
         <div style="margin-top:12px;">
@@ -840,6 +844,7 @@ export class SimulationsTab {
         ),
         speed,
         logVerbosity: (modal.querySelector('#sim-verbosity') as HTMLSelectElement).value as any,
+        recordReplays: (modal.querySelector('#sim-record-replays') as HTMLInputElement).checked,
       };
 
       // Validate bot count for Teams mode (minimum 4)

@@ -67,7 +67,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - Full-screen panel accessible from lobby header (Admin button visible for admin and moderator roles)
 - **Top-tab navigation**: Dashboard, Users, Matches, Rooms, Logs, Simulations, Announcements (role-filtered)
 - **Permission matrix**: Admin sees all 7 tabs (Simulations is admin-only); Moderator sees Users, Matches, Rooms, Announcements only
-- **Dashboard**: 5 stat cards (total users, active 24h, total matches, active rooms, online players) with 30s auto-refresh
+- **Dashboard**: 5 stat cards (total users, active 24h, total matches, active rooms, online players) with 30s auto-refresh; "Server Settings" card with match recordings toggle (admin-only)
 - **Users**: Paginated table with search, role change dropdown, deactivate (soft delete), delete permanently (type-username confirmation), create user modal
 - **Matches**: Paginated table, click row for detail modal with per-player stats
 - **Rooms**: Active rooms with 5s auto-refresh, kick player, force close (admin only), spectate, send message — all via socket events
@@ -80,6 +80,9 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - Deactivated users blocked from login and token refresh
 - Self-protection: admins cannot deactivate/delete themselves
 - Public endpoint `GET /admin/announcements/banner` for lobby banner display (no auth required)
+- Public endpoint `GET /admin/settings/recordings_enabled` for recording toggle state (no auth required)
+- Admin-only `PUT /admin/settings/recordings_enabled` with `{ enabled: boolean }` — updates DB, logs to audit, broadcasts `admin:settingsChanged` socket event
+- `server_settings` table: key-value store for server-wide settings; `backend/src/services/settings.ts` provides `getSetting()`, `setSetting()`, `isRecordingEnabled()`
 
 ## Bot Simulation System
 - Admin-only batch simulation runner for bot-only games — no human players, no DB records
@@ -96,7 +99,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - REST endpoints: `GET/POST /admin/simulations`, `GET/DELETE /admin/simulations/:batchId`, `GET /admin/simulations/:batchId/replay/:gameIndex`
 - Bot names pool: AlphaBot through PulseBot (16 distinct names)
 - Cancellation preserves completed game logs; 3s pause between realtime games, 0.5s for fast
-- **Simulation replays**: Each sim game records a full replay via `ReplayRecorder`, saved as `{gameIndex}_{roomCode}_{gameMode}.replay.json.gz` in the batch directory. `SimulationGame` calls `recordTick()` after every `processTick()` (both fast and realtime). `ReplayRecorder.finalize()` accepts optional `{ saveDir }` to write replays to batch dir instead of `/app/replays/`. Results table has a "Replay" button per game; `SimulationsTab.launchSimulationReplay()` mirrors `MatchesTab.launchReplay()` pattern
+- **Simulation replays**: Each sim game records a full replay via `ReplayRecorder` (when `recordReplays !== false`), saved as `{gameIndex}_{roomCode}_{gameMode}.replay.json.gz` in the batch directory. `SimulationGame` calls `recordTick()` after every `processTick()` (both fast and realtime). `ReplayRecorder.finalize()` accepts optional `{ saveDir }` to write replays to batch dir instead of `/app/replays/`. Results table has a "Replay" button per game; `SimulationsTab.launchSimulationReplay()` mirrors `MatchesTab.launchReplay()` pattern
+- **Record Replays checkbox**: SimulationsTab config modal includes a "Record Replays" checkbox (checked by default) that sets `recordReplays` in SimulationConfig
 - Delete batch: removes from memory + disk (`SimulationManager.deleteBatch()`) including replay files; delete button shown for completed/cancelled batches
 - Spectate button hidden for fast-speed batches (only shown for realtime)
 - Results table: paginated (25/page) with sortable columns (click #/Winner/Duration/Kill Leader/Reason) and per-game Replay button
@@ -202,7 +206,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - **Hazard tiles** (optional): Teleporter pairs (A/B, instant transport), conveyor belts (force movement in direction)
 
 ## Room Configuration
-MatchConfig includes: gameMode, maxPlayers, mapWidth/Height, mapSeed, roundTime, wallDensity, enabledPowerUps (all 8), powerUpDropRate, botCount, botDifficulty, botTeams, friendlyFire, hazardTiles, enableMapEvents, reinforcedWalls
+MatchConfig includes: gameMode, maxPlayers, mapWidth/Height, mapSeed, roundTime, wallDensity, enabledPowerUps (all 8), powerUpDropRate, botCount, botDifficulty, botTeams, friendlyFire, hazardTiles, enableMapEvents, reinforcedWalls, recordGame
 
 ## Game Logging
 - JSONL game logs written to ./data/gamelogs/ (bind-mounted from container)
@@ -212,7 +216,8 @@ MatchConfig includes: gameMode, maxPlayers, mapWidth/Height, mapSeed, roundTime,
 - Simulation logs written to `./data/simulations/{gameMode}/batch_*/` with separate directory per game mode
 
 ## Game Replay System
-- Every completed game (and simulation game) is recorded as a gzipped JSON replay file. Regular game replays in `./data/replays/`, simulation replays in their batch directory under `./data/simulations/`
+- Game and simulation replays are recorded as gzipped JSON files when recording is enabled. Regular game replays in `./data/replays/`, simulation replays in their batch directory under `./data/simulations/`
+- **Recording toggles**: Admin-level global toggle (`recordings_enabled` in `server_settings` table) controls whether the "Record Game" checkbox appears in CreateRoomModal. Per-room `recordGame` field in MatchConfig (default true when recordings enabled). Per-simulation `recordReplays` field in SimulationConfig (default true). `GameRoom.replayRecorder` and `SimulationGame.replayRecorder` are nullable — only created when recording is active; all usage sites guarded with optional chaining
 - `ReplayRecorder` (backend) captures full GameState every tick, with tile diffs (not full map per frame) for space efficiency
 - `GameLogger` forwards log events (kills, bombs, bot decisions, movements, powerups) to ReplayRecorder with tick numbers for synchronized display
 - Replay files: `{matchId}_{roomCode}_{gameMode}.replay.json.gz` (~400-700KB per game)

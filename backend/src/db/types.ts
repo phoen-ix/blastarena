@@ -110,6 +110,11 @@ export interface AdminActionRow extends RowDataPacket {
   created_at: Date;
 }
 
+/** Server settings row */
+export interface SettingRow extends RowDataPacket {
+  setting_value: string;
+}
+
 /** Admin user list row (user joined with stats) */
 export interface AdminUserRow extends RowDataPacket {
   id: number;

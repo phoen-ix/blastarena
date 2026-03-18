@@ -8,6 +8,7 @@ export interface CreateRoomModalDeps {
   notifications: NotificationUI;
   onRoomCreated: (room: Room) => void;
   generateRoomName: () => string;
+  recordingsEnabled?: boolean;
 }
 
 export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
@@ -124,6 +125,11 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
           <input type="checkbox" id="room-hazard-tiles" style="accent-color:var(--info);">
           <span style="color:var(--info);font-weight:600;">Hazard Tiles</span>
         </label>
+        ${deps.recordingsEnabled ? `<label style="display:flex;align-items:center;gap:5px;padding:5px 10px;
+          background:var(--bg-deep);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;">
+          <input type="checkbox" id="room-record-game" checked style="accent-color:var(--accent);">
+          <span style="color:var(--accent);font-weight:600;">Record Game</span>
+        </label>` : ''}
         <span id="friendly-fire-row" style="display:none;">
           <label style="display:flex;align-items:center;gap:5px;padding:5px 10px;
             background:var(--bg-deep);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;">
@@ -227,6 +233,9 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
       .checked;
     const enableMapEvents = (modal.querySelector('#room-map-events') as HTMLInputElement).checked;
     const hazardTiles = (modal.querySelector('#room-hazard-tiles') as HTMLInputElement).checked;
+    const recordGame = deps.recordingsEnabled
+      ? (modal.querySelector('#room-record-game') as HTMLInputElement)?.checked ?? true
+      : false;
 
     socketClient.emit(
       'room:create',
@@ -247,6 +256,7 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
           reinforcedWalls,
           enableMapEvents,
           hazardTiles,
+          recordGame,
         },
       },
       (response: any) => {

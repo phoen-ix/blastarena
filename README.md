@@ -89,6 +89,7 @@ When creating a room, the host can configure:
 - Bot count (0-7) and difficulty (Easy / Normal / Hard)
 - Map features: reinforced walls, map events, hazard tiles
 - Friendly fire (Teams mode only)
+- Record Game toggle (visible when admin has enabled recordings globally)
 
 ## Bot AI
 
@@ -138,7 +139,7 @@ Accessible from the lobby header for admin and moderator roles.
 
 | Tab | Access | Features |
 |-----|--------|----------|
-| **Dashboard** | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh |
+| **Dashboard** | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings section with match recordings toggle |
 | **Users** | Admin + Mod | Search, paginated table, role change, deactivate/reactivate, permanently delete (type-to-confirm), create user |
 | **Matches** | Admin + Mod | Paginated match history, click any row for detailed per-player stats modal |
 | **Rooms** | Admin + Mod | Active rooms with 5s refresh, spectate, send message, kick player, force close (admin only) |
@@ -152,7 +153,7 @@ All admin actions are logged to an audit table.
 
 Admins can run batch bot-only game simulations to collect AI behavior data for analysis and optimization.
 
-- **Configure**: Game mode, bot count/difficulty, map size, round time, wall density, power-ups, total games (1-1000)
+- **Configure**: Game mode, bot count/difficulty, map size, round time, wall density, power-ups, total games (1-1000), record replays toggle
 - **Two speed modes**: Fast (ticks as fast as possible) or Real-time (20 tps with live spectating in-browser)
 - **Log verbosity**: Normal (5-tick snapshots), Detailed (2-tick + movements/pickups), Full (every tick + pathfinding)
 - **Results**: Paginated table with sortable columns, win distribution chart, per-game stats with replay button
@@ -295,7 +296,7 @@ The UI uses the **INFERNO** design system — a high-energy arcade-industrial ae
 
 ## Game Replay System
 
-Every completed game (including simulation games) is automatically recorded for admin review:
+Games are recorded when recording is enabled (controlled via admin Dashboard toggle and per-room/per-simulation checkboxes):
 
 - **Full recording**: Every tick's game state saved as gzipped JSON in `./data/replays/`
 - **Video player controls**: Play/pause (click canvas or Space), seek slider, speed (0.5x / 1x / 2x / 4x), skip forward/back (arrow keys), mouse drag to pan camera. Arrow keys are reserved for timeline control in replay mode; use WASD or mouse drag to pan
@@ -368,3 +369,4 @@ Migrations in `backend/src/db/migrations/` run automatically on server start:
 2. `002_admin_panel.sql` — Admin actions audit table
 3. `003_user_profile.sql` — Pending email change columns
 4. `004_remove_ban.sql` — Schema cleanup
+5. `005_server_settings.sql` — Server settings key-value table (recordings toggle)

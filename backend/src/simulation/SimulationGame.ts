@@ -29,7 +29,7 @@ const BOT_NAMES = [
 export class SimulationGame {
   private gameState: GameStateManager;
   private gameLogger: GameLogger;
-  private replayRecorder: ReplayRecorder;
+  private replayRecorder: ReplayRecorder | null = null;
   private config: SimulationConfig;
   private gameIndex: number;
   private logDir: string;
@@ -118,10 +118,12 @@ export class SimulationGame {
       logVerbosity: config.logVerbosity,
     });
 
-    // Set up replay recorder
-    this.replayRecorder = new ReplayRecorder(`sim_${simNum}`, config.gameMode, this.gameState.toState());
-    this.replayRecorder.setMatchId(gameIndex);
-    this.gameLogger.replayRecorder = this.replayRecorder;
+    // Set up replay recorder (conditional on config)
+    if (config.recordReplays !== false) {
+      this.replayRecorder = new ReplayRecorder(`sim_${simNum}`, config.gameMode, this.gameState.toState());
+      this.replayRecorder.setMatchId(gameIndex);
+      this.gameLogger.replayRecorder = this.replayRecorder;
+    }
   }
 
   setStateCallback(cb: (state: ReturnType<GameStateManager['toState']>) => void): void {
@@ -141,7 +143,7 @@ export class SimulationGame {
     while (!this.isFinished() && !this.cancelled) {
       for (let i = 0; i < TICKS_PER_BATCH; i++) {
         this.gameState.processTick();
-        this.replayRecorder.recordTick(this.gameState.toState(), this.gameState.tickEvents);
+        this.replayRecorder?.recordTick(this.gameState.toState(), this.gameState.tickEvents);
         if (this.isFinished()) break;
       }
 
@@ -187,14 +189,14 @@ export class SimulationGame {
               this.gameState.status = 'playing';
             }
             const state = this.gameState.toState();
-            this.replayRecorder.recordTick(state, this.gameState.tickEvents);
+            this.replayRecorder?.recordTick(state, this.gameState.tickEvents);
             this.onStateUpdate?.(state);
             return;
           }
 
           this.gameState.processTick();
           const state = this.gameState.toState();
-          this.replayRecorder.recordTick(state, this.gameState.tickEvents);
+          this.replayRecorder?.recordTick(state, this.gameState.tickEvents);
           this.onStateUpdate?.(state);
 
           if (this.gameState.status === 'finished') {
@@ -255,21 +257,23 @@ export class SimulationGame {
       durationSeconds: Math.floor(this.gameState.tick / TICK_RATE),
       mapSeed: this.mapSeed,
       placements,
-      hasReplay: true,
+      hasReplay: this.replayRecorder !== null,
     };
 
     this.gameLogger.logGameOver(this.gameState.winnerId, placements);
 
     // Save replay to batch log directory
-    this.replayRecorder.finalize(
-      {
-        winnerId: this.gameState.winnerId,
-        winnerTeam: this.gameState.winnerTeam,
-        reason: result.finishReason,
-        placements,
-      },
-      { saveDir: this.logDir },
-    );
+    if (this.replayRecorder) {
+      this.replayRecorder.finalize(
+        {
+          winnerId: this.gameState.winnerId,
+          winnerTeam: this.gameState.winnerTeam,
+          reason: result.finishReason,
+          placements,
+        },
+        { saveDir: this.logDir },
+      );
+    }
 
     return result;
   }
