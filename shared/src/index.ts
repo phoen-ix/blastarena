@@ -5,6 +5,7 @@ export * from './types/socket-events';
 export * from './types/admin';
 export * from './types/simulation';
 export * from './types/replay';
+export * from './types/settings';
 export * from './constants/game';
 export * from './constants/powerups';
 export * from './constants/modes';

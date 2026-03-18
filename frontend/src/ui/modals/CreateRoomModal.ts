@@ -1,6 +1,6 @@
 import { SocketClient } from '../../network/SocketClient';
 import { NotificationUI } from '../NotificationUI';
-import { PowerUpType, POWERUP_DEFINITIONS, Room } from '@blast-arena/shared';
+import { PowerUpType, POWERUP_DEFINITIONS, Room, GameDefaults } from '@blast-arena/shared';
 import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 
 export interface CreateRoomModalDeps {
@@ -9,6 +9,7 @@ export interface CreateRoomModalDeps {
   onRoomCreated: (room: Room) => void;
   generateRoomName: () => string;
   recordingsEnabled?: boolean;
+  gameDefaults?: GameDefaults;
 }
 
 export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
@@ -166,6 +167,11 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
     </div>
   `;
 
+  // Apply admin-configured defaults
+  if (deps.gameDefaults) {
+    applyGameDefaults(modal, deps.gameDefaults);
+  }
+
   // Show friendly fire option only for teams mode
   const modeSelect = modal.querySelector('#room-mode') as HTMLSelectElement;
   const ffRow = modal.querySelector('#friendly-fire-row') as HTMLElement;
@@ -287,4 +293,38 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
     ],
     onBack: closeModal,
   });
+}
+
+function applyGameDefaults(modal: HTMLElement, defaults: GameDefaults): void {
+  const setSelect = (id: string, value: string | number | undefined) => {
+    if (value === undefined) return;
+    const el = modal.querySelector(id) as HTMLSelectElement | null;
+    if (el) el.value = String(value);
+  };
+  const setCheckbox = (id: string, value: boolean | undefined) => {
+    if (value === undefined) return;
+    const el = modal.querySelector(id) as HTMLInputElement | null;
+    if (el) el.checked = value;
+  };
+
+  setSelect('#room-mode', defaults.gameMode);
+  setSelect('#room-max-players', defaults.maxPlayers);
+  setSelect('#room-round-time', defaults.roundTime);
+  setSelect('#room-map-size', defaults.mapWidth);
+  setSelect('#room-wall-density', defaults.wallDensity);
+  setSelect('#room-powerup-rate', defaults.powerUpDropRate);
+  setSelect('#room-bots', defaults.botCount);
+  setSelect('#room-bot-difficulty', defaults.botDifficulty);
+  setCheckbox('#room-reinforced-walls', defaults.reinforcedWalls);
+  setCheckbox('#room-map-events', defaults.enableMapEvents);
+  setCheckbox('#room-hazard-tiles', defaults.hazardTiles);
+  setCheckbox('#room-friendly-fire', defaults.friendlyFire);
+
+  if (defaults.enabledPowerUps) {
+    const enabled = new Set(defaults.enabledPowerUps);
+    modal.querySelectorAll('.powerup-check').forEach((cb) => {
+      const input = cb as HTMLInputElement;
+      input.checked = enabled.has(input.value as PowerUpType);
+    });
+  }
 }

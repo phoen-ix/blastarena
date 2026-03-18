@@ -67,7 +67,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - Full-screen panel accessible from lobby header (Admin button visible for admin and moderator roles)
 - **Top-tab navigation**: Dashboard, Users, Matches, Rooms, Logs, Simulations, Announcements (role-filtered)
 - **Permission matrix**: Admin sees all 7 tabs (Simulations is admin-only); Moderator sees Users, Matches, Rooms, Announcements only
-- **Dashboard**: 5 stat cards (total users, active 24h, total matches, active rooms, online players) with 30s auto-refresh; "Server Settings" card with match recordings toggle (admin-only)
+- **Dashboard**: 5 stat cards (total users, active 24h, total matches, active rooms, online players) with 30s auto-refresh; "Server Settings" card with match recordings toggle (admin-only), collapsible "Game Creation Defaults" and "Simulation Defaults" editors
 - **Users**: Paginated table with search, role change dropdown, deactivate (soft delete), delete permanently (type-username confirmation), create user modal
 - **Matches**: Paginated table, click row for detail modal with per-player stats
 - **Rooms**: Active rooms with 5s auto-refresh, kick player, force close (admin only), spectate, send message — all via socket events
@@ -82,7 +82,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - Public endpoint `GET /admin/announcements/banner` for lobby banner display (no auth required)
 - Public endpoint `GET /admin/settings/recordings_enabled` for recording toggle state (no auth required)
 - Admin-only `PUT /admin/settings/recordings_enabled` with `{ enabled: boolean }` — updates DB, logs to audit, broadcasts `admin:settingsChanged` socket event
-- `server_settings` table: key-value store for server-wide settings; `backend/src/services/settings.ts` provides `getSetting()`, `setSetting()`, `isRecordingEnabled()`
+- `server_settings` table: key-value store for server-wide settings; `backend/src/services/settings.ts` provides `getSetting()`, `setSetting()`, `isRecordingEnabled()`, `getGameDefaults()`, `setGameDefaults()`, `getSimulationDefaults()`, `setSimulationDefaults()`
+- **Admin-configurable defaults**: `game_defaults` and `simulation_defaults` stored as JSON blobs in `server_settings`. Public `GET /admin/settings/game_defaults` endpoint; staff `GET /admin/settings/simulation_defaults`; admin-only PUT for both. Zod-validated with all fields optional — empty `{}` means "use hardcoded defaults". CreateRoomModal and SimulationsTab config modal fetch defaults on open and pre-fill form elements. `GameDefaults` and `SimulationDefaults` types in `shared/src/types/settings.ts`
 
 ## Bot Simulation System
 - Admin-only batch simulation runner for bot-only games — no human players, no DB records

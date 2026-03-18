@@ -5,8 +5,10 @@ import {
   SimulationBatchStatus,
   SimulationGameResult,
   SimulationConfig,
+  SimulationDefaults,
   GameState,
   ReplayData,
+  PowerUpType,
   POWERUP_DEFINITIONS,
   GAME_MODES,
 } from '@blast-arena/shared';
@@ -646,7 +648,15 @@ export class SimulationsTab {
     this.attachResultsTableListeners();
   }
 
-  private showConfigModal(): void {
+  private async showConfigModal(): Promise<void> {
+    let simDefaults: SimulationDefaults = {};
+    try {
+      const resp = await ApiClient.get<{ defaults: SimulationDefaults }>('/admin/settings/simulation_defaults');
+      simDefaults = resp.defaults ?? {};
+    } catch {
+      // Use hardcoded defaults on failure
+    }
+
     const allPowerUps = Object.values(POWERUP_DEFINITIONS);
 
     const modal = document.createElement('div');
@@ -794,6 +804,9 @@ export class SimulationsTab {
 
     document.getElementById('ui-overlay')!.appendChild(modal);
 
+    // Apply admin-configured simulation defaults
+    this.applySimulationDefaults(modal, simDefaults);
+
     // Show/hide friendly fire based on game mode
     const modeSelect = modal.querySelector('#sim-mode') as HTMLSelectElement;
     const ffLabel = modal.querySelector('#sim-ff-label') as HTMLElement;
@@ -884,5 +897,47 @@ export class SimulationsTab {
         }
       });
     });
+  }
+
+  private applySimulationDefaults(modal: HTMLElement, defaults: SimulationDefaults): void {
+    const setSelect = (id: string, value: string | number | undefined) => {
+      if (value === undefined) return;
+      const el = modal.querySelector(id) as HTMLSelectElement | null;
+      if (el) el.value = String(value);
+    };
+    const setCheckbox = (id: string, value: boolean | undefined) => {
+      if (value === undefined) return;
+      const el = modal.querySelector(id) as HTMLInputElement | null;
+      if (el) el.checked = value;
+    };
+
+    setSelect('#sim-mode', defaults.gameMode);
+    setSelect('#sim-bot-count', defaults.botCount);
+    setSelect('#sim-difficulty', defaults.botDifficulty);
+    setSelect('#sim-map-size', defaults.mapWidth);
+    setSelect('#sim-round-time', defaults.roundTime);
+    setSelect('#sim-wall-density', defaults.wallDensity);
+    setSelect('#sim-powerup-rate', defaults.powerUpDropRate);
+    setSelect('#sim-speed', defaults.speed);
+    setSelect('#sim-verbosity', defaults.logVerbosity);
+
+    if (defaults.totalGames !== undefined) {
+      const el = modal.querySelector('#sim-total-games') as HTMLInputElement | null;
+      if (el) el.value = String(defaults.totalGames);
+    }
+
+    setCheckbox('#sim-reinforced', defaults.reinforcedWalls);
+    setCheckbox('#sim-map-events', defaults.enableMapEvents);
+    setCheckbox('#sim-hazard-tiles', defaults.hazardTiles);
+    setCheckbox('#sim-friendly-fire', defaults.friendlyFire);
+    setCheckbox('#sim-record-replays', defaults.recordReplays);
+
+    if (defaults.enabledPowerUps) {
+      const enabled = new Set(defaults.enabledPowerUps);
+      modal.querySelectorAll('.sim-powerup-check').forEach((cb) => {
+        const input = cb as HTMLInputElement;
+        input.checked = enabled.has(input.value as PowerUpType);
+      });
+    }
   }
 }

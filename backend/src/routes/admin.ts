@@ -8,7 +8,7 @@ import * as replayService from '../services/replay';
 import * as settingsService from '../services/settings';
 import { getSimulationManager, getIO } from '../game/registry';
 import { execute } from '../db/connection';
-import { SimulationConfig } from '@blast-arena/shared';
+import { SimulationConfig, GameDefaults, SimulationDefaults } from '@blast-arena/shared';
 
 const router = Router();
 
@@ -44,6 +44,16 @@ router.get('/admin/settings/recordings_enabled', async (_req, res, next) => {
   try {
     const enabled = await settingsService.isRecordingEnabled();
     res.json({ enabled });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Public: get game creation defaults (no auth required)
+router.get('/admin/settings/game_defaults', async (_req, res, next) => {
+  try {
+    const defaults = await settingsService.getGameDefaults();
+    res.json({ defaults });
   } catch (err) {
     next(err);
   }
@@ -86,6 +96,103 @@ router.put(
         value: req.body.enabled,
       });
       res.json({ message: 'Setting updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// --- Game/Simulation Defaults ---
+
+const gameDefaultsSchema = z.object({
+  defaults: z.object({
+    gameMode: z.enum(['ffa', 'teams', 'battle_royale', 'sudden_death', 'deathmatch', 'king_of_the_hill']).optional(),
+    maxPlayers: z.number().int().min(2).max(8).optional(),
+    roundTime: z.number().int().min(30).max(600).optional(),
+    mapWidth: z.number().int().min(11).max(61).optional(),
+    wallDensity: z.number().min(0).max(1).optional(),
+    powerUpDropRate: z.number().min(0).max(1).optional(),
+    botCount: z.number().int().min(0).max(7).optional(),
+    botDifficulty: z.enum(['easy', 'normal', 'hard']).optional(),
+    reinforcedWalls: z.boolean().optional(),
+    enableMapEvents: z.boolean().optional(),
+    hazardTiles: z.boolean().optional(),
+    friendlyFire: z.boolean().optional(),
+    enabledPowerUps: z.array(z.enum([
+      'bomb_up', 'fire_up', 'speed_up', 'shield', 'kick', 'pierce_bomb', 'remote_bomb', 'line_bomb',
+    ])).optional(),
+  }),
+});
+
+const simulationDefaultsSchema = z.object({
+  defaults: z.object({
+    gameMode: z.enum(['ffa', 'teams', 'battle_royale', 'sudden_death', 'deathmatch', 'king_of_the_hill']).optional(),
+    maxPlayers: z.number().int().min(2).max(8).optional(),
+    roundTime: z.number().int().min(30).max(600).optional(),
+    mapWidth: z.number().int().min(11).max(61).optional(),
+    wallDensity: z.number().min(0).max(1).optional(),
+    powerUpDropRate: z.number().min(0).max(1).optional(),
+    botCount: z.number().int().min(0).max(8).optional(),
+    botDifficulty: z.enum(['easy', 'normal', 'hard']).optional(),
+    reinforcedWalls: z.boolean().optional(),
+    enableMapEvents: z.boolean().optional(),
+    hazardTiles: z.boolean().optional(),
+    friendlyFire: z.boolean().optional(),
+    enabledPowerUps: z.array(z.enum([
+      'bomb_up', 'fire_up', 'speed_up', 'shield', 'kick', 'pierce_bomb', 'remote_bomb', 'line_bomb',
+    ])).optional(),
+    totalGames: z.number().int().min(1).max(1000).optional(),
+    speed: z.enum(['fast', 'realtime']).optional(),
+    logVerbosity: z.enum(['normal', 'detailed', 'full']).optional(),
+    recordReplays: z.boolean().optional(),
+  }),
+});
+
+router.get('/admin/settings/simulation_defaults', async (_req, res, next) => {
+  try {
+    const defaults = await settingsService.getSimulationDefaults();
+    res.json({ defaults });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put(
+  '/admin/settings/game_defaults',
+  adminOnlyMiddleware,
+  validate(gameDefaultsSchema),
+  async (req, res, next) => {
+    try {
+      const defaults = req.body.defaults as GameDefaults;
+      await settingsService.setGameDefaults(defaults);
+      await execute(
+        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user!.userId, 'update_setting', 'setting', 0, JSON.stringify({ key: 'game_defaults', value: defaults })],
+      );
+      const io = getIO();
+      io.emit('admin:settingsChanged' as any, { key: 'game_defaults', value: defaults });
+      res.json({ message: 'Game defaults updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.put(
+  '/admin/settings/simulation_defaults',
+  adminOnlyMiddleware,
+  validate(simulationDefaultsSchema),
+  async (req, res, next) => {
+    try {
+      const defaults = req.body.defaults as SimulationDefaults;
+      await settingsService.setSimulationDefaults(defaults);
+      await execute(
+        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user!.userId, 'update_setting', 'setting', 0, JSON.stringify({ key: 'simulation_defaults', value: defaults })],
+      );
+      const io = getIO();
+      io.emit('admin:settingsChanged' as any, { key: 'simulation_defaults', value: defaults });
+      res.json({ message: 'Simulation defaults updated' });
     } catch (err) {
       next(err);
     }

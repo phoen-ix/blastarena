@@ -1,5 +1,6 @@
 import { query, execute } from '../db/connection';
 import { SettingRow } from '../db/types';
+import { GameDefaults, SimulationDefaults } from '@blast-arena/shared';
 
 export async function getSetting(key: string): Promise<string | null> {
   const rows = await query<SettingRow[]>(
@@ -19,4 +20,32 @@ export async function setSetting(key: string, value: string): Promise<void> {
 export async function isRecordingEnabled(): Promise<boolean> {
   const value = await getSetting('recordings_enabled');
   return value !== 'false';
+}
+
+export async function getGameDefaults(): Promise<GameDefaults> {
+  const value = await getSetting('game_defaults');
+  if (!value) return {};
+  try {
+    return JSON.parse(value) as GameDefaults;
+  } catch {
+    return {};
+  }
+}
+
+export async function setGameDefaults(defaults: GameDefaults): Promise<void> {
+  await setSetting('game_defaults', JSON.stringify(defaults));
+}
+
+export async function getSimulationDefaults(): Promise<SimulationDefaults> {
+  const value = await getSetting('simulation_defaults');
+  if (!value) return {};
+  try {
+    return JSON.parse(value) as SimulationDefaults;
+  } catch {
+    return {};
+  }
+}
+
+export async function setSimulationDefaults(defaults: SimulationDefaults): Promise<void> {
+  await setSetting('simulation_defaults', JSON.stringify(defaults));
 }

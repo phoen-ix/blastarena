@@ -3,7 +3,7 @@ import { AuthManager } from '../network/AuthManager';
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
 import { AdminUI } from './AdminUI';
-import { RoomListItem, Room, getErrorMessage } from '@blast-arena/shared';
+import { RoomListItem, Room, GameDefaults, getErrorMessage } from '@blast-arena/shared';
 import { escapeHtml } from '../utils/html';
 import { showCreateRoomModal } from './modals/CreateRoomModal';
 import { showAccountModal } from './modals/AccountModal';
@@ -189,11 +189,16 @@ export class LobbyUI {
 
   private async showCreateRoomModal(): Promise<void> {
     let recordingsEnabled = false;
+    let gameDefaults: GameDefaults = {};
     try {
-      const resp = await ApiClient.get<{ enabled: boolean }>('/admin/settings/recordings_enabled');
-      recordingsEnabled = resp.enabled;
+      const [recResp, defResp] = await Promise.all([
+        ApiClient.get<{ enabled: boolean }>('/admin/settings/recordings_enabled'),
+        ApiClient.get<{ defaults: GameDefaults }>('/admin/settings/game_defaults'),
+      ]);
+      recordingsEnabled = recResp.enabled;
+      gameDefaults = defResp.defaults ?? {};
     } catch {
-      // Default to false on fetch failure
+      // Default to false/empty on fetch failure
     }
     showCreateRoomModal({
       socketClient: this.socketClient,
@@ -204,6 +209,7 @@ export class LobbyUI {
       },
       generateRoomName: () => this.generateRoomName(),
       recordingsEnabled,
+      gameDefaults,
     });
   }
 

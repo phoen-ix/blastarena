@@ -139,7 +139,7 @@ Accessible from the lobby header for admin and moderator roles.
 
 | Tab | Access | Features |
 |-----|--------|----------|
-| **Dashboard** | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings section with match recordings toggle |
+| **Dashboard** | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings: match recordings toggle, game creation defaults, simulation defaults |
 | **Users** | Admin + Mod | Search, paginated table, role change, deactivate/reactivate, permanently delete (type-to-confirm), create user |
 | **Matches** | Admin + Mod | Paginated match history, click any row for detailed per-player stats modal |
 | **Rooms** | Admin + Mod | Active rooms with 5s refresh, spectate, send message, kick player, force close (admin only) |
@@ -382,3 +382,4 @@ Migrations in `backend/src/db/migrations/` run automatically on server start:
 3. `003_user_profile.sql` — Pending email change columns
 4. `004_remove_ban.sql` — Schema cleanup
 5. `005_server_settings.sql` — Server settings key-value table (recordings toggle)
+6. `006_default_settings.sql` — Game creation and simulation default settings
