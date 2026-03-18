@@ -250,6 +250,25 @@ MatchConfig includes: gameMode, maxPlayers, mapWidth/Height, mapSeed, roundTime,
 - JWT_SECRET minimum 16 chars enforced via Zod config validation
 - Admin audit trail: all admin actions logged to `admin_actions` table
 
+## Performance Optimizations
+- `getAlivePlayers()` result is cached within `processTick()` (guarded by `_processingTick` flag); invalidated via `invalidateAliveCache()` after every death/respawn — eliminates 7+ redundant `Array.from().filter()` per tick
+- Bomb slide collision uses pre-built `Set<string>` for bomb and player positions — O(1) lookups instead of O(n) inner loops
+- Shared `bombPositions` array built once per tick and passed to all `processPlayerInput()` calls (previously rebuilt per-player)
+- Chain reaction bomb lookup uses `Set<string>` of explosion cells — O(1) `has()` instead of O(cells) `Array.some()`
+- KOTH hill controlling player cached during scoring step, reused in `toState()` — avoids redundant `getAlivePlayers().filter()` in serialization
+- Conditional tile snapshot: `map.tiles` deep-copy only when other bombs exist beyond those detonating (chain reactions possible)
+- `mapToArray()` helper replaces `Array.from(map.values()).map(fn)` chains in `toState()` — single-pass iteration, halves intermediate allocations
+- `DIR_DELTA_ARRAY` module-level constant in BotAI replaces 12 `Object.values(DIR_DELTA)` calls per bot per tick
+- BotAI `aliveEnemies` computed once in `generateInput()` and reused for stalemate detection (previously duplicated `Array.from().filter()`)
+- HUD stats bar uses persistent element refs — creates DOM once, updates `textContent`/`opacity` only when values change (no innerHTML rebuild per tick)
+- Kill feed tracks individual DOM elements — appends new entries, removes expired ones directly (no innerHTML rebuild)
+- Team indicator drawn at Graphics origin, positioned via `setPosition()` — eliminates `clear()` + `fillRoundedRect()` every frame
+- Shield graphic drawn at origin with `setPosition()` for positioning
+- Dust particle emitter pooled per player — one persistent emitter repositioned and reused instead of create/destroy per movement
+- ReplayLogPanel uses `DocumentFragment` for batch DOM insertion when rebuilding log entries
+- Admin dashboard stats consolidated into single SQL query with subselects (3 queries → 1)
+- Match history uses pre-aggregated JOIN for player count instead of correlated subquery per row
+
 ## Code Quality & Tooling
 - ESLint v10 + `@typescript-eslint/recommended` via flat config (`eslint.config.mjs`); `no-explicit-any` as warning, `no-unused-vars` as error
 - Prettier with single quotes, trailing commas, 100 char width

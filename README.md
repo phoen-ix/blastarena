@@ -351,6 +351,17 @@ Detailed JSONL game logs are written to `./data/gamelogs/` for every match:
 - Simulation logs: `./data/simulations/{gameMode}/batch_*/sim_NNN.jsonl`
 - Simulation replays: `./data/simulations/{gameMode}/batch_*/{gameIndex}_sim_NNN_{gameMode}.replay.json.gz`
 
+## Performance Optimizations
+
+The game loop and rendering pipeline are optimized for low-latency multiplayer with multiple bots:
+
+- **Per-tick caching**: Alive player list, bomb/player position sets, and KOTH hill control cached within each tick — eliminates redundant `Array.from().filter()` and enables O(1) collision lookups
+- **Efficient serialization**: Single-pass `mapToArray()` for state broadcast, conditional tile snapshots (only when chain reactions are possible)
+- **BotAI**: Pre-computed direction deltas, deduplicated enemy/bomb array creation, cached explosion cells — reduces per-bot overhead significantly
+- **Frontend HUD**: Stats bar and kill feed use persistent DOM elements with differential updates instead of innerHTML rebuilds every tick
+- **Sprite rendering**: Team indicators use `setPosition()` instead of per-frame clear/redraw; dust particle emitters pooled per player
+- **Database**: Admin dashboard uses consolidated single-query stats; match lists use pre-aggregated JOINs instead of correlated subqueries
+
 ## Testing & Linting
 
 ```bash

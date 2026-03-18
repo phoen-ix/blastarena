@@ -25,6 +25,13 @@ import { InputBuffer } from './InputBuffer';
 import { BotAI } from './BotAI';
 import { GameLogger } from '../utils/gameLogger';
 
+/** Single-pass Map-to-array transform (avoids intermediate Array.from allocation) */
+function mapToArray<K, V, R>(map: Map<K, V>, fn: (v: V) => R): R[] {
+  const result: R[] = [];
+  for (const v of map.values()) result.push(fn(v));
+  return result;
+}
+
 // Simple seeded random for power-up drops
 class SeededRandom {
   private seed: number;
@@ -86,6 +93,11 @@ export class GameStateManager {
   public reinforcedWalls: boolean;
   public enableMapEvents: boolean;
   private static readonly FINISH_DELAY_TICKS = 30; // 1.5s grace period to show final explosions
+
+  // Cached per-tick data (invalidated at start of each processTick)
+  private _alivePlayersCache: Player[] | null = null;
+  private _processingTick: boolean = false;
+  private _hillControllingPlayerId: number | null = null;
 
   // Per-tick event buffers for discrete event emission
   public tickEvents: {
@@ -172,14 +184,17 @@ export class GameStateManager {
   processTick(): void {
     if (this.status !== 'playing') return;
     this.tick++;
+    this._processingTick = true;
 
-    // Clear per-tick event buffers
+    // Clear per-tick event buffers and caches
     this.tickEvents = { explosions: [], playerDied: [], powerupCollected: [] };
+    this._alivePlayersCache = null;
 
     // Check if grace period has elapsed
     if (this.finishTick !== null) {
       if (this.tick >= this.finishTick + GameStateManager.FINISH_DELAY_TICKS) {
         this.status = 'finished';
+        this._processingTick = false;
         return;
       }
       // During grace period: skip player/bot input, but keep processing explosions and bombs below
@@ -191,9 +206,9 @@ export class GameStateManager {
     if (this.gameLogger && this.gameLogger.shouldLogTick(this.tick)) {
       this.gameLogger.logTick(
         this.tick,
-        Array.from(this.players.values()),
-        Array.from(this.bombs.values()),
-        Array.from(this.explosions.values()),
+        [...this.players.values()],
+        [...this.bombs.values()],
+        [...this.explosions.values()],
       );
     }
 
@@ -209,13 +224,17 @@ export class GameStateManager {
         }
       }
 
+      // Pre-compute position arrays once for all processPlayerInput calls
+      const sharedBombPositions: { x: number; y: number }[] = [];
+      for (const b of this.bombs.values()) sharedBombPositions.push(b.position);
+
       // 1. Process inputs
       for (const [playerId, player] of this.players) {
         if (!player.alive) continue;
 
         const input = this.inputBuffer.getLatestInput(playerId);
         if (input) {
-          this.processPlayerInput(player, input);
+          this.processPlayerInput(player, input, sharedBombPositions);
         }
 
         player.tick();
@@ -223,6 +242,14 @@ export class GameStateManager {
     }
 
     // 2. Update bomb timers and slide kicked bombs
+    // Build position sets for O(1) slide collision checks
+    const bombPosSet = new Set<string>();
+    const playerPosSet = new Set<string>();
+    for (const b of this.bombs.values()) bombPosSet.add(`${b.position.x},${b.position.y}`);
+    for (const p of this.players.values()) {
+      if (p.alive) playerPosSet.add(`${p.position.x},${p.position.y}`);
+    }
+
     const bombsToDetonate: Bomb[] = [];
     for (const bomb of this.bombs.values()) {
       // Slide kicked bombs
@@ -231,30 +258,22 @@ export class GameStateManager {
         const dy = bomb.sliding === 'up' ? -1 : bomb.sliding === 'down' ? 1 : 0;
         const nextX = bomb.position.x + dx;
         const nextY = bomb.position.y + dy;
+        const nextKey = `${nextX},${nextY}`;
 
         // Stop if hitting a wall, another bomb, or a player
-        let blocked = !this.collisionSystem.isWalkable(nextX, nextY);
-        if (!blocked) {
-          for (const b of this.bombs.values()) {
-            if (b.id !== bomb.id && b.position.x === nextX && b.position.y === nextY) {
-              blocked = true;
-              break;
-            }
-          }
-        }
-        if (!blocked) {
-          for (const p of this.players.values()) {
-            if (p.alive && p.position.x === nextX && p.position.y === nextY) {
-              blocked = true;
-              break;
-            }
-          }
-        }
+        // (bomb's own position is currentPos, not nextPos, so Set check is safe)
+        const blocked =
+          !this.collisionSystem.isWalkable(nextX, nextY) ||
+          bombPosSet.has(nextKey) ||
+          playerPosSet.has(nextKey);
 
         if (blocked) {
           bomb.sliding = null;
         } else {
+          // Update position sets to reflect the move
+          bombPosSet.delete(`${bomb.position.x},${bomb.position.y}`);
           bomb.position = { x: nextX, y: nextY };
+          bombPosSet.add(nextKey);
         }
       }
 
@@ -265,8 +284,11 @@ export class GameStateManager {
 
     // 3. Process detonations (including chain reactions)
     if (bombsToDetonate.length > 0) {
-      // Snapshot tiles before detonations so chain reactions use original wall layout
-      const tileSnapshot = this.map.tiles.map((row) => [...row]);
+      // Only snapshot tiles when chain reactions are possible (other bombs exist)
+      const tileSnapshot =
+        this.bombs.size > bombsToDetonate.length
+          ? this.map.tiles.map((row) => [...row])
+          : undefined;
       for (const bomb of bombsToDetonate) {
         this.detonateBomb(bomb, tileSnapshot);
       }
@@ -309,6 +331,7 @@ export class GameStateManager {
             player.invulnerableTicks = 10;
           } else {
             player.die();
+            this.invalidateAliveCache();
             this.placementCounter--;
             player.placement = this.getAlivePlayers().length + 1;
 
@@ -355,6 +378,7 @@ export class GameStateManager {
     }
 
     // 6.5 King of the Hill scoring
+    this._hillControllingPlayerId = null;
     if (this.hillZone && this.finishTick === null) {
       const playersInZone = this.getAlivePlayers().filter(
         (p) =>
@@ -367,6 +391,7 @@ export class GameStateManager {
       // Score only if exactly one player (or one team) controls the zone
       if (playersInZone.length === 1) {
         const controllerId = playersInZone[0].id;
+        this._hillControllingPlayerId = controllerId;
         const current = this.kothScores.get(controllerId) || 0;
         this.kothScores.set(controllerId, current + KOTH_POINTS_PER_TICK);
 
@@ -463,6 +488,7 @@ export class GameStateManager {
             player.hasShield = false;
           } else {
             player.die();
+            this.invalidateAliveCache();
             this.placementCounter--;
             player.placement = this.getAlivePlayers().length + 1;
             this.tickEvents.playerDied.push({ playerId: player.id, killerId: null });
@@ -482,6 +508,7 @@ export class GameStateManager {
           const spawnPoints = this.map.spawnPoints;
           const spawnPos = spawnPoints[Math.floor(this.rng.next() * spawnPoints.length)];
           player.respawn(spawnPos);
+          this.invalidateAliveCache();
         }
       }
     }
@@ -504,6 +531,8 @@ export class GameStateManager {
     if (this.finishTick === null) {
       this.checkWinCondition();
     }
+
+    this._processingTick = false;
   }
 
   private hasBombAt(x: number, y: number): boolean {
@@ -520,12 +549,15 @@ export class GameStateManager {
     return false;
   }
 
-  private processPlayerInput(player: Player, input: PlayerInput): void {
+  private processPlayerInput(
+    player: Player,
+    input: PlayerInput,
+    sharedBombPositions?: { x: number; y: number }[],
+  ): void {
     // Movement (with cooldown)
     if (input.direction && player.canMove()) {
       player.direction = input.direction;
-      const bombPositions: { x: number; y: number }[] = [];
-      for (const b of this.bombs.values()) bombPositions.push(b.position);
+      const bombPositions = sharedBombPositions ?? Array.from(this.bombs.values()).map((b) => b.position);
 
       const otherPlayerPositions: { x: number; y: number }[] = [];
       for (const other of this.players.values()) {
@@ -696,14 +728,10 @@ export class GameStateManager {
     }
 
     // Chain reaction: detonate other bombs caught in explosion
+    const cellSet = new Set(cells.map((c: { x: number; y: number }) => `${c.x},${c.y}`));
     const chainingBombs: Bomb[] = [];
     for (const otherBomb of this.bombs.values()) {
-      if (
-        cells.some(
-          (c: { x: number; y: number }) =>
-            c.x === otherBomb.position.x && c.y === otherBomb.position.y,
-        )
-      ) {
+      if (cellSet.has(`${otherBomb.position.x},${otherBomb.position.y}`)) {
         chainingBombs.push(otherBomb);
       }
     }
@@ -770,7 +798,16 @@ export class GameStateManager {
   }
 
   getAlivePlayers(): Player[] {
-    return Array.from(this.players.values()).filter((p) => p.alive);
+    if (this._processingTick && this._alivePlayersCache) {
+      return this._alivePlayersCache;
+    }
+    this._alivePlayersCache = Array.from(this.players.values()).filter((p) => p.alive);
+    return this._alivePlayersCache;
+  }
+
+  /** Invalidate alive players cache (call after any death/respawn) */
+  private invalidateAliveCache(): void {
+    this._alivePlayersCache = null;
   }
 
   /** Kill a player externally (e.g. disconnect timeout). Handles placement and logging. */
@@ -779,6 +816,7 @@ export class GameStateManager {
     if (!player?.alive) return;
 
     player.die();
+    this.invalidateAliveCache();
     this.placementCounter--;
     player.placement = this.getAlivePlayers().length + 1;
     this.tickEvents.playerDied.push({ playerId, killerId });
@@ -794,10 +832,10 @@ export class GameStateManager {
   toState(): GameStateType {
     return {
       tick: this.tick,
-      players: Array.from(this.players.values()).map((p) => p.toState()),
-      bombs: Array.from(this.bombs.values()).map((b) => b.toState()),
-      explosions: Array.from(this.explosions.values()).map((e) => e.toState()),
-      powerUps: Array.from(this.powerUps.values()).map((p) => p.toState()),
+      players: mapToArray(this.players, (p) => p.toState()),
+      bombs: mapToArray(this.bombs, (b) => b.toState()),
+      explosions: mapToArray(this.explosions, (e) => e.toState()),
+      powerUps: mapToArray(this.powerUps, (p) => p.toState()),
       map: {
         width: this.map.width,
         height: this.map.height,
@@ -809,16 +847,7 @@ export class GameStateManager {
       hillZone: this.hillZone
         ? {
             ...this.hillZone,
-            controllingPlayer: (() => {
-              const playersInZone = this.getAlivePlayers().filter(
-                (p) =>
-                  p.position.x >= this.hillZone!.x &&
-                  p.position.x < this.hillZone!.x + this.hillZone!.width &&
-                  p.position.y >= this.hillZone!.y &&
-                  p.position.y < this.hillZone!.y + this.hillZone!.height,
-              );
-              return playersInZone.length === 1 ? playersInZone[0].id : null;
-            })(),
+            controllingPlayer: this._hillControllingPlayerId,
             controllingTeam: null,
           }
         : undefined,

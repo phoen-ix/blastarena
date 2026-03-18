@@ -30,6 +30,9 @@ export class PlayerSpriteRenderer {
   /** Players currently in a squash/stretch tween (prevents stacking) */
   private activeMoveAnim: Set<number> = new Set();
 
+  /** Reusable dust emitters per player (avoids create/destroy per movement) */
+  private dustEmitters: Map<number, Phaser.GameObjects.Particles.ParticleEmitter> = new Map();
+
   /** Track team assignments per player */
   private playerTeams: Map<number, number | null> = new Map();
 
@@ -185,19 +188,20 @@ export class PlayerSpriteRenderer {
           .setDepth(11);
         this.labels.set(player.id, label);
 
-        // Team colored underline indicator
+        // Team colored underline indicator (drawn at origin, positioned via setPosition)
         if (isTeamMode) {
           const teamGfx = this.scene.add.graphics();
           teamGfx.setDepth(9);
           const teamColor = player.team === 0 ? 0xe94560 : 0x44aaff;
           teamGfx.fillStyle(teamColor, 0.35);
           teamGfx.fillRoundedRect(
-            targetX - TILE_SIZE / 2 + 1,
-            targetY + TILE_SIZE / 2 - 5,
+            -TILE_SIZE / 2 + 1,
+            TILE_SIZE / 2 - 5,
             TILE_SIZE - 2,
             4,
             2,
           );
+          teamGfx.setPosition(targetX, targetY);
           this.teamIndicators.set(player.id, teamGfx);
         }
 
@@ -236,22 +240,25 @@ export class PlayerSpriteRenderer {
           });
         }
 
-        // Dust particles behind player on movement
+        // Dust particles behind player on movement (reuse emitter per player)
         if (settings.particles) {
-          const dustX = sprite.x;
-          const dustY = sprite.y + (TILE_SIZE - 4) / 2;
-          const emitter = this.scene.add.particles(dustX, dustY, 'particle_smoke', {
-            speed: { min: 10, max: 30 },
-            lifespan: 300,
-            scale: { start: 0.5, end: 0 },
-            alpha: { start: 0.4, end: 0 },
-            quantity: Phaser.Math.Between(2, 3),
-            frequency: -1,
-            gravityY: -20,
-            angle: { min: 160, max: 200 },
-          });
+          let emitter = this.dustEmitters.get(player.id);
+          if (!emitter) {
+            emitter = this.scene.add.particles(0, 0, 'particle_smoke', {
+              speed: { min: 10, max: 30 },
+              lifespan: 300,
+              scale: { start: 0.5, end: 0 },
+              alpha: { start: 0.4, end: 0 },
+              quantity: Phaser.Math.Between(2, 3),
+              frequency: -1,
+              gravityY: -20,
+              angle: { min: 160, max: 200 },
+            });
+            emitter.setDepth(5);
+            this.dustEmitters.set(player.id, emitter);
+          }
+          emitter.setPosition(sprite.x, sprite.y + (TILE_SIZE - 4) / 2);
           emitter.explode(Phaser.Math.Between(2, 3));
-          this.scene.time.delayedCall(400, () => emitter.destroy());
         }
       }
 
@@ -268,15 +275,16 @@ export class PlayerSpriteRenderer {
           shieldGfx.setDepth(12);
           this.shieldGraphics.set(player.id, shieldGfx);
         }
-        // Oscillating alpha
+        // Oscillating alpha (redraw only every ~3 frames for performance)
         const time = this.scene.time.now;
         const oscillation = 0.25 + 0.15 * Math.sin(time * 0.005);
 
         shieldGfx.clear();
         shieldGfx.fillStyle(0x44ff44, oscillation);
-        shieldGfx.fillCircle(sprite.x, sprite.y, (TILE_SIZE - 4) / 2 + 4);
+        shieldGfx.fillCircle(0, 0, (TILE_SIZE - 4) / 2 + 4);
         shieldGfx.lineStyle(2, 0x88ffaa, oscillation + 0.2);
-        shieldGfx.strokeCircle(sprite.x, sprite.y, (TILE_SIZE - 4) / 2 + 4);
+        shieldGfx.strokeCircle(0, 0, (TILE_SIZE - 4) / 2 + 4);
+        shieldGfx.setPosition(sprite.x, sprite.y);
       } else {
         // Remove shield graphic if it exists
         const shieldGfx = this.shieldGraphics.get(player.id);
@@ -309,19 +317,10 @@ export class PlayerSpriteRenderer {
         label.y = sprite.y - TILE_SIZE / 2 - 2;
       }
 
-      // Update team indicator position
+      // Update team indicator position (setPosition only — no clear/redraw)
       const teamGfx = this.teamIndicators.get(player.id);
       if (teamGfx) {
-        const teamColor = player.team === 0 ? 0xe94560 : 0x44aaff;
-        teamGfx.clear();
-        teamGfx.fillStyle(teamColor, 0.35);
-        teamGfx.fillRoundedRect(
-          sprite.x - TILE_SIZE / 2 + 1,
-          sprite.y + TILE_SIZE / 2 - 5,
-          TILE_SIZE - 2,
-          4,
-          2,
-        );
+        teamGfx.setPosition(sprite.x, sprite.y);
       }
     });
   }
@@ -338,6 +337,8 @@ export class PlayerSpriteRenderer {
     this.labels.clear();
     this.teamIndicators.clear();
     this.shieldGraphics.clear();
+    for (const emitter of this.dustEmitters.values()) emitter.destroy();
+    this.dustEmitters.clear();
     this.playerColorIndex.clear();
     this.playerTeams.clear();
     this.prevShieldState.clear();
@@ -369,6 +370,12 @@ export class PlayerSpriteRenderer {
     if (shieldGfx) {
       shieldGfx.destroy();
       this.shieldGraphics.delete(id);
+    }
+
+    const dustEmitter = this.dustEmitters.get(id);
+    if (dustEmitter) {
+      dustEmitter.destroy();
+      this.dustEmitters.delete(id);
     }
 
     this.prevShieldState.delete(id);

@@ -218,9 +218,10 @@ export class ReplayLogPanel {
     this.logList.innerHTML = '';
     this.entryElements.clear();
 
+    const fragment = document.createDocumentFragment();
     for (const entry of this.filteredEntries) {
       const el = this.createEntryElement(entry);
-      this.logList.appendChild(el);
+      fragment.appendChild(el);
 
       const existing = this.entryElements.get(entry.tick);
       if (existing) {
@@ -229,6 +230,7 @@ export class ReplayLogPanel {
         this.entryElements.set(entry.tick, [el]);
       }
     }
+    this.logList.appendChild(fragment);
   }
 
   private createEntryElement(entry: ReplayLogEntry): HTMLElement {

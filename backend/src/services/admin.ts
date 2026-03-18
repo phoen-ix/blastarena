@@ -148,13 +148,13 @@ export async function deleteUser(adminId: number, userId: number): Promise<void>
 }
 
 export async function getServerStats() {
-  const [userCount] = await query<CountRow[]>(
-    'SELECT COUNT(*) as total FROM users WHERE is_deactivated = FALSE',
-  );
-  const [activeCount] = await query<CountRow[]>(
-    'SELECT COUNT(*) as total FROM users WHERE last_login > DATE_SUB(NOW(), INTERVAL 24 HOUR)',
-  );
-  const [matchCount] = await query<CountRow[]>('SELECT COUNT(*) as total FROM matches');
+  // Single query with subselects instead of 3 separate round-trips
+  const [stats] = await query<CountRow[]>(
+    `SELECT
+      (SELECT COUNT(*) FROM users WHERE is_deactivated = FALSE) as totalUsers,
+      (SELECT COUNT(*) FROM users WHERE last_login > DATE_SUB(NOW(), INTERVAL 24 HOUR)) as activeUsers24h,
+      (SELECT COUNT(*) FROM matches) as totalMatches`,
+  ) as unknown as [{ totalUsers: number; activeUsers24h: number; totalMatches: number }];
 
   let activeRooms = 0;
   let activePlayers = 0;
@@ -173,9 +173,9 @@ export async function getServerStats() {
   }
 
   return {
-    totalUsers: userCount.total,
-    activeUsers24h: activeCount.total,
-    totalMatches: matchCount.total,
+    totalUsers: stats.totalUsers,
+    activeUsers24h: stats.activeUsers24h,
+    totalMatches: stats.totalMatches,
     activeRooms,
     activePlayers,
   };
@@ -187,9 +187,10 @@ export async function getMatchHistory(page: number = 1, limit: number = 20) {
     `SELECT m.id, m.room_code, m.game_mode, m.status, m.duration,
             m.started_at, m.finished_at,
             u.username as winner_username,
-            (SELECT COUNT(*) FROM match_players WHERE match_id = m.id) as player_count
+            COALESCE(pc.player_count, 0) as player_count
      FROM matches m
      LEFT JOIN users u ON u.id = m.winner_id
+     LEFT JOIN (SELECT match_id, COUNT(*) as player_count FROM match_players GROUP BY match_id) pc ON pc.match_id = m.id
      ORDER BY m.created_at DESC
      LIMIT ? OFFSET ?`,
     [limit, offset],

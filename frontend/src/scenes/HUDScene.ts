@@ -14,7 +14,7 @@ export class HUDScene extends Phaser.Scene {
   private playerDiedHandler:
     | ((data: { playerId: number; killerId: number | null }) => void)
     | null = null;
-  private killFeedEntries: { text: string; time: number }[] = [];
+  private killFeedEntries: { text: string; time: number; el?: HTMLElement }[] = [];
   private stateUpdateHandler: ((state: GameState) => void) | null = null;
   private previousStats: {
     maxBombs: number;
@@ -23,6 +23,16 @@ export class HUDScene extends Phaser.Scene {
     hasShield: boolean;
     hasKick: boolean;
   } | null = null;
+  // Element refs for stats bar (avoid innerHTML on every update)
+  private statEls: {
+    bombs: HTMLElement;
+    fire: HTMLElement;
+    speed: HTMLElement;
+    shield: HTMLElement;
+    kick: HTMLElement;
+  } | null = null;
+  // Player list element cache for differential updates
+  private playerListCache: Map<string, HTMLElement> = new Map();
 
   constructor() {
     super({ key: 'HUDScene' });
@@ -150,18 +160,32 @@ export class HUDScene extends Phaser.Scene {
 
   private renderKillFeed(): void {
     const now = Date.now();
-    // Remove entries older than 5 seconds
-    this.killFeedEntries = this.killFeedEntries.filter((e) => now - e.time < 5000);
+    if (!this.killFeedEl) return;
 
-    if (this.killFeedEl) {
-      this.killFeedEl.innerHTML = this.killFeedEntries
-        .map((e) => {
-          const age = now - e.time;
-          const opacity = Math.max(0.3, 1 - age / 5000);
-          return `<div class="killfeed-entry" style="opacity:${opacity}">${e.text}</div>`;
-        })
-        .join('');
+    // Remove expired entries and their DOM elements
+    const filtered: typeof this.killFeedEntries = [];
+    for (const entry of this.killFeedEntries) {
+      if (now - entry.time >= 5000) {
+        entry.el?.remove();
+      } else {
+        // Update opacity on surviving entries
+        const age = now - entry.time;
+        const opacity = Math.max(0.3, 1 - age / 5000);
+        if (entry.el) {
+          entry.el.style.opacity = String(opacity);
+        } else {
+          // Create DOM element for new entries
+          const el = document.createElement('div');
+          el.className = 'killfeed-entry';
+          el.style.opacity = String(opacity);
+          el.innerHTML = entry.text;
+          this.killFeedEl.appendChild(el);
+          entry.el = el;
+        }
+        filtered.push(entry);
+      }
     }
+    this.killFeedEntries = filtered;
   }
 
   private updateHUD(state: GameState): void {
@@ -189,27 +213,50 @@ export class HUDScene extends Phaser.Scene {
       timerEl.style.color = remaining <= 30 ? '#ff3355' : '#fff';
     }
 
-    // Player stats bar
+    // Player stats bar (element reuse — only update text/class when values change)
     if (me && me.alive) {
       const statsEl = document.getElementById('hud-stats');
       if (statsEl) {
-        const changed = (key: 'maxBombs' | 'fireRange' | 'speed' | 'hasShield' | 'hasKick') => {
-          if (!this.previousStats) return '';
-          const prev = this.previousStats[key];
-          const curr = me[key];
-          if (prev !== undefined && curr !== undefined && prev !== curr) {
-            return ' stat-changed';
-          }
-          return '';
-        };
+        // Lazily create stat elements once
+        if (!this.statEls) {
+          statsEl.innerHTML = `
+            <span class="stat-item">💣 <span id="stat-bombs"></span></span>
+            <span class="stat-item">🔥 <span id="stat-fire"></span></span>
+            <span class="stat-item">⚡ <span id="stat-speed"></span></span>
+            <span class="stat-item" id="stat-shield">🛡️</span>
+            <span class="stat-item" id="stat-kick">👢</span>
+          `;
+          this.statEls = {
+            bombs: document.getElementById('stat-bombs')!,
+            fire: document.getElementById('stat-fire')!,
+            speed: document.getElementById('stat-speed')!,
+            shield: document.getElementById('stat-shield')!,
+            kick: document.getElementById('stat-kick')!,
+          };
+        }
 
-        statsEl.innerHTML = `
-          <span class="stat-item${changed('maxBombs')}">💣 ${me.maxBombs}</span>
-          <span class="stat-item${changed('fireRange')}">🔥 ${me.fireRange}</span>
-          <span class="stat-item${changed('speed')}">⚡ ${me.speed}</span>
-          <span class="stat-item">${me.hasShield ? '🛡️' : '<span style="opacity:0.3">🛡️</span>'}</span>
-          <span class="stat-item">${me.hasKick ? '👢' : '<span style="opacity:0.3">👢</span>'}</span>
-        `;
+        const prev = this.previousStats;
+        const els = this.statEls;
+
+        // Only update DOM when values actually change
+        if (!prev || prev.maxBombs !== me.maxBombs) {
+          els.bombs.textContent = String(me.maxBombs);
+          if (prev) els.bombs.parentElement!.classList.add('stat-changed');
+        }
+        if (!prev || prev.fireRange !== me.fireRange) {
+          els.fire.textContent = String(me.fireRange);
+          if (prev) els.fire.parentElement!.classList.add('stat-changed');
+        }
+        if (!prev || prev.speed !== me.speed) {
+          els.speed.textContent = String(me.speed);
+          if (prev) els.speed.parentElement!.classList.add('stat-changed');
+        }
+        if (!prev || prev.hasShield !== me.hasShield) {
+          els.shield.style.opacity = me.hasShield ? '1' : '0.3';
+        }
+        if (!prev || prev.hasKick !== me.hasKick) {
+          els.kick.style.opacity = me.hasKick ? '1' : '0.3';
+        }
 
         this.previousStats = {
           maxBombs: me.maxBombs,

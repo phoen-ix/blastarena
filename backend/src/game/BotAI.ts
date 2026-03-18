@@ -11,6 +11,8 @@ const DIR_DELTA: Record<Direction, { dx: number; dy: number }> = {
   left: { dx: -1, dy: 0 },
   right: { dx: 1, dy: 0 },
 };
+/** Pre-computed direction delta array — avoids Object.values() allocation per call */
+const DIR_DELTA_ARRAY = Object.values(DIR_DELTA);
 
 function isDestructibleTile(tile: TileType): boolean {
   return tile === 'destructible' || tile === ('destructible_cracked' as TileType);
@@ -214,9 +216,15 @@ export class BotAI {
     }
 
     const bombPositions = Array.from(state.bombs.values()).map((b) => b.position);
-    const otherPlayers = Array.from(state.players.values())
-      .filter((p) => p.id !== player.id && p.alive)
-      .map((p) => p.position);
+    // Cache alive enemies once — reused for stalemate detection, roaming, etc.
+    const aliveEnemies: Player[] = [];
+    const otherPlayers: Position[] = [];
+    for (const p of state.players.values()) {
+      if (p.id !== player.id && p.alive) {
+        aliveEnemies.push(p);
+        otherPlayers.push(p.position);
+      }
+    }
 
     // Track max fire range on map for dynamic escape depth scaling
     if (player.fireRange > this.maxFireRangeOnMap) {
@@ -246,9 +254,7 @@ export class BotAI {
     // === Stalemate detection (Fix A) ===
     if (this.config.stalemateBreaker) {
       let shieldedEnemyNearby = false;
-      const alivePlayers = Array.from(state.players.values()).filter(
-        (p) => p.id !== player.id && p.alive,
-      );
+      const alivePlayers = aliveEnemies;
       if (player.hasShield) {
         for (const other of alivePlayers) {
           if (
@@ -430,7 +436,7 @@ export class BotAI {
         let enemyInBlast = false;
         let enemyInBlastShielded = false;
         for (const bomb of ownRemoteBombs) {
-          for (const { dx, dy } of Object.values(DIR_DELTA)) {
+          for (const { dx, dy } of DIR_DELTA_ARRAY) {
             for (let i = 0; i <= bomb.fireRange; i++) {
               const cx = bomb.position.x + dx * i;
               const cy = bomb.position.y + dy * i;
@@ -485,7 +491,7 @@ export class BotAI {
               selfInBlast = true;
               break;
             }
-            for (const { dx, dy } of Object.values(DIR_DELTA)) {
+            for (const { dx, dy } of DIR_DELTA_ARRAY) {
               for (let i = 1; i <= bomb.fireRange; i++) {
                 const cx = bomb.position.x + dx * i;
                 const cy = bomb.position.y + dy * i;
@@ -506,7 +512,7 @@ export class BotAI {
         const ownRemoteBlastCells = new Set<string>();
         for (const bomb of ownRemoteBombs) {
           ownRemoteBlastCells.add(`${bomb.position.x},${bomb.position.y}`);
-          for (const { dx, dy } of Object.values(DIR_DELTA)) {
+          for (const { dx, dy } of DIR_DELTA_ARRAY) {
             for (let i = 1; i <= bomb.fireRange; i++) {
               const cx = bomb.position.x + dx * i;
               const cy = bomb.position.y + dy * i;
@@ -636,7 +642,7 @@ export class BotAI {
           let hasVulnerableTarget = true;
           if (this.stalemateActive) {
             hasVulnerableTarget = false;
-            for (const { dx, dy } of Object.values(DIR_DELTA)) {
+            for (const { dx, dy } of DIR_DELTA_ARRAY) {
               for (let i = 1; i <= player.fireRange + 1; i++) {
                 const cx = pos.x + dx * i;
                 const cy = pos.y + dy * i;
@@ -1066,7 +1072,7 @@ export class BotAI {
       }
 
       danger.add(`${bomb.position.x},${bomb.position.y}`);
-      for (const { dx, dy } of Object.values(DIR_DELTA)) {
+      for (const { dx, dy } of DIR_DELTA_ARRAY) {
         for (let i = 1; i <= bomb.fireRange; i++) {
           const cx = bomb.position.x + dx * i;
           const cy = bomb.position.y + dy * i;
@@ -1084,7 +1090,7 @@ export class BotAI {
         const bombKey = `${bomb.position.x},${bomb.position.y}`;
         if (!danger.has(bombKey)) continue;
         // Add blast cells for chain-reacting bombs
-        for (const { dx, dy } of Object.values(DIR_DELTA)) {
+        for (const { dx, dy } of DIR_DELTA_ARRAY) {
           for (let i = 1; i <= bomb.fireRange; i++) {
             const cx = bomb.position.x + dx * i;
             const cy = bomb.position.y + dy * i;
@@ -1205,7 +1211,7 @@ export class BotAI {
   }
 
   private isEnemyInBlastRange(pos: Position, state: GameStateManager, player: Player): boolean {
-    for (const { dx, dy } of Object.values(DIR_DELTA)) {
+    for (const { dx, dy } of DIR_DELTA_ARRAY) {
       for (let i = 1; i <= player.fireRange + 1; i++) {
         const cx = pos.x + dx * i;
         const cy = pos.y + dy * i;
@@ -1279,7 +1285,7 @@ export class BotAI {
     for (const bombPos of futureBombPositions) {
       if (bombPositions.some((p) => p.x === bombPos.x && p.y === bombPos.y)) continue;
       futureDanger.add(`${bombPos.x},${bombPos.y}`);
-      for (const { dx, dy } of Object.values(DIR_DELTA)) {
+      for (const { dx, dy } of DIR_DELTA_ARRAY) {
         for (let i = 1; i <= player.fireRange; i++) {
           const cx = bombPos.x + dx * i;
           const cy = bombPos.y + dy * i;
@@ -1295,7 +1301,7 @@ export class BotAI {
     for (const bomb of state.bombs.values()) {
       const bombKey = `${bomb.position.x},${bomb.position.y}`;
       if (!futureDanger.has(bombKey)) continue;
-      for (const { dx, dy } of Object.values(DIR_DELTA)) {
+      for (const { dx, dy } of DIR_DELTA_ARRAY) {
         for (let i = 1; i <= bomb.fireRange; i++) {
           const cx = bomb.position.x + dx * i;
           const cy = bomb.position.y + dy * i;
@@ -1362,7 +1368,7 @@ export class BotAI {
   }
 
   private isNearDestructible(pos: Position, state: GameStateManager): boolean {
-    for (const { dx, dy } of Object.values(DIR_DELTA)) {
+    for (const { dx, dy } of DIR_DELTA_ARRAY) {
       if (isDestructibleTile(state.collisionSystem.getTileAt(pos.x + dx, pos.y + dy))) return true;
     }
     return false;
@@ -1745,7 +1751,7 @@ export class BotAI {
         continue;
       }
 
-      for (const { dx, dy } of Object.values(DIR_DELTA)) {
+      for (const { dx, dy } of DIR_DELTA_ARRAY) {
         if (isDestructibleTile(state.collisionSystem.getTileAt(newPos.x + dx, newPos.y + dy))) {
           const distToEnemy = nearestEnemy
             ? Math.abs(newPos.x + dx - nearestEnemy.x) + Math.abs(newPos.y + dy - nearestEnemy.y)
@@ -1774,7 +1780,7 @@ export class BotAI {
           const key = `${newPos.x},${newPos.y}`;
           if (visited.has(key) || danger.has(key)) continue;
           visited.add(key);
-          for (const { dx, dy } of Object.values(DIR_DELTA)) {
+          for (const { dx, dy } of DIR_DELTA_ARRAY) {
             if (isDestructibleTile(state.collisionSystem.getTileAt(newPos.x + dx, newPos.y + dy))) {
               const distToEnemy = nearestEnemy
                 ? Math.abs(newPos.x + dx - nearestEnemy.x) +
