@@ -147,6 +147,28 @@ export async function deleteUser(adminId: number, userId: number): Promise<void>
   await execute('DELETE FROM users WHERE id = ?', [userId]);
 }
 
+export async function resetUserPassword(
+  adminId: number,
+  userId: number,
+  newPassword: string,
+): Promise<void> {
+  const rows = await query<AdminUserRow[]>('SELECT id, username FROM users WHERE id = ?', [userId]);
+  if (rows.length === 0) {
+    throw new AppError('User not found', 404, 'NOT_FOUND');
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+  await execute('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, userId]);
+
+  // Revoke all refresh tokens so user must re-login
+  await execute('UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = ?', [userId]);
+
+  await execute(
+    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+    [adminId, 'reset_password', 'user', userId, rows[0].username],
+  );
+}
+
 export async function getServerStats() {
   // Single query with subselects instead of 3 separate round-trips
   const [stats] = await query<CountRow[]>(

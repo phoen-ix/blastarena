@@ -68,7 +68,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - **Top-tab navigation**: Dashboard, Users, Matches, Rooms, Logs, Simulations, Announcements (role-filtered)
 - **Permission matrix**: Admin sees all 7 tabs (Simulations is admin-only); Moderator sees Users, Matches, Rooms, Announcements only
 - **Dashboard**: 5 stat cards (total users, active 24h, total matches, active rooms, online players) with 30s auto-refresh; "Server Settings" card with match recordings toggle (admin-only), collapsible "Game Creation Defaults" and "Simulation Defaults" editors
-- **Users**: Paginated table with search, role change dropdown, deactivate (soft delete), delete permanently (type-username confirmation), create user modal
+- **Users**: Paginated table with search, role change dropdown, deactivate (soft delete), delete permanently (type-username confirmation), create user modal, admin password reset (sets new password, revokes tokens)
 - **Matches**: Paginated table, click row for detail modal with per-player stats
 - **Rooms**: Active rooms with 5s auto-refresh, kick player, force close (admin only), spectate, send message — all via socket events
 - **Logs**: Admin action audit trail with action type filter, paginated
@@ -117,6 +117,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - Email change confirmation endpoint: `GET /api/user/confirm-email/:token`
 - Migration `003_user_profile.sql` adds `pending_email`, `email_change_token`, `email_change_expires` columns to users table
 - Password change: `POST /api/user/password` with `currentPassword` and `newPassword`; server verifies current password via bcrypt compare before hashing and updating; Zod validation enforces min/max length; client-side confirms new password match
+- Admin password reset: `PUT /admin/users/:id/password` (admin-only) sets a new password directly; revokes all refresh tokens (forces re-login); logged to audit trail as `reset_password`. Frontend: "Reset PW" button in UsersTab actions column opens modal with new password + confirm fields (min 6 chars)
 - `AuthManager.updateUser()` patches in-memory user state after profile edits so the lobby header updates without a page refresh
 
 ## Teams

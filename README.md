@@ -144,7 +144,7 @@ Accessible from the lobby header for admin and moderator roles.
 | Tab | Access | Features |
 |-----|--------|----------|
 | **Dashboard** | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings: match recordings toggle, game creation defaults, simulation defaults |
-| **Users** | Admin + Mod | Search, paginated table, role change, deactivate/reactivate, permanently delete (type-to-confirm), create user |
+| **Users** | Admin + Mod | Search, paginated table, role change, deactivate/reactivate, permanently delete (type-to-confirm), create user, admin password reset |
 | **Matches** | Admin + Mod | Paginated match history, click any row for detailed per-player stats modal |
 | **Rooms** | Admin + Mod | Active rooms with 5s refresh, spectate, send message, kick player, force close (admin only) |
 | **Logs** | Admin | Audit trail of all admin actions with action type filter |
@@ -174,6 +174,7 @@ Users can manage their account from the lobby Account modal:
 - **Username**: Change anytime. Validated (3-20 chars, alphanumeric + underscore/hyphen), uniqueness-checked (409 if taken)
 - **Email**: Two-step flow — submit new address, click confirmation link sent to the new email (24h expiry). Admins skip verification
 - **Password**: Change from the Account modal. Requires current password verification before updating. Minimum 8 characters, confirmation field must match
+- **Admin Password Reset**: Admins can reset any user's password from the Users tab. Sets a new password directly (min 6 chars), revokes all sessions (forces re-login), and logs the action to the audit trail
 
 ## Architecture
 

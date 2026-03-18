@@ -115,6 +115,7 @@ export class UsersTab {
                     <button class="btn-warn btn-sm" data-action="deactivate" data-id="${u.id}" data-deactivated="${u.is_deactivated}">
                       ${u.is_deactivated ? 'Reactivate' : 'Deactivate'}
                     </button>
+                    <button class="btn-sm" style="background:var(--accent);color:var(--bg-deep);" data-action="resetpw" data-id="${u.id}" data-username="${escapeAttr(u.username)}">Reset PW</button>
                     <button class="btn-danger btn-sm" data-action="delete" data-id="${u.id}" data-username="${escapeAttr(u.username)}">Delete</button>
                   `
                       : ''
@@ -163,6 +164,8 @@ export class UsersTab {
       const isDeactivated =
         target.dataset.deactivated === '1' || target.dataset.deactivated === 'true';
       await this.doDeactivate(parseInt(id), !isDeactivated);
+    } else if (action === 'resetpw') {
+      this.showResetPasswordModal(parseInt(id), target.dataset.username || '');
     } else if (action === 'delete') {
       this.showDeleteModal(parseInt(id), target.dataset.username || '');
     }
@@ -280,6 +283,66 @@ export class UsersTab {
         modal.remove();
         this.notifications.success(`User "${username}" created`);
         await this.loadUsers();
+      } catch (err: unknown) {
+        errorEl.textContent = getErrorMessage(err);
+        errorEl.style.display = 'block';
+      }
+    });
+  }
+
+  private showResetPasswordModal(userId: number, username: string): void {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:420px;">
+        <h2 style="margin-bottom:12px;">Reset Password</h2>
+        <p style="color:var(--text-dim);font-size:14px;">Set a new password for <strong style="color:var(--text);">${escapeHtml(username)}</strong>. They will be logged out and must sign in with the new password.</p>
+        <div style="margin-top:12px;">
+          <label style="color:var(--text-dim);font-size:13px;">New Password</label>
+          <input type="password" class="admin-input" id="rp-password" placeholder="Min 6 characters" style="margin-top:4px;">
+        </div>
+        <div style="margin-top:8px;">
+          <label style="color:var(--text-dim);font-size:13px;">Confirm Password</label>
+          <input type="password" class="admin-input" id="rp-confirm" placeholder="Re-enter password" style="margin-top:4px;">
+        </div>
+        <div id="rp-error" style="color:var(--danger);font-size:13px;margin-top:8px;display:none;"></div>
+        <div class="modal-actions" style="margin-top:16px;">
+          <button class="btn btn-secondary" id="rp-cancel">Cancel</button>
+          <button class="btn btn-primary" id="rp-submit">Reset Password</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('ui-overlay')!.appendChild(modal);
+
+    modal.querySelector('#rp-cancel')!.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
+    modal.querySelector('#rp-submit')!.addEventListener('click', async () => {
+      const password = (modal.querySelector('#rp-password') as HTMLInputElement).value;
+      const confirm = (modal.querySelector('#rp-confirm') as HTMLInputElement).value;
+      const errorEl = modal.querySelector('#rp-error') as HTMLElement;
+
+      if (!password) {
+        errorEl.textContent = 'Password is required';
+        errorEl.style.display = 'block';
+        return;
+      }
+      if (password.length < 6) {
+        errorEl.textContent = 'Password must be at least 6 characters';
+        errorEl.style.display = 'block';
+        return;
+      }
+      if (password !== confirm) {
+        errorEl.textContent = 'Passwords do not match';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      try {
+        await ApiClient.put(`/admin/users/${userId}/password`, { password });
+        modal.remove();
+        this.notifications.success(`Password reset for "${username}"`);
       } catch (err: unknown) {
         errorEl.textContent = getErrorMessage(err);
         errorEl.style.display = 'block';

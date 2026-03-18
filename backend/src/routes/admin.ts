@@ -28,6 +28,10 @@ const bannerSchema = z.object({
   message: z.string().min(1).max(1000),
 });
 
+const resetPasswordSchema = z.object({
+  password: z.string().min(6).max(128),
+});
+
 const createUserSchema = z.object({
   username: z
     .string()
@@ -257,6 +261,21 @@ router.put(
       const userId = parseInt(req.params.id);
       await adminService.deactivateUser(req.user!.userId, userId, req.body.deactivated);
       res.json({ message: req.body.deactivated ? 'User deactivated' : 'User reactivated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.put(
+  '/admin/users/:id/password',
+  adminOnlyMiddleware,
+  validate(resetPasswordSchema),
+  async (req, res, next) => {
+    try {
+      const userId = parseInt(req.params.id);
+      await adminService.resetUserPassword(req.user!.userId, userId, req.body.password);
+      res.json({ message: 'Password reset' });
     } catch (err) {
       next(err);
     }
