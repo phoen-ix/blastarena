@@ -253,7 +253,7 @@ MatchConfig includes: gameMode, maxPlayers, mapWidth/Height, mapSeed, roundTime,
 - Match detail modal shows "Watch Replay" button when `hasReplay: true`
 - `ReplayPlayer` (frontend) manages playback: play/pause, speed (0.5x/1x/2x/4x), seek to any frame. Uses Phaser-synced time accumulator (`tick(deltaMs)`) instead of `setInterval` to prevent drift/fast-forward; frame bounds-checked before access
 - `ReplayControls` — video-player-like bottom bar with slider, time display, speed selector, keyboard shortcuts (Space=play/pause, arrows=skip). Arrow keys reserved for timeline in replay mode (GameScene skips them); WASD/mouse drag used for camera pan
-- `ReplayLogPanel` — collapsible right-side panel showing game events synced to replay time, with filters by event type (kills, bombs, bot AI, powerups, movement), clickable timestamps for seeking
+- `ReplayLogPanel` — collapsible right-side panel showing game events synced to replay time, with filters by event type (kills, bombs, bot AI, powerups, movement), clickable timestamps for seeking. Defaults to collapsed; when expanded, shifts `.hud-players` list to `right: 360px` to avoid overlap
 - `ReplayRecorder.finalize()` accepts optional `{ saveDir }` to write to a custom directory (used by simulations to store replays in batch dir)
 - GameScene detects `registry.get('replayMode')` and uses ReplayPlayer instead of socket events; replay auto-plays on open; clicking the game canvas toggles play/pause
 - EffectSystem has `triggerExplosion()`/`triggerPlayerDied()` public methods for replay mode (bypasses socket listeners)

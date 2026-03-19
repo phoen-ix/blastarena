@@ -70,7 +70,7 @@ export class ReplayLogPanel {
   private onSeek: (tick: number) => void;
   private container: HTMLElement | null = null;
   private logList: HTMLElement | null = null;
-  private isOpen: boolean = true;
+  private isOpen: boolean = false;
   private currentTick: number = 0;
   private filters: FilterState;
 
@@ -118,6 +118,7 @@ export class ReplayLogPanel {
       font-family: 'DM Sans', sans-serif; color: var(--text);
       display: flex; flex-direction: column;
       transition: transform 0.25s ease;
+      transform: translateX(100%);
     `;
 
     // Toggle button (tab on the left edge)
@@ -131,7 +132,7 @@ export class ReplayLogPanel {
       color: var(--text-dim); font-size: 14px;
       display: flex; align-items: center; justify-content: center;
     `;
-    toggle.textContent = '\u25C0';
+    toggle.textContent = '\u25B6';
     toggle.title = 'Toggle log panel';
     toggle.addEventListener('click', () => this.togglePanel());
     this.container.appendChild(toggle);
@@ -206,6 +207,11 @@ export class ReplayLogPanel {
       if (toggle) {
         toggle.textContent = this.isOpen ? '\u25C0' : '\u25B6';
       }
+    }
+    // Shift player list so it doesn't overlap with the open panel
+    const playerList = document.querySelector('.hud-players') as HTMLElement;
+    if (playerList) {
+      playerList.style.right = this.isOpen ? '360px' : '20px';
     }
   }
 

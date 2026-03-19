@@ -324,7 +324,7 @@ Games are recorded when recording is enabled (controlled via admin Dashboard tog
 
 - **Full recording**: Every tick's game state saved as gzipped JSON in `./data/replays/`
 - **Video player controls**: Play/pause (click canvas or Space), seek slider, speed (0.5x / 1x / 2x / 4x), skip forward/back (arrow keys), mouse drag to pan camera. Arrow keys are reserved for timeline control in replay mode; use WASD or mouse drag to pan
-- **Live game log panel**: Collapsible side panel showing kills, bombs, bot decisions, power-ups in sync with replay playback. Filter by event type, click any entry to seek to that moment
+- **Live game log panel**: Collapsible side panel (collapsed by default) showing kills, bombs, bot decisions, power-ups in sync with replay playback. Filter by event type, click any entry to seek to that moment. Player list shifts when panel opens to avoid overlap
 - **Admin access**: Matches tab → click match → "Watch Replay" button. Simulations tab → batch detail → per-game "Replay" button. Shows all players including bots
 - **Space efficient**: Tile diffs instead of full map per frame, gzip compression (~400-700KB per game)
 - **Replay API**: `GET /admin/replays` (list), `GET /admin/replays/:matchId` (fetch), `DELETE /admin/replays/:matchId` (delete), `GET /admin/simulations/:batchId/replay/:gameIndex` (sim replay)
