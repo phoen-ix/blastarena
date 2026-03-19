@@ -374,7 +374,7 @@ export class CampaignTab {
       btn.addEventListener('click', async () => {
         const worldId = Number((btn as HTMLElement).dataset.worldId);
         try {
-          const res = await ApiClient.post<{ level: CampaignLevelSummary }>('/admin/campaign/levels', { worldId });
+          const res = await ApiClient.post<{ id: number }>('/admin/campaign/levels', { worldId });
           this.notifications.success('Level created');
           const world = this.worlds.find((w) => w.id === worldId);
           if (world) {
@@ -383,7 +383,7 @@ export class CampaignTab {
             if (contentEl) this.renderWorldsTable(contentEl);
           }
           // Launch editor for the new level
-          this.launchLevelEditor(res.level.id);
+          this.launchLevelEditor(res.id);
         } catch (err: unknown) {
           this.notifications.error(getErrorMessage(err));
         }
@@ -498,9 +498,17 @@ export class CampaignTab {
   }
 
   private launchLevelEditor(levelId: number): void {
-    // Store levelId in Phaser registry and dispatch event for level editor launch
-    game.registry.set('editLevelId', levelId);
-    game.events.emit('launchLevelEditor', levelId);
+    game.registry.set('editorLevelId', levelId);
+
+    // Clear admin UI DOM, then start the editor scene
+    const uiOverlay = document.getElementById('ui-overlay');
+    if (uiOverlay) {
+      while (uiOverlay.firstChild) uiOverlay.removeChild(uiOverlay.firstChild);
+    }
+    const lobbyScene = game.scene.getScene('LobbyScene');
+    if (lobbyScene) {
+      lobbyScene.scene.start('LevelEditorScene');
+    }
   }
 
   private showWorldModal(existing?: CampaignWorld): void {

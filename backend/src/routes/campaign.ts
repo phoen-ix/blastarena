@@ -72,6 +72,7 @@ const enemyTypeSchema = z.object({
 });
 
 const levelSchema = z.object({
+  worldId: z.number().int().optional(),
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(2000).optional(),
   mapWidth: z.number().int().min(7).max(51).optional(),
