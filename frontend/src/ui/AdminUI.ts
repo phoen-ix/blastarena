@@ -61,7 +61,7 @@ export class AdminUI {
         id: 'matches',
         label: 'Matches',
         adminOnly: false,
-        instance: new MatchesTab(notifications),
+        instance: new MatchesTab(notifications, isAdmin),
       },
       {
         id: 'rooms',

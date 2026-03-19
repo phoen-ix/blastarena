@@ -340,6 +340,43 @@ router.get('/admin/matches/:id', async (req, res, next) => {
   }
 });
 
+router.delete('/admin/matches/:id', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const matchId = parseInt(req.params.id);
+    // Delete replay file if it exists
+    replayService.deleteReplay(matchId);
+    // Delete match record (cascades to match_players)
+    await execute('DELETE FROM matches WHERE id = ?', [matchId]);
+    await execute(
+      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'delete_match', 'match', matchId, JSON.stringify({ matchId })],
+    );
+    res.json({ message: 'Match deleted' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/admin/matches', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    // Get all match IDs to clean up replay files
+    const matches = await adminService.getMatchHistory(1, 100000);
+    let replaysCleaned = 0;
+    for (const m of matches.matches) {
+      if (replayService.deleteReplay(m.id)) replaysCleaned++;
+    }
+    // Delete all match records (cascades to match_players)
+    await execute('DELETE FROM matches');
+    await execute(
+      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'delete_all_matches', 'match', null, JSON.stringify({ count: matches.total, replaysCleaned })],
+    );
+    res.json({ message: 'All matches deleted', count: matches.total, replaysCleaned });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --- Active Rooms ---
 
 router.get('/admin/rooms', async (_req, res, next) => {

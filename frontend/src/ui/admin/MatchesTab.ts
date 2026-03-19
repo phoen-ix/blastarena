@@ -8,9 +8,11 @@ export class MatchesTab {
   private container: HTMLElement | null = null;
   private notifications: NotificationUI;
   private page = 1;
+  private isAdmin = false;
 
-  constructor(notifications: NotificationUI) {
+  constructor(notifications: NotificationUI, isAdmin = false) {
     this.notifications = notifications;
+    this.isAdmin = isAdmin;
   }
 
   async render(parent: HTMLElement): Promise<void> {
@@ -32,7 +34,11 @@ export class MatchesTab {
       const result = await ApiClient.get<any>(`/admin/matches?page=${this.page}&limit=20`);
       const totalPages = Math.ceil(result.total / result.limit);
 
+      const colCount = this.isAdmin ? 9 : 8;
       this.container.innerHTML = `
+        ${this.isAdmin && result.total > 0 ? `<div style="margin-bottom:10px;display:flex;justify-content:flex-end;">
+          <button class="btn btn-secondary" id="delete-all-matches" style="font-size:12px;padding:5px 12px;color:var(--danger);border-color:var(--danger);">Delete All Matches</button>
+        </div>` : ''}
         <table class="admin-table">
           <thead>
             <tr>
@@ -44,6 +50,7 @@ export class MatchesTab {
               <th>Winner</th>
               <th>Status</th>
               <th>Started</th>
+              ${this.isAdmin ? '<th>Actions</th>' : ''}
             </tr>
           </thead>
           <tbody>
@@ -59,11 +66,12 @@ export class MatchesTab {
                 <td>${m.winner_username ? escapeHtml(m.winner_username) : '-'}</td>
                 <td><span class="badge badge-${this.statusBadgeClass(m)}">${this.statusLabel(m)}</span></td>
                 <td>${m.started_at ? new Date(m.started_at).toLocaleString() : '-'}</td>
+                ${this.isAdmin ? `<td><button class="btn btn-secondary delete-match-btn" data-delete-match="${m.id}" style="font-size:11px;padding:2px 8px;color:var(--danger);border-color:var(--danger);">Delete</button></td>` : ''}
               </tr>
             `,
               )
               .join('')}
-            ${result.matches.length === 0 ? '<tr><td colspan="8" style="text-align:center;color:var(--text-dim);">No matches found</td></tr>' : ''}
+            ${result.matches.length === 0 ? `<tr><td colspan="${colCount}" style="text-align:center;color:var(--text-dim);">No matches found</td></tr>` : ''}
           </tbody>
         </table>
         <div class="admin-pagination">
@@ -85,6 +93,35 @@ export class MatchesTab {
     if (target.dataset.page) {
       this.page = parseInt(target.dataset.page);
       await this.loadMatches();
+      return;
+    }
+
+    // Delete single match
+    if (target.dataset.deleteMatch) {
+      e.stopPropagation();
+      const matchId = parseInt(target.dataset.deleteMatch);
+      if (!confirm(`Delete match #${matchId}? This will also delete its replay if one exists.`)) return;
+      try {
+        await ApiClient.delete(`/admin/matches/${matchId}`);
+        this.notifications.success(`Match #${matchId} deleted`);
+        await this.loadMatches();
+      } catch {
+        this.notifications.error('Failed to delete match');
+      }
+      return;
+    }
+
+    // Delete all matches
+    if (target.id === 'delete-all-matches' || target.closest('#delete-all-matches')) {
+      if (!confirm('Delete ALL matches and their replays? This cannot be undone.')) return;
+      try {
+        const result = await ApiClient.delete<{ count: number; replaysCleaned: number }>('/admin/matches');
+        this.notifications.success(`Deleted ${result.count} matches, ${result.replaysCleaned} replays cleaned`);
+        this.page = 1;
+        await this.loadMatches();
+      } catch {
+        this.notifications.error('Failed to delete matches');
+      }
       return;
     }
 

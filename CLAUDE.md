@@ -69,7 +69,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - **Permission matrix**: Admin sees all 8 tabs (Simulations and AI are admin-only); Moderator sees Users, Matches, Rooms, Announcements only
 - **Dashboard**: 5 stat cards (total users, active 24h, total matches, active rooms, online players) with 30s auto-refresh; "Server Settings" card with match recordings toggle (admin-only), collapsible "Game Creation Defaults" and "Simulation Defaults" editors
 - **Users**: Paginated table with search, role change dropdown, deactivate (soft delete), delete permanently (type-username confirmation), create user modal, admin password reset (sets new password, revokes tokens)
-- **Matches**: Paginated table, click row for detail modal with per-player stats
+- **Matches**: Paginated table, click row for detail modal with per-player stats. Admin-only delete per row and "Delete All Matches" button — deletes DB records (cascades to match_players) and cleans up replay files from disk. `DELETE /admin/matches/:id` and `DELETE /admin/matches` endpoints; both audit-logged
 - **Rooms**: Active rooms with 5s auto-refresh, kick player, force close (admin only), spectate, send message — all via socket events
 - **Logs**: Admin action audit trail with action type filter, paginated
 - **Announcements**: Toast broadcast (ephemeral notification to all players) + persistent banner (shows at top of lobby until cleared)

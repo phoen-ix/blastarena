@@ -145,7 +145,7 @@ Accessible from the lobby header for admin and moderator roles.
 |-----|--------|----------|
 | **Dashboard** | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings: match recordings toggle, game creation defaults, simulation defaults |
 | **Users** | Admin + Mod | Search, paginated table, role change, deactivate/reactivate, permanently delete (type-to-confirm), create user, admin password reset |
-| **Matches** | Admin + Mod | Paginated match history, click any row for detailed per-player stats modal |
+| **Matches** | Admin + Mod | Paginated match history, click any row for detailed per-player stats modal. Admins can delete individual matches or all at once (cleans up replay files from disk) |
 | **Rooms** | Admin + Mod | Active rooms with 5s refresh, spectate, send message, kick player, force close (admin only) |
 | **Logs** | Admin | Audit trail of all admin actions with action type filter |
 | **Simulations** | Admin | Batch bot-only game simulations for AI analysis (see below) |
