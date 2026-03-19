@@ -164,6 +164,7 @@ Admins can upload custom bot AI implementations as TypeScript files, which are c
 - **Per-room selection**: Each room or simulation batch can use a different AI via the `botAiId` config field
 - **Runtime safety**: If a custom AI crashes during gameplay, the bot silently falls back to the built-in default
 - **Storage**: Source and compiled files in `data/ai/{uuid}/`, metadata in `bot_ais` database table
+- **Developer guide**: See [docs/bot-ai-guide.md](docs/bot-ai-guide.md) for the full API reference and examples
 
 ## Bot Simulation System
 

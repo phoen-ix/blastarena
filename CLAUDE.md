@@ -100,6 +100,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - **Database**: `bot_ais` table (migration `007_bot_ais.sql`) with FK to `users` for uploader; `BotAIEntry` type in `shared/src/types/botai.ts`
 - **API endpoints**: Public `GET /admin/ai/active`; admin-only `GET /admin/ai`, `POST /admin/ai` (multipart), `PUT /admin/ai/:id`, `PUT /admin/ai/:id/upload` (multipart), `GET /admin/ai/:id/download`, `DELETE /admin/ai/:id`
 - **Dependencies**: `esbuild` (production, TypeScript transpiler), `multer` (file upload handling)
+- **Developer guide**: `docs/bot-ai-guide.md` — comprehensive manual covering IBotAI interface, game state API, types, constants, difficulty system, logging, validation pipeline, and complete example with BFS pathfinding
 
 ## Bot Simulation System
 - Admin-only batch simulation runner for bot-only games — no human players, no DB records
