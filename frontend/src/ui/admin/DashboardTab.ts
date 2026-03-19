@@ -5,6 +5,7 @@ import {
   SimulationDefaults,
   PowerUpType,
   POWERUP_DEFINITIONS,
+  BotAIEntry,
 } from '@blast-arena/shared';
 
 const ALL_POWER_UPS = Object.values(POWERUP_DEFINITIONS);
@@ -16,6 +17,7 @@ export class DashboardTab {
   private recordingsEnabled: boolean = true;
   private gameDefaults: GameDefaults = {};
   private simulationDefaults: SimulationDefaults = {};
+  private activeAIs: BotAIEntry[] = [];
 
   constructor(notifications: NotificationUI) {
     this.notifications = notifications;
@@ -40,14 +42,16 @@ export class DashboardTab {
 
   private async loadSettings(): Promise<void> {
     try {
-      const [recResp, gameResp, simResp] = await Promise.all([
+      const [recResp, gameResp, simResp, aiResp] = await Promise.all([
         ApiClient.get<{ enabled: boolean }>('/admin/settings/recordings_enabled'),
         ApiClient.get<{ defaults: GameDefaults }>('/admin/settings/game_defaults'),
         ApiClient.get<{ defaults: SimulationDefaults }>('/admin/settings/simulation_defaults'),
+        ApiClient.get<{ ais: BotAIEntry[] }>('/admin/ai/active'),
       ]);
       this.recordingsEnabled = recResp.enabled;
       this.gameDefaults = gameResp.defaults ?? {};
       this.simulationDefaults = simResp.defaults ?? {};
+      this.activeAIs = aiResp.ais ?? [];
     } catch {
       // Use defaults on failure
     }
@@ -111,13 +115,13 @@ export class DashboardTab {
         </button>
         <div id="${prefix}-body" style="display:none;padding:14px 18px;margin-top:4px;
           background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
-          ${this.renderDefaultsForm(prefix, defaults, type)}
+          ${this.renderDefaultsForm(prefix, defaults, type, this.activeAIs)}
         </div>
       </div>
     `;
   }
 
-  private renderDefaultsForm(prefix: string, defaults: SimulationDefaults, type: 'game' | 'simulation'): string {
+  private renderDefaultsForm(prefix: string, defaults: SimulationDefaults, type: 'game' | 'simulation', activeAIs: BotAIEntry[] = []): string {
     const sel = (id: string, options: { value: string; label: string }[], current?: string | number) => {
       const val = current !== undefined ? String(current) : '';
       return `<select id="${id}" style="width:100%;background:var(--bg-deep);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:12px;">
@@ -229,6 +233,10 @@ export class DashboardTab {
           <label style="font-size:11px;color:var(--text-dim);">Bot Difficulty</label>
           ${sel(`${prefix}-botDifficulty`, botDiffOpts, defaults.botDifficulty)}
         </div>
+        ${activeAIs.length > 1 ? `<div class="form-group" style="margin-bottom:0;">
+          <label style="font-size:11px;color:var(--text-dim);">Bot AI</label>
+          ${sel(`${prefix}-botAiId`, activeAIs.map((ai) => ({ value: ai.id, label: ai.name })), defaults.botAiId)}
+        </div>` : ''}
         ${simExtra}
       </div>
 
@@ -347,6 +355,9 @@ export class DashboardTab {
 
     const botDifficulty = getSelect('botDifficulty');
     if (botDifficulty) defaults.botDifficulty = botDifficulty as GameDefaults['botDifficulty'];
+
+    const botAiId = getSelect('botAiId');
+    if (botAiId) defaults.botAiId = botAiId;
 
     // Checkboxes: only include if not at indeterminate (data-indeterminate means "use default")
     const boolFields = ['reinforcedWalls', 'enableMapEvents', 'hazardTiles', 'friendlyFire'] as const;
