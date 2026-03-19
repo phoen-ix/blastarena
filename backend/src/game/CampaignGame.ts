@@ -120,11 +120,12 @@ export class CampaignGame {
 
     // Create enemies
     for (const placement of level.enemyPlacements) {
-      const typeConfig = enemyTypes.get(placement.enemyTypeId);
+      const typeId = Number(placement.enemyTypeId);
+      const typeConfig = enemyTypes.get(typeId);
       if (!typeConfig) continue;
       // Deep copy config so boss phase mutations don't affect template
       const configCopy = JSON.parse(JSON.stringify(typeConfig)) as EnemyTypeConfig;
-      const enemy = new Enemy(placement.enemyTypeId, { x: placement.x, y: placement.y }, configCopy, placement.patrolPath);
+      const enemy = new Enemy(typeId, { x: placement.x, y: placement.y }, configCopy, placement.patrolPath);
       this.enemies.set(enemy.id, enemy);
     }
 
@@ -401,6 +402,7 @@ export class CampaignGame {
   private checkWinCondition(player: Player): void {
     switch (this.level.winCondition) {
       case 'kill_all': {
+        if (this.enemies.size === 0) break; // No enemies to kill
         const allDead = Array.from(this.enemies.values()).every((e) => !e.alive);
         if (allDead) this.completeLevelInternal();
         break;

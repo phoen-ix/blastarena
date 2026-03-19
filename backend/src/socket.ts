@@ -568,7 +568,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         }
 
         // Gather enemy type configs
-        const typeIds = [...new Set(level.enemyPlacements.map((e) => e.enemyTypeId))];
+        const typeIds = [...new Set(level.enemyPlacements.map((e) => Number(e.enemyTypeId)))];
         const enemyTypes = await enemyTypeService.getEnemyTypeConfigs(typeIds);
 
         // Get carried powerups if level supports carry-over
