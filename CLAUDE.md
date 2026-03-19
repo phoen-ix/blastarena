@@ -41,337 +41,115 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
 ## Frontend Architecture
 - **Design System ("INFERNO")**: All CSS in `frontend/index.html` using CSS custom properties (`:root` vars). Colors: `--primary` (#ff6b35 hot orange), `--accent` (#00d4aa teal), `--danger` (#ff3355), `--success` (#00e676), `--warning` (#ffaa22), `--info` (#448aff). Backgrounds: `--bg-deep` (#080810) through `--bg-hover` (#24243e). Typography: Chakra Petch (display/headings) + DM Sans (body) via Google Fonts. Team colors: `--team-red` (#ff4466), `--team-blue` (#448aff). Always use CSS variables in inline styles (e.g. `var(--primary)` not hardcoded hex) for consistency.
-- **Composed rendering**: GameScene.ts is a thin orchestrator that delegates to dedicated renderer classes in `frontend/src/game/`:
-  - `TileMap.ts` — tile grid rendering with floor variants, destruction animation, and support for new tile types (teleporters, conveyors, cracked walls)
-  - `PlayerSprite.ts` — player sprites with directional eyes, shield aura, squash/stretch movement (guarded by `activeMoveAnim` Set to prevent tween stacking), dust particles, and death effects
-  - `BombSprite.ts` — bomb sprites with pulsing scale tween; remote bombs (blue texture) combine scale pulse with slow alpha blink for visual distinction; fuse spark particles, and last-second urgency flashing
-  - `ExplosionSprite.ts` — animated explosions with expansion wave, sustain pulse, fade phase, and fire/smoke particles
-  - `PowerUpSprite.ts` — power-up sprites with floating animation and distinctive icons per type
-  - `ShrinkingZone.ts` — Battle Royale danger zone overlay using Graphics path with circle hole
-  - `HillZone.ts` — KOTH hill zone overlay with pulsing gold fill (green when controlled), corner markers, diamond center icon
-  - `EffectSystem.ts` — subscribes to `game:explosion`, `game:playerDied`, `game:powerupCollected` socket events for screen shake, debris particles, and collection popups
-  - `CountdownOverlay.ts` — animated "3, 2, 1, GO!" countdown at game start
-  - `GamepadManager.ts` — gamepad/controller input polling with deadzone, D-pad/stick direction, just-pressed action tracking
-  - `Settings.ts` — per-user visual settings (animations, screen shake, particles) stored in localStorage
-  - `EnemySprite.ts` — campaign enemy sprites with directional textures, HP bars, position lerp (0.45), death animation (red tint, scale down, fade), ghost translucency
-  - `EnemyTextureGenerator.ts` — procedural enemy sprite generation (6 body shapes × 4 eye styles × 4 directions) with Canvas2D preview for admin editor
-- **Procedural textures**: All sprites generated in `BootScene.generateTextures()` — no external image assets. Player textures include 4 directional variants with eyes per color. Power-up textures use Canvas2D with emoji icons (💣🔥⚡🛡️👢💥📡🧨) on colored rounded-rect backgrounds instead of abstract geometric shapes, matching the HUD stats display for visual consistency. Enemy textures generated on-demand via `EnemyTextureGenerator.ts` for campaign mode
+- **Composed rendering**: GameScene.ts delegates to renderer classes in `frontend/src/game/`:
+  - `TileMap.ts` — tile grid, floor variants, destruction animation, teleporters/conveyors/cracked walls
+  - `PlayerSprite.ts` — directional eyes, shield aura, squash/stretch movement (`activeMoveAnim` Set prevents tween stacking), dust particles, death effects
+  - `BombSprite.ts` — pulsing scale tween; remote bombs (blue) add alpha blink; fuse sparks, urgency flash
+  - `ExplosionSprite.ts` — expansion wave, sustain pulse, fade phase, fire/smoke particles
+  - `PowerUpSprite.ts` — floating animation, distinctive icons per type
+  - `ShrinkingZone.ts` — Battle Royale danger zone overlay (Graphics path with circle hole)
+  - `HillZone.ts` — KOTH hill overlay (pulsing gold/green fill, corner markers, diamond center)
+  - `EffectSystem.ts` — screen shake, debris particles, collection popups via socket events
+  - `CountdownOverlay.ts` — animated "3, 2, 1, GO!" countdown
+  - `GamepadManager.ts` — gamepad input polling with deadzone, D-pad/stick, just-pressed tracking
+  - `Settings.ts` — per-user visual settings (animations, shake, particles) in localStorage
+  - `EnemySprite.ts` / `EnemyTextureGenerator.ts` — campaign enemy rendering (see [docs/campaign.md](docs/campaign.md))
+- **Procedural textures**: All sprites generated in `BootScene.generateTextures()` — no external image assets. Player textures: 4 directional variants with eyes per color. Power-up textures: Canvas2D emoji icons (💣🔥⚡🛡️👢💥📡🧨) on rounded-rect backgrounds. Enemy textures on-demand via `EnemyTextureGenerator.ts`
 - **Particle textures**: `particle_fire`, `particle_smoke`, `particle_spark`, `particle_debris`, `particle_star`, `particle_shield` generated in BootScene
-- **HUD**: DOM-based overlay in HUDScene.ts with timer, player list, kill feed, stats bar (bottom-left), spectator banner. In KOTH mode, player list shows scores sorted descending with crown icon for the controlling player
+- **HUD**: DOM-based overlay in HUDScene.ts with timer, player list, kill feed, stats bar (bottom-left), spectator banner. KOTH mode: scores sorted descending with crown icon
 - Settings and Help are in the lobby header (LobbyUI), not in-game HUD, to avoid overlapping player names
-- Help modal covers: controls (keyboard + gamepad), all 8 power-ups (with in-game tile preview + HUD emoji), all 6 game modes, map features (reinforced walls, map events, hazard tiles with visual previews), and core mechanics
 - Countdown synced between server and client: GameLoop holds `status: 'countdown'` for 36 ticks (1.8s) while CountdownOverlay plays "3, 2, 1" — gameplay starts on "GO!". Both client and server block inputs during countdown.
-- **Gamepad support**: Xbox/standard gamepad via Phaser gamepad plugin (`input: { gamepad: true }` in config). D-pad/left stick for movement (0.3 deadzone, dominant-axis), A=bomb, B=detonate, LB/RB=cycle spectate. GamepadManager polls each frame; actions latched in `pendingGamepadAction` to survive 50ms tick throttle. Keyboard takes priority when both active.
-- **Gamepad UI navigation**: `UIGamepadNavigator` singleton (`frontend/src/game/UIGamepadNavigator.ts`) enables full controller navigation of all DOM menus. Uses browser `navigator.getGamepads()` (not Phaser plugin) with its own rAF polling loop. D-pad/stick navigates between focusable elements, A=confirm, B=back/close. Spatial navigation via `getBoundingClientRect()` with heavy cross-axis penalty (5x) so same-row/column neighbors always win over diagonal ones. Focus context stack handles nested UI (lobby → modal): each screen pushes a context on show and pops on hide. Custom dropdown overlay (`.gp-dropdown`) for `<select>` elements — A opens, up/down navigates options, A confirms, B cancels. Mouse movement auto-hides the `.gp-focus` ring; next D-pad input restores it. Disabled during gameplay (`setActive(false)` in GameScene) to avoid conflict with GamepadManager. GameOverScene has its own inline gamepad polling (Phaser text objects, not DOM). Out of scope: AdminUI, AuthUI (keyboard-dependent).
-- **Real-time lobby**: Room list auto-updates via `room:list` socket broadcast on every room mutation (create/join/leave/start/restart/disconnect) — no manual refresh needed
+- **Gamepad support**: Xbox/standard gamepad via Phaser plugin. D-pad/left stick for movement (0.3 deadzone), A=bomb, B=detonate, LB/RB=cycle spectate. Actions latched in `pendingGamepadAction` to survive 50ms tick throttle. Keyboard takes priority.
+- **Gamepad UI navigation**: `UIGamepadNavigator` singleton enables full controller navigation of DOM menus. Spatial navigation via `getBoundingClientRect()` (5x cross-axis penalty). Focus context stack for nested UI. Custom `.gp-dropdown` overlay for `<select>`. Disabled during gameplay. See source for full details.
+- **Real-time lobby**: Room list auto-updates via `room:list` socket broadcast on every room mutation — no manual refresh needed
 
 ## Solo Campaign System
-- Single-player campaign mode: progress through hand-crafted levels grouped into worlds, defeating enemies to advance
-- **World/level structure**: Worlds contain ordered levels. Each level has configurable: win condition, lives, timer, power-up carry-over, starting stats, map dimensions, tile layout
-- **Data-driven enemy types**: Admin-created templates stored in DB (`campaign_enemy_types` table). Each type specifies: speed, movement pattern, wall/bomb passability, HP, contact damage, bombing ability, sprite config, drop table, boss phases
-- **Movement patterns**: `random_walk` (60% continue, random at intersections), `chase_player` (BFS + 30% random), `patrol_path` (waypoint reversal), `wall_follow` (right-hand rule), `stationary`
-- **Enemy bomb triggers**: `timer` (every N ticks), `proximity` (manhattan distance check), `random` (15% chance)
-- **Win conditions**: `kill_all` (all enemies dead), `find_exit` (kill prerequisite → exit unlocks → player steps on it), `reach_goal` (step on goal tile), `survive_time` (elapsed time ≥ target)
-- **Lives system**: Configurable per level (1-99). On death: respawn at spawn point after 40 ticks with 40 ticks invulnerability. Lives exhausted → game over
-- **Boss support**: `isBoss` flag on enemy types with `bossPhases` (HP threshold triggers: speed changes, new movement patterns, minion spawns, bomb activation). Visual: `sizeMultiplier` for larger sprites, dedicated HP bar in HUD
-- **Hidden power-ups**: Power-ups marked `hidden: true` are placed under destructible walls; revealed when the wall is destroyed
-- **Procedural enemy textures**: `EnemyTextureGenerator.ts` renders 6 body shapes (blob, spiky, ghost, robot, bug, skull) × 4 eye styles (round, angry, sleepy, crazy) × 4 directions. Features: teeth, horns. Canvas2D preview for admin editor
-- **Campaign game session**: `CampaignGame.ts` wraps `GameStateManager` with `customMap` (bypasses `generateMap()`). Extended tick: enemy AI → movement → enemy-explosion collision → player-enemy contact → hidden powerup reveals → boss phases → win condition check. `GameStateManager.checkWinCondition()` and time limit check skip `campaign` mode — CampaignGame handles its own
-- **Skip countdown**: Campaign uses `GameLoop` with `skipCountdown: true` — game starts immediately (no 3-2-1 countdown). Status set to `'playing'` at start
-- **Campaign respawn**: On death, player respawns after 40 ticks. Frontend detects `me.alive` flipping back to `true` in campaign mode and exits spectator mode, restoring normal controls
-- **Session management**: `CampaignGameManager` singleton — one active session per user. Starting a new level ends existing session
-- **Par time & star ratings**: Each level has a configurable `parTime` (seconds, 0=none). Stars: 3=zero deaths, 2=completed under par time, 1=completed. Stars only improve, never regress. Level editor exposes par time in settings panel
-- **Progress tracking**: `campaign_progress` table per user per level. Best time tracked. `campaign_user_state` for current position and carried powerups
-- **Frontend**: Campaign button in lobby → `CampaignUI` full-screen overlay with world cards, level selection, progress display, star ratings. Clicking "Start" fetches level + enemy types, sets `campaignMode` registry flag, emits `campaign:start`
-- **GameScene integration**: Detects `campaignMode` → creates `EnemySpriteRenderer`, listens on `campaign:state` instead of `game:state`, sends `campaign:input`
-- **HUD campaign variant**: Lives hearts (top-left), enemy count remaining, boss HP bar (300px, centered). Hides player list and kill feed. Timer hidden when no time limit (`roundTime >= 99999`)
-- **Game over campaign variant**: "LEVEL COMPLETE!" (green) or "LEVEL FAILED" (red), stars display, time taken, Next Level / Retry / Campaign buttons. Retry and Next Level directly emit `campaign:start` and transition to GameScene (no lobby round-trip)
-- **Tile types**: `exit` (trapdoor texture, conditionally walkable) and `goal` (gold star texture, always walkable) added to `TileType` union, `CollisionSystem.isWalkable()`, `TileMap.getTileTexture()`, `BootScene.generateTextures()`
-- **Level editor**: `LevelEditorScene.ts` — full Phaser scene with DOM overlay. Tool palette (tiles, enemies, power-ups), click-to-place, paint mode (drag), zoom (scroll), pan (right-click drag), undo/redo (Ctrl+Z/Y, 50-state stack), save/load via API. Level settings panel: name, lives, time limit, par time, win condition, published toggle. Admin-only, launched from CampaignTab
-- **Admin CampaignTab**: Two views — "Worlds & Levels" (CRUD, reorder, publish/unpublish, edit launches editor) and "Enemy Types" (CRUD with live Canvas2D sprite preview, all config fields)
-- **Database**: Migration `008_campaign.sql` — 5 tables: `campaign_enemy_types`, `campaign_worlds`, `campaign_levels`, `campaign_progress`, `campaign_user_state`. Seed migration `009_campaign_seed.sql` — 3 enemy types + "Training Grounds" world with 3 levels. Migration `010_campaign_par_time.sql` — adds `par_time` column to `campaign_levels`. Migration `011_fix_campaign_tile_types.sql` — fixes seed tile types (`'indestructible'` → `'wall'`)
-- **API endpoints**: Player (auth): `GET /campaign/worlds`, `GET /campaign/worlds/:id/levels`, `GET /campaign/levels/:id`, `GET /campaign/progress`, `GET /campaign/enemy-types`. Admin: full CRUD for worlds, levels, enemy types at `/admin/campaign/*`. `POST /admin/campaign/levels` requires `worldId` in body (included in Zod `levelSchema`), returns `{ id }` (not `{ level }`)
-- **Admin → Editor flow**: CampaignTab's "Edit" button sets `editorLevelId` in Phaser registry, clears admin UI DOM, and starts `LevelEditorScene` directly via scene manager
-- **Socket events (C→S)**: `campaign:start` (levelId, callback), `campaign:input` (PlayerInput), `campaign:quit`, `campaign:buddyInput` (stub)
-- **Socket events (S→C)**: `campaign:gameStart`, `campaign:state`, `campaign:playerDied`, `campaign:enemyDied`, `campaign:exitOpened`, `campaign:levelComplete`, `campaign:gameOver`
-- **Buddy mode stubs**: `BuddyEntity.ts` (backend, position/direction/active), `BuddySprite.ts` (frontend, empty renderer), `campaign:buddyInput` (no-op handler). Foundation for future second-player mini-character
-- **Seed data — Training Grounds** (3 levels):
-  - Level 1 "First Steps": 15×13, 3 lives, no timer, par 60s, kill_all, 3 blob enemies, 2 hidden powerups
-  - Level 2 "Ghost Town": 19×15, 3 lives, 120s, par 90s, find_exit (kill 3 to unlock), 2 blobs + 2 ghosts, 3 powerups
-  - Level 3 "Bomber's Lair": 21×17, 5 lives, 180s, par 120s, kill_all, 3 blobs + 2 ghosts + 1 robot bomber (stationary, proximity bombs, 2 HP), 5 powerups
+Single-player campaign with hand-crafted levels, enemies, and bosses. Campaign uses `GameLoop` with `skipCountdown: true`. `CampaignGame.ts` wraps `GameStateManager` with `customMap`. `GameStateManager.checkWinCondition()` and time limit check skip `campaign` mode. Frontend detects `campaignMode` registry flag for different socket events (`campaign:state`/`campaign:input`). See [docs/campaign.md](docs/campaign.md) for full details.
 
 ## Admin Panel
-- Full-screen panel accessible from lobby header (Admin button visible for admin and moderator roles)
-- **Top-tab navigation**: Dashboard, Users, Matches, Rooms, Logs, Simulations, AI, Campaign, Announcements (role-filtered)
-- **Permission matrix**: Admin sees all 9 tabs (Simulations, AI, and Campaign are admin-only); Moderator sees Users, Matches, Rooms, Announcements only
-- **Dashboard**: 5 stat cards (total users, active 24h, total matches, active rooms, online players) with 30s auto-refresh; "Server Settings" card with match recordings toggle (admin-only), collapsible "Game Creation Defaults" and "Simulation Defaults" editors
-- **Users**: Paginated table with search, role change dropdown, deactivate (soft delete), delete permanently (type-username confirmation), create user modal, admin password reset (sets new password, revokes tokens)
-- **Matches**: Paginated table, click row for detail modal with per-player stats. Admin-only delete per row and "Delete All Matches" button — deletes DB records (cascades to match_players) and cleans up replay files from disk. `DELETE /admin/matches/:id` and `DELETE /admin/matches` endpoints; both audit-logged
-- **Rooms**: Active rooms with 5s auto-refresh, kick player, force close (admin only), spectate, send message — all via socket events
-- **Logs**: Admin action audit trail with action type filter, paginated
-- **Announcements**: Toast broadcast (ephemeral notification to all players) + persistent banner (shows at top of lobby until cleared)
-- Backend: `staffMiddleware` (admin+moderator) and `adminOnlyMiddleware` (admin only) for route protection
-- `backend/src/game/registry.ts` — singleton for RoomManager/IO access from admin service
-- Admin socket events: `admin:kick`, `admin:closeRoom`, `admin:spectate`, `admin:roomMessage`, `admin:toast`, `admin:banner`, `admin:kicked`
-- All admin actions logged to `admin_actions` table for audit
-- Deactivated users blocked from login and token refresh
-- Self-protection: admins cannot deactivate/delete themselves
-- Public endpoint `GET /admin/announcements/banner` for lobby banner display (no auth required)
-- Public endpoint `GET /admin/settings/recordings_enabled` for recording toggle state (no auth required)
-- Admin-only `PUT /admin/settings/recordings_enabled` with `{ enabled: boolean }` — updates DB, logs to audit, broadcasts `admin:settingsChanged` socket event
-- `server_settings` table: key-value store for server-wide settings; `backend/src/services/settings.ts` provides `getSetting()`, `setSetting()`, `isRecordingEnabled()`, `getGameDefaults()`, `setGameDefaults()`, `getSimulationDefaults()`, `setSimulationDefaults()`
-- **Admin-configurable defaults**: `game_defaults` and `simulation_defaults` stored as JSON blobs in `server_settings`. Public `GET /admin/settings/game_defaults` endpoint; staff `GET /admin/settings/simulation_defaults`; admin-only PUT for both. Zod-validated with all fields optional — empty `{}` means "use hardcoded defaults". CreateRoomModal and SimulationsTab config modal fetch defaults on open and pre-fill form elements. `GameDefaults` and `SimulationDefaults` types in `shared/src/types/settings.ts`
+Full-screen panel for admin/moderator roles. 9 tabs: Dashboard, Users, Matches, Rooms, Logs, Simulations, AI, Campaign, Announcements. `staffMiddleware` (admin+moderator) and `adminOnlyMiddleware` for route protection. All actions audit-logged. See [docs/admin-and-systems.md](docs/admin-and-systems.md) for full details.
 
 ## Bot AI Management
-- Admin-only system for managing multiple bot AI implementations
-- **AI Tab** in admin panel: list all AIs, upload new ones, activate/deactivate, download source, re-upload, delete (with type-name confirmation)
-- **Built-in AI**: The default BotAI is listed as a non-deletable entry (id `'builtin'`); can be deactivated but not deleted or re-uploaded
-- **Upload pipeline**: Admin uploads `.ts` file → esbuild transpiles to `.js` → structure validation (must export class with `generateInput` method) → dangerous import scan (blocks `fs`, `child_process`, `net`, etc.) → stored in `data/ai/{uuid}/source.ts` + `compiled.js`
-- **IBotAI interface**: `backend/src/game/BotAI.ts` exports `IBotAI` with `generateInput(player, state, logger?): PlayerInput | null`. Custom AIs must implement this interface with same constructor signature: `(difficulty: 'easy' | 'normal' | 'hard', mapSize?: { width, height })`
-- **BotAIRegistry** (`backend/src/services/botai-registry.ts`): singleton managing loaded AI constructors; `createInstance(aiId, difficulty, mapSize)` factory with built-in fallback; initialized at server startup after DB ready
-- **BotAI Compiler** (`backend/src/services/botai-compiler.ts`): esbuild transpilation + validation pipeline; checks file size (500KB max), dangerous imports, compilation, structure, and instantiation
-- **CRUD Service** (`backend/src/services/botai.ts`): `listAllAIs()`, `listActiveAIs()`, `uploadAI()`, `updateAI()`, `reuploadAI()`, `deleteAI()`, `downloadSource()`
-- **Runtime safety**: `GameStateManager.processTick()` wraps `generateInput()` in try/catch; on crash, replaces bot's AI with built-in fallback
-- **Per-room selection**: `botAiId` field in `MatchConfig`, `SimulationConfig`, `GameDefaults`, `SimulationDefaults`. When multiple AIs are active, a "Bot AI" dropdown appears in CreateRoomModal and SimulationsTab config modal
-- **File storage**: `./data/ai/{uuid}/source.ts` + `compiled.js`; Docker volume mount `./data/ai:/app/ai`
-- **Database**: `bot_ais` table (migration `007_bot_ais.sql`) with FK to `users` for uploader; `BotAIEntry` type in `shared/src/types/botai.ts`
-- **API endpoints**: Public `GET /admin/ai/active`; admin-only `GET /admin/ai`, `POST /admin/ai` (multipart), `PUT /admin/ai/:id`, `PUT /admin/ai/:id/upload` (multipart), `GET /admin/ai/:id/download`, `DELETE /admin/ai/:id`
-- **Dependencies**: `esbuild` (production, TypeScript transpiler), `multer` (file upload handling)
-- **Developer guide**: `docs/bot-ai-guide.md` — comprehensive manual covering IBotAI interface, game state API, types, constants, difficulty system, logging, validation pipeline, and complete example with BFS pathfinding
+Admin-only system for custom AI upload/management. Built-in AI as fallback. esbuild compilation pipeline with dangerous import scanning. `IBotAI` interface in `BotAI.ts`. Runtime crash recovery falls back to built-in. `botAiId` field in MatchConfig/SimulationConfig. See [docs/admin-and-systems.md](docs/admin-and-systems.md#bot-ai-management) and [docs/bot-ai-guide.md](docs/bot-ai-guide.md).
 
 ## Bot Simulation System
-- Admin-only batch simulation runner for bot-only games — no human players, no DB records
-- **SimulationsTab** in admin panel: configure game mode, bot count/difficulty, map size, round time, total games (1-1000), speed, log verbosity, all power-up/map options
-- **Two speed modes**: Fast (ticks as fast as possible via `setImmediate` batching, ~100 ticks/yield) and Real-time (20 tps like normal games)
-- **Live spectating**: Real-time mode auto-launches GameScene in spectator mode with click-to-follow and mouse drag panning; Fast mode streams state at ~20fps via capped interval
-- GameScene handles `sim:state` events for rendering, `sim:gameTransition` for between-game scene restarts, `sim:completed` for returning to lobby
-- **Log directory structure**: `data/simulations/{gameMode}/batch_{timestamp}_{batchId}/` with per-game `sim_NNN.jsonl` files, replay files, `batch_config.json`, and `batch_summary.json`
-- **Log verbosity levels**: Normal (5-tick snapshots), Detailed (2-tick + movements + pickups), Full (every tick + explosion detail + bot pathfinding)
-- `GameLogger` enhanced with `shouldLogTick()`, `logMovement()`, `logPowerupPickup()`, `logExplosionDetail()`, `logBotPathfinding()` — all backward-compatible
-- Backend: `SimulationGame.ts` (headless game runner), `SimulationRunner.ts` (batch orchestrator, EventEmitter), `SimulationManager.ts` (singleton, 1 concurrent + queue up to 10)
-- **Simulation queue**: when a batch is already running, new batches are queued (max 10) and auto-start when the current one finishes. Cancelling the running batch advances the queue. Queued entries show position in UI with a "Remove" button. Admin sockets auto-join `sim:admin` room for queue-started batch broadcasts.
-- Socket events: `sim:start`, `sim:cancel`, `sim:spectate`, `sim:unspectate` (C→S); `sim:progress`, `sim:gameResult`, `sim:state`, `sim:gameTransition`, `sim:completed`, `sim:queueUpdate` (S→C)
-- REST endpoints: `GET/POST /admin/simulations`, `GET/DELETE /admin/simulations/:batchId`, `GET /admin/simulations/:batchId/replay/:gameIndex`
-- Bot names pool: AlphaBot through PulseBot (16 distinct names)
-- Cancellation preserves completed game logs; 3s pause between realtime games, 0.5s for fast
-- **Simulation replays**: Each sim game records a full replay via `ReplayRecorder` (when `recordReplays !== false`), saved as `{gameIndex}_{roomCode}_{gameMode}.replay.json.gz` in the batch directory. `SimulationGame` calls `recordTick()` after every `processTick()` (both fast and realtime). `ReplayRecorder.finalize()` accepts optional `{ saveDir }` to write replays to batch dir instead of `/app/replays/`. Results table has a "Replay" button per game; `SimulationsTab.launchSimulationReplay()` mirrors `MatchesTab.launchReplay()` pattern
-- **Record Replays checkbox**: SimulationsTab config modal includes a "Record Replays" checkbox (checked by default) that sets `recordReplays` in SimulationConfig
-- Delete batch: removes from memory + disk (`SimulationManager.deleteBatch()`) including replay files; delete button shown for completed/cancelled batches
-- Spectate button hidden for fast-speed batches (only shown for realtime)
-- Results table: paginated (25/page) with sortable columns (click #/Winner/Duration/Kill Leader/Reason) and per-game Replay button
-- Docker: `./data/simulations:/app/simulations` volume mount in both compose files
-
-## Account Management
-- **Account modal** in lobby header lets users edit their username, email, and password
-- Username is the single player name shown everywhere (no separate display name)
-- Username change: server validates format (3-20 chars, alphanumeric + underscore/hyphen) and checks uniqueness; returns 409 CONFLICT if taken
-- Email change: two-step confirmation flow — user submits new email, server sends a confirmation link to the new address (24h expiry), email only swaps when the link is clicked
-- Admins skip email verification — email changes take effect immediately
-- Pending email changes visible in Account modal with a cancel option
-- Email change confirmation endpoint: `GET /api/user/confirm-email/:token`
-- Migration `003_user_profile.sql` adds `pending_email`, `email_change_token`, `email_change_expires` columns to users table
-- Password change: `POST /api/user/password` with `currentPassword` and `newPassword`; server verifies current password via bcrypt compare before hashing and updating; Zod validation enforces min/max length; client-side confirms new password match
-- Admin password reset: `PUT /admin/users/:id/password` (admin-only) sets a new password directly; revokes all refresh tokens (forces re-login); logged to audit trail as `reset_password`. Frontend: "Reset PW" button in UsersTab actions column opens modal with new password + confirm fields (min 6 chars)
-- Forgot password: `POST /api/auth/forgot-password` sends reset link to email (rate limited: 3/15min); response intentionally vague ("If the email exists…") to prevent email enumeration. `POST /api/auth/reset-password` accepts token + new password. Tokens stored in `users.password_reset_token` / `users.password_reset_expires` (001_initial.sql). AuthUI `forgot` mode: email input → POST → returns to login with success message
-- `AuthManager.updateUser()` patches in-memory user state after profile edits so the lobby header updates without a page refresh
-
-## Teams
-- Team assignment: host can assign players and bots to Team Red (0) or Team Blue (1) via dropdowns in RoomUI waiting room
-- Unassigned players/bots fall back to round-robin at game start
-- Bot team assignments stored in `MatchConfig.botTeams` array; bots rendered as placeholder entries in waiting room player list
-- **In-game visual distinction**: Team-based color palettes (Red team: red/orange/yellow; Blue team: blue/cyan/purple), team-colored name labels, colored underline bar beneath sprites
-- **HUD**: Player list grouped by team with "Team Red"/"Team Blue" headers and colored dots
-- **Game over**: Team column in results, dead players shown with strikethrough and dimmed colors, finish reason uses team names ("Team Red wins!")
-- `room:setTeam` and `room:setBotTeam` socket events for lobby team assignment
+Admin-only batch runner for bot-only games. Fast/real-time modes, queue system (max 10), live spectating. See [docs/admin-and-systems.md](docs/admin-and-systems.md#bot-simulation-system).
 
 ## Game Architecture
 - 20 tick/sec server game loop (GameLoop.ts -> GameState.ts)
 - GameState.processTick(): bot AI -> inputs -> movement -> bomb slide -> bomb timers -> explosions -> collisions -> power-ups -> KOTH scoring -> map events -> zone -> deathmatch respawns -> time check -> win check
 - Bomb kick: player with hasKick walking into a bomb sets bomb.sliding direction; sliding bombs advance 1 tile/tick until blocked; kicking applies movement cooldown
-- BotAI: difficulty-aware (easy/normal/hard) with configurable awareness, aggression, escape depth, reaction delay, kick usage, and difficulty-specific mistake/aggression mechanics
-- BotAI difficulty config includes: `wrongMoveChance` (easy: 0.25), `randomBombChance` (easy: 0.12), `chainReactionAwareness` (hard), `shieldAggression` (hard), `lateGameBombCooldownMin/Max` (hard: 3-6 ticks)
-- BotAI kick decisions gated on canMove() + kickCooldown (2 ticks) to prevent kick spam; `findKickableBomb()` skips own bombs unless <=15 ticks remaining (self-defense kick)
-- BotAI offensive kick: priority 3.5 — `findOffensiveKick()` pushes bombs toward enemies in line-of-sight when not in danger
-- Bot difficulty set per-room via MatchConfig.botDifficulty; defaults to 'normal'; UI dropdown always visible but disabled when bots = 0
-- BotAI escape logic: BFS through danger cells to find nearest safe cell; active explosion cells (ticksRemaining > 3) are treated as impassable — never pathed through; canEscapeAfterBomb verifies immediate walkable+non-explosion neighbor AND BFS escape path with full danger awareness (ignoreDangerThreshold=true)
-- BotAI escape depth: dynamic `max(config.escapeSearchDepth, ceil(maxFireRangeOnMap * 1.5) + 2)` so high-range scenarios get adequate search depth
-- BotAI `findEscapeDirection` returns `{ dir, depth }` — depth used for time-to-safety check in `canEscapeAfterBomb` (at fireRange >= 4, verifies bot can physically reach safe cell before bomb detonates with 10-tick margin)
-- BotAI bomb safety: requires `player.canMove()` before placing bombs; dead-end check (`walkableDirs >= minWalkableDirs` where min is 3 at fireRange >= 5, else 2); `hasOwnBombNearby()` prevents sandwich traps within `fireRange+1` tiles of own active bomb
-- BotAI chain reaction awareness: `canEscapeAfterBomb()` always adds chain-reacting bomb blast cells to future danger; `getDangerCells()` does chain reaction second pass for hard difficulty only
-- BotAI shield aggression: hard bots skip escape validation when shielded (bomb freely with shield active)
-- BotAI movement decisions only run when player.canMove() to prevent oscillation between hunt/seek_wall
-- BotAI power-up seeking uses BFS pathfinding (not line-of-sight) so bots find power-ups around corners
-- BotAI hunt search depth is configurable per difficulty (easy=6, normal=25, hard=40) to handle large/dense maps
-- BotAI hunt persistence: `huntLockTicks` keeps bot hunting for 15 ticks after finding a path, preventing chain breaks from random huntChance gate; `wasHunting` flag continues movement in last direction when hunt BFS loses the path (`hunt_persist`)
-- BotAI close-range bombing: `bomb_hunt` triggers when hunting within 3 tiles of enemy and enemy is in blast range
-- BotAI game phase system: three phases — early (<35% round time), mid-game (35-60%), late-game (>60%). Mid-game: +0.1 hunt chance, 75% bomb cooldown, halved roam idle threshold. Late-game: always hunt, always roam, custom bomb cooldown
-- BotAI proximity bomb aggression: when within 5 tiles of enemy, bomb cooldown reduced to 75% even in early game
-- BotAI wall path-clearing: `bomb_path` (when hunt BFS fails) and `bomb_roam` (while roaming) actively bomb destructible walls toward nearest enemy via `findWallTowardEnemy()` heuristic; `bomb_roam` suppressed when oscillating (≤2 unique positions in last 4 moves)
-- BotAI roaming: tracks ticksSinceEnemyContact; after idle threshold (normal=3s, hard=2s, halved in mid-game) bot moves toward nearest enemy via manhattan heuristic
-- BotAI directional wall clearing: prefers breaking walls toward enemies rather than just the nearest wall
-- BotAI danger timer threshold: dynamic safe distance based on moves-available-before-detonation (`floor(ticksRemaining / MOVE_COOLDOWN_BASE)` capped at `fireRange + 2`) replaces fixed manhattan > 2 check
-- BotAI reachability filter: `getDangerCells()` skips bombs whose blast cells are too far to reach the bot before detonation (`minDist > movesBeforeDetonation + 1`), reducing unnecessary fleeing; controlled by `enableReachabilityFilter` config (normal/hard only); bypassed by `ignoreDangerThreshold` for conservative escape checks
-- BotAI duel stalemate breaker: detects 1v1 scenarios (≤1 alive enemy) with no kill progress for `duelStalemateThresholdTicks` (normal=200/10s, hard=120/6s); activates `stalemateActive` to escalate aggression; complements the existing shield stalemate breaker which handles the specific mutual-shield case faster
-- BotAI map-size-scaled parameters: constructor accepts optional `mapSize`, scales `huntSearchDepth`, `escapeSearchDepth`, `roamAfterIdleTicks`, `powerUpVision` relative to reference 15×13 map area using `sqrt(area/referenceArea)` scale factor; capped at sensible maximums (huntSearchDepth=80, escapeSearchDepth=25, powerUpVision=40)
-- BotAI remote bomb pre-placement guard: `wouldRemoteBombSelfBlock()` checks if placing a remote bomb would block ALL walkable neighbor directions with its blast zone; skips placement when no enemy is in blast range, letting hunt/roam reposition first
-- BotAI delayed remote self-unblock: instead of immediately detonating remote bombs when movement is blocked, `remoteBlockedTicks` counter requires 10 ticks (0.5s) blocked OR enemy within manhattan 5 before detonating — gives bots time to find alternative paths
-- BotAI KOTH hill-seeking: priority 4.5 in decision tree, bots navigate toward the 3x3 center zone using manhattan distance heuristic; once inside they stay put rather than wandering off
-- BotAI anti-oscillation: `orderedDirs()` helper iterates `lastDirection` first in all BFS seed steps; `posHistory` (last 4 positions) with `wouldOscillate()` check filters directions that revisit recent tiles; wander has 85% continuation probability and prefers non-oscillating candidates. `seek_wall` skips entirely when already adjacent to a destructible wall (prevents seek_wall↔wander ping-pong). `findDestructibleWallDirection` skips dead-end destinations (walkableDirs < 2) so bots aren't sent to positions where bomb_wall's safety check blocks them.
-- BotAI pierce-aware danger zones: `getDangerCells()`, `canEscapeAfterBomb()`, `isEnemyInBlastRange()`, and remote bomb detonation check all respect `bomb.isPierce`/`player.hasPierceBomb` — pierce bombs blast through destructible walls, matching `calculateExplosionCells()` in shared/
-- BotAI line bomb escape: `canEscapeAfterBomb()` simulates full line of bombs in facing direction (using available bomb capacity) instead of single bomb — danger zones computed for ALL future bomb positions
-- BotAI flee stuck-breaker: tracks `lastFleePos`/`fleeStuckTicks` — after 5 movable ticks (gated on `canMove()`) stuck at same position while fleeing, tries alternative directions with two-pass selection: prefer non-danger walkable directions, fall back to any walkable non-explosion direction (logged as `flee_unstick`)
-- BotAI easy difficulty mistakes: `wrongMoveChance` (25%) flees in wrong direction; `randomBombChance` (12%) places unsafe bombs bypassing all safety checks
-- BotAI trapped behavior: when completely stuck in danger with no movement options, bots accept their fate instead of placing bombs to blow open walls (removed `stuck_bomb` — unfair escape from player traps)
-- BotAI easy difficulty: huntChance=0.15, bombCooldown=45-80, escapeSearchDepth=2, reactionDelay=5, wrongMoveChance=0.25, randomBombChance=0.12, enableReachabilityFilter=false, duelStalemateThresholdTicks=0
-- BotAI normal difficulty: huntChance=0.90, bombCooldown=15-25, escapeSearchDepth=8, dangerTimerThreshold=40, roamAfterIdleTicks=60, huntStuckThreshold=3, huntStuckMaxTicks=60, stalemateThresholdTicks=100, remoteHoldThreshold=40, optimalMoveChance=0.8, enableReachabilityFilter=true, duelStalemateThresholdTicks=200
-- BotAI hard difficulty: huntChance=0.95, bombCooldown=5-12, escapeSearchDepth=15, dangerTimerThreshold=50, chainReactionAwareness=true, shieldAggression=true, lateGameBombCooldown=3-6, huntSearchDepth=40, huntStuckMaxTicks=40, stalemateThresholdTicks=60, remoteHoldThreshold=60, enableReachabilityFilter=true, duelStalemateThresholdTicks=120
-- BotAI complete config: see `DIFFICULTY_PRESETS` in `backend/src/game/BotAI.ts` — above lists key differentiators only
-- Spawn position randomization: `GameStateManager` shuffles spawn point indices via Fisher-Yates using seeded RNG in constructor (`shuffledSpawnIndices`), so player-to-spawn mapping varies per game seed while remaining deterministic for replays
+- BotAI: 3 difficulty tiers (easy/normal/hard) with BFS pathfinding, game phase system, stalemate breakers, pierce/line/remote bomb awareness. See [docs/bot-ai-internals.md](docs/bot-ai-internals.md)
+- Bot difficulty set per-room via MatchConfig.botDifficulty; defaults to 'normal'
+- Spawn position randomization: Fisher-Yates shuffle using seeded RNG (`shuffledSpawnIndices`), deterministic for replays
 - Self-kills subtract 1 from kill score (owner.kills decremented, owner.selfKills incremented)
 - Game over placements sorted by kills descending, tiebreak by survival placement
-- Grace period: 30 ticks (1.5s) after win condition before status='finished' to show final explosions; winner is invulnerable during grace period
-- Dead players enter spectator mode with free camera pan (WASD/arrows/D-pad/mouse drag), click-to-follow on HUD player list, number keys 1-9, or LB/RB gamepad bumpers
-- Mouse drag panning: pointerdown records start, pointermove after 4px threshold pans freeCam and clears spectateTargetId; pointerup without drag triggers replay play/pause toggle
-- Spectate-follow breaks only on new keydown or mouse drag (not stale keysDown state); blur handler clears keysDown to prevent stuck keys
-- HUD spectate click uses mousedown event delegation on stable container (not click, which is unreliable with innerHTML rebuilds)
-- HUDScene forces `localPlayerDead = true` when `simulationSpectate` or `replayMode` registry flags are set, enabling click-to-follow from the first frame
+- Grace period: 30 ticks (1.5s) after win condition before status='finished'; winner invulnerable during grace period
+- Dead players enter spectator mode: free camera pan (WASD/arrows/D-pad/mouse drag), click-to-follow, number keys 1-9, LB/RB bumpers
+- Mouse drag panning: pointerdown records start, pointermove after 4px threshold pans freeCam; pointerup without drag triggers replay play/pause
+- Spectate-follow breaks only on new keydown or mouse drag (not stale keysDown state); blur handler clears keysDown
+- HUD spectate click uses mousedown event delegation on stable container (not click — unreliable with innerHTML rebuilds)
+- HUDScene forces `localPlayerDead = true` when `simulationSpectate` or `replayMode` registry flags are set
 - Camera follows local player with smooth lerp when map exceeds viewport
 - Room name auto-generated if left blank (random adjective + noun)
-- Play Again: room:restart socket event resets room to 'waiting' so all players can rematch; other players auto-navigate via room:state listener
-- Phaser scene lifecycle: shutdown() must be registered via `this.events.once('shutdown', this.shutdown, this)` — Phaser does NOT auto-call shutdown() methods. Scenes also defensively clean up stale state at the top of create() in case shutdown wasn't called.
-- `tickEvents` buffer on GameStateManager accumulates per-tick events (explosions, deaths, power-up pickups) for fine-grained socket emission in GameRoom
-- Chain reaction tile snapshot: before processing detonations, tiles are snapshotted so chained bombs calculate blast cells against original wall layout (prevents blasts going through walls destroyed by earlier bombs in the same tick)
-- Shield has no time limit — lasts until consumed by an explosion. After shield breaks, player gets 10 ticks of invulnerability to escape the explosion area. Extra shield pickups are consumed but don't stack.
-- BotAI detonates remote bombs when enemy is in blast zone, near a bomb (manhattan ≤2), movement blocked by own remote bomb blast, or after hold threshold at max bombs (priority 2.5); shield-aware sacrifice detonates even when selfInBlast if bot has shield and enemy doesn't; self-damage check skipped if bot has shield; invulnerable enemies (post-shield-break) are ignored
-- BotAI self-unblock detonation: computes `ownRemoteBlastCells` from own remote bombs (pierce-aware), checks if any walkable direction leads into a cell in both the blast set and the BFS danger set — detonates (with `!selfInBlast` guard) to clear movement
-- BotAI strategic remote hold (Fix B): instead of immediate detonation when bomb slots full, bots hold for `remoteHoldThreshold` ticks (easy=20, normal=40, hard=60) before detonating — prevents wasteful fire-and-forget; `stalemateActive` overrides the hold
-- BotAI shield stalemate breaker (Fix A): detects mutual shielded bombing loops (both players shielded, within 8 tiles, no kills, late game or ≤2 alive); after threshold ticks (normal=100, hard=60) activates `stalemateActive` — bypasses `canEscapeAfterBomb`, reduces `minWalkableDirs` to 1, increases `bomb_hunt` distance to 5, skips `hasOwnBombNearby`; skips bombing invulnerable enemies
-- BotAI hunt oscillation detector (Fix C): tracks `huntPosHistory` (last 10 hunt positions) and `huntWithoutProgressTicks`; triggers `huntStuck` when ≤`huntStuckThreshold` unique positions in 8+ entries OR `huntWithoutProgressTicks ≥ huntStuckMaxTicks` (normal=60, hard=40); when stuck, forces `bomb_wall`/`seek_wall` toward enemy for 30-tick cooldown then retries hunt; fixes aggressive mode oscillation bypass (`findHuntDirection` respects `huntStuck` flag)
-- Game over screen shows context message (e.g., "Time's up!", "PlayerX is the last survivor!", "Draw — no survivors!")
-- Game start transitions instantly to game scene; room:start guard checks both GameRoom existence and room status to prevent duplicate starts
+- Play Again: room:restart resets to 'waiting'; other players auto-navigate via room:state listener
+- Phaser scene lifecycle: shutdown() must be registered via `this.events.once('shutdown', this.shutdown, this)` — Phaser does NOT auto-call shutdown(). Scenes defensively clean up stale state at top of create().
+- `tickEvents` buffer on GameStateManager accumulates per-tick events for fine-grained socket emission in GameRoom
+- Chain reaction tile snapshot: tiles snapshotted before processing detonations so chained bombs use original wall layout
+- Shield has no time limit — lasts until consumed. After break, 10 ticks invulnerability. Extra pickups consumed but don't stack.
+- Game start transitions instantly; room:start guard checks GameRoom existence and room status to prevent duplicate starts
 - "Back to Lobby" from game over clears currentRoom registry to prevent stale room UI
 
+## Teams
+- Host assigns players/bots to Team Red (0) or Team Blue (1) via dropdowns; unassigned fall back to round-robin
+- Bot teams stored in `MatchConfig.botTeams`; bots rendered as placeholders in waiting room
+- In-game: team-colored palettes, name labels, underline bars, HUD grouping
+- `room:setTeam` and `room:setBotTeam` socket events
+
 ## Game Modes
-- **Free for All (FFA)**: 2-8 players, last player standing wins, 3 min
-- **Teams**: 4-8 players, 2 teams, last team standing wins, friendly fire toggle, 4 min
+- **Free for All (FFA)**: 2-8 players, last standing, 3 min
+- **Teams**: 4-8 players, 2 teams, last team standing, friendly fire toggle, 4 min
 - **Battle Royale**: 4-8 players, shrinking circular zone, 5 min
-- **Sudden Death**: 2-8 players, all start maxed (8 bombs, 8 range, max speed, kick), no power-ups, one hit kills, 2 min
-- **Deathmatch**: 2-8 players, respawn after 3s with reset stats, first to 10 kills or most kills at time wins, 5 min
-- **King of the Hill**: 2-8 players, control 3x3 center zone for points, first to 100 wins, 4 min
+- **Sudden Death**: 2-8 players, all maxed stats, no power-ups, one hit kills, 2 min
+- **Deathmatch**: 2-8 players, respawn after 3s, first to 10 kills or most at time, 5 min
+- **King of the Hill**: 2-8 players, control 3x3 center zone, first to 100, 4 min
 
 ## Power-Ups (8 types)
 - bomb_up, fire_up, speed_up, shield, kick (original 5)
 - **pierce_bomb**: Explosions pass through destructible walls (still destroys them)
-- **remote_bomb**: Bombs don't auto-detonate; press E key to detonate all remote bombs at once (10s safety max timer)
-- **line_bomb**: Places a line of bombs in facing direction (up to remaining bomb capacity)
+- **remote_bomb**: Bombs don't auto-detonate; press E to detonate all at once (10s safety max)
+- **line_bomb**: Places line of bombs in facing direction (up to remaining bomb capacity)
 
 ## Map Features
-- **Reinforced walls** (optional): Destructible walls take 2 hits — first hit cracks (`destructible_cracked`), second hit destroys
-- **Dynamic map events** (optional): Meteor strikes every 30-45s (2s warning reticle), power-up rain every 60s
-- **Hazard tiles** (optional): Teleporter pairs (A/B, instant transport), conveyor belts (force movement in direction)
+- **Reinforced walls** (optional): 2 hits — first cracks (`destructible_cracked`), second destroys
+- **Dynamic map events** (optional): Meteor strikes every 30-45s (2s warning), power-up rain every 60s
+- **Hazard tiles** (optional): Teleporter pairs (A/B, instant transport), conveyor belts (force movement)
 
 ## Room Configuration
 MatchConfig includes: gameMode, maxPlayers, mapWidth/Height, mapSeed, roundTime, wallDensity, enabledPowerUps (all 8), powerUpDropRate, botCount, botDifficulty, botTeams, friendlyFire, hazardTiles, enableMapEvents, reinforcedWalls, recordGame
 
-## Game Logging
-- JSONL game logs written to ./data/gamelogs/ (bind-mounted from container)
-- Logs every bot decision, kill, bomb placement/detonation, and tick snapshots (frequency depends on verbosity)
-- Filename format: `{ISO-timestamp}_{roomCode}_{gameMode}_{playerCount}p.jsonl`
-- `GameLogger` supports 3 verbosity levels: normal (tick every 5), detailed (tick every 2 + movements/pickups), full (every tick + explosion detail + bot pathfinding)
-- Simulation logs written to `./data/simulations/{gameMode}/batch_*/` with separate directory per game mode
-
 ## Game Replay System
-- Game and simulation replays are recorded as gzipped JSON files when recording is enabled. Regular game replays in `./data/replays/`, simulation replays in their batch directory under `./data/simulations/`
-- **Recording toggles**: Admin-level global toggle (`recordings_enabled` in `server_settings` table) controls whether the "Record Game" checkbox appears in CreateRoomModal. Per-room `recordGame` field in MatchConfig (default true when recordings enabled). Per-simulation `recordReplays` field in SimulationConfig (default true). `GameRoom.replayRecorder` and `SimulationGame.replayRecorder` are nullable — only created when recording is active; all usage sites guarded with optional chaining
-- `ReplayRecorder` (backend) captures full GameState every tick, with tile diffs (not full map per frame) for space efficiency
-- `GameLogger` forwards log events (kills, bombs, bot decisions, movements, powerups) to ReplayRecorder with tick numbers for synchronized display
-- Replay files: `{matchId}_{roomCode}_{gameMode}.replay.json.gz` (~400-700KB per game)
-- Admin API: `GET /admin/replays` (list), `GET /admin/replays/:matchId` (fetch), `DELETE /admin/replays/:matchId` (delete)
-- Match detail modal shows "Watch Replay" button when `hasReplay: true`
-- `ReplayPlayer` (frontend) manages playback: play/pause, speed (0.5x/1x/2x/4x), seek to any frame. Uses Phaser-synced time accumulator (`tick(deltaMs)`) instead of `setInterval` to prevent drift/fast-forward; frame bounds-checked before access
-- `ReplayControls` — video-player-like bottom bar with slider, time display, speed selector, keyboard shortcuts (Space=play/pause, arrows=skip). Arrow keys reserved for timeline in replay mode (GameScene skips them); WASD/mouse drag used for camera pan
-- `ReplayLogPanel` — collapsible right-side panel showing game events synced to replay time, with filters by event type (kills, bombs, bot AI, powerups, movement), clickable timestamps for seeking. Defaults to collapsed; when expanded, shifts `.hud-players` list to `right: 360px` to avoid overlap
-- `ReplayRecorder.finalize()` accepts optional `{ saveDir }` to write to a custom directory (used by simulations to store replays in batch dir)
-- GameScene detects `registry.get('replayMode')` and uses ReplayPlayer instead of socket events; replay auto-plays on open; clicking the game canvas toggles play/pause
-- EffectSystem has `triggerExplosion()`/`triggerPlayerDied()` public methods for replay mode (bypasses socket listeners)
-- `ReplayRecorder` deep-copies `initialState.map.tiles` in constructor (game engine mutates tiles in-place as walls are destroyed)
-- Tile state reconstruction: initial tiles stored once, diffs applied forward; seeking backward rebuilds from initial
-- Match detail modal shows all players (including bots) when replay exists via `allPlayers` field from `getReplayPlacements()`
-- Docker volume: `./data/replays:/app/replays`
+Gzipped JSON replays with tile diffs for space efficiency. `ReplayRecorder` nullable — only created when recording active. Frontend: `ReplayPlayer` with play/pause/seek/speed, `ReplayControls` bottom bar, `ReplayLogPanel` collapsible side panel. See [docs/replay-system.md](docs/replay-system.md).
 
-## Security
-- CORS restricted to `APP_URL` origin for both Express and Socket.io (not `origin: true`)
-- Content-Security-Policy header in nginx: `default-src 'self'`, inline scripts/styles allowed, fonts from Google, WebSocket connections
-- XSS defense-in-depth: all user-generated content (usernames) escaped via `escapeHtml()` before innerHTML insertion (HUD kill feed, player list)
-- No inline `onclick` handlers — all event handlers use `addEventListener` for CSP compatibility
-- Socket rate limiter cleanup: entries removed on socket disconnect + periodic 60s sweep of stale entries (prevents memory leak from disconnected sockets)
-- HTTP rate limiter in-memory fallback: when Redis is unavailable, rate limiting continues via in-memory sliding window instead of failing open
-- Runtime validation on `game:input` socket payload: direction, action, seq, tick fields validated at runtime (TypeScript types are compile-time only)
-- Admin `roomMessage` server-side sanitization: type check, empty check, 500-char length limit before broadcast
-- SQL injection: all queries use parameterized statements via mysql2
-- Password hashing: bcrypt with 12 salt rounds
-- Token storage: access token in-memory only, refresh token in httpOnly sameSite:strict cookie with secure flag derived from APP_URL
-- Refresh token rotation with reuse detection
-- JWT_SECRET minimum 16 chars enforced via Zod config validation
-- Admin audit trail: all admin actions logged to `admin_actions` table
+## Security, Connection Resilience & Docker
+See [docs/infrastructure.md](docs/infrastructure.md) for security details, connection resilience (10s disconnect grace period, auto-reconnect, stale room cleanup, 502 page), Docker setup, and database migrations.
 
 ## Performance Optimizations
-
-### Network & Bandwidth
-- **Delta tile encoding**: `toTickState()` sends only changed tiles as `tileDiffs` array instead of full `map.tiles` grid every tick — client stores initial tiles from `game:start` and applies diffs in-place. `toState()` still sends full tiles for replays, simulations, and initial state. `TileDiff` type in `shared/src/types/game.ts`
-- **Socket.io per-message compression**: `perMessageDeflate` enabled with 256-byte threshold — compresses JSON payloads ~60-70% on WebSocket frames
-- **Room list broadcast debouncing**: `broadcastRoomList()` coalesced via `setImmediate()` — multiple rapid room mutations (create/join/leave/start) within the same event loop tick produce a single broadcast
-- **Game input hot path**: `game:input` socket handler uses cached `socket.data.activeRoomCode` instead of Redis `getPlayerRoom()` lookup per input — eliminates ~600 Redis calls/sec per active room. `activeRoomCode` set on room create/join/reconnect, cleared on leave/disconnect
-- `GameRoom.broadcastState()` passes raw `gameState.map.tiles` reference to `ReplayRecorder` (via shallow object spread) so replays get actual tile data while broadcasts send empty tiles array with diffs
-
-### Bot AI Tick Throttling
-- Bot AI runs full `generateInput()` every other tick (even ticks only); on odd ticks, reuses last input via `_lastBotInputs` cache — halves bot CPU cost with minimal behavior impact (decisions update every 100ms instead of 50ms)
-- `_lastBotInputs: Map<number, PlayerInput>` stores each bot's last decision; cleared when bot returns null input
-
-### Tile Change Tracking
-- `_dirtyTiles: Map<string, TileDiff>` in `GameStateManager` tracks tile mutations per tick
-- `destroyTileTracked()` wraps `CollisionSystem.destroyTile()` and records the change — used in bomb detonation and meteor impacts
-- `toTickState()` drains `_dirtyTiles` into `tileDiffs` array, then clears the map
-
-### Per-Tick Caching
-- `getAlivePlayers()` result is cached within `processTick()` (guarded by `_processingTick` flag); invalidated via `invalidateAliveCache()` after every death/respawn — eliminates 7+ redundant `Array.from().filter()` per tick
-- Bomb slide collision uses pre-built `Set<string>` for bomb and player positions — O(1) lookups instead of O(n) inner loops
-- Shared `bombPositions` array built once per tick and passed to all `processPlayerInput()` calls (previously rebuilt per-player)
-- Chain reaction bomb lookup uses `Set<string>` of explosion cells — O(1) `has()` instead of O(cells) `Array.some()`
-- KOTH hill controlling player cached during scoring step, reused in `toState()` — avoids redundant `getAlivePlayers().filter()` in serialization
-- Conditional tile snapshot: `map.tiles` deep-copy only when other bombs exist beyond those detonating (chain reactions possible)
-
-### Serialization
-- `mapToArray()` helper replaces `Array.from(map.values()).map(fn)` chains in `toState()` — single-pass iteration, halves intermediate allocations
-- `DIR_DELTA_ARRAY` module-level constant in BotAI replaces 12 `Object.values(DIR_DELTA)` calls per bot per tick
-- BotAI `aliveEnemies` computed once in `generateInput()` and reused for stalemate detection (previously duplicated `Array.from().filter()`)
-
-### Frontend Rendering
-- HUD stats bar uses persistent element refs — creates DOM once, updates `textContent`/`opacity` only when values change (no innerHTML rebuild per tick)
-- Kill feed tracks individual DOM elements — appends new entries, removes expired ones directly (no innerHTML rebuild)
-- Team indicator drawn at Graphics origin, positioned via `setPosition()` — eliminates `clear()` + `fillRoundedRect()` every frame
-- Shield graphic drawn at origin with `setPosition()` for positioning
-- Dust particle emitter pooled per player — one persistent emitter repositioned and reused instead of create/destroy per movement
-- ReplayLogPanel uses `DocumentFragment` for batch DOM insertion when rebuilding log entries
-
-### Database
-- Admin dashboard stats consolidated into single SQL query with subselects (3 queries → 1)
-- Match history uses pre-aggregated JOIN for player count instead of correlated subquery per row
+Delta tile encoding, bot AI tick throttling, per-tick caching, efficient serialization, frontend HUD differential updates. See [docs/performance-and-internals.md](docs/performance-and-internals.md).
 
 ## Code Quality & Tooling
 - ESLint v10 + `@typescript-eslint/recommended` via flat config (`eslint.config.mjs`); `no-explicit-any` as warning, `no-unused-vars` as error
 - Prettier with single quotes, trailing commas, 100 char width
 - Husky + lint-staged pre-commit hook runs ESLint `--fix` + Prettier on staged `.ts` files
-- `prepare` script uses `husky || true` to avoid failures in Docker builds where husky isn't installed
-- Socket rate limiting: `backend/src/utils/socketRateLimit.ts` — in-memory sliding window per socket ID (game:input 30/sec, room:create 2/sec, room:join 5/sec), with disconnect cleanup and periodic sweep
-- All Socket.io server types fully parameterized: `RoomManager`, `registry.ts`, `GameRoom` use `Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>` — no `as any` casts on socket events
-- DB row types in `backend/src/db/types.ts`: `UserRow`, `CountRow`, `IdRow`, `MatchRow`, `MatchPlayerRow`, `AdminActionRow`, etc. — all service queries use typed `query<T>()` calls
-- `shared/src/utils/error.ts`: `getErrorMessage(err: unknown)` helper used in all `catch` blocks instead of `catch (err: any)`
-- `backend/src/db/connection.ts`: `withTransaction<T>(fn)` helper for multi-statement DB operations
-- `GameStateManager` constructor takes a `GameConfig` object instead of 13 positional parameters
-- `frontend/src/utils/html.ts`: shared `escapeHtml()` and `escapeAttr()` utilities (extracted from 9+ files)
-- LobbyUI modals extracted to `frontend/src/ui/modals/`: `CreateRoomModal.ts`, `AccountModal.ts`, `SettingsModal.ts`, `HelpModal.ts` — LobbyUI.ts is a thin orchestrator (~200 lines)
-- `GameState.processTick()` optimizations: conditional tile snapshot (only when bombs detonate), `hasBombAt()`/`hasAlivePlayerAt()` helpers replace repeated `Array.from().some()`, `for...of` with early break on bomb slide collision
+- `prepare` script uses `husky || true` to avoid failures in Docker builds
+- Socket rate limiting: `backend/src/utils/socketRateLimit.ts` — in-memory sliding window per socket ID
+- All Socket.io server types fully parameterized — no `as any` casts on socket events
+- DB row types in `backend/src/db/types.ts`; all service queries use typed `query<T>()` calls
+- `shared/src/utils/error.ts`: `getErrorMessage(err: unknown)` in all catch blocks
+- `backend/src/db/connection.ts`: `withTransaction<T>(fn)` helper
+- `GameStateManager` constructor takes a `GameConfig` object (not positional parameters)
+- `frontend/src/utils/html.ts`: shared `escapeHtml()` and `escapeAttr()` utilities
+- LobbyUI modals extracted to `frontend/src/ui/modals/` — LobbyUI.ts is thin orchestrator (~200 lines)
 
 ## Testing
 ```bash
@@ -381,21 +159,11 @@ npx jest --config tests/backend/jest.config.ts  # Run from project root
 - 117 tests across 8 suites (GameState integration, GameLoop, Bomb, Map, CollisionSystem, Auth, validation, grid)
 - GameState tests cover: lifecycle, movement, bombs, explosions, death, self-kills, shield, chain reactions, win conditions, grace period, power-ups, remote bombs, bomb kick, teams, deathmatch, KOTH, line/pierce bombs, reinforced walls, battle royale zone
 
-## Connection Resilience
-- Socket.io reconnects indefinitely (1-5s backoff) with a "Reconnecting..." overlay when disconnected; overlay also starts health polling (`/api/health` every 3s) — when backend responds, page auto-reloads (handles stale Socket.io state, expired tokens, nginx DNS cache)
-- **Disconnect grace period**: when a player's socket disconnects during a game, they get 10 seconds (200 ticks) to reconnect before being killed. `GameRoom.disconnectedPlayers` tracks pending disconnects; `checkDisconnectGracePeriods()` runs each tick. On reconnect, `handlePlayerReconnect()` cancels the grace timer and the player resumes playing.
-- During disconnect grace period, the player is NOT removed from the lobby room — only on grace expiry or game end
-- On reconnect, server auto-detects if player was in an active game (`isPlayerDisconnected()`) and rejoins them to the socket room, emitting `game:start` with full state so the client can initialize GameScene directly
-- LobbyScene registers an early `game:start` listener in `create()` to handle reconnection — if the server sends game state on connect, the client skips the lobby and enters the game immediately
-- **Stale room cleanup**: `room:create` and `room:join` handlers check for existing room membership and clean up (disconnect from running game, leave old room) before creating/joining — prevents zombie games and stale state
-- **Bot-only game termination**: after all disconnect grace periods resolve, if no human players remain alive, the game ends immediately with `finishReason = 'All players disconnected'` and match status saved as `'aborted'` (not `'finished'`)
-- `GameState.killPlayer()` handles disconnect-timeout deaths with proper placement tracking, kill logging, and tickEvents emission
-- On reconnect, client fetches `/api/health` and compares `buildId` (server start timestamp). If different, the page auto-refreshes to load new frontend.
-- Nginx serves a custom 502 page (`docker/nginx/502.html`) during container rebuilds that auto-polls and refreshes when the app is back
-- The 502 page detects the real app by checking for `game-container` in the response body
-
-## Docker
-- Production: `docker compose up --build -d`
-- Only nginx exposes a port (APP_EXTERNAL_PORT, default 8080)
-- Data persists in ./data/ (bind mounts)
-- Nginx serves no-cache headers for index.html to prevent stale frontend after deploys
+## Documentation
+- [Bot AI Developer Guide](docs/bot-ai-guide.md) — writing custom bot AIs
+- [Bot AI Internals](docs/bot-ai-internals.md) — built-in BotAI decision engine details
+- [Campaign System](docs/campaign.md) — enemies, levels, editor, progress
+- [Admin Panel & Systems](docs/admin-and-systems.md) — admin tabs, bot AI management, simulations, accounts
+- [Replay System](docs/replay-system.md) — recording, playback, controls, API
+- [Performance & Internals](docs/performance-and-internals.md) — optimizations, game logging
+- [Infrastructure & Security](docs/infrastructure.md) — security, resilience, Docker, migrations
