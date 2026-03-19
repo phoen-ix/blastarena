@@ -102,7 +102,7 @@ const levelSchema = z.object({
 // List published worlds with user progress
 router.get('/campaign/worlds', authMiddleware, async (req, res, next) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.userId;
     const worlds = await campaignService.listWorldsWithProgress(userId);
     res.json({ worlds });
   } catch (err) {
@@ -113,7 +113,7 @@ router.get('/campaign/worlds', authMiddleware, async (req, res, next) => {
 // List published levels in a world with user progress
 router.get('/campaign/worlds/:worldId/levels', authMiddleware, async (req, res, next) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.userId;
     const worldId = parseInt(req.params.worldId, 10);
     const levels = await campaignService.listLevelsWithProgress(worldId, userId);
     res.json({ levels });
@@ -139,7 +139,7 @@ router.get('/campaign/levels/:levelId', authMiddleware, async (req, res, next) =
 // User's overall campaign state
 router.get('/campaign/progress', authMiddleware, async (req, res, next) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.userId;
     const state = await progressService.getUserState(userId);
     res.json({ state });
   } catch (err) {
@@ -173,7 +173,7 @@ router.get('/admin/campaign/worlds', authMiddleware, adminOnlyMiddleware, async 
 
 router.post('/admin/campaign/worlds', authMiddleware, adminOnlyMiddleware, validate(worldSchema), async (req, res, next) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.userId;
     const { name, description, theme } = req.body;
     const id = await campaignService.createWorld(name, description || '', theme || 'classic', userId);
     res.status(201).json({ id });
@@ -226,7 +226,7 @@ router.get('/admin/campaign/levels', authMiddleware, adminOnlyMiddleware, async 
 
 router.post('/admin/campaign/levels', authMiddleware, adminOnlyMiddleware, validate(levelSchema), async (req, res, next) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.userId;
     const worldId = parseInt(req.body.worldId ?? req.query.worldId, 10);
     if (isNaN(worldId)) return res.status(400).json({ error: 'worldId required' });
     const id = await campaignService.createLevel(worldId, req.body, userId);
@@ -289,7 +289,7 @@ router.get('/admin/campaign/enemy-types', authMiddleware, adminOnlyMiddleware, a
 
 router.post('/admin/campaign/enemy-types', authMiddleware, adminOnlyMiddleware, validate(enemyTypeSchema), async (req, res, next) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.userId;
     const { name, description, config } = req.body;
     const id = await enemyTypeService.createEnemyType(name, description || '', config, userId);
     res.status(201).json({ id });
