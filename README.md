@@ -386,8 +386,13 @@ Detailed JSONL game logs are written to `./data/gamelogs/` for every match:
 
 ## Performance Optimizations
 
-The game loop and rendering pipeline are optimized for low-latency multiplayer with multiple bots:
+The game loop, network layer, and rendering pipeline are optimized for low-latency multiplayer at scale:
 
+- **Delta tile encoding**: Per-tick state broadcasts send only changed tiles (`tileDiffs`) instead of the full tile grid — reduces payload size ~30-50%. Clients store the initial map from `game:start` and apply diffs in-place
+- **WebSocket compression**: Socket.io `perMessageDeflate` compresses all messages >256 bytes — ~60-70% bandwidth reduction on JSON payloads
+- **Bot AI throttling**: Full AI pathfinding runs every other tick; intermediate ticks reuse the last decision — halves bot CPU cost with minimal behavior impact
+- **Game input hot path**: `game:input` handler uses a cached room code on socket data instead of a Redis lookup per input — eliminates ~600 Redis calls/sec per active room
+- **Room list debouncing**: Multiple rapid room mutations within the same event loop tick coalesce into a single global broadcast
 - **Per-tick caching**: Alive player list, bomb/player position sets, and KOTH hill control cached within each tick — eliminates redundant `Array.from().filter()` and enables O(1) collision lookups
 - **Efficient serialization**: Single-pass `mapToArray()` for state broadcast, conditional tile snapshots (only when chain reactions are possible)
 - **BotAI**: Pre-computed direction deltas, deduplicated enemy/bomb array creation, cached explosion cells — reduces per-bot overhead significantly

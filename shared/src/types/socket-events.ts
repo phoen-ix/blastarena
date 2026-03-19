@@ -114,4 +114,6 @@ export interface SocketData {
   userId: number;
   username: string;
   role: UserRole;
+  /** Cached room code for fast game:input dispatch (avoids Redis lookup per input) */
+  activeRoomCode?: string;
 }

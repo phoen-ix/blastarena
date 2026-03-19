@@ -47,6 +47,8 @@ export class GameScene extends Phaser.Scene {
   private lastGameState: GameState | null = null;
   private localPlayerDead: boolean = false;
   private hasShownCountdown: boolean = false;
+  /** Stored map tiles from initial state — updated in-place with tile diffs */
+  private storedTiles: import('@blast-arena/shared').TileType[][] | null = null;
 
   // Replay mode
   private replayPlayer: ReplayPlayer | null = null;
@@ -124,6 +126,8 @@ export class GameScene extends Phaser.Scene {
     this.countdownOverlay = new CountdownOverlay(this);
 
     if (initialState) {
+      // Store a deep copy of initial tiles for delta updates
+      this.storedTiles = initialState.map.tiles.map(row => [...row]);
       this.tileMap = new TileMapRenderer(
         this,
         initialState.map.tiles,
@@ -256,8 +260,29 @@ export class GameScene extends Phaser.Scene {
       this.countdownOverlay.show();
     }
 
-    // Update renderers
-    if (this.tileMap && state.map.tiles) {
+    // Update tile map — apply diffs to stored tiles, or use full tiles for replays/initial state
+    if (this.tileMap && this.storedTiles) {
+      if (state.tileDiffs && state.tileDiffs.length > 0) {
+        // Apply tile diffs to our stored copy
+        for (const diff of state.tileDiffs) {
+          this.storedTiles[diff.y][diff.x] = diff.type;
+        }
+        const destroyed = this.tileMap.updateTiles(this.storedTiles);
+        if (destroyed.length > 0) {
+          this.effectSystem.onTilesDestroyed(destroyed);
+        }
+      } else if (state.map.tiles && state.map.tiles.length > 0) {
+        // Full tile update (initial state, replays, simulations)
+        const destroyed = this.tileMap.updateTiles(state.map.tiles);
+        if (destroyed.length > 0) {
+          this.effectSystem.onTilesDestroyed(destroyed);
+        }
+        // Update stored tiles from full state
+        this.storedTiles = state.map.tiles.map(row => [...row]);
+      }
+    } else if (this.tileMap && state.map.tiles && state.map.tiles.length > 0) {
+      // No stored tiles yet (e.g. simulation spectate joining mid-game)
+      this.storedTiles = state.map.tiles.map(row => [...row]);
       const destroyed = this.tileMap.updateTiles(state.map.tiles);
       if (destroyed.length > 0) {
         this.effectSystem.onTilesDestroyed(destroyed);

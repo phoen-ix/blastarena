@@ -43,13 +43,13 @@ export class GameLoop {
           if (this.countdownTicksRemaining <= 0) {
             this.gameState.status = 'playing';
           }
-          const state = this.gameState.toState();
+          const state = this.gameState.toTickState();
           this.onTick(state);
           return;
         }
 
         this.gameState.processTick();
-        const state = this.gameState.toState();
+        const state = this.gameState.toTickState();
         this.onTick(state);
 
         if (this.gameState.status === 'finished') {

@@ -276,8 +276,14 @@ export class GameRoom {
       this.io.to(room).emit('game:powerupCollected', pickup);
     }
 
-    // Record frame for replay
-    this.replayRecorder?.recordTick(state, events);
+    // Record frame for replay — pass raw tile grid reference for diff computation
+    // (broadcast state has empty tiles for bandwidth savings, but replays need actual tiles)
+    if (this.replayRecorder) {
+      const replayState = state.tileDiffs !== undefined
+        ? { ...state, map: { ...state.map, tiles: this.gameState.map.tiles } }
+        : state;
+      this.replayRecorder.recordTick(replayState, events);
+    }
   }
 
   private async onGameOver(): Promise<void> {

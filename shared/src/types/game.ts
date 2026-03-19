@@ -58,6 +58,12 @@ export interface PowerUpState {
   type: PowerUpType;
 }
 
+export interface TileDiff {
+  x: number;
+  y: number;
+  type: TileType;
+}
+
 export interface GameMap {
   width: number;
   height: number;
@@ -89,6 +95,8 @@ export interface GameState {
   explosions: ExplosionState[];
   powerUps: PowerUpState[];
   map: GameMap;
+  /** Tile diffs since last tick (omitted when no tiles changed). When present, client applies these instead of full map.tiles. */
+  tileDiffs?: TileDiff[];
   zone?: ZoneState;
   hillZone?: HillZone;
   kothScores?: Record<number, number>;

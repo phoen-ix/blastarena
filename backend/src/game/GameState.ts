@@ -1,6 +1,7 @@
 import {
   GameState as GameStateType,
   TileType,
+  TileDiff,
   PlayerInput,
   Position,
   PowerUpType,
@@ -117,6 +118,12 @@ export class GameStateManager {
     [];
   private nextMeteorTick: number = 0;
   private nextPowerupRainTick: number = 0;
+
+  // Tile diff tracking for delta state broadcasts
+  private _dirtyTiles: Map<string, TileDiff> = new Map();
+
+  // Bot AI tick throttling: cache last bot inputs to reuse on skipped ticks
+  private _lastBotInputs: Map<number, PlayerInput> = new Map();
 
   constructor(config: GameConfig) {
     const {
@@ -238,28 +245,40 @@ export class GameStateManager {
     }
 
     if (!isFinishing) {
-      // 0. Generate bot inputs
+      // 0. Generate bot inputs (throttled: full AI every other tick, reuse last input on off-ticks)
+      const runFullBotAI = this.tick % 2 === 0;
       for (const [botId, ai] of this.botAIs) {
         const botPlayer = this.players.get(botId);
         if (botPlayer && botPlayer.alive) {
-          try {
-            const input = ai.generateInput(botPlayer, this, this.gameLogger);
-            if (input) {
-              this.inputBuffer.addInput(botId, input);
+          if (runFullBotAI) {
+            try {
+              const input = ai.generateInput(botPlayer, this, this.gameLogger);
+              if (input) {
+                this.inputBuffer.addInput(botId, input);
+                this._lastBotInputs.set(botId, input);
+              } else {
+                this._lastBotInputs.delete(botId);
+              }
+            } catch (err: unknown) {
+              // Custom AI crashed — replace with built-in fallback
+              const msg = err instanceof Error ? err.message : String(err);
+              if (this.gameLogger) {
+                this.gameLogger.logBotDecision(botId, 'ai_crash', `Custom AI error: ${msg}`);
+              }
+              this.botAIs.set(
+                botId,
+                getBotAIRegistry().createInstance('builtin', this.botDifficulty, {
+                  width: this.map.width,
+                  height: this.map.height,
+                }),
+              );
             }
-          } catch (err: unknown) {
-            // Custom AI crashed — replace with built-in fallback
-            const msg = err instanceof Error ? err.message : String(err);
-            if (this.gameLogger) {
-              this.gameLogger.logBotDecision(botId, 'ai_crash', `Custom AI error: ${msg}`);
+          } else {
+            // Off-tick: reuse last input (movement continues, no new decisions)
+            const lastInput = this._lastBotInputs.get(botId);
+            if (lastInput) {
+              this.inputBuffer.addInput(botId, { ...lastInput, seq: lastInput.seq + 1, tick: this.tick });
             }
-            this.botAIs.set(
-              botId,
-              getBotAIRegistry().createInstance('builtin', this.botDifficulty, {
-                width: this.map.width,
-                height: this.map.height,
-              }),
-            );
           }
         }
       }
@@ -506,7 +525,7 @@ export class GameStateManager {
           this.explosions.set(explosion.id, explosion);
           // Destroy walls
           for (const cell of cells) {
-            this.collisionSystem.destroyTile(cell.x, cell.y);
+            this.destroyTileTracked(cell.x, cell.y);
           }
           this.mapEvents.splice(i, 1);
         }
@@ -573,6 +592,21 @@ export class GameStateManager {
     }
 
     this._processingTick = false;
+  }
+
+  /** Destroy a tile and track the change for delta broadcasting */
+  private destroyTileTracked(x: number, y: number): boolean {
+    const result = this.collisionSystem.destroyTile(x, y);
+    // Track tile change regardless of whether it was "destroyed" (cracked counts too)
+    if (x >= 0 && x < this.map.width && y >= 0 && y < this.map.height) {
+      const currentType = this.map.tiles[y][x];
+      const key = `${x},${y}`;
+      const existing = this._dirtyTiles.get(key);
+      if (!existing || existing.type !== currentType) {
+        this._dirtyTiles.set(key, { x, y, type: currentType });
+      }
+    }
+    return result;
   }
 
   private hasBombAt(x: number, y: number): boolean {
@@ -757,7 +791,7 @@ export class GameStateManager {
     // Destroy walls and possibly spawn power-ups
     let destroyedWalls = 0;
     for (const cell of cells) {
-      if (this.collisionSystem.destroyTile(cell.x, cell.y)) {
+      if (this.destroyTileTracked(cell.x, cell.y)) {
         destroyedWalls++;
         if (this.enabledPowerUps.length > 0 && this.rng.next() < this.powerUpDropRate) {
           const type = this.getRandomEnabledPowerUp();
@@ -869,6 +903,7 @@ export class GameStateManager {
     );
   }
 
+  /** Full state including map tiles — used for game:start, replays, and simulations */
   toState(): GameStateType {
     return {
       tick: this.tick,
@@ -883,6 +918,53 @@ export class GameStateManager {
         spawnPoints: this.map.spawnPoints,
         seed: this.map.seed,
       },
+      zone: this.zone?.toState(),
+      hillZone: this.hillZone
+        ? {
+            ...this.hillZone,
+            controllingPlayer: this._hillControllingPlayerId,
+            controllingTeam: null,
+          }
+        : undefined,
+      kothScores: this.hillZone ? Object.fromEntries(this.kothScores) : undefined,
+      mapEvents:
+        this.mapEvents.length > 0
+          ? this.mapEvents.map((e) => ({
+              type: e.type as 'meteor' | 'powerup_rain',
+              position: e.position,
+              tick: e.tick,
+              warningTick: e.warningTick,
+            }))
+          : undefined,
+      status: this.status,
+      winnerId: this.winnerId,
+      winnerTeam: this.winnerTeam,
+      roundTime: this.roundTime,
+      timeElapsed: this.tick / TICK_RATE,
+    };
+  }
+
+  /** Delta state for per-tick broadcasts — omits full tile grid, sends only tile diffs */
+  toTickState(): GameStateType {
+    const tileDiffs = this._dirtyTiles.size > 0
+      ? Array.from(this._dirtyTiles.values())
+      : undefined;
+    this._dirtyTiles.clear();
+
+    return {
+      tick: this.tick,
+      players: mapToArray(this.players, (p) => p.toState()),
+      bombs: mapToArray(this.bombs, (b) => b.toState()),
+      explosions: mapToArray(this.explosions, (e) => e.toState()),
+      powerUps: mapToArray(this.powerUps, (p) => p.toState()),
+      map: {
+        width: this.map.width,
+        height: this.map.height,
+        tiles: [], // Empty — client uses stored map from game:start
+        spawnPoints: this.map.spawnPoints,
+        seed: this.map.seed,
+      },
+      tileDiffs,
       zone: this.zone?.toState(),
       hillZone: this.hillZone
         ? {

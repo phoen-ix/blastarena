@@ -42,6 +42,9 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     },
     pingInterval: 25000,
     pingTimeout: 60000,
+    perMessageDeflate: {
+      threshold: 256, // Only compress messages larger than 256 bytes
+    },
   });
 
   const roomManager = new RoomManager(io);
@@ -66,13 +69,19 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     }
   });
 
-  async function broadcastRoomList() {
-    try {
-      const rooms = await lobbyService.listRooms();
-      io.emit('room:list', rooms);
-    } catch (err) {
-      logger.error({ err }, 'Failed to broadcast room list');
-    }
+  let roomListDirty = false;
+  function broadcastRoomList() {
+    if (roomListDirty) return; // Already scheduled
+    roomListDirty = true;
+    setImmediate(async () => {
+      roomListDirty = false;
+      try {
+        const rooms = await lobbyService.listRooms();
+        io.emit('room:list', rooms);
+      } catch (err) {
+        logger.error({ err }, 'Failed to broadcast room list');
+      }
+    });
   }
 
   io.on('connection', async (socket) => {
@@ -96,6 +105,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       if (gameRoom && gameRoom.isRunning() && gameRoom.isPlayerDisconnected(socket.data.userId)) {
         // Rejoin socket room and resume game
         socket.join(`room:${existingRoomCode}`);
+        socket.data.activeRoomCode = existingRoomCode;
         gameRoom.handlePlayerReconnect(socket.data.userId);
         // Send current game state so client can resume
         logger.info(
@@ -111,6 +121,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       try {
         const room = await lobbyService.createRoom(currentUser, data.name, data.config);
         socket.join(`room:${room.code}`);
+        socket.data.activeRoomCode = room.code;
         callback({ success: true, room });
         broadcastRoomList();
       } catch (err: unknown) {
@@ -124,6 +135,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       try {
         const room = await lobbyService.joinRoom(data.code, currentUser);
         socket.join(`room:${room.code}`);
+        socket.data.activeRoomCode = room.code;
         socket
           .to(`room:${room.code}`)
           .emit('room:playerJoined', { user: currentUser, ready: false, team: null });
@@ -147,6 +159,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
       const room = await lobbyService.leaveRoom(roomCode, socket.data.userId);
       socket.leave(`room:${roomCode}`);
+      socket.data.activeRoomCode = undefined;
       if (room) {
         io.to(`room:${roomCode}`).emit('room:playerLeft', socket.data.userId);
         io.to(`room:${roomCode}`).emit('room:state', room);
@@ -301,8 +314,9 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       io.to(`room:${roomCode}`).emit('room:state', room);
     });
 
-    // Game input
-    socket.on('game:input', async (input) => {
+    // Game input — hot path, avoid Redis lookup per input
+    // Cache the room code on socket data when game starts; cleared on disconnect/leave
+    socket.on('game:input', (input) => {
       if (!inputLimiter(socket.id)) return;
 
       // Runtime validation — TypeScript types are compile-time only
@@ -321,7 +335,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         return;
       }
 
-      const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
+      const roomCode = socket.data.activeRoomCode;
       if (!roomCode) return;
 
       const gameRoom = roomManager.getRoom(roomCode);
@@ -520,6 +534,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     socket.on('disconnect', async () => {
       logger.info({ userId: socket.data.userId }, 'Socket disconnected');
       removeSocket(socket.id);
+      socket.data.activeRoomCode = undefined;
 
       const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
       if (roomCode) {
