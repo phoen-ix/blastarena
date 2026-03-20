@@ -84,10 +84,12 @@ Added to `TileType` union, `CollisionSystem.isWalkable()`, `TileMap.getTileTextu
 
 `LevelEditorScene.ts` — full Phaser scene with DOM overlay:
 - Tool palette (tiles, enemies, power-ups), click-to-place, paint mode (drag)
-- Zoom (scroll), pan (right-click drag)
-- Undo/redo (Ctrl+Z/Y, 50-state stack)
+- Camera viewport offset so toolbar doesn't obscure the map
+- Zoom (scroll), pan (right/middle-click drag or WASD/arrow keys)
+- Map dimension controls (width/height, odd 7-51) with content-preserving resize
+- Undo/redo (Ctrl+Z/Y, 50-state stack, includes dimension changes)
 - Save/load via API
-- Level settings panel: name, lives, time limit, par time, win condition, published toggle
+- Level settings panel: name, dimensions, lives, time limit, par time, win condition, published toggle
 - Admin-only, launched from CampaignTab
 
 ## Admin CampaignTab

@@ -63,11 +63,29 @@ export class LevelEditorScene extends Phaser.Scene {
   private undoStack: string[] = [];
   private redoStack: string[] = [];
 
+  // Map dimension inputs (for programmatic update after odd-rounding)
+  private widthInput: HTMLInputElement | null = null;
+  private heightInput: HTMLInputElement | null = null;
+
+  // Keyboard pan keys
+  private panKeys: {
+    up: Phaser.Input.Keyboard.Key;
+    down: Phaser.Input.Keyboard.Key;
+    left: Phaser.Input.Keyboard.Key;
+    right: Phaser.Input.Keyboard.Key;
+    w: Phaser.Input.Keyboard.Key;
+    a: Phaser.Input.Keyboard.Key;
+    s: Phaser.Input.Keyboard.Key;
+    d: Phaser.Input.Keyboard.Key;
+  } | null = null;
+
   // DOM overlay
   private editorContainer: HTMLElement | null = null;
   private isPanning = false;
   private lastPanX = 0;
   private lastPanY = 0;
+
+  private static readonly TOOLBAR_WIDTH = 200;
 
   constructor() {
     super({ key: 'LevelEditorScene' });
@@ -249,7 +267,16 @@ export class LevelEditorScene extends Phaser.Scene {
     const worldW = this.mapWidth * TILE_SIZE;
     const worldH = this.mapHeight * TILE_SIZE;
     cam.setBounds(-TILE_SIZE, -TILE_SIZE, worldW + TILE_SIZE * 2, worldH + TILE_SIZE * 2);
+
+    // Restrict rendering to the area right of the toolbar
+    const tw = LevelEditorScene.TOOLBAR_WIDTH;
+    cam.setViewport(tw, 0, this.scale.width - tw, this.scale.height);
     cam.centerOn(worldW / 2, worldH / 2);
+
+    // Update viewport on window resize
+    this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
+      cam.setViewport(tw, 0, gameSize.width - tw, gameSize.height);
+    });
 
     // Zoom with scroll wheel
     this.input.on('wheel', (_pointer: any, _gameObjects: any, _dx: number, _dy: number, dz: number) => {
@@ -269,7 +296,7 @@ export class LevelEditorScene extends Phaser.Scene {
       }
 
       // Check if clicking on UI
-      if (pointer.x < 200) return; // Left panel
+      if (pointer.x < LevelEditorScene.TOOLBAR_WIDTH) return; // Left panel
 
       this.saveUndoState();
       this.handlePlacement(pointer);
@@ -286,7 +313,7 @@ export class LevelEditorScene extends Phaser.Scene {
       }
 
       // Paint mode (left button held)
-      if (pointer.isDown && pointer.leftButtonDown() && pointer.x >= 200) {
+      if (pointer.isDown && pointer.leftButtonDown() && pointer.x >= LevelEditorScene.TOOLBAR_WIDTH) {
         this.handlePlacement(pointer);
       }
     });
@@ -306,6 +333,47 @@ export class LevelEditorScene extends Phaser.Scene {
       this.input.keyboard.on('keydown-Y', (event: KeyboardEvent) => {
         if (event.ctrlKey || event.metaKey) this.redo();
       });
+
+      // Pan keys (false = don't capture, so Ctrl+Z still works)
+      this.panKeys = {
+        up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.UP, false),
+        down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN, false),
+        left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT, false),
+        right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT, false),
+        w: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W, false),
+        a: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A, false),
+        s: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S, false),
+        d: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D, false),
+      };
+    }
+  }
+
+  update(_time: number, delta: number): void {
+    if (!this.panKeys) return;
+
+    // Don't pan while typing in input fields
+    const active = document.activeElement;
+    if (
+      active &&
+      (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA')
+    ) {
+      return;
+    }
+
+    const PAN_SPEED = 400;
+    const cam = this.cameras.main;
+    const speed = (PAN_SPEED * delta) / (1000 * cam.zoom);
+
+    let dx = 0;
+    let dy = 0;
+    if (this.panKeys.left.isDown || this.panKeys.a.isDown) dx -= speed;
+    if (this.panKeys.right.isDown || this.panKeys.d.isDown) dx += speed;
+    if (this.panKeys.up.isDown || this.panKeys.w.isDown) dy -= speed;
+    if (this.panKeys.down.isDown || this.panKeys.s.isDown) dy += speed;
+
+    if (dx !== 0 || dy !== 0) {
+      cam.scrollX += dx;
+      cam.scrollY += dy;
     }
   }
 
@@ -408,55 +476,60 @@ export class LevelEditorScene extends Phaser.Scene {
     });
   }
 
-  private saveUndoState(): void {
-    const state = JSON.stringify({
+  private serializeState(): string {
+    return JSON.stringify({
+      mapWidth: this.mapWidth,
+      mapHeight: this.mapHeight,
       tiles: this.tiles,
       enemies: this.enemies.map((e) => ({ enemyTypeId: e.enemyTypeId, x: e.x, y: e.y })),
       powerups: this.powerups.map((p) => ({ type: p.type, x: p.x, y: p.y, hidden: p.hidden })),
     });
-    this.undoStack.push(state);
+  }
+
+  private saveUndoState(): void {
+    this.undoStack.push(this.serializeState());
     if (this.undoStack.length > 50) this.undoStack.shift();
     this.redoStack = [];
   }
 
   private undo(): void {
     if (this.undoStack.length === 0) return;
-    const current = JSON.stringify({
-      tiles: this.tiles,
-      enemies: this.enemies.map((e) => ({ enemyTypeId: e.enemyTypeId, x: e.x, y: e.y })),
-      powerups: this.powerups.map((p) => ({ type: p.type, x: p.x, y: p.y, hidden: p.hidden })),
-    });
-    this.redoStack.push(current);
+    this.redoStack.push(this.serializeState());
     const prev = JSON.parse(this.undoStack.pop()!);
     this.restoreState(prev);
   }
 
   private redo(): void {
     if (this.redoStack.length === 0) return;
-    const current = JSON.stringify({
-      tiles: this.tiles,
-      enemies: this.enemies.map((e) => ({ enemyTypeId: e.enemyTypeId, x: e.x, y: e.y })),
-      powerups: this.powerups.map((p) => ({ type: p.type, x: p.x, y: p.y, hidden: p.hidden })),
-    });
-    this.undoStack.push(current);
+    this.undoStack.push(this.serializeState());
     const next = JSON.parse(this.redoStack.pop()!);
     this.restoreState(next);
   }
 
   private restoreState(state: any): void {
+    const dimensionsChanged =
+      state.mapWidth !== this.mapWidth || state.mapHeight !== this.mapHeight;
+    this.mapWidth = state.mapWidth ?? this.mapWidth;
+    this.mapHeight = state.mapHeight ?? this.mapHeight;
     this.tiles = state.tiles;
+
     // Clear existing entity sprites
     for (const e of this.enemies) e.sprite?.destroy();
     for (const p of this.powerups) p.sprite?.destroy();
     this.enemies = [];
     this.powerups = [];
 
-    // Rebuild
-    for (let y = 0; y < this.mapHeight; y++) {
-      for (let x = 0; x < this.mapWidth; x++) {
-        this.updateTileSprite(x, y);
+    if (dimensionsChanged) {
+      this.rebuildAfterResize();
+    } else {
+      for (let y = 0; y < this.mapHeight; y++) {
+        for (let x = 0; x < this.mapWidth; x++) {
+          this.updateTileSprite(x, y);
+        }
       }
     }
+
+    // Restore entities
     for (const e of state.enemies) {
       const enemy: PlacedEnemy = { id: this.nextEntityId++, ...e };
       const key = `enemy_${enemy.enemyTypeId}_down`;
@@ -484,6 +557,88 @@ export class LevelEditorScene extends Phaser.Scene {
       }
       this.powerups.push(pu);
     }
+
+    // Update dimension inputs if they exist
+    if (this.widthInput) this.widthInput.value = String(this.mapWidth);
+    if (this.heightInput) this.heightInput.value = String(this.mapHeight);
+  }
+
+  private rebuildAfterResize(): void {
+    this.buildGrid();
+    this.gridOverlay?.destroy();
+    this.buildGridOverlay();
+    const cam = this.cameras.main;
+    const worldW = this.mapWidth * TILE_SIZE;
+    const worldH = this.mapHeight * TILE_SIZE;
+    cam.setBounds(-TILE_SIZE, -TILE_SIZE, worldW + TILE_SIZE * 2, worldH + TILE_SIZE * 2);
+    cam.centerOn(worldW / 2, worldH / 2);
+  }
+
+  private resizeMap(newWidth: number, newHeight: number): void {
+    // Enforce odd numbers
+    if (newWidth % 2 === 0) newWidth++;
+    if (newHeight % 2 === 0) newHeight++;
+    newWidth = Phaser.Math.Clamp(newWidth, 7, 51);
+    newHeight = Phaser.Math.Clamp(newHeight, 7, 51);
+
+    if (newWidth === this.mapWidth && newHeight === this.mapHeight) return;
+
+    this.saveUndoState();
+
+    const oldTiles = this.tiles;
+    const oldW = this.mapWidth;
+    const oldH = this.mapHeight;
+    this.mapWidth = newWidth;
+    this.mapHeight = newHeight;
+
+    // Build new tile array, preserving existing content
+    this.tiles = [];
+    for (let y = 0; y < newHeight; y++) {
+      this.tiles[y] = [];
+      for (let x = 0; x < newWidth; x++) {
+        if (y < oldH && x < oldW) {
+          this.tiles[y][x] = oldTiles[y][x];
+        } else if (x === 0 || y === 0 || x === newWidth - 1 || y === newHeight - 1) {
+          this.tiles[y][x] = 'wall';
+        } else if (x % 2 === 0 && y % 2 === 0) {
+          this.tiles[y][x] = 'wall';
+        } else {
+          this.tiles[y][x] = 'empty';
+        }
+      }
+    }
+
+    // Enforce perimeter walls on all edges
+    for (let y = 0; y < newHeight; y++) {
+      this.tiles[y][0] = 'wall';
+      this.tiles[y][newWidth - 1] = 'wall';
+    }
+    for (let x = 0; x < newWidth; x++) {
+      this.tiles[0][x] = 'wall';
+      this.tiles[newHeight - 1][x] = 'wall';
+    }
+
+    // Remove out-of-bounds entities
+    this.enemies = this.enemies.filter((e) => {
+      if (e.x >= newWidth || e.y >= newHeight) {
+        e.sprite?.destroy();
+        return false;
+      }
+      return true;
+    });
+    this.powerups = this.powerups.filter((p) => {
+      if (p.x >= newWidth || p.y >= newHeight) {
+        p.sprite?.destroy();
+        return false;
+      }
+      return true;
+    });
+
+    this.rebuildAfterResize();
+
+    // Update input values in case odd-rounding changed them
+    if (this.widthInput) this.widthInput.value = String(this.mapWidth);
+    if (this.heightInput) this.heightInput.value = String(this.mapHeight);
   }
 
   private buildEditorUI(): void {
@@ -618,6 +773,54 @@ export class LevelEditorScene extends Phaser.Scene {
 
     const inputStyle = 'width:100%;padding:3px 5px;background:var(--bg-surface);border:1px solid var(--bg-hover);color:var(--text);font-size:11px;border-radius:3px;box-sizing:border-box;';
     const labelStyle = 'font-size:10px;color:var(--text-dim);margin:4px 0 2px 0;';
+
+    // Map dimensions
+    const dimRow = document.createElement('div');
+    dimRow.style.cssText = 'display:flex;gap:6px;';
+
+    const wCol = document.createElement('div');
+    wCol.style.cssText = 'flex:1;';
+    const wLabel = document.createElement('div');
+    wLabel.textContent = 'Width';
+    wLabel.style.cssText = labelStyle;
+    wCol.appendChild(wLabel);
+    this.widthInput = document.createElement('input');
+    this.widthInput.type = 'number';
+    this.widthInput.min = '7';
+    this.widthInput.max = '51';
+    this.widthInput.step = '2';
+    this.widthInput.value = String(this.mapWidth);
+    this.widthInput.style.cssText = inputStyle;
+    this.widthInput.addEventListener('change', () => {
+      this.resizeMap(parseInt(this.widthInput!.value, 10) || this.mapWidth, this.mapHeight);
+    });
+    wCol.appendChild(this.widthInput);
+    dimRow.appendChild(wCol);
+
+    const hCol = document.createElement('div');
+    hCol.style.cssText = 'flex:1;';
+    const hLabel = document.createElement('div');
+    hLabel.textContent = 'Height';
+    hLabel.style.cssText = labelStyle;
+    hCol.appendChild(hLabel);
+    this.heightInput = document.createElement('input');
+    this.heightInput.type = 'number';
+    this.heightInput.min = '7';
+    this.heightInput.max = '51';
+    this.heightInput.step = '2';
+    this.heightInput.value = String(this.mapHeight);
+    this.heightInput.style.cssText = inputStyle;
+    this.heightInput.addEventListener('change', () => {
+      this.resizeMap(this.mapWidth, parseInt(this.heightInput!.value, 10) || this.mapHeight);
+    });
+    hCol.appendChild(this.heightInput);
+    dimRow.appendChild(hCol);
+    section.appendChild(dimRow);
+
+    const dimHint = document.createElement('div');
+    dimHint.textContent = 'Odd numbers, 7-51';
+    dimHint.style.cssText = 'font-size:9px;color:var(--text-dim);margin-top:1px;margin-bottom:2px;';
+    section.appendChild(dimHint);
 
     // Name
     const nameLabel = document.createElement('div');

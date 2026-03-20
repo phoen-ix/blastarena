@@ -59,7 +59,7 @@ All optional, toggled per-room: **Reinforced Walls** (2-hit destructible walls),
 
 ## Solo Campaign
 
-Single-player campaign with hand-crafted levels grouped into worlds. Defeat enemies (5 movement patterns, boss phases), earn 1-3 stars per level, track progress. Admins create enemy types and levels via a visual editor. Ships with "Training Grounds" (3 levels). See [docs/campaign.md](docs/campaign.md).
+Single-player campaign with hand-crafted levels grouped into worlds. Defeat enemies (5 movement patterns, boss phases), earn 1-3 stars per level, track progress. Admins create enemy types and levels via a visual editor with resizable maps, WASD/arrow panning, and zoom. Ships with "Training Grounds" (3 levels). See [docs/campaign.md](docs/campaign.md).
 
 ## Bot AI
 
