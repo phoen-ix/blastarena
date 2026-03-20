@@ -14,9 +14,16 @@ const mockRedis = {
     store.delete(key);
     return Promise.resolve(1);
   }),
-  keys: jest.fn<AnyFn>((pattern: string) =>
-    Promise.resolve([...store.keys()].filter((k) => k.startsWith(pattern.replace('*', '')))),
-  ),
+  // SCAN returns all matching keys in a single cursor pass (test simplification)
+  scan: jest.fn<AnyFn>((_cursor: string, _matchKw: string, pattern: string) => {
+    const prefix = pattern.replace('*', '');
+    const matched = [...store.keys()].filter((k) => k.startsWith(prefix));
+    return Promise.resolve(['0', matched]);
+  }),
+  mget: jest.fn<AnyFn>((...keys: string[]) => {
+    return Promise.resolve(keys.map((k) => store.get(k) || null));
+  }),
+  eval: jest.fn<AnyFn>(),
 };
 
 jest.mock('../../../backend/src/db/redis', () => ({
@@ -76,8 +83,36 @@ describe('lobby service', () => {
       store.delete(key);
       return Promise.resolve(1);
     });
-    mockRedis.keys.mockImplementation((pattern: string) =>
-      Promise.resolve([...store.keys()].filter((k) => k.startsWith(pattern.replace('*', '')))),
+    mockRedis.scan.mockImplementation((_cursor: string, _matchKw: string, pattern: string) => {
+      const prefix = pattern.replace('*', '');
+      const matched = [...store.keys()].filter((k) => k.startsWith(prefix));
+      return Promise.resolve(['0', matched]);
+    });
+    mockRedis.mget.mockImplementation((...keys: string[]) => {
+      return Promise.resolve(keys.map((k) => store.get(k) || null));
+    });
+    // eval mock: simulate the Lua join script behavior using the in-memory store
+    mockRedis.eval.mockImplementation(
+      (_script: string, _numKeys: number, roomKey: string, playerRoomKey: string, userJson: string, userIdStr: string) => {
+        const data = store.get(roomKey);
+        if (!data) return Promise.resolve('ERR:NOT_FOUND');
+
+        const room = JSON.parse(data);
+        if (room.status !== 'waiting') return Promise.resolve('ERR:GAME_IN_PROGRESS');
+        if (room.players.length >= room.config.maxPlayers) return Promise.resolve('ERR:ROOM_FULL');
+
+        const userId = parseInt(userIdStr);
+        if (room.players.some((p: any) => p.user.id === userId)) return Promise.resolve('ERR:ALREADY_IN_ROOM');
+
+        const user = JSON.parse(userJson);
+        room.players.push({ user, ready: false, team: null });
+
+        const updated = JSON.stringify(room);
+        store.set(roomKey, updated);
+        store.set(playerRoomKey, room.code);
+
+        return Promise.resolve(updated);
+      },
     );
   });
 

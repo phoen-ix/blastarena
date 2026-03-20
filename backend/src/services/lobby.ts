@@ -43,11 +43,23 @@ export async function getRoom(code: string): Promise<Room | null> {
 
 export async function listRooms(): Promise<RoomListItem[]> {
   const redis = getRedis();
-  const keys = await redis.keys('room:*');
+
+  // Collect all room keys using non-blocking SCAN instead of O(N) KEYS
+  const keys: string[] = [];
+  let cursor = '0';
+  do {
+    const [nextCursor, batch] = await redis.scan(cursor, 'MATCH', 'room:*', 'COUNT', 100);
+    cursor = nextCursor;
+    keys.push(...batch);
+  } while (cursor !== '0');
+
+  if (keys.length === 0) return [];
+
+  // Fetch all values in a single MGET round-trip instead of sequential GETs
+  const values = await redis.mget(...keys);
   const rooms: RoomListItem[] = [];
 
-  for (const key of keys) {
-    const data = await redis.get(key);
+  for (const data of values) {
     if (!data) continue;
 
     const room: Room = JSON.parse(data);
@@ -67,32 +79,72 @@ export async function listRooms(): Promise<RoomListItem[]> {
   return rooms;
 }
 
+// Lua script for atomic join: reads room, validates, adds player, writes back
+// KEYS[1] = room key, KEYS[2] = player:userId:room key
+// ARGV[1] = user JSON, ARGV[2] = user id (string)
+// Returns: room JSON on success, or error string prefixed with "ERR:"
+const JOIN_ROOM_LUA = `
+local data = redis.call('GET', KEYS[1])
+if not data then
+  return 'ERR:NOT_FOUND'
+end
+
+local room = cjson.decode(data)
+
+if room.status ~= 'waiting' then
+  return 'ERR:GAME_IN_PROGRESS'
+end
+
+if #room.players >= room.config.maxPlayers then
+  return 'ERR:ROOM_FULL'
+end
+
+local userId = tonumber(ARGV[2])
+for _, p in ipairs(room.players) do
+  if p.user.id == userId then
+    return 'ERR:ALREADY_IN_ROOM'
+  end
+end
+
+local user = cjson.decode(ARGV[1])
+table.insert(room.players, { user = user, ready = false, team = cjson.null })
+
+local updated = cjson.encode(room)
+redis.call('SET', KEYS[1], updated, 'EX', 3600)
+redis.call('SET', KEYS[2], room.code, 'EX', 3600)
+
+return updated
+`;
+
+const JOIN_ERROR_MAP: Record<string, { message: string; status: number; code: string }> = {
+  NOT_FOUND: { message: 'Room not found', status: 404, code: 'NOT_FOUND' },
+  GAME_IN_PROGRESS: { message: 'Game already in progress', status: 400, code: 'GAME_IN_PROGRESS' },
+  ROOM_FULL: { message: 'Room is full', status: 400, code: 'ROOM_FULL' },
+  ALREADY_IN_ROOM: { message: 'Already in this room', status: 400, code: 'ALREADY_IN_ROOM' },
+};
+
 export async function joinRoom(code: string, user: PublicUser): Promise<Room> {
   const redis = getRedis();
-  const room = await getRoom(code);
 
-  if (!room) {
-    throw new AppError('Room not found', 404, 'NOT_FOUND');
+  const result = await redis.eval(
+    JOIN_ROOM_LUA,
+    2,
+    `room:${code}`,
+    `player:${user.id}:room`,
+    JSON.stringify(user),
+    String(user.id),
+  ) as string;
+
+  if (result.startsWith('ERR:')) {
+    const errorCode = result.slice(4);
+    const err = JOIN_ERROR_MAP[errorCode];
+    if (err) {
+      throw new AppError(err.message, err.status, err.code);
+    }
+    throw new AppError('Join failed', 500);
   }
 
-  if (room.status !== 'waiting') {
-    throw new AppError('Game already in progress', 400, 'GAME_IN_PROGRESS');
-  }
-
-  if (room.players.length >= room.config.maxPlayers) {
-    throw new AppError('Room is full', 400, 'ROOM_FULL');
-  }
-
-  if (room.players.some((p) => p.user.id === user.id)) {
-    throw new AppError('Already in this room', 400, 'ALREADY_IN_ROOM');
-  }
-
-  room.players.push({ user, ready: false, team: null });
-
-  await redis.set(`room:${code}`, JSON.stringify(room), 'EX', 3600);
-  await redis.set(`player:${user.id}:room`, code, 'EX', 3600);
-
-  return room;
+  return JSON.parse(result);
 }
 
 export async function leaveRoom(code: string, userId: number): Promise<Room | null> {

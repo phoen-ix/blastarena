@@ -27,6 +27,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - ApiClient 401 interceptor: auto-refreshes token and retries, but auth endpoints (login/register) use `skipAuthRetry` to pass 401 errors through directly — prevents logout side effects from corrupting session state
 - Vite `allowedHosts` derived from `APP_URL` env var (hostname extracted at config load time), passed via docker-compose `environment`
 - Zod for request validation; `ApiClient` appends field-level `details` from validation errors to the error message
+- Redis room join uses atomic Lua script (`JOIN_ROOM_LUA`) to prevent race conditions exceeding maxPlayers
+- `listRooms()` uses `SCAN` + `MGET` pipeline instead of blocking `KEYS` + sequential `GET`
 - All game constants in shared/src/constants/
 - Socket.io listeners use one-shot pattern for game:start to prevent leaks across scene transitions
 - Bot players use negative IDs (-(i+1)) to avoid DB conflicts; skipped in DB writes
