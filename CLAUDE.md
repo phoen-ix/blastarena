@@ -163,9 +163,9 @@ Delta tile encoding, bot AI tick throttling, per-tick caching, efficient seriali
 npm test                    # Run all test suites
 npx jest --config tests/backend/jest.config.ts  # Run from project root
 ```
-- 314 tests across 23 suites covering game logic, services, middleware, routes, and utilities
+- 448 tests across 26 suites covering game logic, services, middleware, routes, and utilities
 - Game: GameState (lifecycle, movement, bombs, explosions, power-ups, all modes), GameLoop, GameRoom, Bomb, Map, CollisionSystem, InputBuffer, BattleRoyale, BotAI
-- Services: auth (register/login/refresh/logout/verify/reset), user (profile/username/email/password), lobby (rooms/join/leave/ready/teams), settings (get/set/defaults), botai-sandbox (source scan, global blocking, vm sandbox, import blocking, eval/Function blocking, timeout)
+- Services: auth (register/login/refresh/logout/verify/reset), user (profile/username/email/password), lobby (rooms/join/leave/ready/teams), settings (get/set/defaults), botai-sandbox (source scan, global blocking, vm sandbox, import blocking, eval/Function blocking, timeout), campaign (worlds CRUD/reorder/progress, levels CRUD/reorder/next-level, JSON field mapping), campaign-progress (user state, level progress, star calculation, attempt/completion recording), enemy-type (CRUD, bulk config fetch, JSON config parsing, isBoss extraction)
 - Middleware: auth + admin role checks, validation (Zod), error handler, rate limiter (Redis + fallback)
 - Routes: health endpoint
 - Utils: crypto (hash/compare/token), socket rate limiting
