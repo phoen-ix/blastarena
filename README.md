@@ -159,7 +159,7 @@ blast-arena/
 ## Testing & Linting
 
 ```bash
-npm test                    # Run all test suites (629 tests)
+npm test                    # Run all test suites (671 tests)
 npm run lint                # ESLint across all workspaces
 npm run format:check        # Prettier format check
 ```

@@ -160,18 +160,26 @@ Delta tile encoding, bot AI tick throttling, per-tick caching, efficient seriali
 - `frontend/src/utils/html.ts`: shared `escapeHtml()` and `escapeAttr()` utilities
 - LobbyUI modals extracted to `frontend/src/ui/modals/` — LobbyUI.ts is thin orchestrator (~200 lines)
 
+## Database Migrations
+- Forward migrations in `backend/src/db/migrations/*.sql`, numbered `NNN_description.sql`
+- Rollback (DOWN) migrations in `backend/src/db/migrations/down/*.down.sql`
+- Runner: `runMigrations()` (auto-runs on startup), `rollbackMigration(steps)`, `getAppliedMigrations()`
+- Tracking table: `_migrations` (name + executed_at)
+
 ## Testing
 ```bash
-npm test                    # Run all test suites
-npx jest --config tests/backend/jest.config.ts  # Run from project root
+npm test                    # Run all workspace tests (backend + frontend)
+npx jest --config tests/backend/jest.config.ts  # Backend only (from project root)
+cd frontend && npx vitest run                   # Frontend only
 ```
-- 629 tests across 32 suites covering game logic, services, middleware, routes, and utilities
+- 671 tests: 629 backend (Jest, 32 suites) + 42 frontend (Vitest, 3 suites)
 - Game: GameState (lifecycle, movement, bombs, explosions, power-ups, all modes), GameLoop, GameRoom, Bomb, Map, CollisionSystem, InputBuffer, BattleRoyale, BotAI
 - Services: auth (register/login/refresh/logout/verify/reset), user (profile/username/email/password), lobby (rooms/join/leave/ready/teams), settings (get/set/defaults), botai-sandbox (source scan, global blocking, vm sandbox, import blocking, eval/Function blocking, timeout), campaign (worlds CRUD/reorder/progress, levels CRUD/reorder/next-level, JSON field mapping), campaign-progress (user state, level progress, star calculation, attempt/completion recording), enemy-type (CRUD, bulk config fetch, JSON config parsing, isBoss extraction), admin (user CRUD/roles/deactivation, server stats, match history/detail, audit log, announcements/banners), replay (list/read/delete/placements, gzip decompression, file discovery), botai (upload/compile/update/reupload/delete, registry lifecycle, source download)
 - Middleware: auth + admin role checks, validation (Zod), error handler, rate limiter (Redis + fallback)
 - Routes: health endpoint, auth (register/login/logout/refresh/verify/forgot/reset, cookie handling, middleware presence), lobby (room list/create, user mapping, middleware), user (profile CRUD, email change admin bypass, password validation, confirm-email public endpoint)
 - Utils: crypto (hash/compare/token), socket rate limiting
 - Shared: grid utilities, validation (username/password/email/room name)
+- Frontend (Vitest): html escaping (escapeHtml/escapeAttr), Settings (localStorage cache/defaults/merge), grid utils (posToTile/tileToPos/explosionCells/manhattanDistance/isInBounds)
 
 ## Documentation
 - [Bot AI Developer Guide](docs/bot-ai-guide.md) — writing custom bot AIs
