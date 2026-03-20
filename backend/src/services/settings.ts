@@ -1,6 +1,6 @@
 import { query, execute } from '../db/connection';
 import { SettingRow } from '../db/types';
-import { GameDefaults, SimulationDefaults } from '@blast-arena/shared';
+import { GameDefaults, SimulationDefaults, EmailSettings } from '@blast-arena/shared';
 
 export async function getSetting(key: string): Promise<string | null> {
   const rows = await query<SettingRow[]>(
@@ -48,4 +48,18 @@ export async function getSimulationDefaults(): Promise<SimulationDefaults> {
 
 export async function setSimulationDefaults(defaults: SimulationDefaults): Promise<void> {
   await setSetting('simulation_defaults', JSON.stringify(defaults));
+}
+
+export async function getEmailSettings(): Promise<EmailSettings> {
+  const value = await getSetting('email_settings');
+  if (!value) return {};
+  try {
+    return JSON.parse(value) as EmailSettings;
+  } catch {
+    return {};
+  }
+}
+
+export async function setEmailSettings(settings: EmailSettings): Promise<void> {
+  await setSetting('email_settings', JSON.stringify(settings));
 }

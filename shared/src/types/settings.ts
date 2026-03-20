@@ -25,3 +25,12 @@ export interface SimulationDefaults extends GameDefaults {
   logVerbosity?: LogVerbosity;
   recordReplays?: boolean;
 }
+
+export interface EmailSettings {
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpUser?: string;
+  smtpPassword?: string;
+  fromEmail?: string;
+  fromName?: string;
+}

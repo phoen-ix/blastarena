@@ -1,8 +1,10 @@
 import { ApiClient } from '../../network/ApiClient';
+import { escapeAttr } from '../../utils/html';
 import { NotificationUI } from '../NotificationUI';
 import {
   GameDefaults,
   SimulationDefaults,
+  EmailSettings,
   PowerUpType,
   POWERUP_DEFINITIONS,
   BotAIEntry,
@@ -18,6 +20,7 @@ export class DashboardTab {
   private gameDefaults: GameDefaults = {};
   private simulationDefaults: SimulationDefaults = {};
   private activeAIs: BotAIEntry[] = [];
+  private emailSettings: EmailSettings = {};
 
   constructor(notifications: NotificationUI) {
     this.notifications = notifications;
@@ -55,6 +58,13 @@ export class DashboardTab {
     } catch {
       // Use defaults on failure
     }
+    // Email settings are admin-only; fetch separately to handle non-admin gracefully
+    try {
+      const emailResp = await ApiClient.get<{ settings: EmailSettings }>('/admin/settings/email_settings');
+      this.emailSettings = emailResp.settings ?? {};
+    } catch {
+      // Non-admin or fetch failure — leave as empty
+    }
     this.renderSettingsCard();
   }
 
@@ -78,6 +88,7 @@ export class DashboardTab {
         <span style="color:var(--text-dim);font-size:12px;">Enable replay recording for all new games</span>
       </div>
 
+      ${this.renderEmailSettingsSection()}
       ${this.renderDefaultsSection('game')}
       ${this.renderDefaultsSection('simulation')}
     `;
@@ -95,8 +106,151 @@ export class DashboardTab {
       }
     });
 
+    this.attachEmailSettingsListeners(card);
     this.attachDefaultsListeners(card, 'game');
     this.attachDefaultsListeners(card, 'simulation');
+  }
+
+  private renderEmailSettingsSection(): string {
+    const s = this.emailSettings;
+    const configured = !!s.smtpHost;
+    const statusDot = configured
+      ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--success);margin-right:6px;" title="SMTP configured"></span>'
+      : '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--danger);margin-right:6px;" title="SMTP not configured"></span>';
+
+    const inputStyle = 'width:100%;background:var(--bg-deep);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:12px;';
+
+    return `
+      <div style="margin-top:12px;">
+        <button id="email-toggle" style="background:none;border:1px solid var(--border);border-radius:6px;
+          padding:8px 14px;cursor:pointer;color:var(--text);font-size:13px;font-weight:600;width:100%;
+          text-align:left;display:flex;justify-content:space-between;align-items:center;">
+          <span>${statusDot}Email / SMTP Settings</span>
+          <span id="email-arrow" style="transition:transform 0.2s;">&#9654;</span>
+        </button>
+        <div id="email-body" style="display:none;padding:14px 18px;margin-top:4px;
+          background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:11px;color:var(--text-dim);">SMTP Host</label>
+              <input type="text" id="email-smtpHost" value="${escapeAttr(s.smtpHost ?? '')}" placeholder="smtp.example.com" style="${inputStyle}">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:11px;color:var(--text-dim);">SMTP Port</label>
+              <input type="number" id="email-smtpPort" value="${s.smtpPort ?? ''}" placeholder="587" min="1" max="65535" style="${inputStyle}">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:11px;color:var(--text-dim);">SMTP User</label>
+              <input type="text" id="email-smtpUser" value="${escapeAttr(s.smtpUser ?? '')}" placeholder="user@example.com" style="${inputStyle}">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:11px;color:var(--text-dim);">SMTP Password</label>
+              <div style="position:relative;">
+                <input type="password" id="email-smtpPassword" value="${escapeAttr(s.smtpPassword ?? '')}" placeholder="No password set" style="${inputStyle}padding-right:30px;">
+                <button id="email-togglePw" type="button" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);
+                  background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:11px;padding:2px 4px;">Show</button>
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:11px;color:var(--text-dim);">From Email</label>
+              <input type="text" id="email-fromEmail" value="${escapeAttr(s.fromEmail ?? '')}" placeholder="noreply@example.com" style="${inputStyle}">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:11px;color:var(--text-dim);">From Name</label>
+              <input type="text" id="email-fromName" value="${escapeAttr(s.fromName ?? '')}" placeholder="BlastArena" style="${inputStyle}">
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:14px;align-items:center;">
+            <button id="email-save" class="btn btn-primary" style="font-size:12px;padding:6px 16px;">Save</button>
+            <button id="email-reset" class="btn btn-secondary" style="font-size:12px;padding:6px 16px;">Reset to Defaults</button>
+            <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+              <input type="email" id="email-testAddr" placeholder="test@example.com" style="${inputStyle}width:180px;">
+              <button id="email-test" class="btn btn-secondary" style="font-size:12px;padding:6px 16px;white-space:nowrap;">Send Test</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  private attachEmailSettingsListeners(card: HTMLElement): void {
+    const toggle = card.querySelector('#email-toggle') as HTMLElement;
+    const body = card.querySelector('#email-body') as HTMLElement;
+    const arrow = card.querySelector('#email-arrow') as HTMLElement;
+    if (!toggle || !body) return;
+
+    toggle.addEventListener('click', () => {
+      const open = body.style.display === 'none';
+      body.style.display = open ? 'block' : 'none';
+      arrow.style.transform = open ? 'rotate(90deg)' : '';
+    });
+
+    // Show/hide password
+    const pwToggle = card.querySelector('#email-togglePw') as HTMLElement;
+    const pwInput = card.querySelector('#email-smtpPassword') as HTMLInputElement;
+    pwToggle?.addEventListener('click', () => {
+      const show = pwInput.type === 'password';
+      pwInput.type = show ? 'text' : 'password';
+      pwToggle.textContent = show ? 'Hide' : 'Show';
+    });
+
+    // Save
+    card.querySelector('#email-save')!.addEventListener('click', async () => {
+      const settings: EmailSettings = {};
+      const host = (card.querySelector('#email-smtpHost') as HTMLInputElement).value.trim();
+      if (host) settings.smtpHost = host;
+      const port = (card.querySelector('#email-smtpPort') as HTMLInputElement).value;
+      if (port) settings.smtpPort = parseInt(port);
+      const user = (card.querySelector('#email-smtpUser') as HTMLInputElement).value.trim();
+      if (user) settings.smtpUser = user;
+      const password = (card.querySelector('#email-smtpPassword') as HTMLInputElement).value;
+      settings.smtpPassword = password; // Send as-is: masked value preserves, empty clears, new value updates
+      const fromEmail = (card.querySelector('#email-fromEmail') as HTMLInputElement).value.trim();
+      if (fromEmail) settings.fromEmail = fromEmail;
+      const fromName = (card.querySelector('#email-fromName') as HTMLInputElement).value.trim();
+      if (fromName) settings.fromName = fromName;
+
+      try {
+        await ApiClient.put('/admin/settings/email_settings', settings);
+        this.notifications.success('Email settings saved');
+        // Reload to get masked password back
+        const resp = await ApiClient.get<{ settings: EmailSettings }>('/admin/settings/email_settings');
+        this.emailSettings = resp.settings ?? {};
+        this.renderSettingsCard();
+      } catch {
+        this.notifications.error('Failed to save email settings');
+      }
+    });
+
+    // Reset
+    card.querySelector('#email-reset')!.addEventListener('click', async () => {
+      try {
+        await ApiClient.put('/admin/settings/email_settings', {});
+        this.notifications.success('Email settings reset to .env defaults');
+        const resp = await ApiClient.get<{ settings: EmailSettings }>('/admin/settings/email_settings');
+        this.emailSettings = resp.settings ?? {};
+        this.renderSettingsCard();
+      } catch {
+        this.notifications.error('Failed to reset email settings');
+      }
+    });
+
+    // Test email
+    card.querySelector('#email-test')!.addEventListener('click', async () => {
+      const addr = (card.querySelector('#email-testAddr') as HTMLInputElement).value.trim();
+      if (!addr) {
+        this.notifications.error('Enter an email address for the test');
+        return;
+      }
+      try {
+        await ApiClient.post('/admin/settings/email_settings/test', { to: addr });
+        this.notifications.success(`Test email sent to ${addr}`);
+      } catch (err: any) {
+        const msg = err?.error || err?.message || 'Failed to send test email';
+        this.notifications.error(msg);
+      }
+    });
   }
 
   private renderDefaultsSection(type: 'game' | 'simulation'): string {

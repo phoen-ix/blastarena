@@ -3,13 +3,16 @@ import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth';
 import { staffMiddleware, adminOnlyMiddleware } from '../middleware/admin';
 import { validate } from '../middleware/validation';
+import { getConfig } from '../config';
 import * as adminService from '../services/admin';
 import * as replayService from '../services/replay';
 import * as settingsService from '../services/settings';
 import * as botaiService from '../services/botai';
+import { invalidateTransporter, sendTestEmail } from '../services/email';
 import { getSimulationManager, getIO } from '../game/registry';
 import { execute } from '../db/connection';
-import { SimulationConfig, GameDefaults, SimulationDefaults } from '@blast-arena/shared';
+import { SimulationConfig, GameDefaults, SimulationDefaults, EmailSettings } from '@blast-arena/shared';
+import { getErrorMessage } from '@blast-arena/shared';
 import multer from 'multer';
 
 const router = Router();
@@ -213,6 +216,95 @@ router.put(
       res.json({ message: 'Simulation defaults updated' });
     } catch (err) {
       next(err);
+    }
+  },
+);
+
+// --- Email Settings ---
+
+const PASSWORD_MASK = '••••••••';
+
+const emailSettingsSchema = z.object({
+  smtpHost: z.string().max(255).optional(),
+  smtpPort: z.number().int().min(1).max(65535).optional(),
+  smtpUser: z.string().max(255).optional(),
+  smtpPassword: z.string().max(255).optional(),
+  fromEmail: z.union([z.string().email().max(255), z.literal('')]).optional(),
+  fromName: z.string().max(100).optional(),
+});
+
+const testEmailSchema = z.object({
+  to: z.string().email(),
+});
+
+router.get(
+  '/admin/settings/email_settings',
+  adminOnlyMiddleware,
+  async (_req, res, next) => {
+    try {
+      const config = getConfig();
+      const dbSettings = await settingsService.getEmailSettings();
+
+      const effective: EmailSettings = {
+        smtpHost: dbSettings.smtpHost ?? config.SMTP_HOST,
+        smtpPort: dbSettings.smtpPort ?? config.SMTP_PORT,
+        smtpUser: dbSettings.smtpUser ?? config.SMTP_USER,
+        smtpPassword: (dbSettings.smtpPassword ?? config.SMTP_PASSWORD) ? PASSWORD_MASK : '',
+        fromEmail: dbSettings.fromEmail ?? config.SMTP_FROM_EMAIL,
+        fromName: dbSettings.fromName ?? config.SMTP_FROM_NAME,
+      };
+
+      res.json({ settings: effective });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.put(
+  '/admin/settings/email_settings',
+  adminOnlyMiddleware,
+  validate(emailSettingsSchema),
+  async (req, res, next) => {
+    try {
+      const incoming = req.body as EmailSettings;
+      const existing = await settingsService.getEmailSettings();
+
+      // Password handling: preserve existing if masked/undefined, clear if empty string
+      if (incoming.smtpPassword === PASSWORD_MASK || incoming.smtpPassword === undefined) {
+        incoming.smtpPassword = existing.smtpPassword;
+      } else if (incoming.smtpPassword === '') {
+        delete incoming.smtpPassword;
+      }
+
+      await settingsService.setEmailSettings(incoming);
+      invalidateTransporter();
+
+      await execute(
+        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user!.userId, 'update_setting', 'setting', 0, JSON.stringify({ key: 'email_settings' })],
+      );
+
+      const io = getIO();
+      io.emit('admin:settingsChanged' as any, { key: 'email_settings' });
+
+      res.json({ message: 'Email settings updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/admin/settings/email_settings/test',
+  adminOnlyMiddleware,
+  validate(testEmailSchema),
+  async (req, res, next) => {
+    try {
+      await sendTestEmail(req.body.to);
+      res.json({ message: 'Test email sent successfully' });
+    } catch (err) {
+      res.status(400).json({ error: `Failed to send test email: ${getErrorMessage(err)}` });
     }
   },
 );

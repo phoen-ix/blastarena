@@ -1,25 +1,49 @@
 import nodemailer from 'nodemailer';
 import { getConfig } from '../config';
 import { logger } from '../utils/logger';
+import { getEmailSettings } from './settings';
 
 let transporter: nodemailer.Transporter | null = null;
 
-function getTransporter(): nodemailer.Transporter | null {
-  const config = getConfig();
+interface ResolvedEmailConfig {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  fromEmail: string;
+  fromName: string;
+}
 
-  if (!config.SMTP_HOST) {
+async function getResolvedEmailConfig(): Promise<ResolvedEmailConfig> {
+  const config = getConfig();
+  const dbSettings = await getEmailSettings();
+
+  return {
+    host: dbSettings.smtpHost ?? config.SMTP_HOST,
+    port: dbSettings.smtpPort ?? config.SMTP_PORT,
+    user: dbSettings.smtpUser ?? config.SMTP_USER,
+    password: dbSettings.smtpPassword ?? config.SMTP_PASSWORD,
+    fromEmail: dbSettings.fromEmail ?? config.SMTP_FROM_EMAIL,
+    fromName: dbSettings.fromName ?? config.SMTP_FROM_NAME,
+  };
+}
+
+async function getTransporter(): Promise<nodemailer.Transporter | null> {
+  const emailConfig = await getResolvedEmailConfig();
+
+  if (!emailConfig.host) {
     logger.warn('SMTP not configured, emails will be logged only');
     return null;
   }
 
   if (!transporter) {
     transporter = nodemailer.createTransport({
-      host: config.SMTP_HOST,
-      port: config.SMTP_PORT,
-      secure: config.SMTP_PORT === 465,
-      auth: config.SMTP_USER ? {
-        user: config.SMTP_USER,
-        pass: config.SMTP_PASSWORD,
+      host: emailConfig.host,
+      port: emailConfig.port,
+      secure: emailConfig.port === 465,
+      auth: emailConfig.user ? {
+        user: emailConfig.user,
+        pass: emailConfig.password,
       } : undefined,
     });
   }
@@ -27,9 +51,13 @@ function getTransporter(): nodemailer.Transporter | null {
   return transporter;
 }
 
+export function invalidateTransporter(): void {
+  transporter = null;
+}
+
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
-  const config = getConfig();
-  const transport = getTransporter();
+  const emailConfig = await getResolvedEmailConfig();
+  const transport = await getTransporter();
 
   if (!transport) {
     logger.info({ to, subject }, 'Email (SMTP not configured, logging only)');
@@ -39,7 +67,7 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
 
   try {
     await transport.sendMail({
-      from: `"${config.SMTP_FROM_NAME}" <${config.SMTP_FROM_EMAIL}>`,
+      from: `"${emailConfig.fromName}" <${emailConfig.fromEmail}>`,
       to,
       subject,
       html,
@@ -84,5 +112,12 @@ export async function sendPasswordResetEmail(email: string, token: string): Prom
     <p><a href="${url}">${url}</a></p>
     <p>This link expires in 1 hour.</p>
     <p>If you didn't request a password reset, you can ignore this email.</p>
+  `);
+}
+
+export async function sendTestEmail(to: string): Promise<void> {
+  await sendEmail(to, 'BlastArena — Test Email', `
+    <h1>Test Email</h1>
+    <p>This is a test email from BlastArena to verify your SMTP configuration is working correctly.</p>
   `);
 }

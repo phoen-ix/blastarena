@@ -74,7 +74,7 @@ Admins can upload custom AI implementations as TypeScript files. See [docs/bot-a
 
 | Tab | Access | Key Features |
 |-----|--------|-------------|
-| Dashboard | Admin | Stats, server settings, game/simulation defaults |
+| Dashboard | Admin | Stats, server settings, email/SMTP config, game/simulation defaults |
 | Users | Staff | Search, roles, deactivate, delete, password reset |
 | Matches | Staff | History, per-player stats, replay viewer, delete |
 | Rooms | Staff | Live rooms, spectate, kick, force close |

@@ -8,7 +8,7 @@ Full-screen panel accessible from lobby header (Admin button visible for admin a
 
 | Tab | Access | Features |
 |-----|--------|----------|
-| Dashboard | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings: recordings toggle, game defaults, simulation defaults |
+| Dashboard | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings: recordings toggle, email/SMTP config, game defaults, simulation defaults |
 | Users | Admin + Mod | Search, paginated table, role change, deactivate/reactivate, delete (type-to-confirm), create user, password reset |
 | Matches | Admin + Mod | Paginated history, per-player stats modal. Admin delete per row / delete all (cleans up replay files) |
 | Rooms | Admin + Mod | Active rooms with 5s refresh, spectate, send message, kick player, force close (admin only) |
@@ -33,9 +33,11 @@ Full-screen panel accessible from lobby header (Admin button visible for admin a
 
 ### Server Settings
 
-`server_settings` table: key-value store for server-wide settings. `backend/src/services/settings.ts` provides `getSetting()`, `setSetting()`, `isRecordingEnabled()`, `getGameDefaults()`, `setGameDefaults()`, `getSimulationDefaults()`, `setSimulationDefaults()`.
+`server_settings` table: key-value store for server-wide settings. `backend/src/services/settings.ts` provides `getSetting()`, `setSetting()`, `isRecordingEnabled()`, `getGameDefaults()`, `setGameDefaults()`, `getSimulationDefaults()`, `setSimulationDefaults()`, `getEmailSettings()`, `setEmailSettings()`.
 
 **Admin-configurable defaults**: `game_defaults` and `simulation_defaults` stored as JSON blobs. Public `GET /admin/settings/game_defaults`; staff `GET /admin/settings/simulation_defaults`; admin-only PUT for both. Zod-validated with all fields optional — empty `{}` means "use hardcoded defaults". `GameDefaults` and `SimulationDefaults` types in `shared/src/types/settings.ts`.
+
+**Email / SMTP settings**: `email_settings` stored as JSON in `server_settings`. `.env` values serve as fallback defaults; DB values take precedence once saved. Admin-only GET/PUT at `/admin/settings/email_settings`. Password masked in GET responses (`••••••••`); PUT preserves existing password if masked value sent, clears if empty string. `invalidateTransporter()` resets the cached nodemailer transporter on save so new settings take effect immediately. Test email endpoint: `POST /admin/settings/email_settings/test` with `{ to }`. `EmailSettings` type in `shared/src/types/settings.ts`.
 
 ---
 
