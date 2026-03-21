@@ -192,6 +192,8 @@ npm run lint                # ESLint across all workspaces
 npm run format:check        # Prettier format check
 ```
 
+1846 tests across 58 suites: game logic (450), services (721), routes (486), middleware (36), simulation (69), utilities (72), frontend (42). See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
+
 ## Documentation
 
 - [Bot AI Developer Guide](docs/bot-ai-guide.md) — writing custom bot AIs
@@ -201,4 +203,5 @@ npm run format:check        # Prettier format check
 - [Replay System](docs/replay-system.md) — recording, playback, controls
 - [Performance & Internals](docs/performance-and-internals.md) — optimizations, game logging
 - [Infrastructure & Security](docs/infrastructure.md) — security, resilience, Docker, migrations
+- [Testing](docs/testing.md) — test inventory, mocking patterns, writing new tests
 - [API Reference](docs/openapi.yaml) — OpenAPI 3.0.3 specification for all REST endpoints
