@@ -150,39 +150,66 @@ export class GameOverScene extends Phaser.Scene {
         .setOrigin(0.5);
     }
 
-    // Vote Rematch button
-    const voteBtn = this.add
-      .text(width / 2 - 100, height - 40, '[ Vote Rematch ]', {
-        fontSize: '20px',
-        color: colors.textHex,
-        fontFamily: 'Chakra Petch, sans-serif',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
-    this.voteButton = voteBtn;
+    // Determine if solo (only human player, rest are bots)
+    const humanCount = data?.placements ? data.placements.filter((p: any) => !p.isBot).length : 2;
+    const isSolo = humanCount <= 1;
 
-    voteBtn.on('pointerover', () =>
-      voteBtn.setColor(this.hasVoted ? colors.successHoverHex : '#cccccc'),
-    );
-    voteBtn.on('pointerout', () =>
-      voteBtn.setColor(this.hasVoted ? colors.successHex : colors.textHex),
-    );
-    voteBtn.on('pointerdown', () => {
-      this.hasVoted = !this.hasVoted;
-      socketClient.emit('rematch:vote' as any, { vote: this.hasVoted }, () => {});
-      voteBtn.setText(this.hasVoted ? '[ Rematch ✓ ]' : '[ Vote Rematch ]');
-      voteBtn.setColor(this.hasVoted ? colors.successHex : colors.textHex);
-    });
+    let actionBtn: Phaser.GameObjects.Text;
 
-    // Vote tally text
-    this.voteTallyText = this.add
-      .text(width / 2, height - 15, '', {
-        fontSize: '13px',
-        color: colors.textDimHex,
-        fontFamily: 'DM Sans, sans-serif',
-      })
-      .setOrigin(0.5);
+    if (isSolo) {
+      // Solo with bots: direct Play Again (no voting needed)
+      actionBtn = this.add
+        .text(width / 2 - 100, height - 40, '[ Play Again ]', {
+          fontSize: '20px',
+          color: colors.textHex,
+          fontFamily: 'Chakra Petch, sans-serif',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+
+      actionBtn.on('pointerover', () => actionBtn.setColor('#cccccc'));
+      actionBtn.on('pointerout', () => actionBtn.setColor(colors.textHex));
+      actionBtn.on('pointerdown', () => {
+        socketClient.emit('room:restart' as any, () => {});
+      });
+
+      this.voteTallyText = this.add.text(0, 0, '').setVisible(false);
+    } else {
+      // Multiplayer: Vote Rematch button
+      actionBtn = this.add
+        .text(width / 2 - 100, height - 40, '[ Vote Rematch ]', {
+          fontSize: '20px',
+          color: colors.textHex,
+          fontFamily: 'Chakra Petch, sans-serif',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+
+      actionBtn.on('pointerover', () =>
+        actionBtn.setColor(this.hasVoted ? colors.successHoverHex : '#cccccc'),
+      );
+      actionBtn.on('pointerout', () =>
+        actionBtn.setColor(this.hasVoted ? colors.successHex : colors.textHex),
+      );
+      actionBtn.on('pointerdown', () => {
+        this.hasVoted = !this.hasVoted;
+        socketClient.emit('rematch:vote' as any, { vote: this.hasVoted }, () => {});
+        actionBtn.setText(this.hasVoted ? '[ Rematch ✓ ]' : '[ Vote Rematch ]');
+        actionBtn.setColor(this.hasVoted ? colors.successHex : colors.textHex);
+      });
+
+      // Vote tally text
+      this.voteTallyText = this.add
+        .text(width / 2, height - 15, '', {
+          fontSize: '13px',
+          color: colors.textDimHex,
+          fontFamily: 'DM Sans, sans-serif',
+        })
+        .setOrigin(0.5);
+    }
+    this.voteButton = actionBtn;
 
     // Back to lobby button
     const backBtn = this.add
@@ -203,7 +230,7 @@ export class GameOverScene extends Phaser.Scene {
       this.scene.start('LobbyScene');
     });
 
-    this.buttons = [voteBtn, backBtn];
+    this.buttons = [actionBtn, backBtn];
     this.baseColors = [colors.textHex, colors.primaryHex];
     this.highlightColors = ['#cccccc', colors.primaryHoverHex];
 

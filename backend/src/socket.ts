@@ -406,7 +406,9 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
       // Initialize vote tracking if needed
       if (!rematchVotes.has(roomCode)) {
-        const humanPlayerIds = new Set(room.players.map((p) => p.user.id));
+        const humanPlayerIds = new Set(
+          room.players.filter((p) => p.user.id > 0).map((p) => p.user.id),
+        );
         const timeout = setTimeout(() => {
           rematchVotes.delete(roomCode);
           io.to(`room:${roomCode}`).emit('rematch:update' as any, {
