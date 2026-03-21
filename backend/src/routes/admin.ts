@@ -182,6 +182,27 @@ router.get('/admin/settings/default_theme', async (_req, res, next) => {
   }
 });
 
+// Public: get imprint settings (no auth required, needed by AuthUI + HelpUI)
+router.get('/admin/settings/imprint', async (_req, res, next) => {
+  try {
+    const enabled = (await settingsService.getSetting('display_imprint')) === 'true';
+    const text = enabled ? ((await settingsService.getSetting('imprint_text')) ?? '') : '';
+    res.json({ enabled, text });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Public: get github display setting (no auth required, needed by AuthUI + HelpUI)
+router.get('/admin/settings/display_github', async (_req, res, next) => {
+  try {
+    const enabled = (await settingsService.getSetting('display_github')) === 'true';
+    res.json({ enabled });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // All other admin routes require auth + staff role (admin or moderator)
 router.use(authMiddleware, staffMiddleware);
 
@@ -436,6 +457,64 @@ router.put(
       const io = getIO();
       io.emit('admin:settingsChanged' as any, { key: 'default_theme', value: req.body.theme });
       res.json({ message: 'Default theme updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// --- Imprint & GitHub Display ---
+
+const imprintSchema = z.object({
+  enabled: z.boolean(),
+  text: z.string().max(10000).optional(),
+});
+
+router.put(
+  '/admin/settings/imprint',
+  adminOnlyMiddleware,
+  validate(imprintSchema),
+  async (req, res, next) => {
+    try {
+      await settingsService.setSetting('display_imprint', String(req.body.enabled));
+      if (req.body.text !== undefined) {
+        await settingsService.setSetting('imprint_text', req.body.text);
+      }
+      await execute(
+        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [
+          req.user!.userId,
+          'update_setting',
+          'setting',
+          0,
+          JSON.stringify({ key: 'imprint', value: req.body.enabled }),
+        ],
+      );
+      res.json({ message: 'Imprint settings updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.put(
+  '/admin/settings/display_github',
+  adminOnlyMiddleware,
+  validate(toggleSchema),
+  async (req, res, next) => {
+    try {
+      await settingsService.setSetting('display_github', String(req.body.enabled));
+      await execute(
+        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [
+          req.user!.userId,
+          'update_setting',
+          'setting',
+          0,
+          JSON.stringify({ key: 'display_github', value: req.body.enabled }),
+        ],
+      );
+      res.json({ message: 'Setting updated' });
     } catch (err) {
       next(err);
     }

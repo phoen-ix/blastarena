@@ -1,5 +1,5 @@
 import { ApiClient } from '../../network/ApiClient';
-import { escapeAttr } from '../../utils/html';
+import { escapeAttr, escapeHtml } from '../../utils/html';
 import { NotificationUI } from '../NotificationUI';
 import {
   GameDefaults,
@@ -33,6 +33,9 @@ export class DashboardTab {
   private spectatorChatMode: ChatMode = 'everyone';
   private xpMultiplier: number = 1;
   private defaultTheme: ThemeId = 'inferno';
+  private displayImprint: boolean = false;
+  private imprintText: string = '';
+  private displayGithub: boolean = false;
 
   constructor(notifications: NotificationUI) {
     this.notifications = notifications;
@@ -70,6 +73,8 @@ export class DashboardTab {
         gameResp,
         simResp,
         aiResp,
+        imprintResp,
+        githubResp,
       ] = await Promise.all([
         ApiClient.get<{ enabled: boolean }>('/admin/settings/recordings_enabled'),
         ApiClient.get<{ enabled: boolean }>('/admin/settings/registration_enabled'),
@@ -83,6 +88,8 @@ export class DashboardTab {
         ApiClient.get<{ defaults: GameDefaults }>('/admin/settings/game_defaults'),
         ApiClient.get<{ defaults: SimulationDefaults }>('/admin/settings/simulation_defaults'),
         ApiClient.get<{ ais: BotAIEntry[] }>('/admin/ai/active'),
+        ApiClient.get<{ enabled: boolean; text: string }>('/admin/settings/imprint'),
+        ApiClient.get<{ enabled: boolean }>('/admin/settings/display_github'),
       ]);
       this.recordingsEnabled = recResp.enabled;
       this.registrationEnabled = regResp.enabled;
@@ -96,6 +103,9 @@ export class DashboardTab {
       this.gameDefaults = gameResp.defaults ?? {};
       this.simulationDefaults = simResp.defaults ?? {};
       this.activeAIs = aiResp.ais ?? [];
+      this.displayImprint = imprintResp.enabled;
+      this.imprintText = imprintResp.text ?? '';
+      this.displayGithub = githubResp.enabled;
     } catch {
       // Use defaults on failure
     }
@@ -201,6 +211,25 @@ export class DashboardTab {
           </select>
           <span class="setting-item-desc">Theme for users without a preference</span>
         </div>
+        <div class="setting-item">
+          <label class="setting-item-checkbox">
+            <input type="checkbox" id="toggle-display-github" ${this.displayGithub ? 'checked' : ''}>
+            <span class="setting-item-label">Display GitHub Link</span>
+          </label>
+          <span class="setting-item-desc">Show GitHub repo link on login page and in Help</span>
+        </div>
+        <div class="setting-item">
+          <label class="setting-item-checkbox">
+            <input type="checkbox" id="toggle-display-imprint" ${this.displayImprint ? 'checked' : ''}>
+            <span class="setting-item-label">Display Imprint</span>
+          </label>
+          <span class="setting-item-desc">Show imprint link on login page and in Help</span>
+        </div>
+        <div class="setting-item" id="imprint-text-group" style="${this.displayImprint ? '' : 'display:none;'}">
+          <span class="setting-item-label">Imprint Text</span>
+          <textarea id="input-imprint-text" class="admin-select" rows="4" style="width:100%;resize:vertical;font-family:var(--font-body);font-size:13px;padding:var(--sp-2) var(--sp-3);background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);">${escapeHtml(this.imprintText)}</textarea>
+          <button id="btn-save-imprint" class="btn btn-primary btn-sm" style="margin-top:var(--sp-2);">Save Imprint</button>
+        </div>
       </div>
 
       ${this.renderEmailSettingsSection()}
@@ -305,6 +334,48 @@ export class DashboardTab {
         this.notifications.success(`Default theme set to ${THEME_NAMES[val as ThemeId]}`);
       } catch {
         this.notifications.error('Failed to update default theme');
+      }
+    });
+
+    // GitHub display toggle
+    card.querySelector('#toggle-display-github')!.addEventListener('change', async (e) => {
+      const enabled = (e.target as HTMLInputElement).checked;
+      try {
+        await ApiClient.put('/admin/settings/display_github', { enabled });
+        this.displayGithub = enabled;
+        this.notifications.success(`GitHub link ${enabled ? 'enabled' : 'disabled'}`);
+      } catch {
+        (e.target as HTMLInputElement).checked = !enabled;
+        this.notifications.error('Failed to update setting');
+      }
+    });
+
+    // Imprint toggle + text
+    const imprintToggle = card.querySelector('#toggle-display-imprint') as HTMLInputElement;
+    const imprintTextGroup = card.querySelector('#imprint-text-group') as HTMLElement;
+    imprintToggle.addEventListener('change', async () => {
+      const enabled = imprintToggle.checked;
+      const text = (card.querySelector('#input-imprint-text') as HTMLTextAreaElement).value;
+      try {
+        await ApiClient.put('/admin/settings/imprint', { enabled, text });
+        this.displayImprint = enabled;
+        this.imprintText = text;
+        imprintTextGroup.style.display = enabled ? '' : 'none';
+        this.notifications.success(`Imprint ${enabled ? 'enabled' : 'disabled'}`);
+      } catch {
+        imprintToggle.checked = !enabled;
+        this.notifications.error('Failed to update setting');
+      }
+    });
+
+    card.querySelector('#btn-save-imprint')?.addEventListener('click', async () => {
+      const text = (card.querySelector('#input-imprint-text') as HTMLTextAreaElement).value;
+      try {
+        await ApiClient.put('/admin/settings/imprint', { enabled: this.displayImprint, text });
+        this.imprintText = text;
+        this.notifications.success('Imprint text saved');
+      } catch {
+        this.notifications.error('Failed to save imprint text');
       }
     });
 

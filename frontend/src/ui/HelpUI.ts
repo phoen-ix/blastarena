@@ -1,4 +1,5 @@
 import { AuthManager } from '../network/AuthManager';
+import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { POWERUP_DEFINITIONS, GAME_MODES, UserRole } from '@blast-arena/shared';
@@ -77,6 +78,8 @@ export class HelpUI {
   private contentEl: HTMLElement | null = null;
   private tabs: HelpTab[];
   private markdownCache: Map<string, string> = new Map();
+  private displayGithub = false;
+  private displayImprint = false;
 
   constructor(
     authManager: AuthManager,
@@ -112,6 +115,20 @@ export class HelpUI {
   }
 
   private async render(): Promise<void> {
+    await this.loadFooterSettings();
+
+    const rightLinks: string[] = [];
+    if (this.displayGithub) {
+      rightLinks.push(
+        '<a class="admin-tab help-external-link" href="https://github.com/phoen-ix/blastarena/" target="_blank" rel="noopener">GitHub</a>',
+      );
+    }
+    if (this.displayImprint) {
+      rightLinks.push(
+        '<button class="admin-tab help-external-link" data-tab="imprint">Imprint</button>',
+      );
+    }
+
     this.container.innerHTML = `
       <div class="admin-header">
         <h1>Help</h1>
@@ -124,6 +141,7 @@ export class HelpUI {
               `<button class="admin-tab ${t.id === this.activeTabId ? 'active' : ''}" data-tab="${t.id}">${t.label}</button>`,
           )
           .join('')}
+        ${rightLinks.length > 0 ? `<span class="help-tab-spacer"></span>${rightLinks.join('')}` : ''}
       </div>
       <div class="admin-tab-content" id="help-tab-content"></div>
     `;
@@ -136,6 +154,10 @@ export class HelpUI {
     this.container.querySelector('#help-tab-bar')!.addEventListener('click', (e: Event) => {
       const target = e.target as HTMLElement;
       const tabId = target.getAttribute('data-tab');
+      if (tabId === 'imprint') {
+        this.showImprintTab();
+        return;
+      }
       if (tabId && tabId !== this.activeTabId) {
         this.switchTab(tabId);
       }
@@ -438,6 +460,20 @@ export class HelpUI {
 
   async renderEmbedded(container: HTMLElement): Promise<void> {
     this.container = container;
+    await this.loadFooterSettings();
+
+    const rightLinks: string[] = [];
+    if (this.displayGithub) {
+      rightLinks.push(
+        '<a class="admin-tab help-external-link" href="https://github.com/phoen-ix/blastarena/" target="_blank" rel="noopener">GitHub</a>',
+      );
+    }
+    if (this.displayImprint) {
+      rightLinks.push(
+        '<button class="admin-tab help-external-link" data-tab="imprint">Imprint</button>',
+      );
+    }
+
     this.container.innerHTML = `
       <div class="view-content">
         <div class="admin-tabs" id="help-tab-bar">
@@ -447,6 +483,7 @@ export class HelpUI {
                 `<button class="admin-tab ${t.id === this.activeTabId ? 'active' : ''}" data-tab="${t.id}">${t.label}</button>`,
             )
             .join('')}
+          ${rightLinks.length > 0 ? `<span class="help-tab-spacer"></span>${rightLinks.join('')}` : ''}
         </div>
         <div class="admin-tab-content" id="help-tab-content"></div>
       </div>
@@ -455,6 +492,10 @@ export class HelpUI {
     this.container.querySelector('#help-tab-bar')!.addEventListener('click', (e: Event) => {
       const target = e.target as HTMLElement;
       const tabId = target.getAttribute('data-tab');
+      if (tabId === 'imprint') {
+        this.showImprintTab();
+        return;
+      }
       if (tabId && tabId !== this.activeTabId) {
         this.switchTab(tabId);
       }
@@ -463,6 +504,40 @@ export class HelpUI {
     this.contentEl = this.container.querySelector('#help-tab-content');
     await this.renderActiveTab();
     this.pushGamepadContext();
+  }
+
+  private async loadFooterSettings(): Promise<void> {
+    try {
+      const [imprintResp, githubResp] = await Promise.all([
+        ApiClient.get<{ enabled: boolean }>('/admin/settings/imprint'),
+        ApiClient.get<{ enabled: boolean }>('/admin/settings/display_github'),
+      ]);
+      this.displayImprint = imprintResp.enabled;
+      this.displayGithub = githubResp.enabled;
+    } catch {
+      // defaults
+    }
+  }
+
+  private async showImprintTab(): Promise<void> {
+    if (!this.contentEl) return;
+    // Deactivate all tabs, activate imprint
+    this.container.querySelectorAll('.admin-tab').forEach((t) => t.classList.remove('active'));
+    this.container.querySelector('[data-tab="imprint"]')?.classList.add('active');
+    this.activeTabId = '';
+
+    this.contentEl.innerHTML = '<div class="help-section"><p>Loading imprint...</p></div>';
+    try {
+      const resp = await ApiClient.get<{ enabled: boolean; text: string }>(
+        '/admin/settings/imprint',
+      );
+      const text = resp.text || 'No imprint information available.';
+      const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      this.contentEl.innerHTML = `<div class="help-section" style="white-space:pre-wrap;line-height:1.6;">${escaped}</div>`;
+    } catch {
+      this.contentEl.innerHTML =
+        '<div class="help-section"><p class="text-danger">Failed to load imprint.</p></div>';
+    }
   }
 
   destroy(): void {

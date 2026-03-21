@@ -11,6 +11,8 @@ export class AuthUI {
   private mode: 'login' | 'register' | 'forgot' = 'login';
   private onAuthenticated: () => void;
   private registrationEnabled: boolean = true;
+  private displayImprint: boolean = false;
+  private displayGithub: boolean = false;
 
   constructor(
     authManager: AuthManager,
@@ -23,16 +25,33 @@ export class AuthUI {
     this.overlay = document.createElement('div');
     this.overlay.className = 'auth-overlay';
     this.checkRegistration();
+    this.loadFooterLinks();
     this.render();
   }
 
   private async checkRegistration(): Promise<void> {
     try {
-      const resp = await ApiClient.get<{ enabled: boolean }>('/admin/settings/registration_enabled');
+      const resp = await ApiClient.get<{ enabled: boolean }>(
+        '/admin/settings/registration_enabled',
+      );
       this.registrationEnabled = resp.enabled;
       if (this.mode === 'login') this.render();
     } catch {
       // Default to enabled on failure
+    }
+  }
+
+  private async loadFooterLinks(): Promise<void> {
+    try {
+      const [imprintResp, githubResp] = await Promise.all([
+        ApiClient.get<{ enabled: boolean }>('/admin/settings/imprint'),
+        ApiClient.get<{ enabled: boolean }>('/admin/settings/display_github'),
+      ]);
+      this.displayImprint = imprintResp.enabled;
+      this.displayGithub = githubResp.enabled;
+      this.render();
+    } catch {
+      // defaults
     }
   }
 
@@ -99,12 +118,17 @@ export class AuthUI {
         </div>
         <div class="form-error" id="login-error"></div>
         <button class="btn btn-primary" id="login-btn">Login</button>
-        ${this.registrationEnabled ? `<div class="auth-switch">
+        ${
+          this.registrationEnabled
+            ? `<div class="auth-switch">
           Don't have an account? <a id="switch-register">Register</a>
-        </div>` : ''}
+        </div>`
+            : ''
+        }
         <div class="auth-switch">
           <a id="switch-forgot">Forgot password?</a>
         </div>
+        ${this.renderFooterLinks()}
       </div>
     `;
 
@@ -120,8 +144,49 @@ export class AuthUI {
       this.mode = 'forgot';
       this.render();
     });
+    this.overlay.querySelector('#auth-imprint-link')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this.showImprint();
+    });
 
     this.pushGamepadContext();
+  }
+
+  private async showImprint(): Promise<void> {
+    let text = '';
+    try {
+      const resp = await ApiClient.get<{ enabled: boolean; text: string }>(
+        '/admin/settings/imprint',
+      );
+      text = resp.text || 'No imprint information available.';
+    } catch {
+      text = 'Failed to load imprint.';
+    }
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:600px;">
+        <div class="modal-header">
+          <h3>Imprint</h3>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body" style="white-space:pre-wrap;font-size:14px;line-height:1.6;max-height:60vh;overflow-y:auto;">${this.escapeHtml(text)}</div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('.modal-close')!.addEventListener('click', close);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+  }
+
+  private escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   private renderRegister(): void {
@@ -185,6 +250,20 @@ export class AuthUI {
     });
 
     this.pushGamepadContext();
+  }
+
+  private renderFooterLinks(): string {
+    const links: string[] = [];
+    if (this.displayGithub) {
+      links.push(
+        '<a href="https://github.com/phoen-ix/blastarena/" target="_blank" rel="noopener">GitHub</a>',
+      );
+    }
+    if (this.displayImprint) {
+      links.push('<a id="auth-imprint-link" href="#">Imprint</a>');
+    }
+    if (links.length === 0) return '';
+    return `<div class="auth-footer-links">${links.join('<span class="auth-footer-sep">&middot;</span>')}</div>`;
   }
 
   private async handleLogin(): Promise<void> {
