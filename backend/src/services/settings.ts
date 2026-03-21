@@ -1,6 +1,6 @@
 import { query, execute } from '../db/connection';
 import { SettingRow } from '../db/types';
-import { GameDefaults, SimulationDefaults, EmailSettings } from '@blast-arena/shared';
+import { GameDefaults, SimulationDefaults, EmailSettings, ChatMode } from '@blast-arena/shared';
 
 export async function getSetting(key: string): Promise<string | null> {
   const rows = await query<SettingRow[]>(
@@ -67,4 +67,14 @@ export async function getEmailSettings(): Promise<EmailSettings> {
 
 export async function setEmailSettings(settings: EmailSettings): Promise<void> {
   await setSetting('email_settings', JSON.stringify(settings));
+}
+
+const VALID_CHAT_MODES: ChatMode[] = ['everyone', 'staff', 'admin_only', 'disabled'];
+
+export async function getChatMode(): Promise<ChatMode> {
+  const value = await getSetting('party_chat_mode');
+  if (value && VALID_CHAT_MODES.includes(value as ChatMode)) {
+    return value as ChatMode;
+  }
+  return 'everyone';
 }

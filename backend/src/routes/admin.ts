@@ -11,7 +11,7 @@ import * as botaiService from '../services/botai';
 import { invalidateTransporter, sendTestEmail } from '../services/email';
 import { getSimulationManager, getIO } from '../game/registry';
 import { execute } from '../db/connection';
-import { SimulationConfig, GameDefaults, SimulationDefaults, EmailSettings } from '@blast-arena/shared';
+import { SimulationConfig, GameDefaults, SimulationDefaults, EmailSettings, ChatMode } from '@blast-arena/shared';
 import { getErrorMessage } from '@blast-arena/shared';
 import multer from 'multer';
 
@@ -98,6 +98,16 @@ router.get('/admin/announcements/banner', async (_req, res, next) => {
   }
 });
 
+// Public: get party chat mode (no auth required, needed by PartyBar)
+router.get('/admin/settings/party_chat_mode', async (_req, res, next) => {
+  try {
+    const mode = await settingsService.getChatMode();
+    res.json({ mode });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // All other admin routes require auth + staff role (admin or moderator)
 router.use(authMiddleware, staffMiddleware);
 
@@ -146,6 +156,33 @@ router.put(
       io.emit('admin:settingsChanged' as any, {
         key: 'recordings_enabled',
         value: req.body.enabled,
+      });
+      res.json({ message: 'Setting updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+const chatModeSchema = z.object({
+  mode: z.enum(['everyone', 'staff', 'admin_only', 'disabled']),
+});
+
+router.put(
+  '/admin/settings/party_chat_mode',
+  adminOnlyMiddleware,
+  validate(chatModeSchema),
+  async (req, res, next) => {
+    try {
+      await settingsService.setSetting('party_chat_mode', req.body.mode);
+      await execute(
+        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user!.userId, 'update_setting', 'setting', 0, JSON.stringify({ key: 'party_chat_mode', value: req.body.mode })],
+      );
+      const io = getIO();
+      io.emit('admin:settingsChanged' as any, {
+        key: 'party_chat_mode',
+        value: req.body.mode,
       });
       res.json({ message: 'Setting updated' });
     } catch (err) {

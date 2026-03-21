@@ -90,7 +90,7 @@ All actions audit-logged. See [docs/admin-and-systems.md](docs/admin-and-systems
 
 - **Friends List**: Send/accept/decline friend requests, block/unblock, username search. Friends panel slides out from the right side of the lobby.
 - **Online Presence**: See friends' real-time status (online, in lobby, in game, in campaign). Presence tracked via Redis with 120s TTL.
-- **Parties**: Create a party, invite friends, party chat. When the party leader joins a room, all members auto-follow.
+- **Parties**: Create a party, invite friends, party chat. When the party leader joins a room, all members auto-follow. Party chat can be restricted by admins: everyone (default), staff only (admin+mod), admin only, or fully disabled.
 - **Room Invites**: Invite friends directly to your current room. Invite toasts with Accept/Decline buttons (30s auto-dismiss).
 
 ## Game Replays

@@ -9,6 +9,7 @@ import {
 } from '@blast-arena/shared';
 import * as partyService from '../services/party';
 import * as friendsService from '../services/friends';
+import * as settingsService from '../services/settings';
 import { createSocketRateLimiter } from '../utils/socketRateLimit';
 import { logger } from '../utils/logger';
 
@@ -166,10 +167,16 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
   });
 
   // Party chat
-  socket.on('party:chat', (data) => {
+  socket.on('party:chat', async (data) => {
     if (!partyChatLimiter.isAllowed(socket.id)) return;
     const partyId = socket.data.activePartyId;
     if (!partyId) return;
+
+    // Check chat mode setting
+    const chatMode = await settingsService.getChatMode();
+    if (chatMode === 'disabled') return;
+    if (chatMode === 'admin_only' && socket.data.role !== 'admin') return;
+    if (chatMode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator') return;
 
     const message = typeof data.message === 'string'
       ? data.message.trim().substring(0, PARTY_CHAT_MAX_LENGTH)

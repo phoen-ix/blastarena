@@ -1,6 +1,7 @@
 import { SocketClient } from '../network/SocketClient';
+import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
-import { Party, PartyChatMessage, PartyInvite } from '@blast-arena/shared';
+import { Party, PartyChatMessage, PartyInvite, ChatMode, UserRole } from '@blast-arena/shared';
 import { escapeHtml } from '../utils/html';
 
 export class PartyBar {
@@ -12,6 +13,8 @@ export class PartyBar {
   private chatMessages: PartyChatMessage[] = [];
   private chatContainer: HTMLElement | null = null;
   private currentUserId: number;
+  private currentUserRole: UserRole;
+  private chatMode: ChatMode = 'everyone';
 
   // Invite handler for room/party invites
   private onJoinRoom: ((roomCode: string) => void) | null = null;
@@ -23,23 +26,44 @@ export class PartyBar {
   private partyInviteHandler: any;
   private partyJoinRoomHandler: any;
   private roomInviteHandler: any;
+  private settingsChangedHandler: any;
 
   constructor(
     socketClient: SocketClient,
     notifications: NotificationUI,
     currentUserId: number,
+    currentUserRole: UserRole = 'user',
   ) {
     this.socketClient = socketClient;
     this.notifications = notifications;
     this.currentUserId = currentUserId;
+    this.currentUserRole = currentUserRole;
     this.container = document.createElement('div');
     this.container.className = 'party-bar';
     this.container.style.display = 'none';
     this.setupSocketListeners();
+    this.loadChatMode();
   }
 
   setJoinRoomCallback(cb: (roomCode: string) => void): void {
     this.onJoinRoom = cb;
+  }
+
+  private async loadChatMode(): Promise<void> {
+    try {
+      const resp = await ApiClient.get<{ mode: ChatMode }>('/admin/settings/party_chat_mode');
+      this.chatMode = resp.mode ?? 'everyone';
+    } catch {
+      // Default to everyone on failure
+    }
+  }
+
+  private canChat(): boolean {
+    if (this.chatMode === 'everyone') return true;
+    if (this.chatMode === 'disabled') return false;
+    if (this.chatMode === 'admin_only') return this.currentUserRole === 'admin';
+    if (this.chatMode === 'staff') return this.currentUserRole === 'admin' || this.currentUserRole === 'moderator';
+    return false;
   }
 
   mount(parent: HTMLElement): void {
@@ -55,6 +79,7 @@ export class PartyBar {
     this.socketClient.off('party:invite' as any, this.partyInviteHandler);
     this.socketClient.off('party:joinRoom' as any, this.partyJoinRoomHandler);
     this.socketClient.off('invite:room' as any, this.roomInviteHandler);
+    this.socketClient.off('admin:settingsChanged' as any, this.settingsChangedHandler);
     this.chatContainer?.remove();
     this.container.remove();
   }
@@ -104,6 +129,19 @@ export class PartyBar {
       this.showInviteToast(invite);
     };
     this.socketClient.on('invite:room' as any, this.roomInviteHandler);
+
+    this.settingsChangedHandler = (data: { key: string; value: any }) => {
+      if (data.key === 'party_chat_mode') {
+        this.chatMode = data.value as ChatMode;
+        if (!this.canChat() && this.chatOpen) {
+          this.chatOpen = false;
+          this.chatContainer?.remove();
+          this.chatContainer = null;
+        }
+        if (this.party) this.render();
+      }
+    };
+    this.socketClient.on('admin:settingsChanged' as any, this.settingsChangedHandler);
   }
 
   createParty(): void {
@@ -144,7 +182,7 @@ export class PartyBar {
           .join('')}
       </div>
       ${isLeader ? '<button class="btn btn-ghost" id="party-invite-btn" style="padding:4px 12px;font-size:11px;color:var(--accent);">+ Invite</button>' : ''}
-      <button class="btn btn-ghost" id="party-chat-btn" style="padding:4px 12px;font-size:11px;">Chat</button>
+      ${this.canChat() ? '<button class="btn btn-ghost" id="party-chat-btn" style="padding:4px 12px;font-size:11px;">Chat</button>' : ''}
       <button class="btn btn-ghost" id="party-leave-btn" style="padding:4px 12px;font-size:11px;color:var(--danger);">Leave</button>
     `;
 
@@ -155,7 +193,7 @@ export class PartyBar {
       });
     }
 
-    this.container.querySelector('#party-chat-btn')!.addEventListener('click', () => {
+    this.container.querySelector('#party-chat-btn')?.addEventListener('click', () => {
       this.chatOpen = !this.chatOpen;
       if (this.chatOpen) {
         this.showChat();

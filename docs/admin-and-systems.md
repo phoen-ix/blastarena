@@ -8,7 +8,7 @@ Full-screen panel accessible from lobby header (Admin button visible for admin a
 
 | Tab | Access | Features |
 |-----|--------|----------|
-| Dashboard | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings: recordings toggle, registration toggle, email/SMTP config, game defaults, simulation defaults |
+| Dashboard | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings: recordings toggle, registration toggle, party chat mode, email/SMTP config, game defaults, simulation defaults |
 | Users | Admin + Mod | Search, paginated table, role change, deactivate/reactivate, delete (type-to-confirm), create user, password reset |
 | Matches | Admin + Mod | Paginated history, per-player stats modal. Admin delete per row / delete all (cleans up replay files) |
 | Rooms | Admin + Mod | Active rooms with 5s refresh, spectate, send message, kick player, force close (admin only) |
@@ -29,14 +29,17 @@ Full-screen panel accessible from lobby header (Admin button visible for admin a
 - Public endpoint `GET /admin/announcements/banner` (no auth)
 - Public endpoint `GET /admin/settings/recordings_enabled` (no auth)
 - Public endpoint `GET /admin/settings/registration_enabled` (no auth, needed by AuthUI)
-- Admin-only `PUT /admin/settings/recordings_enabled` and `PUT /admin/settings/registration_enabled` — update DB, log to audit, broadcast `admin:settingsChanged`
+- Admin-only `PUT /admin/settings/recordings_enabled`, `PUT /admin/settings/registration_enabled`, and `PUT /admin/settings/party_chat_mode` — update DB, log to audit, broadcast `admin:settingsChanged`
+- Public endpoint `GET /admin/settings/party_chat_mode` (no auth, needed by PartyBar)
 - Match deletion: `DELETE /admin/matches/:id` and `DELETE /admin/matches` — deletes DB records (cascades to match_players) + replay files from disk; both audit-logged
 
 ### Server Settings
 
-`server_settings` table: key-value store for server-wide settings. `backend/src/services/settings.ts` provides `getSetting()`, `setSetting()`, `isRecordingEnabled()`, `isRegistrationEnabled()`, `getGameDefaults()`, `setGameDefaults()`, `getSimulationDefaults()`, `setSimulationDefaults()`, `getEmailSettings()`, `setEmailSettings()`.
+`server_settings` table: key-value store for server-wide settings. `backend/src/services/settings.ts` provides `getSetting()`, `setSetting()`, `isRecordingEnabled()`, `isRegistrationEnabled()`, `getChatMode()`, `getGameDefaults()`, `setGameDefaults()`, `getSimulationDefaults()`, `setSimulationDefaults()`, `getEmailSettings()`, `setEmailSettings()`.
 
 **Registration toggle**: `registration_enabled` boolean setting (defaults to `true`). When disabled, `POST /auth/register` returns 403 and the AuthUI hides the register link. Admins can still create users via the admin panel.
+
+**Party chat mode**: `party_chat_mode` setting — `ChatMode` type (`'everyone'` | `'staff'` | `'admin_only'` | `'disabled'`), defaults to `'everyone'`. Controls who can send party chat messages. Backend enforces in `party:chat` socket handler by checking `socket.data.role`. Frontend `PartyBar` hides the Chat button for users without access and auto-closes open chat windows when mode changes via `admin:settingsChanged` broadcast. Admin-only PUT at `/admin/settings/party_chat_mode`; public GET for frontend.
 
 **Admin-configurable defaults**: `game_defaults` and `simulation_defaults` stored as JSON blobs. Public `GET /admin/settings/game_defaults`; staff `GET /admin/settings/simulation_defaults`; admin-only PUT for both. Zod-validated with all fields optional — empty `{}` means "use hardcoded defaults". `GameDefaults` and `SimulationDefaults` types in `shared/src/types/settings.ts`.
 

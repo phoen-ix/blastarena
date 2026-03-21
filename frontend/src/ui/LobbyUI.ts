@@ -36,8 +36,10 @@ export class LobbyUI {
     this.container = document.createElement('div');
     this.container.className = 'lobby-container';
     this.friendsPanel = new FriendsPanel(socketClient, notifications);
-    const userId = authManager.getUser()?.id ?? 0;
-    this.partyBar = new PartyBar(socketClient, notifications, userId);
+    const user = authManager.getUser();
+    const userId = user?.id ?? 0;
+    const userRole = user?.role ?? 'user';
+    this.partyBar = new PartyBar(socketClient, notifications, userId, userRole);
     this.partyBar.setJoinRoomCallback((roomCode) => this.joinRoom(roomCode));
   }
 

@@ -26,6 +26,8 @@ export interface SimulationDefaults extends GameDefaults {
   recordReplays?: boolean;
 }
 
+export type ChatMode = 'everyone' | 'staff' | 'admin_only' | 'disabled';
+
 export interface EmailSettings {
   smtpHost?: string;
   smtpPort?: number;

@@ -8,6 +8,7 @@ import {
   PowerUpType,
   POWERUP_DEFINITIONS,
   BotAIEntry,
+  ChatMode,
 } from '@blast-arena/shared';
 
 const ALL_POWER_UPS = Object.values(POWERUP_DEFINITIONS);
@@ -22,6 +23,7 @@ export class DashboardTab {
   private simulationDefaults: SimulationDefaults = {};
   private activeAIs: BotAIEntry[] = [];
   private emailSettings: EmailSettings = {};
+  private chatMode: ChatMode = 'everyone';
 
   constructor(notifications: NotificationUI) {
     this.notifications = notifications;
@@ -46,15 +48,17 @@ export class DashboardTab {
 
   private async loadSettings(): Promise<void> {
     try {
-      const [recResp, regResp, gameResp, simResp, aiResp] = await Promise.all([
+      const [recResp, regResp, chatResp, gameResp, simResp, aiResp] = await Promise.all([
         ApiClient.get<{ enabled: boolean }>('/admin/settings/recordings_enabled'),
         ApiClient.get<{ enabled: boolean }>('/admin/settings/registration_enabled'),
+        ApiClient.get<{ mode: ChatMode }>('/admin/settings/party_chat_mode'),
         ApiClient.get<{ defaults: GameDefaults }>('/admin/settings/game_defaults'),
         ApiClient.get<{ defaults: SimulationDefaults }>('/admin/settings/simulation_defaults'),
         ApiClient.get<{ ais: BotAIEntry[] }>('/admin/ai/active'),
       ]);
       this.recordingsEnabled = recResp.enabled;
       this.registrationEnabled = regResp.enabled;
+      this.chatMode = chatResp.mode ?? 'everyone';
       this.gameDefaults = gameResp.defaults ?? {};
       this.simulationDefaults = simResp.defaults ?? {};
       this.activeAIs = aiResp.ais ?? [];
@@ -98,6 +102,16 @@ export class DashboardTab {
           </label>
           <span style="color:var(--text-dim);font-size:12px;">Allow new users to create accounts</span>
         </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:var(--text);font-weight:600;font-size:14px;">Party Chat</span>
+          <select id="select-chat-mode" style="background:var(--bg-deep);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;">
+            <option value="everyone" ${this.chatMode === 'everyone' ? 'selected' : ''}>Everyone</option>
+            <option value="staff" ${this.chatMode === 'staff' ? 'selected' : ''}>Staff Only (Admin + Mod)</option>
+            <option value="admin_only" ${this.chatMode === 'admin_only' ? 'selected' : ''}>Admin Only</option>
+            <option value="disabled" ${this.chatMode === 'disabled' ? 'selected' : ''}>Disabled</option>
+          </select>
+          <span style="color:var(--text-dim);font-size:12px;">Who can use party chat</span>
+        </div>
       </div>
 
       ${this.renderEmailSettingsSection()}
@@ -126,6 +140,26 @@ export class DashboardTab {
         this.notifications.success(`User registration ${enabled ? 'enabled' : 'disabled'}`);
       } catch {
         (e.target as HTMLInputElement).checked = !enabled;
+        this.notifications.error('Failed to update setting');
+      }
+    });
+
+    const chatModeSelect = card.querySelector('#select-chat-mode') as HTMLSelectElement;
+    const prevChatMode = this.chatMode;
+    chatModeSelect.addEventListener('change', async () => {
+      const mode = chatModeSelect.value as ChatMode;
+      try {
+        await ApiClient.put('/admin/settings/party_chat_mode', { mode });
+        this.chatMode = mode;
+        const labels: Record<ChatMode, string> = {
+          everyone: 'Everyone',
+          staff: 'Staff Only',
+          admin_only: 'Admin Only',
+          disabled: 'Disabled',
+        };
+        this.notifications.success(`Party chat set to: ${labels[mode]}`);
+      } catch {
+        chatModeSelect.value = prevChatMode;
         this.notifications.error('Failed to update setting');
       }
     });
