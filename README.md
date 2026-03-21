@@ -87,7 +87,7 @@ Admin-configurable achievement system with four condition types: cumulative stat
 
 | Tab | Access | Key Features |
 |-----|--------|-------------|
-| Dashboard | Admin | Stats, server settings (recordings, registration, email/SMTP, chat modes, XP multiplier, default theme), game/simulation defaults |
+| Dashboard | Admin | Stats, server settings (recordings, registration, email/SMTP, chat modes, XP multiplier, default theme, GitHub/imprint display), game/simulation defaults |
 | Users | Staff | Search, roles, deactivate, delete, password reset |
 | Matches | Staff | History, per-player stats, replay viewer, delete |
 | Rooms | Staff | Live rooms, spectate, kick, force close |
@@ -109,12 +109,13 @@ All actions audit-logged. See [docs/admin-and-systems.md](docs/admin-and-systems
 - **Online Presence**: See friends' real-time status (online, in lobby, in game, in campaign). Presence tracked via Redis with 120s TTL.
 - **Parties**: Full-page view with two states: empty (create party) / active (member cards, chat, invites). When the party leader joins a room, all members auto-follow.
 - **Room Invites**: Invite friends directly to your current room. Invite toasts with Accept/Decline buttons (30s auto-dismiss).
-- **Lobby Chat**: Global ephemeral chat for all connected lobby users. Collapsible panel bottom-right.
+- **Lobby Chat**: Global ephemeral chat for all connected lobby users. Collapsible panel bottom-right. Users can hide via Settings > Preferences > Chat toggle.
 - **Direct Messages**: Full-page two-column view (conversation sidebar + active conversation). Persistent messages between friends with unread badges, real-time delivery, read receipts.
 - **In-Game Emotes**: 6 predefined quick phrases (GG, Help!, Nice!, Oops, Taunt, Thanks) — keys 1-6 during gameplay. Floating bubbles above player sprites with 3s cooldown.
 - **Spectator Chat**: Dead players can text chat during live games. Collapsible panel bottom-left, role-colored usernames, 3/sec rate limit.
 - **Rematch Voting**: After game over, players vote for rematch. >50% triggers auto-restart with same settings. 30s timeout. Replaces manual "Play Again" flow.
 - **Admin Chat Controls**: All chat features (party chat, lobby chat, DMs, emotes, spectator chat) individually configurable: everyone (default), staff only, admin only, or fully disabled.
+- **Imprint & GitHub**: Admin-toggled links displayed on the login page footer and as right-aligned items in the Help tab bar. Imprint text editable in Dashboard; shown as modal on login, inline tab in Help. GitHub link opens repo in new tab.
 
 ## Game Replays
 
