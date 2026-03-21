@@ -17,6 +17,9 @@ import {
 } from '@blast-arena/shared';
 import { setupFriendHandlers, notifyFriendsOnline, notifyFriendsOffline, cleanupFriendLimiters } from './handlers/friendHandlers';
 import { setupPartyHandlers, handlePartyDisconnect, cleanupPartyLimiters } from './handlers/partyHandlers';
+import { setupLobbyHandlers, cleanupLobbyLimiters } from './handlers/lobbyHandlers';
+import { setupDMHandlers, cleanupDMLimiters } from './handlers/dmHandlers';
+import * as settingsService from './services/settings';
 import * as presenceService from './services/presence';
 import * as partyService from './services/party';
 
@@ -26,6 +29,9 @@ type TypedServer = Server<
   InterServerEvents,
   SocketData
 >;
+
+// Per-player emote cooldown (3 seconds)
+const emoteLastUsed = new Map<number, number>();
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -119,6 +125,8 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     // Setup friend and party handlers
     setupFriendHandlers(socket, io);
     setupPartyHandlers(socket, io);
+    setupLobbyHandlers(socket, io);
+    setupDMHandlers(socket, io);
 
     // Check if player was in an active game (reconnection after disconnect)
     const existingRoomCode = await lobbyService.getPlayerRoom(socket.data.userId);
@@ -413,6 +421,29 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       if (gameRoom) {
         gameRoom.handleInput(socket.data.userId, input);
       }
+    });
+
+    // In-game emotes
+    socket.on('game:emote', async (data) => {
+      const roomCode = socket.data.activeRoomCode;
+      if (!roomCode) return;
+
+      if (typeof data.emoteId !== 'number' || data.emoteId < 0 || data.emoteId > 5) return;
+
+      const emoteMode = await settingsService.getEmoteMode();
+      if (emoteMode === 'disabled') return;
+      if (emoteMode === 'admin_only' && socket.data.role !== 'admin') return;
+      if (emoteMode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator') return;
+
+      const now = Date.now();
+      const last = emoteLastUsed.get(socket.data.userId) ?? 0;
+      if (now - last < 3000) return;
+      emoteLastUsed.set(socket.data.userId, now);
+
+      io.to(`room:${roomCode}`).emit('game:emote', {
+        playerId: socket.data.userId,
+        emoteId: data.emoteId as any,
+      });
     });
 
     // Admin: kick player from room
@@ -747,6 +778,9 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       removeSocket(socket.id);
       cleanupFriendLimiters(socket.id);
       cleanupPartyLimiters(socket.id);
+      cleanupLobbyLimiters(socket.id);
+      cleanupDMLimiters(socket.id);
+      emoteLastUsed.delete(socket.data.userId);
       socket.data.activeRoomCode = undefined;
 
       // Remove presence and notify friends offline

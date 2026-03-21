@@ -3,7 +3,8 @@ import { Room, RoomPlayer, CreateRoomRequest, RoomListItem } from './lobby';
 import { UserRole } from './auth';
 import { SimulationConfig, SimulationBatchStatus, SimulationGameResult } from './simulation';
 import { CampaignGameState, CampaignLevelSummary } from './campaign';
-import { Friend, FriendRequest, Party, PartyInvite, PartyChatMessage, ActivityStatus } from './friends';
+import { Friend, FriendRequest, Party, PartyInvite, PartyChatMessage, LobbyChatMessage, DirectMessage, ActivityStatus } from './friends';
+import { EmoteId } from '../constants/emotes';
 
 // Client -> Server events
 export interface ClientToServerEvents {
@@ -125,6 +126,19 @@ export interface ClientToServerEvents {
   ) => void;
   'party:chat': (data: { message: string }) => void;
 
+  // Lobby chat
+  'lobby:chat': (data: { message: string }) => void;
+
+  // Direct messages
+  'dm:send': (
+    data: { toUserId: number; message: string },
+    callback: (response: { success: boolean; message?: DirectMessage; error?: string }) => void,
+  ) => void;
+  'dm:read': (data: { fromUserId: number }) => void;
+
+  // In-game emotes
+  'game:emote': (data: { emoteId: EmoteId }) => void;
+
   // Room invites
   'invite:room': (
     data: { userId: number },
@@ -222,6 +236,16 @@ export interface ServerToClientEvents {
   'party:invite': (invite: PartyInvite) => void;
   'party:chat': (message: PartyChatMessage) => void;
   'party:joinRoom': (data: { roomCode: string }) => void;
+
+  // Lobby chat
+  'lobby:chat': (message: LobbyChatMessage) => void;
+
+  // Direct messages
+  'dm:receive': (message: DirectMessage) => void;
+  'dm:read': (data: { fromUserId: number; readAt: string }) => void;
+
+  // In-game emotes
+  'game:emote': (data: { playerId: number; emoteId: EmoteId }) => void;
 
   // Room invites
   'invite:room': (invite: PartyInvite) => void;

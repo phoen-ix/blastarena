@@ -24,6 +24,9 @@ export class DashboardTab {
   private activeAIs: BotAIEntry[] = [];
   private emailSettings: EmailSettings = {};
   private chatMode: ChatMode = 'everyone';
+  private lobbyChatMode: ChatMode = 'everyone';
+  private dmMode: ChatMode = 'everyone';
+  private emoteMode: ChatMode = 'everyone';
 
   constructor(notifications: NotificationUI) {
     this.notifications = notifications;
@@ -48,10 +51,13 @@ export class DashboardTab {
 
   private async loadSettings(): Promise<void> {
     try {
-      const [recResp, regResp, chatResp, gameResp, simResp, aiResp] = await Promise.all([
+      const [recResp, regResp, chatResp, lobbyResp, dmResp, emoteResp, gameResp, simResp, aiResp] = await Promise.all([
         ApiClient.get<{ enabled: boolean }>('/admin/settings/recordings_enabled'),
         ApiClient.get<{ enabled: boolean }>('/admin/settings/registration_enabled'),
         ApiClient.get<{ mode: ChatMode }>('/admin/settings/party_chat_mode'),
+        ApiClient.get<{ mode: ChatMode }>('/admin/settings/lobby_chat_mode'),
+        ApiClient.get<{ mode: ChatMode }>('/admin/settings/dm_mode'),
+        ApiClient.get<{ mode: ChatMode }>('/admin/settings/emote_mode'),
         ApiClient.get<{ defaults: GameDefaults }>('/admin/settings/game_defaults'),
         ApiClient.get<{ defaults: SimulationDefaults }>('/admin/settings/simulation_defaults'),
         ApiClient.get<{ ais: BotAIEntry[] }>('/admin/ai/active'),
@@ -59,6 +65,9 @@ export class DashboardTab {
       this.recordingsEnabled = recResp.enabled;
       this.registrationEnabled = regResp.enabled;
       this.chatMode = chatResp.mode ?? 'everyone';
+      this.lobbyChatMode = lobbyResp.mode ?? 'everyone';
+      this.dmMode = dmResp.mode ?? 'everyone';
+      this.emoteMode = emoteResp.mode ?? 'everyone';
       this.gameDefaults = gameResp.defaults ?? {};
       this.simulationDefaults = simResp.defaults ?? {};
       this.activeAIs = aiResp.ais ?? [];
@@ -112,6 +121,36 @@ export class DashboardTab {
           </select>
           <span style="color:var(--text-dim);font-size:12px;">Who can use party chat</span>
         </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:var(--text);font-weight:600;font-size:14px;">Lobby Chat</span>
+          <select id="select-lobby-chat-mode" style="background:var(--bg-deep);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;">
+            <option value="everyone" ${this.lobbyChatMode === 'everyone' ? 'selected' : ''}>Everyone</option>
+            <option value="staff" ${this.lobbyChatMode === 'staff' ? 'selected' : ''}>Staff Only (Admin + Mod)</option>
+            <option value="admin_only" ${this.lobbyChatMode === 'admin_only' ? 'selected' : ''}>Admin Only</option>
+            <option value="disabled" ${this.lobbyChatMode === 'disabled' ? 'selected' : ''}>Disabled</option>
+          </select>
+          <span style="color:var(--text-dim);font-size:12px;">Global lobby chat</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:var(--text);font-weight:600;font-size:14px;">Direct Messages</span>
+          <select id="select-dm-mode" style="background:var(--bg-deep);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;">
+            <option value="everyone" ${this.dmMode === 'everyone' ? 'selected' : ''}>Everyone</option>
+            <option value="staff" ${this.dmMode === 'staff' ? 'selected' : ''}>Staff Only (Admin + Mod)</option>
+            <option value="admin_only" ${this.dmMode === 'admin_only' ? 'selected' : ''}>Admin Only</option>
+            <option value="disabled" ${this.dmMode === 'disabled' ? 'selected' : ''}>Disabled</option>
+          </select>
+          <span style="color:var(--text-dim);font-size:12px;">Friend-to-friend messaging</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:var(--text);font-weight:600;font-size:14px;">In-Game Emotes</span>
+          <select id="select-emote-mode" style="background:var(--bg-deep);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;">
+            <option value="everyone" ${this.emoteMode === 'everyone' ? 'selected' : ''}>Everyone</option>
+            <option value="staff" ${this.emoteMode === 'staff' ? 'selected' : ''}>Staff Only (Admin + Mod)</option>
+            <option value="admin_only" ${this.emoteMode === 'admin_only' ? 'selected' : ''}>Admin Only</option>
+            <option value="disabled" ${this.emoteMode === 'disabled' ? 'selected' : ''}>Disabled</option>
+          </select>
+          <span style="color:var(--text-dim);font-size:12px;">Quick emotes during games</span>
+        </div>
       </div>
 
       ${this.renderEmailSettingsSection()}
@@ -164,9 +203,39 @@ export class DashboardTab {
       }
     });
 
+    this.attachChatModeListener(card, '#select-lobby-chat-mode', 'lobby_chat_mode', 'Lobby chat', (m) => { this.lobbyChatMode = m; });
+    this.attachChatModeListener(card, '#select-dm-mode', 'dm_mode', 'Direct messages', (m) => { this.dmMode = m; });
+    this.attachChatModeListener(card, '#select-emote-mode', 'emote_mode', 'In-game emotes', (m) => { this.emoteMode = m; });
+
     this.attachEmailSettingsListeners(card);
     this.attachDefaultsListeners(card, 'game');
     this.attachDefaultsListeners(card, 'simulation');
+  }
+
+  private attachChatModeListener(
+    card: HTMLElement,
+    selector: string,
+    settingKey: string,
+    label: string,
+    onSuccess: (mode: ChatMode) => void,
+  ): void {
+    const select = card.querySelector(selector) as HTMLSelectElement;
+    if (!select) return;
+    const prev = select.value;
+    select.addEventListener('change', async () => {
+      const mode = select.value as ChatMode;
+      try {
+        await ApiClient.put(`/admin/settings/${settingKey}`, { mode });
+        onSuccess(mode);
+        const labels: Record<ChatMode, string> = {
+          everyone: 'Everyone', staff: 'Staff Only', admin_only: 'Admin Only', disabled: 'Disabled',
+        };
+        this.notifications.success(`${label} set to: ${labels[mode]}`);
+      } catch {
+        select.value = prev;
+        this.notifications.error('Failed to update setting');
+      }
+    });
   }
 
   private renderEmailSettingsSection(): string {

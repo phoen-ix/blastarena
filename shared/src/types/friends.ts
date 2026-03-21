@@ -1,5 +1,7 @@
 // Friends + Party System Types
 
+import { UserRole } from './auth';
+
 export type FriendshipStatus = 'pending' | 'accepted';
 export type ActivityStatus = 'offline' | 'online' | 'in_lobby' | 'in_game' | 'in_campaign';
 
@@ -53,8 +55,36 @@ export interface PartyChatMessage {
   timestamp: number;
 }
 
+export interface LobbyChatMessage {
+  fromUserId: number;
+  fromUsername: string;
+  message: string;
+  timestamp: number;
+  role: UserRole;
+}
+
+export interface DirectMessage {
+  id: number;
+  senderId: number;
+  senderUsername: string;
+  recipientId: number;
+  message: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface DMConversation {
+  userId: number;
+  username: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+}
+
 // Constants
 export const MAX_FRIENDS = 200;
 export const MAX_PARTY_SIZE = 8;
 export const MAX_PENDING_INVITES = 5;
 export const PARTY_CHAT_MAX_LENGTH = 200;
+export const LOBBY_CHAT_MAX_LENGTH = 200;
+export const DM_MAX_LENGTH = 500;

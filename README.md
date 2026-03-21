@@ -36,6 +36,7 @@ Open `http://localhost:8080` (or your configured `APP_EXTERNAL_PORT`). See `.env
 | `WASD` / `Arrow Keys` | D-Pad / Left Stick | Move |
 | `Space` | A | Place bomb |
 | `E` | B | Detonate remote bombs |
+| `1`-`6` | — | Quick emote (when alive) |
 | `1`-`9` | LB / RB | Spectate player (when dead) |
 
 Walk into a bomb with the Kick power-up to send it sliding. Click a player name in the HUD to follow them as spectator.
@@ -74,7 +75,7 @@ Admins can upload custom AI implementations as TypeScript files. See [docs/bot-a
 
 | Tab | Access | Key Features |
 |-----|--------|-------------|
-| Dashboard | Admin | Stats, server settings (recordings, registration, email/SMTP), game/simulation defaults |
+| Dashboard | Admin | Stats, server settings (recordings, registration, email/SMTP, chat modes), game/simulation defaults |
 | Users | Staff | Search, roles, deactivate, delete, password reset |
 | Matches | Staff | History, per-player stats, replay viewer, delete |
 | Rooms | Staff | Live rooms, spectate, kick, force close |
@@ -86,12 +87,16 @@ Admins can upload custom AI implementations as TypeScript files. See [docs/bot-a
 
 All actions audit-logged. See [docs/admin-and-systems.md](docs/admin-and-systems.md).
 
-## Friends + Party System
+## Social Features
 
 - **Friends List**: Send/accept/decline friend requests, block/unblock, username search. Friends panel slides out from the right side of the lobby.
 - **Online Presence**: See friends' real-time status (online, in lobby, in game, in campaign). Presence tracked via Redis with 120s TTL.
-- **Parties**: Create a party, invite friends, party chat. When the party leader joins a room, all members auto-follow. Party chat can be restricted by admins: everyone (default), staff only (admin+mod), admin only, or fully disabled.
+- **Parties**: Create a party, invite friends, party chat. When the party leader joins a room, all members auto-follow.
 - **Room Invites**: Invite friends directly to your current room. Invite toasts with Accept/Decline buttons (30s auto-dismiss).
+- **Lobby Chat**: Global ephemeral chat for all connected lobby users. Collapsible panel bottom-left.
+- **Direct Messages**: Persistent messages between friends. Conversation list with unread badges, real-time delivery, read receipts. Accessible via "Messages" button or "Msg" on any friend.
+- **In-Game Emotes**: 6 predefined quick phrases (GG, Help!, Nice!, Oops, Taunt, Thanks) — keys 1-6 during gameplay. Floating bubbles above player sprites with 3s cooldown.
+- **Admin Chat Controls**: All chat features (party chat, lobby chat, DMs, emotes) individually configurable: everyone (default), staff only, admin only, or fully disabled.
 
 ## Game Replays
 
@@ -145,11 +150,11 @@ blast-arena/
 ├── shared/                  # Shared types, constants, utilities
 ├── backend/
 │   └── src/
-│       ├── routes/          # REST endpoints (auth, lobby, user, admin, campaign, friends)
+│       ├── routes/          # REST endpoints (auth, lobby, user, admin, campaign, friends, messages)
 │       ├── game/            # Server game logic (GameLoop, GameState, BotAI, etc.)
 │       ├── simulation/      # Bot simulation system
 │       ├── db/              # MariaDB connection, migrations, redis
-│       ├── services/        # Auth, user, admin, lobby, email, replay, settings, friends, party, presence
+│       ├── services/        # Auth, user, admin, lobby, email, replay, settings, friends, party, presence, messages
 │       └── middleware/       # Auth, rate limiting, staff checks
 ├── frontend/
 │   ├── index.html           # HTML + full CSS design system (INFERNO theme)

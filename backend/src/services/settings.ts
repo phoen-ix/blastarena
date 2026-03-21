@@ -78,3 +78,27 @@ export async function getChatMode(): Promise<ChatMode> {
   }
   return 'everyone';
 }
+
+export async function getLobbyChatMode(): Promise<ChatMode> {
+  const value = await getSetting('lobby_chat_mode');
+  if (value && VALID_CHAT_MODES.includes(value as ChatMode)) {
+    return value as ChatMode;
+  }
+  return 'everyone';
+}
+
+export async function getDMMode(): Promise<ChatMode> {
+  const value = await getSetting('dm_mode');
+  if (value && VALID_CHAT_MODES.includes(value as ChatMode)) {
+    return value as ChatMode;
+  }
+  return 'everyone';
+}
+
+export async function getEmoteMode(): Promise<ChatMode> {
+  const value = await getSetting('emote_mode');
+  if (value && VALID_CHAT_MODES.includes(value as ChatMode)) {
+    return value as ChatMode;
+  }
+  return 'everyone';
+}

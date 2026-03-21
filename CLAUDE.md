@@ -77,7 +77,7 @@ JSON-based export/import for levels and enemy types. Export formats use `_format
 - Download pattern: `Blob` + `createObjectURL` + click anchor (same as AITab).
 
 ## Admin Panel
-Full-screen panel for admin/moderator roles. 9 tabs: Dashboard, Users, Matches, Rooms, Logs, Simulations, AI, Campaign, Announcements. `staffMiddleware` (admin+moderator) and `adminOnlyMiddleware` for route protection. All actions audit-logged. Logs tab: rows are click-to-expand — clicking a row toggles a detail row showing the full message text. `admin_actions.target_id` is `INT NOT NULL` — use `0` (not `null`) for bulk operations without a specific target. Dashboard includes email/SMTP settings (admin-only) — stored in DB (`email_settings` key), `.env` values as fallback; password masked in API responses; `invalidateTransporter()` resets cached nodemailer on save. Registration toggle (`registration_enabled` setting) — when disabled, `/auth/register` returns 403 and AuthUI hides the register link. Party chat mode (`party_chat_mode` setting) — `ChatMode` type: `'everyone'` (default), `'staff'` (admin+mod), `'admin_only'`, `'disabled'`. Admin-only PUT; public GET. Backend enforces in `party:chat` handler; frontend hides chat button and auto-closes open chat on mode change. See [docs/admin-and-systems.md](docs/admin-and-systems.md) for full details.
+Full-screen panel for admin/moderator roles. 9 tabs: Dashboard, Users, Matches, Rooms, Logs, Simulations, AI, Campaign, Announcements. Dashboard includes chat mode dropdowns for Party Chat, Lobby Chat, Direct Messages, and In-Game Emotes — each with 4 options (Everyone, Staff Only, Admin Only, Disabled). `staffMiddleware` (admin+moderator) and `adminOnlyMiddleware` for route protection. All actions audit-logged. Logs tab: rows are click-to-expand — clicking a row toggles a detail row showing the full message text. `admin_actions.target_id` is `INT NOT NULL` — use `0` (not `null`) for bulk operations without a specific target. Dashboard includes email/SMTP settings (admin-only) — stored in DB (`email_settings` key), `.env` values as fallback; password masked in API responses; `invalidateTransporter()` resets cached nodemailer on save. Registration toggle (`registration_enabled` setting) — when disabled, `/auth/register` returns 403 and AuthUI hides the register link. Party chat mode (`party_chat_mode` setting) — `ChatMode` type: `'everyone'` (default), `'staff'` (admin+mod), `'admin_only'`, `'disabled'`. Admin-only PUT; public GET. Backend enforces in `party:chat` handler; frontend hides chat button and auto-closes open chat on mode change. See [docs/admin-and-systems.md](docs/admin-and-systems.md) for full details.
 
 ## Bot AI Management
 Admin-only system for custom AI upload/management. Built-in AI as fallback. Three-layer sandbox: (1) source scan blocks dangerous module imports and global access patterns (`process`, `globalThis`, `__proto__`, `Reflect`, `Proxy`, etc.), (2) esbuild `bundle: true` with `blockImportsPlugin` rejects ALL import/require at build time, (3) `vm.runInContext()` executes code in isolated context with `codeGeneration: { strings: false }` (blocks `eval`/`Function`) and 5s timeout. `loadBotAIInSandbox()` exported from `botai-compiler.ts` — used by both compiler validation and registry runtime loading. `IBotAI` interface in `BotAI.ts`. Runtime crash recovery falls back to built-in. `botAiId` field in MatchConfig/SimulationConfig. See [docs/admin-and-systems.md](docs/admin-and-systems.md#bot-ai-management) and [docs/bot-ai-guide.md](docs/bot-ai-guide.md).
@@ -97,29 +97,64 @@ Social features for the lobby: friend list, online presence, party grouping, and
 ### Key Patterns
 - Each socket joins `user:{userId}` room on connect for targeted friend/party notifications
 - Party follows leader: when leader creates/joins a room, all members receive `party:joinRoom` and auto-join
-- Socket handlers extracted to `backend/src/handlers/friendHandlers.ts` and `partyHandlers.ts`
-- Rate limiters: `friendRequestLimiter` (3/sec), `friendActionLimiter` (5/sec), `partyChatLimiter` (5/sec), `inviteLimiter` (3/sec)
+- Socket handlers extracted to `backend/src/handlers/friendHandlers.ts`, `partyHandlers.ts`, `lobbyHandlers.ts`, and `dmHandlers.ts`
+- Rate limiters: `friendRequestLimiter` (3/sec), `friendActionLimiter` (5/sec), `partyChatLimiter` (5/sec), `inviteLimiter` (3/sec), `lobbyChatLimiter` (3/sec), `dmLimiter` (5/sec)
 - On disconnect: presence removed, friends notified offline, party leave/disband handled
 
 ### Frontend
 - **FriendsPanel** (`frontend/src/ui/FriendsPanel.ts`): Fixed slide-out panel (right side, z-index 200). Three tabs: Friends (sorted online-first), Requests (incoming+outgoing), Blocked. Search bar with username prefix lookup. Live-updates via socket events.
 - **PartyBar** (`frontend/src/ui/PartyBar.ts`): Persistent bar below lobby header when in party. Member chips, chat toggle (hidden when chat disabled for user's role), leave button. Chat window is in-memory ephemeral messages. Fetches `party_chat_mode` on init and listens for `admin:settingsChanged` to update in real-time.
 - **Invite toasts**: Action toasts with Accept/Decline buttons, 30s auto-dismiss. Triggered by `party:invite` and `invite:room` socket events.
-- LobbyUI: Friends button + Party button added to lobby header. PartyBar mounted below header.
+- **LobbyChatPanel** (`frontend/src/ui/LobbyChatPanel.ts`): Fixed collapsible panel bottom-left (z-index 150). Broadcasts to all users. Role-colored names. Checks `lobby_chat_mode` setting.
+- **DMPanel** (`frontend/src/ui/DMPanel.ts`): Slide-out panel right side (z-index 201). Two views: conversation list with unread badges, active conversation with message history. Real-time via `dm:receive`/`dm:read` socket events.
+- **EmoteBubbleRenderer** (`frontend/src/game/EmoteBubble.ts`): Phaser composed renderer. Floating text bubbles above players with tween animations (float up + fade out). Follows player positions.
+- LobbyUI: Friends, Messages, Party buttons in lobby header. PartyBar and LobbyChatPanel mounted with lobby. DMPanel accessible from Messages button or "Msg" button on friends.
 
 ### Services
 - `backend/src/services/friends.ts`: sendRequest, accept, decline, cancel, remove, block, unblock, getFriends, getFriendIds, getPending, areFriends, isBlocked, search
 - `backend/src/services/presence.ts`: set, get, getBatch (MGET), remove, refresh
 - `backend/src/services/party.ts`: create, get, join (Lua), leave, kick, disband, invite CRUD
+- `backend/src/services/messages.ts`: sendMessage, getConversation, getConversationList, markRead, getUnreadCounts
 
-### REST Routes (`/api/friends`)
+### REST Routes (`/api/friends`, `/api/messages`)
 - `GET /friends` — list friends + pending + blocked (authMiddleware)
 - `GET /friends/blocked` — blocked users (authMiddleware)
 - `POST /friends/search` — username prefix search (authMiddleware + validate)
+- `GET /messages` — conversation list (authMiddleware)
+- `GET /messages/unread` — unread counts per sender (authMiddleware)
+- `GET /messages/:userId` — paginated conversation history (authMiddleware)
+- `PUT /messages/:userId/read` — mark messages as read (authMiddleware)
 
 ### Database
 - Migration `013_friends_parties.sql`: `friendships` + `user_blocks` tables
-- Row types: `FriendshipRow`, `UserBlockRow` in `backend/src/db/types.ts`
+- Migration `014_direct_messages.sql`: `direct_messages` table (sender_id, recipient_id, message, read_at, created_at)
+- Row types: `FriendshipRow`, `UserBlockRow`, `DirectMessageRow` in `backend/src/db/types.ts`
+
+## Lobby Chat, Direct Messages & In-Game Emotes
+Three additional social features, all admin-configurable with `ChatMode` (`'everyone' | 'staff' | 'admin_only' | 'disabled'`).
+
+### Global Lobby Chat
+- Ephemeral, socket-based broadcast to all connected users. Fixed panel bottom-left of lobby (collapsible).
+- Backend: `backend/src/handlers/lobbyHandlers.ts`. Rate limit: 3/sec. Broadcasts via `io.emit('lobby:chat')`.
+- Frontend: `frontend/src/ui/LobbyChatPanel.ts`. 100-message buffer, role-colored usernames (admin=orange, mod=blue).
+- Admin setting: `lobby_chat_mode` (public GET, admin PUT on `/api/admin/settings/lobby_chat_mode`).
+
+### Direct Messages
+- Persistent (DB), between friends only. Slide-out panel on right side of lobby (z-index 201, overlays FriendsPanel).
+- Backend service: `backend/src/services/messages.ts` — sendMessage (checks areFriends + isBlocked), getConversation (paginated), getConversationList (with unread counts), markRead, getUnreadCounts.
+- Socket handlers: `backend/src/handlers/dmHandlers.ts`. Rate limit: 5/sec. `dm:send` with callback, `dm:read` with sender notification.
+- REST routes: `GET /messages`, `GET /messages/unread`, `GET /messages/:userId`, `PUT /messages/:userId/read`.
+- Frontend: `frontend/src/ui/DMPanel.ts`. Conversation list + active conversation views, real-time delivery, read receipts.
+- FriendsPanel: "Msg" button per friend opens DMPanel.openConversation(). LobbyUI: "Messages" button in header.
+- Admin setting: `dm_mode`.
+
+### In-Game Quick Emotes
+- Ephemeral, predefined phrases rendered as floating bubbles above player sprites. Keys 1-6 during gameplay.
+- 6 emotes: GG, Help!, Nice!, Oops, Taunt, Thanks (`shared/src/constants/emotes.ts`).
+- Server-side cooldown: 3s per player (`emoteLastUsed` Map). Broadcasts to game room via `game:emote`.
+- Frontend: `frontend/src/game/EmoteBubble.ts` (composed renderer). Float-up + fade-out tweens, follows player positions.
+- Number keys 1-6 for emotes only fire when `!localPlayerDead` (no conflict with spectator digit keys 1-9).
+- Admin setting: `emote_mode`.
 
 ## Game Architecture
 - 20 tick/sec server game loop (GameLoop.ts -> GameState.ts)
@@ -214,7 +249,7 @@ cd frontend && npx vitest run                   # Frontend only
 - Services: auth (register/login/refresh/logout/verify/reset), user (profile/username/email/password), lobby (rooms/join/leave/ready/teams), settings (get/set/defaults), email (SMTP config, send verification/reset/change/test, transporter caching, env/DB config priority), botai-sandbox (source scan, global blocking, vm sandbox, import blocking, eval/Function blocking, timeout), campaign (worlds CRUD/reorder/progress, levels CRUD/reorder/next-level, JSON field mapping), campaign-progress (user state, level progress, star calculation, attempt/completion recording), enemy-type (CRUD, bulk config fetch, JSON config parsing, isBoss extraction), admin (user CRUD/roles/deactivation, server stats, match history/detail, audit log, announcements/banners), replay (list/read/delete/placements, gzip decompression, file discovery), botai (upload/compile/update/reupload/delete, registry lifecycle, source download), friends (send/accept/decline/cancel/remove/block/unblock, getFriends with presence, getPending, areFriends, isBlocked, search, count), presence (set/get/getBatch/remove/refresh, TTL, JSON serialization), party (create/join/leave/kick/disband, Lua script, invite CRUD)
 - Simulation: SimulationManager (batch lifecycle, queue management, getHistory pagination, disk scanning, batch results/deletion)
 - Middleware: auth + admin role checks, validation (Zod), error handler, rate limiter (Redis + fallback)
-- Routes: health endpoint, auth (register/login/logout/refresh/verify/forgot/reset, cookie handling, middleware presence), lobby (room list/create, user mapping, middleware), user (profile CRUD, email change admin bypass, password validation, confirm-email public endpoint), campaign (worlds/levels/enemies CRUD, reorder, progress, import/export, middleware), admin (users/matches/rooms/audit/announcements/simulations/bot-ai/replays/settings, staff vs admin middleware), friends (list/blocked/search, middleware presence)
+- Routes: health endpoint, auth (register/login/logout/refresh/verify/forgot/reset, cookie handling, middleware presence), lobby (room list/create, user mapping, middleware), user (profile CRUD, email change admin bypass, password validation, confirm-email public endpoint), campaign (worlds/levels/enemies CRUD, reorder, progress, import/export, middleware), admin (users/matches/rooms/audit/announcements/simulations/bot-ai/replays/settings, chat modes, staff vs admin middleware), friends (list/blocked/search, middleware presence), messages (conversation list/history/unread/mark-read)
 - Utils: crypto (hash/compare/token), socket rate limiting
 - Shared: grid utilities, validation (username/password/email/room name)
 - Frontend (Vitest): html escaping (escapeHtml/escapeAttr), Settings (localStorage cache/defaults/merge), grid utils (posToTile/tileToPos/explosionCells/manhattanDistance/isInBounds)

@@ -18,6 +18,8 @@ import { ReplayControls } from '../game/ReplayControls';
 import { ReplayLogPanel } from '../game/ReplayLogPanel';
 import { EnemySpriteRenderer } from '../game/EnemySprite';
 import { EnemyTextureGenerator } from '../game/EnemyTextureGenerator';
+import { EmoteBubbleRenderer } from '../game/EmoteBubble';
+import { EmoteId, EMOTES } from '@blast-arena/shared';
 
 export class GameScene extends Phaser.Scene {
   private socketClient!: SocketClient;
@@ -62,6 +64,10 @@ export class GameScene extends Phaser.Scene {
   private enemyRenderer: EnemySpriteRenderer | null = null;
   private lastCampaignState: CampaignGameState | null = null;
 
+  // Emotes
+  private emoteRenderer: EmoteBubbleRenderer | null = null;
+  private emoteKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+
   // Spectator mode
   private freeCamX: number = 0;
   private freeCamY: number = 0;
@@ -89,7 +95,12 @@ export class GameScene extends Phaser.Scene {
     // Clean up stale state from previous game
     this.socketClient.off('game:state' as any);
     this.socketClient.off('game:over' as any);
+    this.socketClient.off('game:emote' as any);
     this.removeSpectatorListeners();
+    if (this.emoteKeyHandler) {
+      window.removeEventListener('keydown', this.emoteKeyHandler);
+      this.emoteKeyHandler = null;
+    }
     this.cleanupRenderers();
 
     // Reset state
@@ -131,6 +142,32 @@ export class GameScene extends Phaser.Scene {
     this.zoneRenderer = new ShrinkingZoneRenderer(this);
     this.hillZoneRenderer = new HillZoneRenderer(this);
     this.countdownOverlay = new CountdownOverlay(this);
+    this.emoteRenderer = new EmoteBubbleRenderer(this);
+
+    // Listen for emotes from other players
+    this.socketClient.on('game:emote' as any, ((data: { playerId: number; emoteId: EmoteId }) => {
+      if (!this.lastGameState || !this.emoteRenderer) return;
+      const player = this.lastGameState.players.find((p) => p.id === data.playerId);
+      if (player && player.alive) {
+        const px = player.position.x * TILE_SIZE + TILE_SIZE / 2;
+        const py = player.position.y * TILE_SIZE + TILE_SIZE / 2;
+        this.emoteRenderer.showEmote(data.playerId, data.emoteId, px, py);
+      }
+    }) as any);
+
+    // Emote keys 1-6 (only when alive — spectator digit keys only fire when localPlayerDead)
+    this.emoteKeyHandler = (e: KeyboardEvent) => {
+      if (this.localPlayerDead) return;
+      if (this.lastGameState?.status !== 'playing') return;
+      const match = e.code.match(/^Digit([1-6])$/);
+      if (match) {
+        const emoteId = (parseInt(match[1]) - 1) as EmoteId;
+        if (EMOTES[emoteId]) {
+          this.socketClient.emit('game:emote' as any, { emoteId });
+        }
+      }
+    };
+    window.addEventListener('keydown', this.emoteKeyHandler);
 
     if (initialState) {
       // Store a deep copy of initial tiles for delta updates
@@ -383,6 +420,20 @@ export class GameScene extends Phaser.Scene {
 
     this.processInput();
     this.updateCamera();
+
+    // Update emote bubble positions to follow players
+    if (this.emoteRenderer && this.lastGameState) {
+      const positions = new Map<number, { x: number; y: number }>();
+      for (const p of this.lastGameState.players) {
+        if (p.alive) {
+          positions.set(p.id, {
+            x: p.position.x * TILE_SIZE + TILE_SIZE / 2,
+            y: p.position.y * TILE_SIZE + TILE_SIZE / 2,
+          });
+        }
+      }
+      this.emoteRenderer.update(positions);
+    }
 
     // Drive replay playback from Phaser's frame loop
     if (this.replayPlayer) {
@@ -679,6 +730,8 @@ export class GameScene extends Phaser.Scene {
     this.gamepadManager?.destroy();
     this.enemyRenderer?.destroy();
     this.enemyRenderer = null;
+    this.emoteRenderer?.destroy();
+    this.emoteRenderer = null;
   }
 
   shutdown(): void {
@@ -690,6 +743,11 @@ export class GameScene extends Phaser.Scene {
     this.socketClient.off('campaign:state' as any);
     this.socketClient.off('campaign:levelComplete' as any);
     this.socketClient.off('campaign:gameOver' as any);
+    this.socketClient.off('game:emote' as any);
+    if (this.emoteKeyHandler) {
+      window.removeEventListener('keydown', this.emoteKeyHandler);
+      this.emoteKeyHandler = null;
+    }
     this.campaignMode = false;
     this.lastCampaignState = null;
     this.replayPlayer?.destroy();

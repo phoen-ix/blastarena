@@ -108,6 +108,36 @@ router.get('/admin/settings/party_chat_mode', async (_req, res, next) => {
   }
 });
 
+// Public: get lobby chat mode (no auth required, needed by LobbyChatPanel)
+router.get('/admin/settings/lobby_chat_mode', async (_req, res, next) => {
+  try {
+    const mode = await settingsService.getLobbyChatMode();
+    res.json({ mode });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Public: get DM mode (no auth required, needed by DMPanel)
+router.get('/admin/settings/dm_mode', async (_req, res, next) => {
+  try {
+    const mode = await settingsService.getDMMode();
+    res.json({ mode });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Public: get emote mode (no auth required, needed by GameScene)
+router.get('/admin/settings/emote_mode', async (_req, res, next) => {
+  try {
+    const mode = await settingsService.getEmoteMode();
+    res.json({ mode });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // All other admin routes require auth + staff role (admin or moderator)
 router.use(authMiddleware, staffMiddleware);
 
@@ -184,6 +214,66 @@ router.put(
         key: 'party_chat_mode',
         value: req.body.mode,
       });
+      res.json({ message: 'Setting updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.put(
+  '/admin/settings/lobby_chat_mode',
+  adminOnlyMiddleware,
+  validate(chatModeSchema),
+  async (req, res, next) => {
+    try {
+      await settingsService.setSetting('lobby_chat_mode', req.body.mode);
+      await execute(
+        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user!.userId, 'update_setting', 'setting', 0, JSON.stringify({ key: 'lobby_chat_mode', value: req.body.mode })],
+      );
+      const io = getIO();
+      io.emit('admin:settingsChanged' as any, { key: 'lobby_chat_mode', value: req.body.mode });
+      res.json({ message: 'Setting updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.put(
+  '/admin/settings/dm_mode',
+  adminOnlyMiddleware,
+  validate(chatModeSchema),
+  async (req, res, next) => {
+    try {
+      await settingsService.setSetting('dm_mode', req.body.mode);
+      await execute(
+        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user!.userId, 'update_setting', 'setting', 0, JSON.stringify({ key: 'dm_mode', value: req.body.mode })],
+      );
+      const io = getIO();
+      io.emit('admin:settingsChanged' as any, { key: 'dm_mode', value: req.body.mode });
+      res.json({ message: 'Setting updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.put(
+  '/admin/settings/emote_mode',
+  adminOnlyMiddleware,
+  validate(chatModeSchema),
+  async (req, res, next) => {
+    try {
+      await settingsService.setSetting('emote_mode', req.body.mode);
+      await execute(
+        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user!.userId, 'update_setting', 'setting', 0, JSON.stringify({ key: 'emote_mode', value: req.body.mode })],
+      );
+      const io = getIO();
+      io.emit('admin:settingsChanged' as any, { key: 'emote_mode', value: req.body.mode });
       res.json({ message: 'Setting updated' });
     } catch (err) {
       next(err);

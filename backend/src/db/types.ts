@@ -236,6 +236,18 @@ export interface UserBlockRow extends RowDataPacket {
   username?: string;
 }
 
+/** Direct message table row */
+export interface DirectMessageRow extends RowDataPacket {
+  id: number;
+  sender_id: number;
+  recipient_id: number;
+  message: string;
+  read_at: Date | null;
+  created_at: Date;
+  // Joined fields
+  sender_username?: string;
+}
+
 /** Admin user list row (user joined with stats) */
 export interface AdminUserRow extends RowDataPacket {
   id: number;

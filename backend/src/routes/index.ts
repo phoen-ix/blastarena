@@ -6,6 +6,7 @@ import lobbyRouter from './lobby';
 import adminRouter from './admin';
 import campaignRouter from './campaign';
 import friendsRouter from './friends';
+import messagesRouter from './messages';
 
 export function registerRoutes(app: Express): void {
   app.use('/api', healthRouter);
@@ -15,4 +16,5 @@ export function registerRoutes(app: Express): void {
   app.use('/api', adminRouter);
   app.use('/api', campaignRouter);
   app.use('/api', friendsRouter);
+  app.use('/api', messagesRouter);
 }

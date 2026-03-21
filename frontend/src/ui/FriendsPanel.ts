@@ -7,6 +7,7 @@ export class FriendsPanel {
   private container: HTMLElement;
   private socketClient: SocketClient;
   private notifications: NotificationUI;
+  private onMessageFriend?: (userId: number, username: string) => void;
   private isOpen = false;
   private activeTab: 'friends' | 'requests' | 'blocked' = 'friends';
   private friends: Friend[] = [];
@@ -22,9 +23,10 @@ export class FriendsPanel {
   private friendOnlineHandler: any;
   private friendOfflineHandler: any;
 
-  constructor(socketClient: SocketClient, notifications: NotificationUI) {
+  constructor(socketClient: SocketClient, notifications: NotificationUI, onMessageFriend?: (userId: number, username: string) => void) {
     this.socketClient = socketClient;
     this.notifications = notifications;
+    this.onMessageFriend = onMessageFriend;
     this.container = document.createElement('div');
     this.container.className = 'friends-panel';
     this.setupSocketListeners();
@@ -210,6 +212,7 @@ export class FriendsPanel {
             </div>
             <div class="friend-actions">
               ${f.activity === 'in_lobby' && f.roomCode ? `<button class="btn btn-primary friend-join-btn" data-room="${escapeHtml(f.roomCode || '')}">Join</button>` : ''}
+              <button class="btn btn-ghost friend-msg-btn" data-user-id="${f.userId}" data-username="${escapeHtml(f.username)}" style="padding:4px 8px;font-size:11px;">Msg</button>
               <button class="btn btn-ghost friend-invite-btn" data-user-id="${f.userId}" style="padding:4px 8px;font-size:11px;">Invite</button>
               <button class="btn btn-ghost friend-remove-btn" data-friend-id="${f.userId}" style="padding:4px 8px;font-size:11px;color:var(--danger);">X</button>
             </div>
@@ -431,6 +434,17 @@ export class FriendsPanel {
             this.notifications.error(res.error || 'Failed to join');
           }
         }) as any);
+      });
+    });
+
+    // Message friend
+    this.container.querySelectorAll('.friend-msg-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const userId = parseInt(btn.getAttribute('data-user-id')!);
+        const username = btn.getAttribute('data-username')!;
+        if (this.onMessageFriend) {
+          this.onMessageFriend(userId, username);
+        }
       });
     });
 

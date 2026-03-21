@@ -6,6 +6,8 @@ import { AdminUI } from './AdminUI';
 import { CampaignUI } from './CampaignUI';
 import { FriendsPanel } from './FriendsPanel';
 import { PartyBar } from './PartyBar';
+import { LobbyChatPanel } from './LobbyChatPanel';
+import { DMPanel } from './DMPanel';
 import { RoomListItem, Room, GameDefaults, BotAIEntry, getErrorMessage } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr } from '../utils/html';
 import { showCreateRoomModal } from './modals/CreateRoomModal';
@@ -22,6 +24,8 @@ export class LobbyUI {
   private roomListHandler: ((rooms: RoomListItem[]) => void) | null = null;
   private friendsPanel: FriendsPanel;
   private partyBar: PartyBar;
+  private lobbyChatPanel: LobbyChatPanel;
+  private dmPanel: DMPanel;
 
   constructor(
     socketClient: SocketClient,
@@ -35,10 +39,14 @@ export class LobbyUI {
     this.onJoinRoom = onJoinRoom;
     this.container = document.createElement('div');
     this.container.className = 'lobby-container';
-    this.friendsPanel = new FriendsPanel(socketClient, notifications);
     const user = authManager.getUser();
     const userId = user?.id ?? 0;
     const userRole = user?.role ?? 'user';
+    this.dmPanel = new DMPanel(socketClient, notifications, userId, userRole);
+    this.friendsPanel = new FriendsPanel(socketClient, notifications, (fUserId, fUsername) => {
+      this.dmPanel.openConversation(fUserId, fUsername);
+    });
+    this.lobbyChatPanel = new LobbyChatPanel(socketClient, notifications, userId, userRole);
     this.partyBar = new PartyBar(socketClient, notifications, userId, userRole);
     this.partyBar.setJoinRoomCallback((roomCode) => this.joinRoom(roomCode));
   }
@@ -55,6 +63,8 @@ export class LobbyUI {
     this.socketClient.on('room:list' as any, this.roomListHandler as any);
     this.friendsPanel.mount();
     this.partyBar.mount(this.container);
+    this.lobbyChatPanel.mount(this.container);
+    this.dmPanel.mount();
     UIGamepadNavigator.getInstance().pushContext({
       id: 'lobby',
       elements: () => [
@@ -71,12 +81,16 @@ export class LobbyUI {
     }
     UIGamepadNavigator.getInstance().popContext('lobby');
     this.friendsPanel.close();
+    this.lobbyChatPanel.unmount();
+    this.dmPanel.close();
     this.container.remove();
   }
 
   destroyPanels(): void {
     this.friendsPanel.destroy();
     this.partyBar.destroy();
+    this.lobbyChatPanel.destroy();
+    this.dmPanel.destroy();
   }
 
   private render(): void {
@@ -90,6 +104,7 @@ export class LobbyUI {
           <button class="btn btn-primary" id="create-room-btn">+ New Room</button>
           <button class="btn" id="campaign-btn" style="background:linear-gradient(135deg, var(--primary), #ff8f35);color:#fff;font-weight:700;letter-spacing:0.5px;">Campaign</button>
           <button class="btn btn-ghost" id="friends-btn" style="color:var(--accent);">Friends</button>
+          <button class="btn btn-ghost" id="messages-btn">Messages</button>
           <button class="btn btn-ghost" id="party-btn">Party</button>
           <button class="btn btn-ghost" id="settings-btn">Settings</button>
           <button class="btn btn-ghost" id="help-btn">Help</button>
@@ -115,6 +130,9 @@ export class LobbyUI {
     });
     this.container.querySelector('#friends-btn')!.addEventListener('click', () => {
       this.friendsPanel.toggle();
+    });
+    this.container.querySelector('#messages-btn')!.addEventListener('click', () => {
+      this.dmPanel.toggle();
     });
     this.container.querySelector('#party-btn')!.addEventListener('click', () => {
       if (this.partyBar.getParty()) {
