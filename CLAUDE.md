@@ -61,6 +61,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - **HUD**: DOM-based overlay in HUDScene.ts with timer, player list, kill feed, stats bar (bottom-left), spectator banner. KOTH mode: scores sorted descending with crown icon
 - Settings and Help are in the lobby header (LobbyUI), not in-game HUD, to avoid overlapping player names
 - **SettingsUI** (`frontend/src/ui/SettingsUI.ts`): Full-screen tabbed panel (reuses `admin-container` CSS) with Account tab (username, email, password) and Preferences tab (visual settings). Replaces the old separate Account and Settings modals — single "Settings" button in lobby header. Pattern matches AdminUI (tabs, switchTab, gamepad context).
+- **HelpUI** (`frontend/src/ui/HelpUI.ts`): Full-screen tabbed panel (reuses `admin-container` CSS) with 7 tabs: Getting Started, Power-Ups, Game Modes, Map Features, Guides, Level Editor (staff), Admin Docs (staff). Power-Ups tab uses Canvas2D inline `<canvas>` elements via `frontend/src/utils/powerUpCanvas.ts` (same drawing logic as BootScene). Guides/Admin Docs tabs fetch markdown from `GET /api/docs/:filename` and `GET /api/docs/admin/:filename` endpoints, rendered with `marked` library into `.help-markdown` styled containers. Collapsible `<details>` sections for each doc. Role-based tab filtering: regular users see 5 tabs, staff see all 7. Markdown response cache prevents re-fetching on tab revisit.
 - Countdown synced between server and client: GameLoop holds `status: 'countdown'` for 36 ticks (1.8s) while CountdownOverlay plays "3, 2, 1" — gameplay starts on "GO!". Both client and server block inputs during countdown.
 - **Gamepad support**: Xbox/standard gamepad via Phaser plugin. D-pad/left stick for movement (0.3 deadzone), A=bomb, B=detonate, LB/RB=cycle spectate. Actions latched in `pendingGamepadAction` to survive 50ms tick throttle. Keyboard takes priority.
 - **Gamepad UI navigation**: `UIGamepadNavigator` singleton enables full controller navigation of DOM menus. Spatial navigation via `getBoundingClientRect()` (5x cross-axis penalty). Focus context stack for nested UI. Custom `.gp-dropdown` overlay for `<select>`. Disabled during gameplay. See source for full details.
@@ -164,7 +165,7 @@ Social features for the lobby: friend list, online presence, party grouping, and
 - `backend/src/services/party.ts`: create, get, join (Lua), leave, kick, disband, invite CRUD
 - `backend/src/services/messages.ts`: sendMessage, getConversation, getConversationList, markRead, getUnreadCounts
 
-### REST Routes (`/api/friends`, `/api/messages`)
+### REST Routes (`/api/friends`, `/api/messages`, `/api/docs`)
 - `GET /friends` — list friends + pending + blocked (authMiddleware)
 - `GET /friends/blocked` — blocked users (authMiddleware)
 - `POST /friends/search` — username prefix search (authMiddleware + validate)
@@ -172,6 +173,8 @@ Social features for the lobby: friend list, online presence, party grouping, and
 - `GET /messages/unread` — unread counts per sender (authMiddleware)
 - `GET /messages/:userId` — paginated conversation history (authMiddleware)
 - `PUT /messages/:userId/read` — mark messages as read (authMiddleware)
+- `GET /docs/:filename` — public docs: campaign.md, replay-system.md, bot-ai-guide.md (authMiddleware, whitelist-validated)
+- `GET /docs/admin/:filename` — staff docs: admin-and-systems.md, infrastructure.md, testing.md, performance-and-internals.md, bot-ai-internals.md, openapi.yaml (authMiddleware + staffMiddleware, whitelist-validated)
 
 ### Database
 - Migration `013_friends_parties.sql`: `friendships` + `user_blocks` tables
@@ -278,6 +281,7 @@ Delta tile encoding, bot AI tick throttling, per-tick caching, efficient seriali
 - `backend/src/db/connection.ts`: `withTransaction<T>(fn)` helper
 - `GameStateManager` constructor takes a `GameConfig` object (not positional parameters)
 - `frontend/src/utils/html.ts`: shared `escapeHtml()` and `escapeAttr()` utilities
+- `frontend/src/utils/powerUpCanvas.ts`: standalone Canvas2D power-up icon renderer (extracted from BootScene), used by HelpUI for inline `<canvas>` elements
 - LobbyUI modals extracted to `frontend/src/ui/modals/` — LobbyUI.ts is thin orchestrator (~200 lines)
 
 ## Database Migrations
@@ -296,6 +300,8 @@ cd frontend && npx vitest run                   # Frontend only
 - See [docs/testing.md](docs/testing.md) for full inventory, mocking patterns, and guide for writing new tests
 
 ## Documentation
+Docs are accessible in-app via the Help panel (lobby header → Help button). Player-facing docs (campaign, replays, bot AI guide) appear in the Guides tab for all users. Staff-only docs appear in Level Editor and Admin Docs tabs. Docs are served via `/api/docs/` endpoints from the `docs/` directory (bind-mounted in dev, baked into Docker image for prod).
+
 - [Bot AI Developer Guide](docs/bot-ai-guide.md) — writing custom bot AIs
 - [Bot AI Internals](docs/bot-ai-internals.md) — built-in BotAI decision engine details
 - [Campaign System](docs/campaign.md) — enemies, levels, editor, progress

@@ -27,6 +27,7 @@ services:
       - ./data/simulations:/app/simulations
       - ./data/replays:/app/replays
       - ./data/ai:/app/ai
+      - ./docs:/app/docs:ro
     healthcheck:
       start_period: 10s
 

@@ -629,30 +629,6 @@
     }
 
     /* ============ HELP ============ */
-    .help-close {
-      position: absolute;
-      top: 10px;
-      right: 16px;
-      font-size: 24px;
-      cursor: pointer;
-      color: var(--text-muted);
-      line-height: 1;
-      transition: color var(--transition);
-    }
-
-    .help-close:hover {
-      color: var(--primary);
-    }
-
-    .help-title {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--primary);
-      margin-bottom: 12px;
-      font-family: var(--font-display);
-      letter-spacing: 1px;
-    }
-
     .help-section {
       margin-bottom: 16px;
     }
@@ -739,6 +715,181 @@
       text-align: center;
       font-size: 8px;
       flex-shrink: 0;
+    }
+
+    /* Help: Power-up rows */
+    .help-powerup-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .help-powerup-row:last-child {
+      border-bottom: none;
+    }
+
+    /* Help: Game mode cards */
+    .help-mode-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .help-mode-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .help-mode-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary);
+      font-family: var(--font-display);
+    }
+    .help-mode-players {
+      font-size: 12px;
+      color: var(--text-dim);
+      background: var(--bg-elevated);
+      padding: 2px 10px;
+      border-radius: 10px;
+    }
+    .help-mode-tags {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .help-mode-tag {
+      font-size: 11px;
+      padding: 1px 8px;
+      border-radius: 8px;
+      background: var(--primary-dim);
+      color: var(--primary);
+      font-weight: 600;
+    }
+    .help-mode-desc {
+      font-size: 13px;
+      color: #d0d0d8;
+      line-height: 1.6;
+    }
+
+    /* Help: Collapsible guide sections */
+    .help-guide-section {
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .help-guide-section summary {
+      padding: 12px 16px;
+      background: var(--bg-surface);
+      color: var(--text);
+      font-weight: 600;
+      font-family: var(--font-display);
+      cursor: pointer;
+      transition: background var(--transition);
+      list-style: none;
+    }
+    .help-guide-section summary::-webkit-details-marker {
+      display: none;
+    }
+    .help-guide-section summary::before {
+      content: '\25B6';
+      display: inline-block;
+      margin-right: 10px;
+      font-size: 10px;
+      transition: transform 0.2s;
+      color: var(--primary);
+    }
+    .help-guide-section[open] summary::before {
+      transform: rotate(90deg);
+    }
+    .help-guide-section summary:hover {
+      background: var(--bg-hover);
+    }
+
+    /* Help: Markdown rendered content */
+    .help-markdown {
+      padding: 16px;
+      line-height: 1.7;
+      color: var(--text);
+      font-size: 14px;
+    }
+    .help-markdown h1, .help-markdown h2, .help-markdown h3, .help-markdown h4 {
+      color: var(--primary);
+      font-family: var(--font-display);
+      margin: 20px 0 10px;
+    }
+    .help-markdown h1 { font-size: 22px; }
+    .help-markdown h2 {
+      font-size: 18px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+    .help-markdown h3 { font-size: 15px; color: var(--text); }
+    .help-markdown code {
+      background: var(--bg-elevated);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--accent);
+    }
+    .help-markdown pre {
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      overflow-x: auto;
+      margin: 12px 0;
+    }
+    .help-markdown pre code {
+      background: none;
+      padding: 0;
+      color: var(--text);
+    }
+    .help-markdown table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+    }
+    .help-markdown th, .help-markdown td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+      font-size: 13px;
+    }
+    .help-markdown th {
+      background: var(--bg-elevated);
+      color: var(--text);
+      font-weight: 600;
+    }
+    .help-markdown a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .help-markdown a:hover {
+      text-decoration: underline;
+    }
+    .help-markdown ul, .help-markdown ol {
+      padding-left: 24px;
+      margin: 8px 0;
+    }
+    .help-markdown li {
+      margin: 4px 0;
+    }
+    .help-markdown blockquote {
+      border-left: 3px solid var(--primary);
+      margin: 12px 0;
+      padding: 8px 16px;
+      background: var(--bg-surface);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    }
+    .help-markdown img {
+      max-width: 100%;
+      border-radius: var(--radius);
     }
 
     /* ============ ADMIN BANNER ============ */

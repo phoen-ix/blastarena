@@ -47,7 +47,7 @@ Walk into a bomb with the Kick power-up to send it sliding. Click a player name 
 |------|------|--------|
 | 💣 | **Bomb Up** | +1 max bombs (up to 8) |
 | 🔥 | **Fire Up** | +1 explosion range (up to 8) |
-| ⚡ | **Speed Up** | Faster movement (up to 2 levels) |
+| ⚡ | **Speed Up** | Faster movement (up to 5 levels) |
 | 🛡️ | **Shield** | Absorbs one explosion hit (no time limit, doesn't stack) |
 | 👢 | **Kick** | Walk into bombs to kick them |
 | 💥 | **Pierce Bomb** | Explosions pass through destructible walls |
@@ -118,6 +118,22 @@ All actions audit-logged. See [docs/admin-and-systems.md](docs/admin-and-systems
 
 Games recorded as gzipped JSON with video-player controls (play/pause, seek, 0.5-4x speed), synced event log panel, and click-to-follow spectating. Access via Matches tab or Simulations tab. See [docs/replay-system.md](docs/replay-system.md).
 
+## In-Game Help & Documentation
+
+Full-screen Help panel accessible from the lobby header. Seven tabs with role-based filtering:
+
+| Tab | Access | Content |
+|-----|--------|---------|
+| Getting Started | All | Keyboard + gamepad controls, basic mechanics, spectator mode |
+| Power-Ups | All | All 8 power-ups with Canvas2D inline sprites matching in-game textures |
+| Game Modes | All | 6 modes with player counts, rules, win conditions |
+| Map Features | All | Reinforced walls, dynamic events, hazard tiles with visual previews |
+| Guides | All | Rendered markdown docs: Campaign, Replays, Bot AI (collapsible sections) |
+| Level Editor | Staff | Campaign level editor documentation |
+| Admin Docs | Staff | Admin systems, infrastructure, testing, performance, API reference |
+
+Documentation served via backend API from `docs/` directory (bind-mounted in dev, baked into image for prod). Markdown rendered client-side with `marked`.
+
 ## Architecture
 
 ```
@@ -166,7 +182,7 @@ blast-arena/
 ├── shared/                  # Shared types, constants, utilities
 ├── backend/
 │   └── src/
-│       ├── routes/          # REST endpoints (auth, lobby, user, admin, campaign, friends, messages, leaderboard, cosmetics)
+│       ├── routes/          # REST endpoints (auth, lobby, user, admin, campaign, friends, messages, leaderboard, cosmetics, docs)
 │       ├── game/            # Server game logic (GameLoop, GameState, BotAI, etc.)
 │       ├── simulation/      # Bot simulation system
 │       ├── db/              # MariaDB connection, migrations, redis

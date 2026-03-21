@@ -33,6 +33,7 @@ COPY --from=builder /app/shared/dist ./shared/dist
 COPY shared/package.json ./shared/
 COPY --from=builder /app/backend/dist ./backend/dist
 COPY backend/src/db/migrations ./backend/src/db/migrations
+COPY docs/ ./docs/
 
 COPY docker/backend/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

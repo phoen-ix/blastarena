@@ -11,7 +11,7 @@ import { DMPanel } from './DMPanel';
 import { RoomListItem, Room, GameDefaults, BotAIEntry, getErrorMessage } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr } from '../utils/html';
 import { showCreateRoomModal } from './modals/CreateRoomModal';
-import { showHelpModal } from './modals/HelpModal';
+import { HelpUI } from './HelpUI';
 import { SettingsUI } from './SettingsUI';
 import { LeaderboardUI } from './LeaderboardUI';
 import { ProfilePanel } from './ProfilePanel';
@@ -136,11 +136,15 @@ export class LobbyUI {
     const profilePanel = new ProfilePanel(this.notifications);
     this.container.querySelector('#leaderboard-btn')!.addEventListener('click', () => {
       this.hide();
-      const leaderboardUI = new LeaderboardUI(this.notifications, () => {
-        this.show();
-      }, (userId) => {
-        profilePanel.open(userId);
-      });
+      const leaderboardUI = new LeaderboardUI(
+        this.notifications,
+        () => {
+          this.show();
+        },
+        (userId) => {
+          profilePanel.open(userId);
+        },
+      );
       leaderboardUI.show();
     });
     this.container.querySelector('#friends-btn')!.addEventListener('click', () => {
@@ -163,9 +167,13 @@ export class LobbyUI {
       });
       settingsUI.show();
     });
-    this.container
-      .querySelector('#help-btn')!
-      .addEventListener('click', () => this.showHelpModal());
+    this.container.querySelector('#help-btn')!.addEventListener('click', () => {
+      this.hide();
+      const helpUI = new HelpUI(this.authManager, this.notifications, () => {
+        this.show();
+      });
+      helpUI.show();
+    });
     this.container.querySelector('#logout-btn')!.addEventListener('click', () => {
       this.authManager.logout();
       this.hide();
@@ -183,20 +191,24 @@ export class LobbyUI {
     }
 
     // Load rank badge and level
-    ApiClient.get<{ rankTier: string; rankColor: string; level?: number }>('/user/rank').then((rank) => {
-      const badge = this.container.querySelector('#rank-badge') as HTMLElement;
-      if (badge && rank.rankTier) {
-        badge.style.display = 'inline-block';
-        badge.style.background = rank.rankColor;
-        badge.style.color = '#fff';
-        badge.textContent = rank.rankTier;
-      }
-      const levelBadge = this.container.querySelector('#level-badge') as HTMLElement;
-      if (levelBadge && rank.level) {
-        levelBadge.style.display = 'inline-block';
-        levelBadge.textContent = `Lvl ${rank.level}`;
-      }
-    }).catch(() => { /* ignore rank load failure */ });
+    ApiClient.get<{ rankTier: string; rankColor: string; level?: number }>('/user/rank')
+      .then((rank) => {
+        const badge = this.container.querySelector('#rank-badge') as HTMLElement;
+        if (badge && rank.rankTier) {
+          badge.style.display = 'inline-block';
+          badge.style.background = rank.rankColor;
+          badge.style.color = '#fff';
+          badge.textContent = rank.rankTier;
+        }
+        const levelBadge = this.container.querySelector('#level-badge') as HTMLElement;
+        if (levelBadge && rank.level) {
+          levelBadge.style.display = 'inline-block';
+          levelBadge.textContent = `Lvl ${rank.level}`;
+        }
+      })
+      .catch(() => {
+        /* ignore rank load failure */
+      });
   }
 
   private async loadRooms(): Promise<void> {
@@ -302,10 +314,6 @@ export class LobbyUI {
       gameDefaults,
       activeAIs,
     });
-  }
-
-  private showHelpModal(): void {
-    showHelpModal();
   }
 
   private generateRoomName(): string {
