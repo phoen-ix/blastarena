@@ -2,8 +2,10 @@ import { ApiClient } from '../network/ApiClient';
 import { SocketClient } from '../network/SocketClient';
 import { NotificationUI } from './NotificationUI';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
+import { PartyBar } from './PartyBar';
 import { escapeHtml } from '../utils/html';
 import { getErrorMessage } from '@blast-arena/shared';
+import { showLocalCoopModal } from './modals/LocalCoopModal';
 import game from '../main';
 
 interface CampaignLevel {
@@ -34,15 +36,22 @@ export class CampaignUI {
   private notifications: NotificationUI;
   private socketClient: SocketClient;
   private onClose: () => void;
+  private partyBar: PartyBar | null;
   private expandedWorldId: number | null = null;
   private selectedLevelId: number | null = null;
   private worlds: CampaignWorld[] = [];
   private embedded = false;
 
-  constructor(socketClient: SocketClient, notifications: NotificationUI, onClose: () => void) {
+  constructor(
+    socketClient: SocketClient,
+    notifications: NotificationUI,
+    onClose: () => void,
+    partyBar?: PartyBar,
+  ) {
     this.socketClient = socketClient;
     this.notifications = notifications;
     this.onClose = onClose;
+    this.partyBar = partyBar ?? null;
     this.container = document.createElement('div');
     this.container.style.cssText = `
       position: absolute;
@@ -518,6 +527,9 @@ export class CampaignUI {
 
     // Start button area (shown when selected and not locked)
     if (isSelected && !level.locked) {
+      const btnArea = document.createElement('div');
+      btnArea.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+
       const startBtn = document.createElement('button');
       startBtn.className = 'btn btn-primary';
       startBtn.style.cssText = `
@@ -531,7 +543,43 @@ export class CampaignUI {
         e.stopPropagation();
         this.startLevel(level.id);
       });
-      rightSide.appendChild(startBtn);
+      btnArea.appendChild(startBtn);
+
+      // Online co-op button: shown when in a 2-person party as the leader
+      const party = this.partyBar?.getParty();
+      if (party && party.members.length === 2) {
+        const coopBtn = document.createElement('button');
+        coopBtn.className = 'btn btn-secondary';
+        coopBtn.style.cssText = `
+          font-size: 14px;
+          padding: 8px 16px;
+          font-weight: 700;
+          letter-spacing: 0.5px;
+        `;
+        coopBtn.textContent = 'Co-op';
+        coopBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.startLevel(level.id, true);
+        });
+        btnArea.appendChild(coopBtn);
+      }
+
+      // Local co-op button: always available
+      const localCoopBtn = document.createElement('button');
+      localCoopBtn.className = 'btn btn-ghost';
+      localCoopBtn.style.cssText = `
+        font-size: 13px;
+        padding: 8px 12px;
+        font-weight: 600;
+      `;
+      localCoopBtn.textContent = 'Local Co-op';
+      localCoopBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.showLocalCoopSetup(level.id);
+      });
+      btnArea.appendChild(localCoopBtn);
+
+      rightSide.appendChild(btnArea);
     }
 
     card.appendChild(leftSide);
@@ -608,7 +656,23 @@ export class CampaignUI {
     });
   }
 
-  private async startLevel(levelId: number): Promise<void> {
+  private showLocalCoopSetup(levelId: number): void {
+    showLocalCoopModal(
+      (config) => {
+        game.registry.set('localCoopConfig', config);
+        this.startLevel(levelId, false, true);
+      },
+      () => {
+        /* cancel — do nothing */
+      },
+    );
+  }
+
+  private async startLevel(
+    levelId: number,
+    coopMode = false,
+    localCoopMode = false,
+  ): Promise<void> {
     try {
       this.notifications.info('Loading level...');
 
@@ -630,6 +694,8 @@ export class CampaignUI {
         // Set registry flags for GameScene
         const registry = game.registry;
         registry.set('campaignMode', true);
+        registry.set('campaignCoopMode', coopMode || localCoopMode);
+        registry.set('localCoopMode', localCoopMode);
         registry.set('initialGameState', data.state.gameState);
         registry.set('campaignEnemyTypes', enemyTypesResp.enemyTypes || []);
 
@@ -642,8 +708,17 @@ export class CampaignUI {
       };
       this.socketClient.on('campaign:gameStart' as any, gameStartHandler as any);
 
+      // Build start data
+      const startData: any = { levelId };
+      if (coopMode) {
+        startData.coopMode = true;
+      } else if (localCoopMode) {
+        startData.localCoopMode = true;
+        startData.localP2 = { username: 'Player 2' };
+      }
+
       // Emit campaign:start socket event
-      this.socketClient.emit('campaign:start' as any, { levelId }, (response: any) => {
+      this.socketClient.emit('campaign:start' as any, startData, (response: any) => {
         if (response && response.error) {
           this.socketClient.off('campaign:gameStart' as any, gameStartHandler as any);
           this.notifications.error(response.error);

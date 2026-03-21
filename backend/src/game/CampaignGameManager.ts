@@ -7,24 +7,38 @@ export class CampaignGameManager {
   private playerSessions: Map<number, string> = new Map();
 
   startLevel(
-    userId: number,
+    userIds: number[],
+    usernames: string[],
     level: CampaignLevel,
     enemyTypes: Map<number, EnemyTypeConfig>,
     callbacks: CampaignSessionCallbacks,
     carriedPowerups?: StartingPowerUps | null,
   ): CampaignGame {
-    // End any existing session for this user
-    const existingSessionId = this.playerSessions.get(userId);
-    if (existingSessionId) {
-      this.endSession(existingSessionId);
+    // End any existing session for ALL users
+    for (const userId of userIds) {
+      const existingSessionId = this.playerSessions.get(userId);
+      if (existingSessionId) {
+        this.endSession(existingSessionId);
+      }
     }
 
-    const game = new CampaignGame(userId, level, enemyTypes, callbacks, carriedPowerups);
+    const game = new CampaignGame(
+      userIds,
+      usernames,
+      level,
+      enemyTypes,
+      callbacks,
+      carriedPowerups,
+    );
     this.sessions.set(game.sessionId, game);
-    this.playerSessions.set(userId, game.sessionId);
+
+    // Register ALL users in playerSessions
+    for (const userId of userIds) {
+      this.playerSessions.set(userId, game.sessionId);
+    }
 
     logger.info(
-      { userId, levelId: level.id, sessionId: game.sessionId },
+      { userIds, levelId: level.id, sessionId: game.sessionId, coopMode: game.coopMode },
       'Campaign session started',
     );
     return game;
@@ -49,14 +63,40 @@ export class CampaignGameManager {
     }
 
     this.sessions.delete(sessionId);
-    this.playerSessions.delete(game.userId);
-    logger.info({ sessionId, userId: game.userId }, 'Campaign session ended');
+    // Clean up ALL player references
+    for (const userId of game.userIds) {
+      this.playerSessions.delete(userId);
+    }
+    logger.info({ sessionId, userIds: game.userIds }, 'Campaign session ended');
   }
 
-  handleInput(sessionId: string, input: PlayerInput): void {
+  handleInput(sessionId: string, userId: number, input: PlayerInput): void {
     const game = this.sessions.get(sessionId);
     if (game && !game.isFinished() && !game.isPaused()) {
-      game.handleInput(input);
+      game.handleInput(userId, input);
+    }
+  }
+
+  /** Remove a single player from a co-op session (partner quit/disconnect) */
+  removePlayer(sessionId: string, userId: number): void {
+    const game = this.sessions.get(sessionId);
+    if (!game) return;
+
+    // Remove from playerSessions lookup
+    this.playerSessions.delete(userId);
+
+    // Kill the player in-game
+    const player = game.getPlayer(userId);
+    if (player && player.alive) {
+      player.die();
+    }
+
+    logger.info({ sessionId, userId }, 'Player removed from campaign session');
+
+    // If no players remain in the lookup, end the session
+    const remainingPlayers = game.userIds.filter((id) => this.playerSessions.get(id) === sessionId);
+    if (remainingPlayers.length === 0) {
+      this.endSession(sessionId);
     }
   }
 

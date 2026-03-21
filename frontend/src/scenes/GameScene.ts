@@ -27,6 +27,12 @@ import { ReplayLogPanel } from '../game/ReplayLogPanel';
 import { EnemySpriteRenderer } from '../game/EnemySprite';
 import { EnemyTextureGenerator } from '../game/EnemyTextureGenerator';
 import { EmoteBubbleRenderer } from '../game/EmoteBubble';
+import {
+  LocalCoopInput,
+  LocalCoopConfig,
+  CameraMode,
+  DEFAULT_LOCAL_COOP_CONFIG,
+} from '../game/LocalCoopInput';
 import { EmoteId, EMOTES } from '@blast-arena/shared';
 
 export class GameScene extends Phaser.Scene {
@@ -69,6 +75,17 @@ export class GameScene extends Phaser.Scene {
 
   // Campaign mode
   private campaignMode: boolean = false;
+  private campaignCoopMode: boolean = false;
+  private localCoopMode: boolean = false;
+  private localCoopInput: LocalCoopInput | null = null;
+  private localP2Id: number = 0;
+  private coopCameraMode: CameraMode = 'shared';
+  private p2Camera: Phaser.Cameras.Scene2D.Camera | null = null;
+  private splitDivider: Phaser.GameObjects.Graphics | null = null;
+  private splitScreenInitialized: boolean = false;
+  private splitBaseZoom: number = 1;
+  private p1PartnerArrow: Phaser.GameObjects.Graphics | null = null;
+  private p2PartnerArrow: Phaser.GameObjects.Graphics | null = null;
   private enemyRenderer: EnemySpriteRenderer | null = null;
   private lastCampaignState: CampaignGameState | null = null;
 
@@ -298,6 +315,23 @@ export class GameScene extends Phaser.Scene {
     } else if (this.registry.get('campaignMode')) {
       // Campaign mode: listen on campaign-specific events
       this.campaignMode = true;
+      this.campaignCoopMode = !!this.registry.get('campaignCoopMode');
+      this.localCoopMode = !!this.registry.get('localCoopMode');
+
+      // Set up local co-op input handler
+      if (this.localCoopMode) {
+        const coopConfig =
+          (this.registry.get('localCoopConfig') as LocalCoopConfig | undefined) ||
+          DEFAULT_LOCAL_COOP_CONFIG;
+        this.coopCameraMode = coopConfig.cameraMode;
+        this.localCoopInput = new LocalCoopInput(this, this.gamepadManager, coopConfig);
+        // Determine P2's ID from the initial state (second player in the player list)
+        const initialState = this.registry.get('initialGameState') as GameState | undefined;
+        if (initialState && initialState.players.length >= 2) {
+          const p2 = initialState.players.find((p) => p.id !== this.localPlayerId);
+          if (p2) this.localP2Id = p2.id;
+        }
+      }
 
       // Generate enemy textures from loaded enemy types
       const campaignEnemyTypes = this.registry.get('campaignEnemyTypes');
@@ -345,6 +379,39 @@ export class GameScene extends Phaser.Scene {
         }) as any,
       );
 
+      // Co-op specific listeners
+      if (this.campaignCoopMode) {
+        this.socketClient.on(
+          'campaign:playerLockedIn' as any,
+          ((data: any) => {
+            // Visual indicator: pulse the locked player's sprite
+            const sprite = this.playerRenderer?.getSprite(data.playerId);
+            if (sprite) {
+              sprite.setTint(0x00ff88);
+              this.tweens.add({
+                targets: sprite,
+                alpha: { from: 1, to: 0.7 },
+                duration: 600,
+                yoyo: true,
+                repeat: -1,
+              });
+            }
+          }) as any,
+        );
+
+        this.socketClient.on(
+          'campaign:partnerLeft' as any,
+          ((data: any) => {
+            const notifications = this.registry.get('notifications');
+            if (notifications) {
+              const reason =
+                data.reason === 'disconnected' ? 'Partner disconnected' : 'Partner left';
+              notifications.info(reason);
+            }
+          }) as any,
+        );
+      }
+
       // Escape key to toggle pause menu
       this.pauseKeyHandler = (e: KeyboardEvent) => {
         if (e.code === 'Escape') {
@@ -372,6 +439,7 @@ export class GameScene extends Phaser.Scene {
     // Camera setup
     if (initialState) {
       this.applyCameraBounds(initialState.map.width, initialState.map.height);
+      this.initSplitScreen();
     }
 
     // Re-apply camera bounds when viewport resizes
@@ -379,6 +447,9 @@ export class GameScene extends Phaser.Scene {
       this.cameras.main.setSize(gameSize.width, gameSize.height);
       if (this.lastGameState) {
         this.applyCameraBounds(this.lastGameState.map.width, this.lastGameState.map.height);
+      }
+      if (this.localCoopMode && this.p2Camera && this.coopCameraMode !== 'shared') {
+        this.updateSplitViewports(gameSize.width, gameSize.height);
       }
     });
 
@@ -470,6 +541,7 @@ export class GameScene extends Phaser.Scene {
 
     this.processInput();
     this.updateCamera();
+    this.updatePartnerArrows();
 
     // Update emote bubble positions to follow players
     if (this.emoteRenderer && this.lastGameState) {
@@ -499,6 +571,26 @@ export class GameScene extends Phaser.Scene {
     const worldW = mapW * TILE_SIZE;
     const worldH = mapH * TILE_SIZE;
 
+    if (this.coopCameraMode !== 'shared' && this.p2Camera) {
+      // Split-screen: use tight bounds and auto-zoom to fill each viewport
+      const fitZoom = (c: Phaser.Cameras.Scene2D.Camera) => {
+        const zx = c.width / worldW;
+        const zy = c.height / worldH;
+        return Phaser.Math.Clamp(Math.min(zx, zy), 0.5, 3.0);
+      };
+
+      this.splitBaseZoom = fitZoom(cam);
+      cam.setZoom(this.splitBaseZoom);
+      cam.setBounds(0, 0, worldW, worldH);
+      cam.centerOn(worldW / 2, worldH / 2);
+
+      const p2Zoom = fitZoom(this.p2Camera);
+      this.p2Camera.setZoom(p2Zoom);
+      this.p2Camera.setBounds(0, 0, worldW, worldH);
+      this.p2Camera.centerOn(worldW / 2, worldH / 2);
+      return;
+    }
+
     // When the world is smaller than the viewport, expand bounds so the camera
     // can center the world instead of being clamped to (0,0)
     const boundsX = Math.min(0, (worldW - cam.width) / 2);
@@ -508,6 +600,151 @@ export class GameScene extends Phaser.Scene {
 
     cam.setBounds(boundsX, boundsY, boundsW, boundsH);
     cam.centerOn(worldW / 2, worldH / 2);
+  }
+
+  private initSplitScreen(): void {
+    if (!this.localCoopMode || this.coopCameraMode === 'shared' || this.splitScreenInitialized) {
+      return;
+    }
+    this.splitScreenInitialized = true;
+
+    const cam = this.cameras.main;
+    const w = this.scale.width;
+    const h = this.scale.height;
+
+    if (this.coopCameraMode === 'split-h') {
+      cam.setViewport(0, 0, w, Math.floor(h / 2));
+      this.p2Camera = this.cameras.add(0, Math.floor(h / 2), w, Math.ceil(h / 2));
+    } else {
+      cam.setViewport(0, 0, Math.floor(w / 2), h);
+      this.p2Camera = this.cameras.add(Math.floor(w / 2), 0, Math.ceil(w / 2), h);
+    }
+
+    // Partner off-screen indicator arrows
+    this.p1PartnerArrow = this.add.graphics();
+    this.p1PartnerArrow.setScrollFactor(0);
+    this.p1PartnerArrow.setDepth(9998);
+    this.p2Camera.ignore(this.p1PartnerArrow);
+
+    this.p2PartnerArrow = this.add.graphics();
+    this.p2PartnerArrow.setScrollFactor(0);
+    this.p2PartnerArrow.setDepth(9998);
+    cam.ignore(this.p2PartnerArrow);
+
+    // Bounds + zoom are applied by applyCameraBounds() which is called right after
+    this.drawSplitDivider(w, h);
+  }
+
+  private updateSplitViewports(w: number, h: number): void {
+    if (!this.p2Camera) return;
+    const cam = this.cameras.main;
+    if (this.coopCameraMode === 'split-h') {
+      cam.setViewport(0, 0, w, Math.floor(h / 2));
+      this.p2Camera.setViewport(0, Math.floor(h / 2), w, Math.ceil(h / 2));
+    } else if (this.coopCameraMode === 'split-v') {
+      cam.setViewport(0, 0, Math.floor(w / 2), h);
+      this.p2Camera.setViewport(Math.floor(w / 2), 0, Math.ceil(w / 2), h);
+    }
+    // Recalculate zoom for new viewport sizes
+    if (this.lastGameState) {
+      this.applyCameraBounds(this.lastGameState.map.width, this.lastGameState.map.height);
+    }
+    this.drawSplitDivider(w, h);
+  }
+
+  private drawSplitDivider(w: number, h: number): void {
+    if (!this.splitDivider) {
+      this.splitDivider = this.add.graphics();
+      this.splitDivider.setScrollFactor(0);
+      this.splitDivider.setDepth(9999);
+    }
+    this.splitDivider.clear();
+    if (this.coopCameraMode === 'split-h') {
+      const y = Math.floor(h / 2);
+      // Dark outline
+      this.splitDivider.lineStyle(6, 0x000000, 0.9);
+      this.splitDivider.lineBetween(0, y, w, y);
+      this.splitDivider.strokePath();
+      // Bright inner line
+      this.splitDivider.lineStyle(2, 0xffffff, 0.7);
+      this.splitDivider.lineBetween(0, y, w, y);
+      this.splitDivider.strokePath();
+    } else {
+      const x = Math.floor(w / 2);
+      this.splitDivider.lineStyle(6, 0x000000, 0.9);
+      this.splitDivider.lineBetween(x, 0, x, h);
+      this.splitDivider.strokePath();
+      this.splitDivider.lineStyle(2, 0xffffff, 0.7);
+      this.splitDivider.lineBetween(x, 0, x, h);
+      this.splitDivider.strokePath();
+    }
+  }
+
+  private updatePartnerArrows(): void {
+    if (this.coopCameraMode === 'shared' || !this.p2Camera) return;
+
+    const p1Sprite = this.playerRenderer.getSprite(this.localPlayerId);
+    const p2Sprite = this.playerRenderer.getSprite(this.localP2Id);
+
+    this.drawPartnerArrow(this.p1PartnerArrow, this.cameras.main, p2Sprite);
+    this.drawPartnerArrow(this.p2PartnerArrow, this.p2Camera, p1Sprite);
+  }
+
+  private drawPartnerArrow(
+    gfx: Phaser.GameObjects.Graphics | null,
+    cam: Phaser.Cameras.Scene2D.Camera,
+    partnerSprite: Phaser.GameObjects.Sprite | undefined,
+  ): void {
+    if (!gfx) return;
+    gfx.clear();
+    if (!partnerSprite) return;
+
+    // Convert partner world position to camera-local coords
+    const localX = (partnerSprite.x - cam.scrollX) * cam.zoom;
+    const localY = (partnerSprite.y - cam.scrollY) * cam.zoom;
+
+    // Check if visible within viewport
+    const pad = 20;
+    if (localX >= pad && localX <= cam.width - pad && localY >= pad && localY <= cam.height - pad) {
+      return;
+    }
+
+    // Direction from viewport center to off-screen partner
+    const cx = cam.width / 2;
+    const cy = cam.height / 2;
+    const dx = localX - cx;
+    const dy = localY - cy;
+    const angle = Math.atan2(dy, dx);
+
+    // Find edge intersection point
+    const edgePad = 24;
+    const hw = cam.width / 2 - edgePad;
+    const hh = cam.height / 2 - edgePad;
+    let scale = Math.min(Math.abs(hw / (dx || 0.001)), Math.abs(hh / (dy || 0.001)));
+    scale = Math.min(scale, 1);
+
+    const arrowX = cx + dx * scale;
+    const arrowY = cy + dy * scale;
+
+    // Triangle pointing toward partner
+    const size = 10;
+    const tipX = arrowX + Math.cos(angle) * size;
+    const tipY = arrowY + Math.sin(angle) * size;
+    const baseAngle = Math.PI * 0.75;
+    const x1 = arrowX + Math.cos(angle + baseAngle) * size;
+    const y1 = arrowY + Math.sin(angle + baseAngle) * size;
+    const x2 = arrowX + Math.cos(angle - baseAngle) * size;
+    const y2 = arrowY + Math.sin(angle - baseAngle) * size;
+
+    gfx.lineStyle(2, 0x000000, 0.8);
+    gfx.fillStyle(0x00ccff, 0.9);
+    gfx.beginPath();
+    gfx.moveTo(tipX, tipY);
+    gfx.lineTo(x1, y1);
+    gfx.lineTo(x2, y2);
+    gfx.closePath();
+    gfx.fillPath();
+    gfx.strokePath();
   }
 
   private handleReplayTickEvents(events: ReplayTickEvents): void {
@@ -560,6 +797,61 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    // Local co-op camera
+    if (this.localCoopMode && this.localP2Id) {
+      const p1Sprite = this.playerRenderer.getSprite(this.localPlayerId);
+      const p2Sprite = this.playerRenderer.getSprite(this.localP2Id);
+
+      if (this.coopCameraMode === 'shared') {
+        // Shared auto-zoom: camera follows midpoint, zooms out as players separate
+        if (p1Sprite && p2Sprite) {
+          const midX = (p1Sprite.x + p2Sprite.x) / 2;
+          const midY = (p1Sprite.y + p2Sprite.y) / 2;
+          const dist = Phaser.Math.Distance.Between(p1Sprite.x, p1Sprite.y, p2Sprite.x, p2Sprite.y);
+          const maxDist = Math.max(cam.width, cam.height);
+          const targetZoom = Phaser.Math.Clamp(1.0 - (dist / maxDist) * 0.6, 0.5, 1.0);
+          cam.zoom = Phaser.Math.Linear(cam.zoom, targetZoom, 0.05);
+          cam.scrollX = Phaser.Math.Linear(cam.scrollX, midX - cam.width / (2 * cam.zoom), 0.15);
+          cam.scrollY = Phaser.Math.Linear(cam.scrollY, midY - cam.height / (2 * cam.zoom), 0.15);
+          return;
+        }
+        // One player dead — follow the alive one
+        const aliveSprite = p1Sprite || p2Sprite;
+        if (aliveSprite) {
+          cam.zoom = Phaser.Math.Linear(cam.zoom, 1.0, 0.05);
+          cam.scrollX = Phaser.Math.Linear(cam.scrollX, aliveSprite.x - cam.width / 2, 0.15);
+          cam.scrollY = Phaser.Math.Linear(cam.scrollY, aliveSprite.y - cam.height / 2, 0.15);
+          return;
+        }
+      } else if (this.lastGameState) {
+        // Split-screen: follow player per-axis, but lock to world center
+        // on axes where the zoomed map already fits within the viewport
+        const worldW = this.lastGameState.map.width * TILE_SIZE;
+        const worldH = this.lastGameState.map.height * TILE_SIZE;
+
+        const followAxis = (
+          c: Phaser.Cameras.Scene2D.Camera,
+          sprite: Phaser.GameObjects.Sprite | undefined,
+        ) => {
+          if (!sprite) return;
+          const fitsX = worldW * c.zoom <= c.width;
+          const fitsY = worldH * c.zoom <= c.height;
+          const targetX = fitsX
+            ? (worldW - c.width / c.zoom) / 2
+            : sprite.x - c.width / (2 * c.zoom);
+          const targetY = fitsY
+            ? (worldH - c.height / c.zoom) / 2
+            : sprite.y - c.height / (2 * c.zoom);
+          c.scrollX = Phaser.Math.Linear(c.scrollX, targetX, 0.15);
+          c.scrollY = Phaser.Math.Linear(c.scrollY, targetY, 0.15);
+        };
+
+        followAxis(cam, p1Sprite);
+        if (this.p2Camera) followAxis(this.p2Camera, p2Sprite);
+        return;
+      }
+    }
+
     const sprite = this.playerRenderer.getSprite(this.localPlayerId);
     if (!sprite) return;
     cam.scrollX = Phaser.Math.Linear(cam.scrollX, sprite.x - cam.width / 2, 0.15);
@@ -597,6 +889,39 @@ export class GameScene extends Phaser.Scene {
     // Don't send inputs during countdown or pause
     if (this.lastGameState?.status !== 'playing') return;
     if (this.paused) return;
+
+    // Local co-op: route both P1 and P2 through LocalCoopInput (configurable presets)
+    if (this.localCoopMode && this.localCoopInput) {
+      const now = Date.now();
+      if (now - this.lastInputTime < TICK_MS) return;
+
+      const p1 = this.localCoopInput.pollP1();
+      if (p1.direction || p1.action) {
+        this.lastInputTime = now;
+        this.lastInputSeq++;
+        this.socketClient.emit('campaign:input' as any, {
+          seq: this.lastInputSeq,
+          direction: p1.direction as any,
+          action: p1.action as any,
+          tick: this.lastGameState?.tick || 0,
+        });
+      }
+
+      if (this.localP2Id) {
+        const p2 = this.localCoopInput.pollP2();
+        if (p2.direction || p2.action) {
+          this.lastInputSeq++;
+          this.socketClient.emit('campaign:input' as any, {
+            seq: this.lastInputSeq,
+            direction: p2.direction as any,
+            action: p2.action as any,
+            tick: this.lastGameState?.tick || 0,
+            playerId: this.localP2Id,
+          });
+        }
+      }
+      return;
+    }
 
     // Poll gamepad before throttle to capture just-pressed actions
     const gpInput = this.gamepadManager.poll();
@@ -832,6 +1157,9 @@ export class GameScene extends Phaser.Scene {
       this.hidePauseOverlay();
       this.socketClient.emit('campaign:quit' as any);
       this.registry.remove('campaignMode');
+      this.registry.remove('campaignCoopMode');
+      this.registry.remove('localCoopMode');
+      this.registry.remove('localCoopConfig');
       this.registry.set('openCampaign', true);
       this.scene.stop('HUDScene');
       this.scene.start('LobbyScene');
@@ -854,6 +1182,8 @@ export class GameScene extends Phaser.Scene {
     this.socketClient.off('campaign:state' as any);
     this.socketClient.off('campaign:levelComplete' as any);
     this.socketClient.off('campaign:gameOver' as any);
+    this.socketClient.off('campaign:playerLockedIn' as any);
+    this.socketClient.off('campaign:partnerLeft' as any);
     this.socketClient.off('game:emote' as any);
     if (this.emoteKeyHandler) {
       window.removeEventListener('keydown', this.emoteKeyHandler);
@@ -866,6 +1196,24 @@ export class GameScene extends Phaser.Scene {
     this.hidePauseOverlay();
     this.paused = false;
     this.campaignMode = false;
+    this.campaignCoopMode = false;
+    this.localCoopMode = false;
+    this.localCoopInput?.destroy();
+    this.localCoopInput = null;
+    this.localP2Id = 0;
+    if (this.p2Camera) {
+      this.cameras.remove(this.p2Camera);
+      this.p2Camera = null;
+    }
+    this.splitDivider?.destroy();
+    this.splitDivider = null;
+    this.p1PartnerArrow?.destroy();
+    this.p1PartnerArrow = null;
+    this.p2PartnerArrow?.destroy();
+    this.p2PartnerArrow = null;
+    this.coopCameraMode = 'shared';
+    this.splitBaseZoom = 1;
+    this.splitScreenInitialized = false;
     this.lastCampaignState = null;
     this.replayPlayer?.destroy();
     this.replayControls?.destroy();

@@ -172,7 +172,7 @@ describe('CampaignGame', () => {
   describe('Construction', () => {
     it('should create a session with a unique sessionId', () => {
       const level = createMinimalLevel();
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       expect(game.sessionId).toBeDefined();
       expect(typeof game.sessionId).toBe('string');
@@ -181,7 +181,7 @@ describe('CampaignGame', () => {
 
     it('should store userId and level reference', () => {
       const level = createMinimalLevel();
-      const game = new CampaignGame(42, level, new Map(), callbacks);
+      const game = new CampaignGame([42], ['Player42'], level, new Map(), callbacks);
 
       expect(game.userId).toBe(42);
       expect(game.level).toBe(level);
@@ -189,22 +189,22 @@ describe('CampaignGame', () => {
 
     it('should generate different sessionIds for different instances', () => {
       const level = createMinimalLevel();
-      const game1 = new CampaignGame(1, level, new Map(), callbacks);
-      const game2 = new CampaignGame(2, level, new Map(), callbacks);
+      const game1 = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
+      const game2 = new CampaignGame([2], ['Player2'], level, new Map(), callbacks);
 
       expect(game1.sessionId).not.toBe(game2.sessionId);
     });
 
     it('should initialize as not finished', () => {
       const level = createMinimalLevel();
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       expect(game.isFinished()).toBe(false);
     });
 
     it('should accept the level lives count', () => {
       const level = createMinimalLevel({ lives: 5 });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       // Access via toCampaignState indirectly through the callback
       // The game state tracks lives internally
@@ -214,7 +214,7 @@ describe('CampaignGame', () => {
     it('should create GameLoop with countdown enabled', () => {
       const GameLoop = require('../../../backend/src/game/GameLoop').GameLoop;
       const level = createMinimalLevel();
-      new CampaignGame(1, level, new Map(), callbacks);
+      new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       // The 5th argument (skipCountdown) should be omitted or falsy
       const lastCallArgs = GameLoop.mock.calls[GameLoop.mock.calls.length - 1];
@@ -223,7 +223,7 @@ describe('CampaignGame', () => {
 
     it('should set up onTick and onTimeUp callbacks in the GameLoop', () => {
       const level = createMinimalLevel();
-      new CampaignGame(1, level, new Map(), callbacks);
+      new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       expect(capturedOnTick).not.toBeNull();
       expect(capturedOnTimeUp).not.toBeNull();
@@ -236,7 +236,7 @@ describe('CampaignGame', () => {
   describe('start / stop', () => {
     it('should call gameLoop.start() when start() is called', () => {
       const level = createMinimalLevel();
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       game.start();
 
       expect(mockGameLoopStart).toHaveBeenCalledTimes(1);
@@ -244,7 +244,7 @@ describe('CampaignGame', () => {
 
     it('should call gameLoop.stop() when stop() is called', () => {
       const level = createMinimalLevel();
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       game.start();
       game.stop();
 
@@ -253,7 +253,7 @@ describe('CampaignGame', () => {
 
     it('should mark game as finished after stop()', () => {
       const level = createMinimalLevel();
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       game.start();
       game.stop();
 
@@ -262,7 +262,7 @@ describe('CampaignGame', () => {
 
     it('should return sessionId from getSessionId()', () => {
       const level = createMinimalLevel();
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       expect(game.getSessionId()).toBe(game.sessionId);
     });
@@ -275,13 +275,13 @@ describe('CampaignGame', () => {
     it('should generate default map when tiles array is empty', () => {
       const level = createMinimalLevel({ tiles: [], playerSpawns: [] });
       // Should not throw — will generate a default map
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
     it('should generate default map when tiles is undefined-like (empty array)', () => {
       const level = createMinimalLevel({ tiles: [] });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -296,7 +296,7 @@ describe('CampaignGame', () => {
       tiles[1][1] = 'spawn';
 
       const level = createMinimalLevel({ tiles, playerSpawns: [{ x: 1, y: 1 }] });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -316,7 +316,7 @@ describe('CampaignGame', () => {
 
       const level = createMinimalLevel({ tiles, playerSpawns: [] });
       // The constructor should scan tiles and find spawn at (3,3)
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -334,7 +334,7 @@ describe('CampaignGame', () => {
       }
       // No spawn tiles, no playerSpawns => should find first empty tile
       const level = createMinimalLevel({ tiles, playerSpawns: [] });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -349,13 +349,13 @@ describe('CampaignGame', () => {
       }
       const level = createMinimalLevel({ tiles, playerSpawns: [] });
       // Should not throw, even if (1,1) is a wall
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
     it('should set respawnPosition to first spawn point', () => {
       const level = createMinimalLevel({ playerSpawns: [{ x: 3, y: 3 }] });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       // The game should use (3,3) as the respawn position
       expect(game.isFinished()).toBe(false);
     });
@@ -363,7 +363,7 @@ describe('CampaignGame', () => {
     it('should use (1,1) as respawnPosition when no spawns defined', () => {
       const level = createMinimalLevel({ playerSpawns: [] });
       // respawnPosition defaults to level.playerSpawns[0] ?? { x: 1, y: 1 }
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
   });
@@ -392,7 +392,7 @@ describe('CampaignGame', () => {
         winCondition: 'reach_goal',
         winConditionConfig: {},
       });
-      new CampaignGame(1, level, new Map(), callbacks);
+      new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       // deriveWinConditionConfig should have found the goal at (5,5)
       expect(level.winConditionConfig!.goalPosition).toEqual({ x: 5, y: 5 });
@@ -418,7 +418,7 @@ describe('CampaignGame', () => {
         winCondition: 'find_exit',
         winConditionConfig: {},
       });
-      new CampaignGame(1, level, new Map(), callbacks);
+      new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       expect(level.winConditionConfig!.exitPosition).toEqual({ x: 4, y: 4 });
     });
@@ -439,7 +439,7 @@ describe('CampaignGame', () => {
         winCondition: 'reach_goal',
         winConditionConfig: { goalPosition: { x: 2, y: 2 } },
       });
-      new CampaignGame(1, level, new Map(), callbacks);
+      new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       // Should keep the explicitly set goal position
       expect(level.winConditionConfig!.goalPosition).toEqual({ x: 2, y: 2 });
@@ -451,7 +451,7 @@ describe('CampaignGame', () => {
         winConditionConfig: {},
         timeLimit: 30,
       });
-      new CampaignGame(1, level, new Map(), callbacks);
+      new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       expect(level.winConditionConfig!.surviveTimeTicks).toBe(30 * TICK_RATE);
     });
@@ -462,7 +462,7 @@ describe('CampaignGame', () => {
         winConditionConfig: { surviveTimeTicks: 100 },
         timeLimit: 30,
       });
-      new CampaignGame(1, level, new Map(), callbacks);
+      new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       // Should keep the explicit value
       expect(level.winConditionConfig!.surviveTimeTicks).toBe(100);
@@ -473,7 +473,7 @@ describe('CampaignGame', () => {
         winCondition: 'kill_all',
         winConditionConfig: null,
       });
-      new CampaignGame(1, level, new Map(), callbacks);
+      new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       expect(level.winConditionConfig).toBeDefined();
     });
@@ -495,7 +495,7 @@ describe('CampaignGame', () => {
         ],
       });
 
-      const game = new CampaignGame(1, level, enemyTypes, callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, enemyTypes, callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -507,7 +507,7 @@ describe('CampaignGame', () => {
       });
 
       // Should not throw
-      const game = new CampaignGame(1, level, enemyTypes, callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, enemyTypes, callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -521,9 +521,9 @@ describe('CampaignGame', () => {
       });
 
       // Create first game
-      new CampaignGame(1, level, enemyTypes, callbacks);
+      new CampaignGame([1], ['Player1'], level, enemyTypes, callbacks);
       // Create second game — should reset IDs
-      new CampaignGame(2, level, enemyTypes, callbacks);
+      new CampaignGame([2], ['Player2'], level, enemyTypes, callbacks);
 
       // Should not throw due to ID conflicts
     });
@@ -537,7 +537,7 @@ describe('CampaignGame', () => {
         enemyPlacements: [{ enemyTypeId: 1, x: 3, y: 3 }],
       });
 
-      new CampaignGame(1, level, enemyTypes, callbacks);
+      new CampaignGame([1], ['Player1'], level, enemyTypes, callbacks);
 
       // Original config should be unchanged
       expect(enemyConfig.hp).toBe(5);
@@ -558,7 +558,7 @@ describe('CampaignGame', () => {
         enemyPlacements: [{ enemyTypeId: 1, x: 3, y: 3, patrolPath }],
       });
 
-      const game = new CampaignGame(1, level, enemyTypes, callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, enemyTypes, callbacks);
       expect(game.isFinished()).toBe(false);
     });
   });
@@ -577,7 +577,7 @@ describe('CampaignGame', () => {
       };
 
       const level = createMinimalLevel({ startingPowerups });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -586,13 +586,13 @@ describe('CampaignGame', () => {
       const carriedPowerups: StartingPowerUps = { fireUp: 3 };
 
       const level = createMinimalLevel({ startingPowerups: levelPowerups });
-      const game = new CampaignGame(1, level, new Map(), callbacks, carriedPowerups);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks, carriedPowerups);
       expect(game.isFinished()).toBe(false);
     });
 
     it('should handle null starting power-ups', () => {
       const level = createMinimalLevel({ startingPowerups: null });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -610,7 +610,7 @@ describe('CampaignGame', () => {
 
       const level = createMinimalLevel({ startingPowerups });
       // Should not throw
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
   });
@@ -627,7 +627,7 @@ describe('CampaignGame', () => {
         ],
       });
 
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -636,7 +636,7 @@ describe('CampaignGame', () => {
         powerupPlacements: [{ type: 'shield', x: 3, y: 3, hidden: true }],
       });
 
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -649,7 +649,7 @@ describe('CampaignGame', () => {
         ],
       });
 
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
   });
@@ -660,28 +660,28 @@ describe('CampaignGame', () => {
   describe('handleInput', () => {
     it('should accept player input without error', () => {
       const level = createMinimalLevel();
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       expect(() => {
-        game.handleInput({ direction: 'right', action: null, tick: 0, seq: 1 });
+        game.handleInput(1, { direction: 'right', action: null, tick: 0, seq: 1 });
       }).not.toThrow();
     });
 
     it('should accept bomb action input', () => {
       const level = createMinimalLevel();
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       expect(() => {
-        game.handleInput({ direction: null, action: 'bomb', tick: 0, seq: 1 });
+        game.handleInput(1, { direction: null, action: 'bomb', tick: 0, seq: 1 });
       }).not.toThrow();
     });
 
     it('should accept combined direction+action input', () => {
       const level = createMinimalLevel();
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       expect(() => {
-        game.handleInput({ direction: 'up', action: 'bomb', tick: 0, seq: 1 });
+        game.handleInput(1, { direction: 'up', action: 'bomb', tick: 0, seq: 1 });
       }).not.toThrow();
     });
   });
@@ -692,7 +692,7 @@ describe('CampaignGame', () => {
   describe('onTimeUp', () => {
     it('should trigger game over on time up for kill_all mode', () => {
       const level = createMinimalLevel({ winCondition: 'kill_all' });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       game.start();
 
       // Simulate time up
@@ -707,7 +707,7 @@ describe('CampaignGame', () => {
         winCondition: 'survive_time',
         winConditionConfig: { surviveTimeTicks: 600 },
       });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       game.start();
 
       capturedOnTimeUp!();
@@ -718,7 +718,7 @@ describe('CampaignGame', () => {
 
     it('should trigger game over for find_exit mode on time up', () => {
       const level = createMinimalLevel({ winCondition: 'find_exit' });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       game.start();
 
       capturedOnTimeUp!();
@@ -728,7 +728,7 @@ describe('CampaignGame', () => {
 
     it('should trigger game over for reach_goal mode on time up', () => {
       const level = createMinimalLevel({ winCondition: 'reach_goal' });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       game.start();
 
       capturedOnTimeUp!();
@@ -738,7 +738,7 @@ describe('CampaignGame', () => {
 
     it('should not trigger onTimeUp callbacks if game already finished', () => {
       const level = createMinimalLevel({ winCondition: 'kill_all' });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       game.start();
       game.stop(); // finish the game
 
@@ -755,7 +755,7 @@ describe('CampaignGame', () => {
     it('should set game mode to campaign', () => {
       const GameLoop = require('../../../backend/src/game/GameLoop').GameLoop;
       const level = createMinimalLevel();
-      new CampaignGame(1, level, new Map(), callbacks);
+      new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
 
       // GameState is passed as 1st arg to GameLoop
       // The mode was set to 'campaign' in the config
@@ -779,33 +779,33 @@ describe('CampaignGame', () => {
       tiles[1][1] = 'spawn';
       level.tiles = tiles;
 
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
     it('should use high round time when timeLimit is 0', () => {
       const level = createMinimalLevel({ timeLimit: 0 });
       // timeLimit 0 -> roundTime: 99999
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
     it('should use timeLimit as roundTime when positive', () => {
       const level = createMinimalLevel({ timeLimit: 120 });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
     it('should disable map events for campaign', () => {
       const level = createMinimalLevel();
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       // enableMapEvents should be false for campaign
       expect(game.isFinished()).toBe(false);
     });
 
     it('should pass reinforcedWalls from level config', () => {
       const level = createMinimalLevel({ reinforcedWalls: true });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -813,13 +813,13 @@ describe('CampaignGame', () => {
       const level = createMinimalLevel({
         availablePowerupTypes: ['bomb_up', 'fire_up'] as PowerUpType[],
       });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
     it('should default enabledPowerUps to empty array when null', () => {
       const level = createMinimalLevel({ availablePowerupTypes: null });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
   });
@@ -830,7 +830,7 @@ describe('CampaignGame', () => {
   describe('Idempotent finish guards', () => {
     it('should not double-fire game over', () => {
       const level = createMinimalLevel({ winCondition: 'kill_all' });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       game.start();
 
       // First time up
@@ -847,7 +847,7 @@ describe('CampaignGame', () => {
         winCondition: 'survive_time',
         winConditionConfig: { surviveTimeTicks: 600 },
       });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       game.start();
 
       capturedOnTimeUp!();
@@ -862,7 +862,7 @@ describe('CampaignGame', () => {
         winCondition: 'survive_time',
         winConditionConfig: { surviveTimeTicks: 600 },
       });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       game.start();
       mockGameLoopStop.mockClear();
 
@@ -873,7 +873,7 @@ describe('CampaignGame', () => {
 
     it('should stop the game loop when game is over', () => {
       const level = createMinimalLevel({ winCondition: 'kill_all' });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       game.start();
       mockGameLoopStop.mockClear();
 
@@ -889,13 +889,13 @@ describe('CampaignGame', () => {
   describe('Edge cases', () => {
     it('should handle level with zero lives', () => {
       const level = createMinimalLevel({ lives: 0 });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
     it('should handle level with no enemy placements', () => {
       const level = createMinimalLevel({ enemyPlacements: [] });
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -924,7 +924,7 @@ describe('CampaignGame', () => {
         ],
       });
 
-      const game = new CampaignGame(1, level, new Map(), callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -943,7 +943,7 @@ describe('CampaignGame', () => {
       }
 
       const level = createMinimalLevel({ enemyPlacements: placements });
-      const game = new CampaignGame(1, level, enemyTypes, callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, enemyTypes, callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -961,7 +961,7 @@ describe('CampaignGame', () => {
         ],
       });
 
-      const game = new CampaignGame(1, level, enemyTypes, callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, enemyTypes, callbacks);
       expect(game.isFinished()).toBe(false);
     });
 
@@ -978,7 +978,7 @@ describe('CampaignGame', () => {
           winCondition: wc,
           winConditionConfig: {},
         });
-        const game = new CampaignGame(1, level, new Map(), callbacks);
+        const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
         expect(game.isFinished()).toBe(false);
       }
     });
@@ -1001,7 +1001,7 @@ describe('CampaignGame', () => {
         enemyPlacements: [{ enemyTypeId: 1, x: 3, y: 3 }],
       });
 
-      const game = new CampaignGame(1, level, enemyTypes, callbacks);
+      const game = new CampaignGame([1], ['Player1'], level, enemyTypes, callbacks);
       expect(game.isFinished()).toBe(false);
     });
   });

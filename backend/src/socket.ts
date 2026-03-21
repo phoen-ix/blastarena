@@ -788,7 +788,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       socket.leave(`sim:${data.batchId}`);
     });
 
-    // Campaign: start level
+    // Campaign: start level (solo, online co-op, or local co-op)
     socket.on('campaign:start', async (data, callback) => {
       try {
         const campaignManager = getCampaignGameManager();
@@ -805,84 +805,168 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         const typeIds = [...new Set(level.enemyPlacements.map((e) => Number(e.enemyTypeId)))];
         const enemyTypes = await enemyTypeService.getEnemyTypeConfigs(typeIds);
 
-        // Get carried powerups if level supports carry-over
+        // Determine player list based on mode
+        const userIds: number[] = [socket.data.userId];
+        const usernames: string[] = [socket.data.username];
+        let partnerSocket: typeof socket | null = null;
+
+        if (data.coopMode) {
+          // Online co-op: party-based
+          if (!socket.data.activePartyId) {
+            return callback({ success: false, error: 'Must be in a party for online co-op' });
+          }
+          const party = await partyService.getParty(socket.data.activePartyId);
+          if (!party || party.members.length !== 2) {
+            return callback({ success: false, error: 'Party must have exactly 2 members' });
+          }
+          if (party.leaderId !== socket.data.userId) {
+            return callback({ success: false, error: 'Only the party leader can start co-op' });
+          }
+          const partner = party.members.find((m) => m.userId !== socket.data.userId);
+          if (!partner) {
+            return callback({ success: false, error: 'Partner not found in party' });
+          }
+
+          // Find partner's socket
+          const partnerSockets = await io.in(`user:${partner.userId}`).fetchSockets();
+          if (partnerSockets.length === 0) {
+            return callback({ success: false, error: 'Partner is not connected' });
+          }
+          partnerSocket = partnerSockets[0] as unknown as typeof socket;
+
+          userIds.push(partner.userId);
+          usernames.push(partner.username);
+        } else if (data.localCoopMode && data.localP2) {
+          // Local co-op: P2 from same client
+          const p2Id = data.localP2.userId ?? -(1000 + (Date.now() % 10000));
+          userIds.push(p2Id);
+          usernames.push(data.localP2.username);
+        }
+
+        const isCoopMode = userIds.length > 1;
+        const campaignRoom = `campaign:${socket.data.userId}`;
+
+        // Get carried powerups if level supports carry-over (use P1's powerups)
         let carriedPowerups = null;
         if (level.carryOverPowerups) {
           const userState = await progressService.getUserState(socket.data.userId);
           carriedPowerups = userState.carriedPowerups;
         }
 
-        // Record attempt
-        await progressService.recordAttempt(socket.data.userId, level.id);
-        await progressService.updateCurrentLevel(socket.data.userId, level.worldId, level.id);
+        // Record attempt for all real (positive ID) players
+        for (const uid of userIds) {
+          if (uid > 0) {
+            await progressService.recordAttempt(uid, level.id);
+            await progressService.updateCurrentLevel(uid, level.worldId, level.id);
+          }
+        }
 
         const nextLevelId = await campaignService.getNextLevel(level.id);
 
+        // Emit helper: broadcast to campaign room (both players) or single socket
+        const emitToCampaign = (event: string, ...args: unknown[]) => {
+          io.to(campaignRoom).emit(event as any, ...args);
+        };
+
         const game = campaignManager.startLevel(
-          socket.data.userId,
+          userIds,
+          usernames,
           level,
           enemyTypes,
           {
             onStateUpdate: (state) => {
-              socket.emit('campaign:state', state);
+              emitToCampaign('campaign:state', state);
             },
-            onPlayerDied: (livesRemaining, respawnPosition) => {
-              socket.emit('campaign:playerDied', { livesRemaining, respawnPosition });
+            onPlayerDied: (playerId, livesRemaining, respawnPosition) => {
+              emitToCampaign('campaign:playerDied', { playerId, livesRemaining, respawnPosition });
             },
             onEnemyDied: (enemyId, position, isBoss) => {
-              socket.emit('campaign:enemyDied', { enemyId, position, isBoss });
+              emitToCampaign('campaign:enemyDied', { enemyId, position, isBoss });
             },
             onExitOpened: (position) => {
-              socket.emit('campaign:exitOpened', { position });
+              emitToCampaign('campaign:exitOpened', { position });
+            },
+            onPlayerLockedIn: (playerId, position) => {
+              emitToCampaign('campaign:playerLockedIn', { playerId, position });
             },
             onLevelComplete: async (timeSeconds, deaths) => {
-              const stars = await progressService.recordCompletion(
-                socket.data.userId,
-                level.id,
-                timeSeconds,
-                deaths,
-                level.parTime,
-              );
-              socket.emit('campaign:levelComplete', {
+              // Record completion for all real players
+              let stars = 0;
+              for (const uid of userIds) {
+                if (uid > 0) {
+                  stars = await progressService.recordCompletion(
+                    uid,
+                    level.id,
+                    timeSeconds,
+                    deaths,
+                    level.parTime,
+                  );
+                }
+              }
+              emitToCampaign('campaign:levelComplete', {
                 levelId: level.id,
                 timeSeconds,
                 stars,
                 nextLevelId,
               });
 
-              // Evaluate campaign achievements and star-based cosmetic unlocks
-              try {
-                const achievementsService = await import('./services/achievements');
-                const cosmeticsService = await import('./services/cosmetics');
-                const userState = await progressService.getUserState(socket.data.userId);
-                const totalStars = userState.totalStars;
-                const unlocked = await achievementsService.evaluateAfterCampaign(
-                  socket.data.userId,
-                  totalStars,
-                  level.id,
-                  level.worldId,
-                );
-                await cosmeticsService.checkCampaignStarUnlocks(socket.data.userId, totalStars);
-                if (unlocked.achievements.length > 0) {
-                  socket.emit('achievement:unlocked', unlocked);
+              // Evaluate campaign achievements for all real players
+              for (const uid of userIds) {
+                if (uid <= 0) continue;
+                try {
+                  const achievementsService = await import('./services/achievements');
+                  const cosmeticsService = await import('./services/cosmetics');
+                  const userState = await progressService.getUserState(uid);
+                  const totalStars = userState.totalStars;
+                  const unlocked = await achievementsService.evaluateAfterCampaign(
+                    uid,
+                    totalStars,
+                    level.id,
+                    level.worldId,
+                  );
+                  await cosmeticsService.checkCampaignStarUnlocks(uid, totalStars);
+                  if (unlocked.achievements.length > 0) {
+                    io.to(`user:${uid}`).emit('achievement:unlocked', unlocked);
+                  }
+                } catch (achErr) {
+                  logger.error(
+                    { err: achErr, userId: uid },
+                    'Failed to evaluate campaign achievements',
+                  );
                 }
-              } catch (achErr) {
-                logger.error({ err: achErr }, 'Failed to evaluate campaign achievements');
               }
 
+              // Clean up sessions
+              if (partnerSocket) {
+                partnerSocket.data.activeCampaignSession = undefined;
+                partnerSocket.leave(campaignRoom);
+              }
               socket.data.activeCampaignSession = undefined;
+              socket.leave(campaignRoom);
               campaignManager.endSession(game.sessionId);
             },
             onGameOver: (reason) => {
-              socket.emit('campaign:gameOver', { levelId: level.id, reason });
+              emitToCampaign('campaign:gameOver', { levelId: level.id, reason });
+              if (partnerSocket) {
+                partnerSocket.data.activeCampaignSession = undefined;
+                partnerSocket.leave(campaignRoom);
+              }
               socket.data.activeCampaignSession = undefined;
+              socket.leave(campaignRoom);
               campaignManager.endSession(game.sessionId);
             },
           },
           carriedPowerups,
         );
 
+        // Join campaign room
+        socket.join(campaignRoom);
         socket.data.activeCampaignSession = game.sessionId;
+
+        if (partnerSocket) {
+          partnerSocket.join(campaignRoom);
+          partnerSocket.data.activeCampaignSession = game.sessionId;
+        }
 
         // Build level summary for client
         const levelSummary = {
@@ -903,11 +987,15 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
         game.start();
 
-        // Update presence to in_campaign
-        presenceService.setPresence(socket.data.userId, 'in_campaign').catch(() => {});
-        notifyFriendsOnline(io, socket.data.userId, 'in_campaign');
+        // Update presence for all real players
+        for (const uid of userIds) {
+          if (uid > 0) {
+            presenceService.setPresence(uid, 'in_campaign').catch(() => {});
+            notifyFriendsOnline(io, uid, 'in_campaign');
+          }
+        }
 
-        // Build initial state before callback to catch serialization errors
+        // Build initial state
         const initialState = {
           state: {
             gameState: game['gameState'].toState(),
@@ -916,13 +1004,33 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
             maxLives: game['maxLives'],
             levelId: level.id,
             exitOpen: false,
+            coopMode: isCoopMode,
           },
           level: levelSummary,
         };
 
         callback({ success: true });
         socket.emit('campaign:gameStart', initialState);
-        logger.info({ levelId: level.id, levelName: level.name }, 'Campaign level started');
+
+        // Send coopStart to partner (online co-op only)
+        if (partnerSocket) {
+          const enemyTypeConfigs = Array.from(enemyTypes.values());
+          partnerSocket.emit('campaign:coopStart', {
+            state: initialState.state as any,
+            level: levelSummary,
+            enemyTypes: enemyTypeConfigs,
+          });
+        }
+
+        logger.info(
+          {
+            levelId: level.id,
+            levelName: level.name,
+            coopMode: isCoopMode,
+            playerCount: userIds.length,
+          },
+          'Campaign level started',
+        );
       } catch (err) {
         logger.error({ err }, 'Campaign start error');
         callback({ success: false, error: getErrorMessage(err) });
@@ -933,10 +1041,18 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     socket.on('campaign:input', (input) => {
       const sessionId = socket.data.activeCampaignSession;
       if (!sessionId) return;
-      getCampaignGameManager().handleInput(sessionId, input);
+      // For local co-op, playerId is specified in the input payload
+      // For online co-op/solo, use the socket's userId
+      const userId = input.playerId ?? socket.data.userId;
+
+      // Validate: only allow playerId that belongs to this session
+      const game = getCampaignGameManager().getSession(sessionId);
+      if (!game || !game.userIds.includes(userId)) return;
+
+      getCampaignGameManager().handleInput(sessionId, userId, input);
     });
 
-    // Campaign: pause
+    // Campaign: pause (either player can pause for both)
     socket.on('campaign:pause', (callback) => {
       const sessionId = socket.data.activeCampaignSession;
       if (!sessionId) return callback({ success: false });
@@ -944,7 +1060,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       callback({ success: ok });
     });
 
-    // Campaign: resume
+    // Campaign: resume (either player can resume)
     socket.on('campaign:resume', (callback) => {
       const sessionId = socket.data.activeCampaignSession;
       if (!sessionId) return callback({ success: false });
@@ -956,7 +1072,20 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     socket.on('campaign:quit', () => {
       const sessionId = socket.data.activeCampaignSession;
       if (!sessionId) return;
-      getCampaignGameManager().endSession(sessionId);
+
+      const campaignManager = getCampaignGameManager();
+      const game = campaignManager.getSession(sessionId);
+
+      if (game && game.coopMode) {
+        // Co-op: remove this player, notify partner
+        campaignManager.removePlayer(sessionId, socket.data.userId);
+        const campaignRoom = `campaign:${game.userIds[0]}`;
+        socket.to(campaignRoom).emit('campaign:partnerLeft', { reason: 'quit' });
+        socket.leave(campaignRoom);
+      } else {
+        campaignManager.endSession(sessionId);
+      }
+
       socket.data.activeCampaignSession = undefined;
     });
 
@@ -1009,7 +1138,17 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
       // Clean up campaign session
       if (socket.data.activeCampaignSession) {
-        getCampaignGameManager().endSession(socket.data.activeCampaignSession);
+        const campaignManager = getCampaignGameManager();
+        const game = campaignManager.getSession(socket.data.activeCampaignSession);
+
+        if (game && game.coopMode) {
+          // Co-op: remove this player, notify partner, keep game alive
+          campaignManager.removePlayer(socket.data.activeCampaignSession, socket.data.userId);
+          const campaignRoom = `campaign:${game.userIds[0]}`;
+          io.to(campaignRoom).emit('campaign:partnerLeft', { reason: 'disconnected' });
+        } else {
+          campaignManager.endSession(socket.data.activeCampaignSession);
+        }
         socket.data.activeCampaignSession = undefined;
       }
 

@@ -94,7 +94,6 @@ export class LevelEditorScene extends Phaser.Scene {
   }
 
   create(): void {
-
     this.levelId = this.registry.get('editorLevelId') ?? null;
     this.enemies = [];
     this.powerups = [];
@@ -133,7 +132,9 @@ export class LevelEditorScene extends Phaser.Scene {
     // Load level if editing existing
     if (this.levelId) {
       try {
-        const resp = await apiClient.get<{ level: CampaignLevel }>(`/admin/campaign/levels/${this.levelId}`);
+        const resp = await apiClient.get<{ level: CampaignLevel }>(
+          `/admin/campaign/levels/${this.levelId}`,
+        );
         this.level = resp.level;
         if (this.level) {
           this.mapWidth = this.level.mapWidth;
@@ -269,23 +270,36 @@ export class LevelEditorScene extends Phaser.Scene {
     }
     this.spawnLabels = [];
 
+    let spawnIndex = 0;
     for (let y = 0; y < this.mapHeight; y++) {
       for (let x = 0; x < this.mapWidth; x++) {
         if (this.tiles[y]?.[x] !== 'spawn') continue;
+        spawnIndex++;
         const cx = x * TILE_SIZE + TILE_SIZE / 2;
         const cy = y * TILE_SIZE + TILE_SIZE / 2;
         const r = TILE_SIZE * 0.35;
 
-        // Solid teal filled background
-        this.spawnOverlay.fillStyle(0x115544, 1);
+        // P2+ spawn uses a slightly different color scheme
+        const isP2 = spawnIndex >= 2;
+        const bgColor = isP2 ? 0x443311 : 0x115544;
+        const borderColor = isP2 ? 0xffcc44 : 0x00ffcc;
+        const labelColor = isP2 ? '#ffcc44' : '#00ffcc';
+
+        // Solid filled background
+        this.spawnOverlay.fillStyle(bgColor, 1);
         this.spawnOverlay.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 
-        // Bright teal border
-        this.spawnOverlay.lineStyle(3, 0x00ffcc, 1);
-        this.spawnOverlay.strokeRect(x * TILE_SIZE + 1, y * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+        // Bright border
+        this.spawnOverlay.lineStyle(3, borderColor, 1);
+        this.spawnOverlay.strokeRect(
+          x * TILE_SIZE + 1,
+          y * TILE_SIZE + 1,
+          TILE_SIZE - 2,
+          TILE_SIZE - 2,
+        );
 
         // Diamond outline
-        this.spawnOverlay.lineStyle(2, 0x00ffcc, 1);
+        this.spawnOverlay.lineStyle(2, borderColor, 1);
         this.spawnOverlay.beginPath();
         this.spawnOverlay.moveTo(cx, cy - r);
         this.spawnOverlay.lineTo(cx + r, cy);
@@ -294,13 +308,16 @@ export class LevelEditorScene extends Phaser.Scene {
         this.spawnOverlay.closePath();
         this.spawnOverlay.strokePath();
 
-        // "S" label
-        const label = this.add.text(cx, cy, 'S', {
-          fontSize: '16px',
-          color: '#00ffcc',
-          fontFamily: 'Chakra Petch, sans-serif',
-          fontStyle: 'bold',
-        }).setOrigin(0.5).setDepth(3);
+        // Numbered spawn label (S1, S2, etc.)
+        const label = this.add
+          .text(cx, cy, `S${spawnIndex}`, {
+            fontSize: '14px',
+            color: labelColor,
+            fontFamily: 'Chakra Petch, sans-serif',
+            fontStyle: 'bold',
+          })
+          .setOrigin(0.5)
+          .setDepth(3);
         this.spawnLabels.push(label);
       }
     }
@@ -308,13 +325,20 @@ export class LevelEditorScene extends Phaser.Scene {
 
   private getTileTexture(type: TileType, x: number, y: number): string {
     switch (type) {
-      case 'wall': return 'wall';
-      case 'destructible': return 'destructible';
-      case 'destructible_cracked': return 'destructible_cracked';
-      case 'exit': return 'exit';
-      case 'goal': return 'goal';
-      case 'spawn': return `floor_${(x + y) % 4}`;
-      default: return `floor_${(x + y) % 4}`;
+      case 'wall':
+        return 'wall';
+      case 'destructible':
+        return 'destructible';
+      case 'destructible_cracked':
+        return 'destructible_cracked';
+      case 'exit':
+        return 'exit';
+      case 'goal':
+        return 'goal';
+      case 'spawn':
+        return `floor_${(x + y) % 4}`;
+      default:
+        return `floor_${(x + y) % 4}`;
     }
   }
 
@@ -335,10 +359,13 @@ export class LevelEditorScene extends Phaser.Scene {
     });
 
     // Zoom with scroll wheel
-    this.input.on('wheel', (_pointer: any, _gameObjects: any, _dx: number, _dy: number, dz: number) => {
-      const newZoom = Phaser.Math.Clamp(cam.zoom - dz * 0.001, 0.25, 3);
-      cam.setZoom(newZoom);
-    });
+    this.input.on(
+      'wheel',
+      (_pointer: any, _gameObjects: any, _dx: number, _dy: number, dz: number) => {
+        const newZoom = Phaser.Math.Clamp(cam.zoom - dz * 0.001, 0.25, 3);
+        cam.setZoom(newZoom);
+      },
+    );
   }
 
   private setupInput(): void {
@@ -372,7 +399,11 @@ export class LevelEditorScene extends Phaser.Scene {
       }
 
       // Paint mode (left button held)
-      if (pointer.isDown && pointer.leftButtonDown() && pointer.x >= LevelEditorScene.TOOLBAR_WIDTH) {
+      if (
+        pointer.isDown &&
+        pointer.leftButtonDown() &&
+        pointer.x >= LevelEditorScene.TOOLBAR_WIDTH
+      ) {
         this.handlePlacement(pointer);
       }
     });
@@ -711,7 +742,8 @@ export class LevelEditorScene extends Phaser.Scene {
 
     const title = document.createElement('h3');
     title.textContent = 'Level Editor';
-    title.style.cssText = 'margin:0 0 8px 0;font-family:"Chakra Petch",sans-serif;color:var(--primary);font-size:16px;';
+    title.style.cssText =
+      'margin:0 0 8px 0;font-family:"Chakra Petch",sans-serif;color:var(--primary);font-size:16px;';
     this.editorContainer.appendChild(title);
 
     // Tool sections
@@ -731,7 +763,8 @@ export class LevelEditorScene extends Phaser.Scene {
       enemySection.style.marginTop = '8px';
       const enemyLabel = document.createElement('div');
       enemyLabel.textContent = 'Enemies';
-      enemyLabel.style.cssText = 'font-weight:bold;font-size:12px;color:var(--text-dim);margin-bottom:4px;';
+      enemyLabel.style.cssText =
+        'font-weight:bold;font-size:12px;color:var(--text-dim);margin-bottom:4px;';
       enemySection.appendChild(enemyLabel);
 
       for (const et of this.enemyTypes) {
@@ -750,12 +783,22 @@ export class LevelEditorScene extends Phaser.Scene {
     }
 
     // Power-up tools
-    const puTypes = ['bomb_up', 'fire_up', 'speed_up', 'shield', 'kick', 'pierce_bomb', 'remote_bomb', 'line_bomb'];
+    const puTypes = [
+      'bomb_up',
+      'fire_up',
+      'speed_up',
+      'shield',
+      'kick',
+      'pierce_bomb',
+      'remote_bomb',
+      'line_bomb',
+    ];
     const puSection = document.createElement('div');
     puSection.style.marginTop = '8px';
     const puLabel = document.createElement('div');
     puLabel.textContent = 'Power-ups';
-    puLabel.style.cssText = 'font-weight:bold;font-size:12px;color:var(--text-dim);margin-bottom:4px;';
+    puLabel.style.cssText =
+      'font-weight:bold;font-size:12px;color:var(--text-dim);margin-bottom:4px;';
     puSection.appendChild(puLabel);
     for (const type of puTypes) {
       const btn = document.createElement('button');
@@ -806,15 +849,13 @@ export class LevelEditorScene extends Phaser.Scene {
     document.getElementById('ui-overlay')?.appendChild(this.editorContainer);
   }
 
-  private addToolSection(
-    label: string,
-    tools: { label: string; tool: EditorTool }[],
-  ): void {
+  private addToolSection(label: string, tools: { label: string; tool: EditorTool }[]): void {
     const section = document.createElement('div');
     section.style.marginBottom = '4px';
     const sectionLabel = document.createElement('div');
     sectionLabel.textContent = label;
-    sectionLabel.style.cssText = 'font-weight:bold;font-size:12px;color:var(--text-dim);margin-bottom:4px;';
+    sectionLabel.style.cssText =
+      'font-weight:bold;font-size:12px;color:var(--text-dim);margin-bottom:4px;';
     section.appendChild(sectionLabel);
 
     for (const t of tools) {
@@ -837,10 +878,12 @@ export class LevelEditorScene extends Phaser.Scene {
 
     const label = document.createElement('div');
     label.textContent = 'Level Settings';
-    label.style.cssText = 'font-weight:bold;font-size:12px;color:var(--text-dim);margin-bottom:6px;';
+    label.style.cssText =
+      'font-weight:bold;font-size:12px;color:var(--text-dim);margin-bottom:6px;';
     section.appendChild(label);
 
-    const inputStyle = 'width:100%;padding:3px 5px;background:var(--bg-surface);border:1px solid var(--bg-hover);color:var(--text);font-size:11px;border-radius:3px;box-sizing:border-box;';
+    const inputStyle =
+      'width:100%;padding:3px 5px;background:var(--bg-surface);border:1px solid var(--bg-hover);color:var(--text);font-size:11px;border-radius:3px;box-sizing:border-box;';
     const labelStyle = 'font-size:10px;color:var(--text-dim);margin:4px 0 2px 0;';
 
     // Map dimensions
@@ -900,7 +943,9 @@ export class LevelEditorScene extends Phaser.Scene {
     nameInput.type = 'text';
     nameInput.value = this.levelName;
     nameInput.style.cssText = inputStyle;
-    nameInput.addEventListener('change', () => { this.levelName = nameInput.value; });
+    nameInput.addEventListener('change', () => {
+      this.levelName = nameInput.value;
+    });
     section.appendChild(nameInput);
 
     // Lives
@@ -914,7 +959,9 @@ export class LevelEditorScene extends Phaser.Scene {
     livesInput.max = '99';
     livesInput.value = String(this.levelLives);
     livesInput.style.cssText = inputStyle;
-    livesInput.addEventListener('change', () => { this.levelLives = parseInt(livesInput.value, 10) || 3; });
+    livesInput.addEventListener('change', () => {
+      this.levelLives = parseInt(livesInput.value, 10) || 3;
+    });
     section.appendChild(livesInput);
 
     // Time Limit
@@ -928,7 +975,9 @@ export class LevelEditorScene extends Phaser.Scene {
     timeInput.max = '3600';
     timeInput.value = String(this.levelTimeLimit);
     timeInput.style.cssText = inputStyle;
-    timeInput.addEventListener('change', () => { this.levelTimeLimit = parseInt(timeInput.value, 10) || 0; });
+    timeInput.addEventListener('change', () => {
+      this.levelTimeLimit = parseInt(timeInput.value, 10) || 0;
+    });
     section.appendChild(timeInput);
 
     // Par Time
@@ -942,7 +991,9 @@ export class LevelEditorScene extends Phaser.Scene {
     parInput.max = '3600';
     parInput.value = String(this.levelParTime);
     parInput.style.cssText = inputStyle;
-    parInput.addEventListener('change', () => { this.levelParTime = parseInt(parInput.value, 10) || 0; });
+    parInput.addEventListener('change', () => {
+      this.levelParTime = parseInt(parInput.value, 10) || 0;
+    });
     section.appendChild(parInput);
     const parHint = document.createElement('div');
     parHint.textContent = '2 stars if completed under par time';
@@ -969,7 +1020,9 @@ export class LevelEditorScene extends Phaser.Scene {
       if (c.value === this.levelWinCondition) opt.selected = true;
       winSelect.appendChild(opt);
     }
-    winSelect.addEventListener('change', () => { this.levelWinCondition = winSelect.value; });
+    winSelect.addEventListener('change', () => {
+      this.levelWinCondition = winSelect.value;
+    });
     section.appendChild(winSelect);
 
     // Published toggle
@@ -978,7 +1031,9 @@ export class LevelEditorScene extends Phaser.Scene {
     const pubCheck = document.createElement('input');
     pubCheck.type = 'checkbox';
     pubCheck.checked = this.levelIsPublished;
-    pubCheck.addEventListener('change', () => { this.levelIsPublished = pubCheck.checked; });
+    pubCheck.addEventListener('change', () => {
+      this.levelIsPublished = pubCheck.checked;
+    });
     pubRow.appendChild(pubCheck);
     const pubLabel = document.createElement('span');
     pubLabel.textContent = 'Published';
@@ -1111,9 +1166,7 @@ export class LevelEditorScene extends Phaser.Scene {
       id: 'level-editor',
       elements: () => {
         if (!this.editorContainer) return [];
-        return [
-          ...this.editorContainer.querySelectorAll<HTMLElement>('button, input, select'),
-        ];
+        return [...this.editorContainer.querySelectorAll<HTMLElement>('button, input, select')];
       },
       onBack: () => {
         this.registry.remove('editorLevelId');

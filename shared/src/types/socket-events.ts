@@ -2,7 +2,7 @@ import { GameState, PlayerInput, Position } from './game';
 import { Room, RoomPlayer, CreateRoomRequest, RoomListItem } from './lobby';
 import { UserRole } from './auth';
 import { SimulationConfig, SimulationBatchStatus, SimulationGameResult } from './simulation';
-import { CampaignGameState, CampaignLevelSummary } from './campaign';
+import { CampaignGameState, CampaignLevelSummary, CoopStartData } from './campaign';
 import {
   Friend,
   FriendRequest,
@@ -70,10 +70,15 @@ export interface ClientToServerEvents {
   ) => void;
   'sim:unspectate': (data: { batchId: string }) => void;
   'campaign:start': (
-    data: { levelId: number },
+    data: {
+      levelId: number;
+      coopMode?: boolean;
+      localCoopMode?: boolean;
+      localP2?: { userId?: number; username: string };
+    },
     callback: (response: { success: boolean; error?: string }) => void,
   ) => void;
-  'campaign:input': (input: PlayerInput) => void;
+  'campaign:input': (input: PlayerInput & { playerId?: number }) => void;
   'campaign:pause': (callback: (response: { success: boolean }) => void) => void;
   'campaign:resume': (callback: (response: { success: boolean }) => void) => void;
   'campaign:quit': () => void;
@@ -219,10 +224,16 @@ export interface ServerToClientEvents {
   }) => void;
   'sim:completed': (data: { batchId: string; status: SimulationBatchStatus }) => void;
   'campaign:gameStart': (data: { state: CampaignGameState; level: CampaignLevelSummary }) => void;
+  'campaign:coopStart': (data: CoopStartData) => void;
   'campaign:state': (state: CampaignGameState) => void;
-  'campaign:playerDied': (data: { livesRemaining: number; respawnPosition: Position }) => void;
+  'campaign:playerDied': (data: {
+    playerId: number;
+    livesRemaining: number;
+    respawnPosition: Position;
+  }) => void;
   'campaign:enemyDied': (data: { enemyId: number; position: Position; isBoss: boolean }) => void;
   'campaign:exitOpened': (data: { position: Position }) => void;
+  'campaign:playerLockedIn': (data: { playerId: number; position: Position }) => void;
   'campaign:levelComplete': (data: {
     levelId: number;
     timeSeconds: number;
@@ -230,6 +241,7 @@ export interface ServerToClientEvents {
     nextLevelId: number | null;
   }) => void;
   'campaign:gameOver': (data: { levelId: number; reason: string }) => void;
+  'campaign:partnerLeft': (data: { reason: string }) => void;
 
   // Friends
   'friend:update': (data: {

@@ -18,6 +18,7 @@ export class LobbyScene extends Phaser.Scene {
   private adminBannerHandler: ((data: any) => void) | null = null;
   private adminKickedHandler: ((data: any) => void) | null = null;
   private partyJoinRoomHandler: ((data: any) => void) | null = null;
+  private campaignCoopStartHandler: ((data: any) => void) | null = null;
 
   constructor() {
     super({ key: 'LobbyScene' });
@@ -146,6 +147,34 @@ export class LobbyScene extends Phaser.Scene {
     };
     this.socketClient.on('party:joinRoom' as any, this.partyJoinRoomHandler as any);
 
+    // Campaign co-op start listener (partner auto-joins when leader starts co-op)
+    this.campaignCoopStartHandler = (data: any) => {
+      this.socketClient.off('campaign:coopStart' as any, this.campaignCoopStartHandler as any);
+      this.campaignCoopStartHandler = null;
+
+      // Clear all DOM overlays
+      const uiOverlay = document.getElementById('ui-overlay');
+      if (uiOverlay) {
+        while (uiOverlay.firstChild) {
+          uiOverlay.removeChild(uiOverlay.firstChild);
+        }
+      }
+
+      // Set registry flags for GameScene
+      const registry = this.registry;
+      registry.set('campaignMode', true);
+      registry.set('campaignCoopMode', true);
+      registry.set('initialGameState', data.state.gameState);
+      registry.set('campaignEnemyTypes', data.enemyTypes || []);
+
+      // Transition to GameScene + HUDScene
+      this.lobbyUI?.hide();
+      this.roomUI?.hide();
+      this.scene.start('GameScene');
+      this.scene.launch('HUDScene');
+    };
+    this.socketClient.on('campaign:coopStart' as any, this.campaignCoopStartHandler as any);
+
     // Background
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
@@ -228,6 +257,10 @@ export class LobbyScene extends Phaser.Scene {
     if (this.partyJoinRoomHandler) {
       this.socketClient.off('party:joinRoom' as any, this.partyJoinRoomHandler as any);
       this.partyJoinRoomHandler = null;
+    }
+    if (this.campaignCoopStartHandler) {
+      this.socketClient.off('campaign:coopStart' as any, this.campaignCoopStartHandler as any);
+      this.campaignCoopStartHandler = null;
     }
     this.lobbyUI?.destroyPanels();
     this.lobbyUI?.hide();

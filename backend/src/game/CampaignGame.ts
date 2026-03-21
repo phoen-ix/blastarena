@@ -40,17 +40,25 @@ class SeededRandom {
 
 export interface CampaignSessionCallbacks {
   onStateUpdate: (state: CampaignGameState) => void;
-  onPlayerDied: (livesRemaining: number, respawnPosition: Position) => void;
+  onPlayerDied: (playerId: number, livesRemaining: number, respawnPosition: Position) => void;
   onEnemyDied: (enemyId: number, position: Position, isBoss: boolean) => void;
   onExitOpened: (position: Position) => void;
+  onPlayerLockedIn?: (playerId: number, position: Position) => void;
   onLevelComplete: (timeSeconds: number, deaths: number) => void;
   onGameOver: (reason: string) => void;
 }
 
 export class CampaignGame {
   public readonly sessionId: string;
-  public readonly userId: number;
+  public readonly userIds: number[];
+  public readonly usernames: string[];
+  public readonly coopMode: boolean;
   public readonly level: CampaignLevel;
+
+  /** @deprecated Use userIds[0] instead. Kept for backward compat with CampaignGameManager. */
+  public get userId(): number {
+    return this.userIds[0];
+  }
 
   private gameState: GameStateManager;
   private gameLoop: GameLoop;
@@ -62,10 +70,15 @@ export class CampaignGame {
   private rng: SeededRandom;
   private callbacks: CampaignSessionCallbacks;
   private playerDeaths: number = 0;
-  private respawnTick: number | null = null;
-  private respawnPosition: Position;
   private finished: boolean = false;
   private startTick: number = 0;
+
+  // Per-player respawn tracking (co-op: each player has independent respawn)
+  private respawnTicks: Map<number, number> = new Map();
+  private respawnPositions: Map<number, Position> = new Map();
+
+  // Sequential lock-in: players frozen on exit/goal tile
+  private lockedInPlayers: Set<number> = new Set();
 
   // Hidden power-ups: revealed when the wall at that position is destroyed
   private hiddenPowerups: Map<string, PowerUpType> = new Map();
@@ -81,26 +94,36 @@ export class CampaignGame {
   private completionTick: number | null = null;
 
   constructor(
-    userId: number,
+    userIds: number[],
+    usernames: string[],
     level: CampaignLevel,
     enemyTypes: Map<number, EnemyTypeConfig>,
     callbacks: CampaignSessionCallbacks,
     carriedPowerups?: StartingPowerUps | null,
   ) {
     this.sessionId = uuidv4();
-    this.userId = userId;
+    this.userIds = userIds;
+    this.usernames = usernames;
+    this.coopMode = userIds.length > 1;
     this.level = level;
     this.enemyTypes = enemyTypes;
     this.callbacks = callbacks;
     this.lives = level.lives;
     this.maxLives = level.lives;
-    this.respawnPosition = level.playerSpawns[0] ?? { x: 1, y: 1 };
     this.rng = new SeededRandom(Date.now());
 
     Enemy.resetIdCounter();
 
-    // Build GameMap from level tiles
+    // Build GameMap from level tiles (includes co-op P2 spawn fallback)
     const gameMap = this.buildGameMap(level);
+
+    // Store per-player respawn positions from spawn points
+    for (let i = 0; i < userIds.length; i++) {
+      this.respawnPositions.set(
+        userIds[i],
+        gameMap.spawnPoints[i % gameMap.spawnPoints.length] ?? { x: 1, y: 1 },
+      );
+    }
 
     // Derive winConditionConfig from tile data if not explicitly set
     this.deriveWinConditionConfig();
@@ -117,17 +140,22 @@ export class CampaignGame {
       reinforcedWalls: level.reinforcedWalls,
       enableMapEvents: false,
       customMap: gameMap,
+      // Co-op: friendly fire OFF so partner bombs don't hurt each other (self-damage still applies)
+      friendlyFire: this.coopMode ? false : true,
     };
 
     this.gameState = new GameStateManager(gameConfig);
 
-    // Add human player
-    const player = this.gameState.addPlayer(userId, 'Player', null);
-
-    // Apply starting power-ups (level-defined or carried over)
+    // Add all human players
     const startPowerups = carriedPowerups ?? level.startingPowerups;
-    if (startPowerups && player) {
-      this.applyStartingPowerups(player, startPowerups);
+    for (let i = 0; i < userIds.length; i++) {
+      // In co-op, assign all players to team 0 (enables FF OFF mechanic)
+      const team = this.coopMode ? 0 : null;
+      const player = this.gameState.addPlayer(userIds[i], usernames[i], team);
+
+      if (startPowerups && player) {
+        this.applyStartingPowerups(player, startPowerups);
+      }
     }
 
     // Create enemies
@@ -196,8 +224,14 @@ export class CampaignGame {
     return this.finished;
   }
 
-  handleInput(input: PlayerInput): void {
-    this.gameState.inputBuffer.addInput(this.userId, input);
+  getPlayer(userId: number): Player | undefined {
+    return this.gameState.players.get(userId);
+  }
+
+  handleInput(userId: number, input: PlayerInput): void {
+    // Don't process input for locked-in (frozen) players
+    if (this.lockedInPlayers.has(userId)) return;
+    this.gameState.inputBuffer.addInput(userId, input);
   }
 
   getSessionId(): string {
@@ -228,7 +262,7 @@ export class CampaignGame {
     }
 
     // Use level spawns, or derive from tiles, or fall back to (1,1)
-    let spawnPoints = [...level.playerSpawns];
+    const spawnPoints = [...level.playerSpawns];
     if (spawnPoints.length === 0) {
       // Scan tiles for spawn markers
       for (let y = 0; y < level.mapHeight; y++) {
@@ -250,7 +284,41 @@ export class CampaignGame {
       }
     }
     if (spawnPoints.length === 0) {
-      spawnPoints = [{ x: 1, y: 1 }];
+      spawnPoints.push({ x: 1, y: 1 });
+    }
+
+    // Co-op: auto-generate P2 spawn if level has only 1 spawn point
+    if (this.coopMode && spawnPoints.length < 2) {
+      const s1 = spawnPoints[0];
+      // Spiral search for nearest empty tile
+      const directions = [
+        [1, 0],
+        [0, 1],
+        [-1, 0],
+        [0, -1],
+        [1, 1],
+        [-1, 1],
+        [1, -1],
+        [-1, -1],
+      ];
+      let found = false;
+      for (let dist = 1; dist < Math.max(level.mapWidth, level.mapHeight) && !found; dist++) {
+        for (const [dx, dy] of directions) {
+          const nx = s1.x + dx * dist;
+          const ny = s1.y + dy * dist;
+          if (
+            nx > 0 &&
+            ny > 0 &&
+            nx < level.mapWidth - 1 &&
+            ny < level.mapHeight - 1 &&
+            (tiles[ny][nx] === 'empty' || tiles[ny][nx] === 'spawn')
+          ) {
+            spawnPoints.push({ x: nx, y: ny });
+            found = true;
+            break;
+          }
+        }
+      }
     }
 
     return {
@@ -341,20 +409,23 @@ export class CampaignGame {
   }
 
   private campaignTick(): void {
-    const player = this.gameState.players.get(this.userId);
-    if (!player) return;
-
     const tick = this.gameState.tick;
 
-    // 1. Handle player respawn
-    if (this.respawnTick != null && tick >= this.respawnTick) {
-      player.respawn(this.respawnPosition);
-      player.invulnerableTicks = CAMPAIGN_RESPAWN_INVULNERABILITY;
-      this.respawnTick = null;
+    // 1. Handle per-player respawn
+    for (const [playerId, respawnTick] of this.respawnTicks) {
+      if (tick >= respawnTick) {
+        const player = this.gameState.players.get(playerId);
+        if (player) {
+          const spawnPos = this.respawnPositions.get(playerId) ?? { x: 1, y: 1 };
+          player.respawn(spawnPos);
+          player.invulnerableTicks = CAMPAIGN_RESPAWN_INVULNERABILITY;
 
-      // Re-apply carried/starting powerups on respawn
-      const startPowerups = this.level.startingPowerups;
-      if (startPowerups) this.applyStartingPowerups(player, startPowerups);
+          // Re-apply starting powerups on respawn
+          const startPowerups = this.level.startingPowerups;
+          if (startPowerups) this.applyStartingPowerups(player, startPowerups);
+        }
+        this.respawnTicks.delete(playerId);
+      }
     }
 
     // 2. Enemy AI + movement
@@ -421,20 +492,23 @@ export class CampaignGame {
       }
     }
 
-    // 4. Player-enemy contact collision
-    if (player.alive && player.invulnerableTicks <= 0) {
+    // 4. Player-enemy contact collision (check ALL alive players)
+    for (const player of this.gameState.players.values()) {
+      if (!player.alive || player.invulnerableTicks > 0 || player.frozen) continue;
       for (const enemy of this.enemies.values()) {
         if (!enemy.alive || !enemy.typeConfig.contactDamage) continue;
         if (enemy.position.x === player.position.x && enemy.position.y === player.position.y) {
-          this.onPlayerDied();
+          this.handlePlayerDeath(player.id);
           break;
         }
       }
     }
 
-    // 5. Check if player was killed by explosion (handled by gameState.processTick)
-    if (!player.alive && this.respawnTick == null) {
-      this.onPlayerDied();
+    // 5. Check if any player was killed by explosion (handled by gameState.processTick)
+    for (const player of this.gameState.players.values()) {
+      if (!player.alive && !this.respawnTicks.has(player.id)) {
+        this.handlePlayerDeath(player.id);
+      }
     }
 
     // 6. Hidden power-up reveals
@@ -469,7 +543,7 @@ export class CampaignGame {
     }
 
     // 8. Win condition check
-    this.checkWinCondition(player);
+    this.checkWinCondition();
 
     // 9. Grace period after win — let final explosions/effects play out
     if (this.completionTick !== null) {
@@ -605,16 +679,23 @@ export class CampaignGame {
     this.callbacks.onEnemyDied(enemy.id, { ...enemy.position }, enemy.typeConfig.isBoss);
   }
 
-  private onPlayerDied(): void {
-    const player = this.gameState.players.get(this.userId);
+  private handlePlayerDeath(playerId: number): void {
+    const player = this.gameState.players.get(playerId);
     if (!player) return;
 
-    // Player might already be handled
-    if (!player.alive && this.respawnTick != null) return;
+    // Player might already be handled (pending respawn)
+    if (!player.alive && this.respawnTicks.has(playerId)) return;
 
     if (player.alive) {
       player.die();
     }
+
+    // If player was locked in on exit/goal, remove lock-in
+    if (this.lockedInPlayers.has(playerId)) {
+      this.lockedInPlayers.delete(playerId);
+      player.frozen = false;
+    }
+
     this.playerDeaths++;
     this.lives--;
 
@@ -623,8 +704,9 @@ export class CampaignGame {
       return;
     }
 
-    this.respawnTick = this.gameState.tick + CAMPAIGN_RESPAWN_TICKS;
-    this.callbacks.onPlayerDied(this.lives, this.respawnPosition);
+    const respawnPos = this.respawnPositions.get(playerId) ?? { x: 1, y: 1 };
+    this.respawnTicks.set(playerId, this.gameState.tick + CAMPAIGN_RESPAWN_TICKS);
+    this.callbacks.onPlayerDied(playerId, this.lives, respawnPos);
   }
 
   private triggerCompletion(): void {
@@ -633,7 +715,7 @@ export class CampaignGame {
     }
   }
 
-  private checkWinCondition(player: Player): void {
+  private checkWinCondition(): void {
     // Already triggered — waiting for grace period
     if (this.completionTick !== null) return;
 
@@ -660,21 +742,17 @@ export class CampaignGame {
           }
         }
 
-        // Check if player is on exit
-        if (this.exitOpen && player.alive && this.level.winConditionConfig?.exitPosition) {
+        // Sequential lock-in: check each alive player on exit tile
+        if (this.exitOpen && this.level.winConditionConfig?.exitPosition) {
           const ep = this.level.winConditionConfig.exitPosition;
-          if (player.position.x === ep.x && player.position.y === ep.y) {
-            this.triggerCompletion();
-          }
+          this.checkLockIn(ep);
         }
         break;
       }
       case 'reach_goal': {
-        if (player.alive && this.level.winConditionConfig?.goalPosition) {
+        if (this.level.winConditionConfig?.goalPosition) {
           const gp = this.level.winConditionConfig.goalPosition;
-          if (player.position.x === gp.x && player.position.y === gp.y) {
-            this.triggerCompletion();
-          }
+          this.checkLockIn(gp);
         }
         break;
       }
@@ -685,6 +763,34 @@ export class CampaignGame {
         }
         break;
       }
+    }
+  }
+
+  /**
+   * Sequential lock-in mechanic for exit/goal tiles.
+   * First player steps on tile → frozen in place (removed from collision).
+   * Second player then walks onto the same tile.
+   * When all alive players are locked in → level complete.
+   */
+  private checkLockIn(targetPos: Position): void {
+    for (const player of this.gameState.players.values()) {
+      if (
+        player.alive &&
+        !player.frozen &&
+        !this.lockedInPlayers.has(player.id) &&
+        player.position.x === targetPos.x &&
+        player.position.y === targetPos.y
+      ) {
+        this.lockedInPlayers.add(player.id);
+        player.frozen = true;
+        this.callbacks.onPlayerLockedIn?.(player.id, targetPos);
+      }
+    }
+
+    // Check if all alive players are locked in
+    const alivePlayers = Array.from(this.gameState.players.values()).filter((p) => p.alive);
+    if (alivePlayers.length > 0 && alivePlayers.every((p) => this.lockedInPlayers.has(p.id))) {
+      this.triggerCompletion();
     }
   }
 
@@ -724,6 +830,12 @@ export class CampaignGame {
       enemies.push(enemy.toState());
     }
 
+    // Build respawn timers: playerId → ticks remaining
+    const respawnTimers: Record<number, number> = {};
+    for (const [playerId, respawnTick] of this.respawnTicks) {
+      respawnTimers[playerId] = Math.max(0, respawnTick - this.gameState.tick);
+    }
+
     return {
       gameState: state,
       enemies,
@@ -731,6 +843,9 @@ export class CampaignGame {
       maxLives: this.maxLives,
       levelId: this.level.id,
       exitOpen: this.exitOpen,
+      coopMode: this.coopMode,
+      respawnTimers: Object.keys(respawnTimers).length > 0 ? respawnTimers : undefined,
+      lockedInPlayers: this.lockedInPlayers.size > 0 ? Array.from(this.lockedInPlayers) : undefined,
     };
   }
 }

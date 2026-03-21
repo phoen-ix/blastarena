@@ -21,17 +21,50 @@ export class GamepadManager {
   private prevLB = false;
   private prevRB = false;
 
+  // Indexed gamepad state for local co-op
+  private prevIndexedBomb: Map<string, boolean> = new Map();
+  private prevIndexedDetonate: Map<string, boolean> = new Map();
+
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
   }
 
-  private getPad(): Phaser.Input.Gamepad.Gamepad | null {
+  private getPad(index?: number): Phaser.Input.Gamepad.Gamepad | null {
     if (!this.scene.input.gamepad) return null;
     const pads = this.scene.input.gamepad.gamepads;
+    if (index !== undefined) {
+      // Return specific gamepad by index
+      const pad = pads[index];
+      return pad && pad.connected ? pad : null;
+    }
     for (const pad of pads) {
       if (pad && pad.connected) return pad;
     }
     return null;
+  }
+
+  /** Poll a specific gamepad by index (for local co-op P2) */
+  pollIndexed(index: number): GamepadInput {
+    const pad = this.getPad(index);
+    if (!pad) return { direction: null, action: null };
+    const direction = this.readDirection(pad);
+
+    const bombDown = pad.buttons[0]?.pressed ?? false;
+    const detonateDown = pad.buttons[1]?.pressed ?? false;
+
+    // Use separate just-pressed state keyed by index
+    const key = `pad${index}`;
+    const prevBomb = this.prevIndexedBomb.get(key) ?? false;
+    const prevDet = this.prevIndexedDetonate.get(key) ?? false;
+
+    let action: 'bomb' | 'detonate' | null = null;
+    if (bombDown && !prevBomb) action = 'bomb';
+    if (detonateDown && !prevDet) action = 'detonate';
+
+    this.prevIndexedBomb.set(key, bombDown);
+    this.prevIndexedDetonate.set(key, detonateDown);
+
+    return { direction, action };
   }
 
   poll(): GamepadInput {
@@ -85,7 +118,9 @@ export class GamepadManager {
     return this.getPad() !== null;
   }
 
-  private readDirection(pad: Phaser.Input.Gamepad.Gamepad): 'up' | 'down' | 'left' | 'right' | null {
+  private readDirection(
+    pad: Phaser.Input.Gamepad.Gamepad,
+  ): 'up' | 'down' | 'left' | 'right' | null {
     const dpadUp = pad.buttons[12]?.pressed ?? false;
     const dpadDown = pad.buttons[13]?.pressed ?? false;
     const dpadLeft = pad.buttons[14]?.pressed ?? false;
@@ -119,6 +154,8 @@ export class GamepadManager {
     this.prevDetonateButton = false;
     this.prevLB = false;
     this.prevRB = false;
+    this.prevIndexedBomb.clear();
+    this.prevIndexedDetonate.clear();
   }
 
   destroy(): void {

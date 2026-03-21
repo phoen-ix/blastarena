@@ -1,5 +1,20 @@
-import { PlayerState, Position, Direction, PowerUpType, PlayerCosmeticData } from '@blast-arena/shared';
-import { DEFAULT_SPEED, DEFAULT_MAX_BOMBS, DEFAULT_FIRE_RANGE, MAX_SPEED, MAX_BOMBS, MAX_FIRE_RANGE, INVULNERABILITY_TICKS, MOVE_COOLDOWN_BASE } from '@blast-arena/shared';
+import {
+  PlayerState,
+  Position,
+  Direction,
+  PowerUpType,
+  PlayerCosmeticData,
+} from '@blast-arena/shared';
+import {
+  DEFAULT_SPEED,
+  DEFAULT_MAX_BOMBS,
+  DEFAULT_FIRE_RANGE,
+  MAX_SPEED,
+  MAX_BOMBS,
+  MAX_FIRE_RANGE,
+  INVULNERABILITY_TICKS,
+  MOVE_COOLDOWN_BASE,
+} from '@blast-arena/shared';
 
 export class Player {
   public readonly id: number;
@@ -35,7 +50,16 @@ export class Player {
   // Deathmatch respawn
   public respawnTick: number | null = null;
 
-  constructor(id: number, username: string, spawnPosition: Position, team: number | null = null, isBot: boolean = false) {
+  // Co-op campaign: frozen on exit/goal tile (lock-in), excluded from collision
+  public frozen: boolean = false;
+
+  constructor(
+    id: number,
+    username: string,
+    spawnPosition: Position,
+    team: number | null = null,
+    isBot: boolean = false,
+  ) {
     this.id = id;
     this.username = username;
     this.position = { ...spawnPosition };

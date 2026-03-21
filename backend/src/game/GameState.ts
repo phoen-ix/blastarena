@@ -289,7 +289,11 @@ export class GameStateManager {
             // Off-tick: reuse last input (movement continues, no new decisions)
             const lastInput = this._lastBotInputs.get(botId);
             if (lastInput) {
-              this.inputBuffer.addInput(botId, { ...lastInput, seq: lastInput.seq + 1, tick: this.tick });
+              this.inputBuffer.addInput(botId, {
+                ...lastInput,
+                seq: lastInput.seq + 1,
+                tick: this.tick,
+              });
             }
           }
         }
@@ -643,11 +647,12 @@ export class GameStateManager {
     // Movement (with cooldown)
     if (input.direction && player.canMove()) {
       player.direction = input.direction;
-      const bombPositions = sharedBombPositions ?? Array.from(this.bombs.values()).map((b) => b.position);
+      const bombPositions =
+        sharedBombPositions ?? Array.from(this.bombs.values()).map((b) => b.position);
 
       const otherPlayerPositions: { x: number; y: number }[] = [];
       for (const other of this.players.values()) {
-        if (other.id !== player.id && other.alive) {
+        if (other.id !== player.id && other.alive && !other.frozen) {
           otherPlayerPositions.push(other.position);
         }
       }
@@ -961,9 +966,7 @@ export class GameStateManager {
 
   /** Delta state for per-tick broadcasts — omits full tile grid, sends only tile diffs */
   toTickState(): GameStateType {
-    const tileDiffs = this._dirtyTiles.size > 0
-      ? Array.from(this._dirtyTiles.values())
-      : undefined;
+    const tileDiffs = this._dirtyTiles.size > 0 ? Array.from(this._dirtyTiles.values()) : undefined;
     this._dirtyTiles.clear();
 
     return {

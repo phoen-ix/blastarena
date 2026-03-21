@@ -11,7 +11,10 @@ export class HUDScene extends Phaser.Scene {
   private localPlayerDead: boolean = false;
   private localPlayerId!: number;
   private boundClickHandler: ((e: MouseEvent) => void) | null = null;
-  private socketClient: { on: (event: string, handler: (...args: any[]) => void) => void; off: (event: string, handler: (...args: any[]) => void) => void } | null = null;
+  private socketClient: {
+    on: (event: string, handler: (...args: any[]) => void) => void;
+    off: (event: string, handler: (...args: any[]) => void) => void;
+  } | null = null;
   private playerDiedHandler:
     | ((data: { playerId: number; killerId: number | null }) => void)
     | null = null;
@@ -149,9 +152,11 @@ export class HUDScene extends Phaser.Scene {
       this.campaignHudEl.className = 'hud-campaign';
       this.campaignHudEl.style.cssText =
         'position:fixed;top:48px;left:20px;display:flex;gap:16px;align-items:center;font-family:"Chakra Petch",sans-serif;font-size:16px;color:#eae8e4;z-index:100;';
+      const isCoopMode = !!this.registry.get('campaignCoopMode');
       this.campaignHudEl.innerHTML = `
         <span id="campaign-lives" style="display:flex;align-items:center;gap:4px;"></span>
         <span id="campaign-enemies" style="color:var(--danger);"></span>
+        ${isCoopMode ? '<span id="campaign-coop-status" style="display:flex;gap:8px;align-items:center;"></span>' : ''}
       `;
       const overlay = document.getElementById('ui-overlay');
       overlay?.appendChild(this.campaignHudEl);
@@ -399,6 +404,36 @@ export class HUDScene extends Phaser.Scene {
       const enemiesEl = document.getElementById('campaign-enemies');
       if (enemiesEl) {
         enemiesEl.textContent = aliveEnemies > 0 ? `Enemies: ${aliveEnemies}` : '';
+      }
+    }
+
+    // Co-op player status indicators
+    if (state.coopMode) {
+      const statusEl = document.getElementById('campaign-coop-status');
+      if (statusEl) {
+        const players = state.gameState.players;
+        const locked = state.lockedInPlayers ?? [];
+        statusEl.innerHTML = players
+          .map((p) => {
+            let statusIcon = '';
+            let statusColor = 'var(--success)';
+            if (!p.alive) {
+              statusIcon = ' (dead)';
+              statusColor = 'var(--danger)';
+              // Check respawn timer
+              if (state.respawnTimers && state.respawnTimers[p.id] !== undefined) {
+                const ticksLeft = state.respawnTimers[p.id];
+                const secsLeft = Math.ceil(ticksLeft / 20);
+                statusIcon = ` (${secsLeft}s)`;
+                statusColor = 'var(--warning)';
+              }
+            } else if (locked.includes(p.id)) {
+              statusIcon = ' (ready)';
+              statusColor = 'var(--accent)';
+            }
+            return `<span style="color:${statusColor}">${escapeHtml(p.username)}${statusIcon}</span>`;
+          })
+          .join('');
       }
     }
 

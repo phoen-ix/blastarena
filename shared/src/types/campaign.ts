@@ -198,6 +198,9 @@ export interface CampaignGameState {
   maxLives: number;
   levelId: number;
   exitOpen: boolean;
+  coopMode: boolean;
+  respawnTimers?: Record<number, number>; // playerId → ticks remaining until respawn
+  lockedInPlayers?: number[]; // playerIds frozen on exit/goal tile
 }
 
 // --- Export/Import Formats ---
@@ -263,6 +266,14 @@ export interface EnemyAIImportConflict {
   aiName: string;
   existingId?: string;
   existingName?: string;
+}
+
+// --- Co-Op Types ---
+
+export interface CoopStartData {
+  state: CampaignGameState;
+  level: CampaignLevelSummary;
+  enemyTypes: EnemyTypeConfig[];
 }
 
 // --- Buddy Mode (stub) ---

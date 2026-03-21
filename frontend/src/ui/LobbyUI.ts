@@ -188,7 +188,7 @@ export class LobbyUI {
       }
       case 'campaign': {
         const { CampaignView } = await import('./views/CampaignView');
-        return new CampaignView(deps);
+        return new CampaignView(deps, this.partyBar);
       }
       case 'friends': {
         const { FriendsView } = await import('./views/FriendsView');

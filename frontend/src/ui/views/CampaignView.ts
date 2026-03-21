@@ -1,5 +1,6 @@
 import { ILobbyView, ViewDeps } from './types';
 import { CampaignUI } from '../CampaignUI';
+import { PartyBar } from '../PartyBar';
 
 export class CampaignView implements ILobbyView {
   readonly viewId = 'campaign';
@@ -7,8 +8,8 @@ export class CampaignView implements ILobbyView {
 
   private panel: CampaignUI;
 
-  constructor(deps: ViewDeps) {
-    this.panel = new CampaignUI(deps.socketClient, deps.notifications, () => {});
+  constructor(deps: ViewDeps, partyBar: PartyBar) {
+    this.panel = new CampaignUI(deps.socketClient, deps.notifications, () => {}, partyBar);
   }
 
   async render(container: HTMLElement): Promise<void> {

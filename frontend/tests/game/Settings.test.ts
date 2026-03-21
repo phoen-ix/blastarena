@@ -21,47 +21,57 @@ describe('Settings', () => {
         animations: true,
         screenShake: true,
         particles: true,
+        lobbyChat: true,
       });
     });
 
     it('merges stored values with defaults', () => {
-      localStorage.setItem(
-        'blast-arena-settings',
-        JSON.stringify({ animations: false })
-      );
+      localStorage.setItem('blast-arena-settings', JSON.stringify({ animations: false }));
       // Re-import to clear cache
-      return vi.resetModules(), import('../../src/game/Settings').then((mod) => {
-        const settings = mod.getSettings();
-        expect(settings).toEqual({
-          animations: false,
-          screenShake: true,
-          particles: true,
-        });
-      });
+      return (
+        vi.resetModules(),
+        import('../../src/game/Settings').then((mod) => {
+          const settings = mod.getSettings();
+          expect(settings).toEqual({
+            animations: false,
+            screenShake: true,
+            particles: true,
+            lobbyChat: true,
+          });
+        })
+      );
     });
 
     it('returns defaults when stored value is invalid JSON', () => {
       localStorage.setItem('blast-arena-settings', 'not-json!!!');
-      return vi.resetModules(), import('../../src/game/Settings').then((mod) => {
-        const settings = mod.getSettings();
-        expect(settings).toEqual({
-          animations: true,
-          screenShake: true,
-          particles: true,
-        });
-      });
+      return (
+        vi.resetModules(),
+        import('../../src/game/Settings').then((mod) => {
+          const settings = mod.getSettings();
+          expect(settings).toEqual({
+            animations: true,
+            screenShake: true,
+            particles: true,
+            lobbyChat: true,
+          });
+        })
+      );
     });
 
     it('returns defaults when stored value is an array (not object)', () => {
       localStorage.setItem('blast-arena-settings', JSON.stringify([1, 2, 3]));
-      return vi.resetModules(), import('../../src/game/Settings').then((mod) => {
-        const settings = mod.getSettings();
-        expect(settings).toEqual({
-          animations: true,
-          screenShake: true,
-          particles: true,
-        });
-      });
+      return (
+        vi.resetModules(),
+        import('../../src/game/Settings').then((mod) => {
+          const settings = mod.getSettings();
+          expect(settings).toEqual({
+            animations: true,
+            screenShake: true,
+            particles: true,
+            lobbyChat: true,
+          });
+        })
+      );
     });
 
     it('caches result (second call returns same ref)', () => {

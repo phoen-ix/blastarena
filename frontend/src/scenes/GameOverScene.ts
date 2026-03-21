@@ -421,6 +421,9 @@ export class GameOverScene extends Phaser.Scene {
     backBtn.on('pointerout', () => backBtn.setColor(colors.primaryHex));
     backBtn.on('pointerdown', () => {
       this.registry.remove('campaignMode');
+      this.registry.remove('campaignCoopMode');
+      this.registry.remove('localCoopMode');
+      this.registry.remove('localCoopConfig');
       this.registry.set('openCampaign', true);
       this.scene.start('LobbyScene');
     });
@@ -486,6 +489,9 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private startCampaignLevel(levelId: number, socketClient: SocketClient): void {
+    const isCoopMode = !!this.registry.get('campaignCoopMode');
+    const isLocalCoopMode = !!this.registry.get('localCoopMode');
+
     // Fetch enemy types, then emit campaign:start and transition directly to GameScene
     ApiClient.get<any>('/campaign/enemy-types')
       .then((enemyTypesResp) => {
@@ -494,6 +500,8 @@ export class GameOverScene extends Phaser.Scene {
 
           const registry = this.registry;
           registry.set('campaignMode', true);
+          registry.set('campaignCoopMode', isCoopMode || isLocalCoopMode);
+          registry.set('localCoopMode', isLocalCoopMode);
           registry.set('initialGameState', data.state.gameState);
           registry.set('campaignEnemyTypes', enemyTypesResp.enemyTypes || []);
 
@@ -502,16 +510,29 @@ export class GameOverScene extends Phaser.Scene {
         };
         socketClient.on('campaign:gameStart' as any, gameStartHandler as any);
 
-        socketClient.emit('campaign:start' as any, { levelId }, (response: any) => {
+        // Build start data preserving co-op mode
+        const startData: any = { levelId };
+        if (isCoopMode && !isLocalCoopMode) {
+          startData.coopMode = true;
+        } else if (isLocalCoopMode) {
+          startData.localCoopMode = true;
+          startData.localP2 = { username: 'Player 2' };
+        }
+
+        socketClient.emit('campaign:start' as any, startData, (response: any) => {
           if (response && response.error) {
             socketClient.off('campaign:gameStart' as any, gameStartHandler as any);
             this.registry.remove('campaignMode');
+            this.registry.remove('campaignCoopMode');
+            this.registry.remove('localCoopMode');
             this.scene.start('LobbyScene');
           }
         });
       })
       .catch(() => {
         this.registry.remove('campaignMode');
+        this.registry.remove('campaignCoopMode');
+        this.registry.remove('localCoopMode');
         this.scene.start('LobbyScene');
       });
   }
