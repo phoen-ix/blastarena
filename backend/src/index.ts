@@ -26,6 +26,8 @@ async function main(): Promise<void> {
   await getBotAIRegistry().initialize();
   const { getEnemyAIRegistry } = await import('./services/enemyai-registry');
   await getEnemyAIRegistry().initialize();
+  const { seedDefaultEnemyAIs } = await import('./game/enemy-ai-defaults');
+  await seedDefaultEnemyAIs();
 
   // 6. Create Express app
   const app = createApp();

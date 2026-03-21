@@ -74,6 +74,12 @@ export class BotAIRegistry {
     let AIClass: BotAIConstructor | undefined;
     if (typeof mod.default === 'function' && mod.default.prototype?.generateInput) {
       AIClass = mod.default as BotAIConstructor;
+    } else if (
+      typeof mod === 'function' &&
+      (mod as unknown as { prototype: Record<string, unknown> }).prototype?.generateInput
+    ) {
+      // Handle module.exports = Class (mod itself is the constructor)
+      AIClass = mod as unknown as BotAIConstructor;
     } else {
       for (const val of Object.values(mod)) {
         if (

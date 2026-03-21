@@ -15,8 +15,17 @@ import {
   AuthPayload,
   PublicUser,
 } from '@blast-arena/shared';
-import { setupFriendHandlers, notifyFriendsOnline, notifyFriendsOffline, cleanupFriendLimiters } from './handlers/friendHandlers';
-import { setupPartyHandlers, handlePartyDisconnect, cleanupPartyLimiters } from './handlers/partyHandlers';
+import {
+  setupFriendHandlers,
+  notifyFriendsOnline,
+  notifyFriendsOffline,
+  cleanupFriendLimiters,
+} from './handlers/friendHandlers';
+import {
+  setupPartyHandlers,
+  handlePartyDisconnect,
+  cleanupPartyLimiters,
+} from './handlers/partyHandlers';
 import { setupLobbyHandlers, cleanupLobbyLimiters } from './handlers/lobbyHandlers';
 import { setupDMHandlers, cleanupDMLimiters } from './handlers/dmHandlers';
 import * as settingsService from './services/settings';
@@ -34,11 +43,14 @@ type TypedServer = Server<
 const emoteLastUsed = new Map<number, number>();
 
 // Rematch vote tracking per room
-const rematchVotes = new Map<string, {
-  votes: Map<number, { username: string; vote: boolean }>;
-  humanPlayerIds: Set<number>;
-  timeout: ReturnType<typeof setTimeout>;
-}>();
+const rematchVotes = new Map<
+  string,
+  {
+    votes: Map<number, { username: string; vote: boolean }>;
+    humanPlayerIds: Set<number>;
+    timeout: ReturnType<typeof setTimeout>;
+  }
+>();
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -253,10 +265,14 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           } else {
             const threshold = Math.floor(voteState.humanPlayerIds.size / 2) + 1;
             const votesArray = [...voteState.votes.entries()].map(([userId, v]) => ({
-              userId, username: v.username, vote: v.vote,
+              userId,
+              username: v.username,
+              vote: v.vote,
             }));
             io.to(`room:${code}`).emit('rematch:update' as any, {
-              votes: votesArray, threshold, totalPlayers: voteState.humanPlayerIds.size,
+              votes: votesArray,
+              threshold,
+              totalPlayers: voteState.humanPlayerIds.size,
             });
           }
         }
@@ -322,10 +338,12 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
         // Update presence for all players in the room to 'in_game'
         for (const player of room.players) {
-          presenceService.setPresence(player.user.id, 'in_game', {
-            roomCode,
-            gameMode: room.config.gameMode,
-          }).catch(() => {});
+          presenceService
+            .setPresence(player.user.id, 'in_game', {
+              roomCode,
+              gameMode: room.config.gameMode,
+            })
+            .catch(() => {});
           notifyFriendsOnline(io, player.user.id, 'in_game');
         }
       } catch (err) {
@@ -383,11 +401,12 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
       const room = await lobbyService.getRoom(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
-      if (room.status !== 'finished') return callback({ success: false, error: 'Game not finished' });
+      if (room.status !== 'finished')
+        return callback({ success: false, error: 'Game not finished' });
 
       // Initialize vote tracking if needed
       if (!rematchVotes.has(roomCode)) {
-        const humanPlayerIds = new Set(room.players.map(p => p.user.id));
+        const humanPlayerIds = new Set(room.players.map((p) => p.user.id));
         const timeout = setTimeout(() => {
           rematchVotes.delete(roomCode);
           io.to(`room:${roomCode}`).emit('rematch:update' as any, {
@@ -410,7 +429,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       });
 
       const threshold = Math.floor(voteState.humanPlayerIds.size / 2) + 1;
-      const yesVotes = [...voteState.votes.values()].filter(v => v.vote).length;
+      const yesVotes = [...voteState.votes.values()].filter((v) => v.vote).length;
 
       const votesArray = [...voteState.votes.entries()].map(([userId, v]) => ({
         userId,
@@ -434,7 +453,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         // Same restart logic as room:restart
         roomManager.removeRoom(roomCode);
         room.status = 'waiting';
-        room.players.forEach(p => (p.ready = false));
+        room.players.forEach((p) => (p.ready = false));
         await lobbyService.updateRoom(roomCode, room);
 
         io.to(`room:${roomCode}`).emit('rematch:triggered' as any);
@@ -535,7 +554,8 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       const emoteMode = await settingsService.getEmoteMode();
       if (emoteMode === 'disabled') return;
       if (emoteMode === 'admin_only' && socket.data.role !== 'admin') return;
-      if (emoteMode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator') return;
+      if (emoteMode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator')
+        return;
 
       const now = Date.now();
       const last = emoteLastUsed.get(socket.data.userId) ?? 0;
@@ -562,7 +582,8 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       const mode = await settingsService.getSpectatorChatMode();
       if (mode === 'disabled') return;
       if (mode === 'admin_only' && socket.data.role !== 'admin') return;
-      if (mode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator') return;
+      if (mode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator')
+        return;
 
       if (!spectatorChatLimiter.isAllowed(socket.id)) return;
 
@@ -834,7 +855,10 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
                 const userState = await progressService.getUserState(socket.data.userId);
                 const totalStars = userState.totalStars;
                 const unlocked = await achievementsService.evaluateAfterCampaign(
-                  socket.data.userId, totalStars, level.id, level.worldId,
+                  socket.data.userId,
+                  totalStars,
+                  level.id,
+                  level.worldId,
                 );
                 await cosmeticsService.checkCampaignStarUnlocks(socket.data.userId, totalStars);
                 if (unlocked.achievements.length > 0) {
@@ -910,6 +934,22 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       getCampaignGameManager().handleInput(sessionId, input);
     });
 
+    // Campaign: pause
+    socket.on('campaign:pause', (callback) => {
+      const sessionId = socket.data.activeCampaignSession;
+      if (!sessionId) return callback({ success: false });
+      const ok = getCampaignGameManager().pauseSession(sessionId);
+      callback({ success: ok });
+    });
+
+    // Campaign: resume
+    socket.on('campaign:resume', (callback) => {
+      const sessionId = socket.data.activeCampaignSession;
+      if (!sessionId) return callback({ success: false });
+      const ok = getCampaignGameManager().resumeSession(sessionId);
+      callback({ success: ok });
+    });
+
     // Campaign: quit
     socket.on('campaign:quit', () => {
       const sessionId = socket.data.activeCampaignSession;
@@ -945,10 +985,14 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           } else {
             const threshold = Math.floor(voteState.humanPlayerIds.size / 2) + 1;
             const votesArray = [...voteState.votes.entries()].map(([userId, v]) => ({
-              userId, username: v.username, vote: v.vote,
+              userId,
+              username: v.username,
+              vote: v.vote,
             }));
             io.to(`room:${code}`).emit('rematch:update' as any, {
-              votes: votesArray, threshold, totalPlayers: voteState.humanPlayerIds.size,
+              votes: votesArray,
+              threshold,
+              totalPlayers: voteState.humanPlayerIds.size,
             });
           }
         }

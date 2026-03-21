@@ -23,7 +23,10 @@ export class CampaignGameManager {
     this.sessions.set(game.sessionId, game);
     this.playerSessions.set(userId, game.sessionId);
 
-    logger.info({ userId, levelId: level.id, sessionId: game.sessionId }, 'Campaign session started');
+    logger.info(
+      { userId, levelId: level.id, sessionId: game.sessionId },
+      'Campaign session started',
+    );
     return game;
   }
 
@@ -52,9 +55,23 @@ export class CampaignGameManager {
 
   handleInput(sessionId: string, input: PlayerInput): void {
     const game = this.sessions.get(sessionId);
-    if (game && !game.isFinished()) {
+    if (game && !game.isFinished() && !game.isPaused()) {
       game.handleInput(input);
     }
+  }
+
+  pauseSession(sessionId: string): boolean {
+    const game = this.sessions.get(sessionId);
+    if (!game || game.isFinished() || game.isPaused()) return false;
+    game.pause();
+    return true;
+  }
+
+  resumeSession(sessionId: string): boolean {
+    const game = this.sessions.get(sessionId);
+    if (!game || game.isFinished() || !game.isPaused()) return false;
+    game.resume();
+    return true;
   }
 
   getActiveSessionCount(): number {

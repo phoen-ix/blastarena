@@ -37,6 +37,7 @@ Open `http://localhost:8080` (or your configured `APP_EXTERNAL_PORT`). See `.env
 | `Space` | A | Place bomb |
 | `E` | B | Detonate remote bombs |
 | `1`-`6` | — | Quick emote (when alive) |
+| `Escape` | — | Pause campaign (when in campaign) |
 | `1`-`9` | LB / RB | Spectate player (when dead) |
 
 Walk into a bomb with the Kick power-up to send it sliding. Click a player name in the HUD to follow them as spectator.
@@ -60,7 +61,7 @@ All optional, toggled per-room: **Reinforced Walls** (2-hit destructible walls),
 
 ## Solo Campaign
 
-Single-player campaign with hand-crafted levels grouped into worlds. Defeat enemies (5 built-in movement patterns, boss phases, or custom AI scripts), earn 1-3 stars per level, track progress. Admins create enemy types and levels via a visual editor with resizable maps, WASD/arrow panning, zoom, and prominent spawn point markers. Enemy types can optionally use custom AI scripts (TypeScript `decide()` method) that override built-in movement patterns — uploaded in the AI tab and assigned per enemy type with a difficulty setting. Export/import levels and enemy types as JSON (AI source bundled in exports). Ships with "Training Grounds" (3 levels). See [docs/campaign.md](docs/campaign.md) and [docs/enemy-ai-guide.md](docs/enemy-ai-guide.md).
+Single-player campaign with hand-crafted levels grouped into worlds. Defeat enemies (5 built-in movement patterns, boss phases, or custom AI scripts), earn 1-3 stars per level, track progress. 3-2-1-GO countdown, pause menu (Escape key — Continue/Exit), and win grace period for smooth transitions. Admins create enemy types and levels via a visual editor with resizable maps, WASD/arrow panning, zoom, and prominent spawn point markers. Enemy types can optionally use custom AI scripts (TypeScript `decide()` method) that override built-in movement patterns — uploaded in the AI tab and assigned per enemy type with a difficulty setting. Ships with 6 default enemy AIs: Hunter (aggressive chaser), Patrol Guard (path follower), Bomber (area denial), Coward (flee + trap), Swarm (coordinated flanking), and Ambusher (wait + rush) — all scaling across easy/normal/hard difficulty. Export/import levels and enemy types as JSON (AI source bundled in exports). Ships with "Training Grounds" (3 levels). See [docs/campaign.md](docs/campaign.md) and [docs/enemy-ai-guide.md](docs/enemy-ai-guide.md).
 
 ## Bot AI
 

@@ -42,12 +42,9 @@ const mockGameLoopStop = jest.fn<AnyFn>();
 let capturedOnTick: AnyFn | null = null;
 let capturedOnTimeUp: AnyFn | null = null;
 jest.mock('../../../backend/src/game/GameLoop', () => ({
-  GameLoop: jest.fn<AnyFn>().mockImplementation(
-    (
-      _gameState: unknown,
-      onTick: AnyFn,
-      onTimeUp: AnyFn,
-    ) => {
+  GameLoop: jest
+    .fn<AnyFn>()
+    .mockImplementation((_gameState: unknown, onTick: AnyFn, onTimeUp: AnyFn) => {
       capturedOnTick = onTick;
       capturedOnTimeUp = onTimeUp;
       return {
@@ -55,8 +52,7 @@ jest.mock('../../../backend/src/game/GameLoop', () => ({
         stop: mockGameLoopStop,
         isRunning: jest.fn().mockReturnValue(true),
       };
-    },
-  ),
+    }),
 }));
 
 // Mock EnemyAI
@@ -215,14 +211,14 @@ describe('CampaignGame', () => {
       expect(game.isFinished()).toBe(false);
     });
 
-    it('should create GameLoop with skipCountdown=true', () => {
+    it('should create GameLoop with countdown enabled', () => {
       const GameLoop = require('../../../backend/src/game/GameLoop').GameLoop;
       const level = createMinimalLevel();
       new CampaignGame(1, level, new Map(), callbacks);
 
-      // The 5th argument to GameLoop should be true (skipCountdown)
+      // The 5th argument (skipCountdown) should be omitted or falsy
       const lastCallArgs = GameLoop.mock.calls[GameLoop.mock.calls.length - 1];
-      expect(lastCallArgs[4]).toBe(true);
+      expect(lastCallArgs[4]).toBeFalsy();
     });
 
     it('should set up onTick and onTimeUp callbacks in the GameLoop', () => {
@@ -637,9 +633,7 @@ describe('CampaignGame', () => {
 
     it('should store hidden power-ups separately', () => {
       const level = createMinimalLevel({
-        powerupPlacements: [
-          { type: 'shield', x: 3, y: 3, hidden: true },
-        ],
+        powerupPlacements: [{ type: 'shield', x: 3, y: 3, hidden: true }],
       });
 
       const game = new CampaignGame(1, level, new Map(), callbacks);

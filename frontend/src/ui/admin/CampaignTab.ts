@@ -920,7 +920,9 @@ export class CampaignTab {
         if (config.enemyAiId) {
           diffGroup.style.display = '';
           diffSelect.value = config.difficulty || 'normal';
+          movementSelect.disabled = true;
           movementSelect.style.opacity = '0.5';
+          movementSelect.style.cursor = 'not-allowed';
           movementSelect.title = 'Overridden by custom AI';
         }
       })
@@ -931,11 +933,15 @@ export class CampaignTab {
     aiSelect.addEventListener('change', () => {
       if (aiSelect.value) {
         diffGroup.style.display = '';
+        movementSelect.disabled = true;
         movementSelect.style.opacity = '0.5';
+        movementSelect.style.cursor = 'not-allowed';
         movementSelect.title = 'Overridden by custom AI';
       } else {
         diffGroup.style.display = 'none';
+        movementSelect.disabled = false;
         movementSelect.style.opacity = '1';
+        movementSelect.style.cursor = '';
         movementSelect.title = '';
       }
     });

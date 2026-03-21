@@ -76,6 +76,10 @@ export class CampaignGame {
   // Custom AI instances per enemy
   private enemyAIs: Map<number, IEnemyAI> = new Map();
 
+  // Grace period: ticks remaining after win condition before level complete
+  private static readonly GRACE_TICKS = 30; // 1.5s at 20 tick/sec
+  private completionTick: number | null = null;
+
   constructor(
     userId: number,
     level: CampaignLevel,
@@ -154,24 +158,38 @@ export class CampaignGame {
       }
     }
 
-    // Create game loop (skip countdown — campaign starts immediately)
+    // Create game loop with countdown
     this.gameLoop = new GameLoop(
       this.gameState,
       (state) => this.onTick(state),
       () => this.onTimeUp(),
       TICK_RATE,
-      true, // skipCountdown
     );
   }
 
   start(): void {
-    this.startTick = this.gameState.tick;
     this.gameLoop.start();
   }
 
   stop(): void {
     this.gameLoop.stop();
     this.finished = true;
+  }
+
+  pause(): void {
+    if (!this.finished) {
+      this.gameLoop.pause();
+    }
+  }
+
+  resume(): void {
+    if (!this.finished) {
+      this.gameLoop.resume();
+    }
+  }
+
+  isPaused(): boolean {
+    return this.gameLoop.isPaused();
   }
 
   isFinished(): boolean {
@@ -294,7 +312,17 @@ export class CampaignGame {
 
   private onTick(_tickState: unknown): void {
     if (this.finished) return;
-    if (this.gameState.status !== 'playing') return;
+    if (this.gameState.status !== 'playing') {
+      // Still broadcast state during countdown so frontend shows the countdown overlay
+      const state = this.toCampaignState();
+      this.callbacks.onStateUpdate(state);
+      return;
+    }
+
+    // Record start tick on first playing tick (after countdown)
+    if (this.startTick === 0) {
+      this.startTick = this.gameState.tick;
+    }
 
     this.campaignTick();
 
@@ -442,6 +470,13 @@ export class CampaignGame {
 
     // 8. Win condition check
     this.checkWinCondition(player);
+
+    // 9. Grace period after win — let final explosions/effects play out
+    if (this.completionTick !== null) {
+      if (tick >= this.completionTick + CampaignGame.GRACE_TICKS) {
+        this.completeLevelInternal();
+      }
+    }
   }
 
   private initEnemyAIs(): void {
@@ -592,12 +627,21 @@ export class CampaignGame {
     this.callbacks.onPlayerDied(this.lives, this.respawnPosition);
   }
 
+  private triggerCompletion(): void {
+    if (this.completionTick === null) {
+      this.completionTick = this.gameState.tick;
+    }
+  }
+
   private checkWinCondition(player: Player): void {
+    // Already triggered — waiting for grace period
+    if (this.completionTick !== null) return;
+
     switch (this.level.winCondition) {
       case 'kill_all': {
         if (this.enemies.size === 0) break; // No enemies to kill
         const allDead = Array.from(this.enemies.values()).every((e) => !e.alive);
-        if (allDead) this.completeLevelInternal();
+        if (allDead) this.triggerCompletion();
         break;
       }
       case 'find_exit': {
@@ -620,7 +664,7 @@ export class CampaignGame {
         if (this.exitOpen && player.alive && this.level.winConditionConfig?.exitPosition) {
           const ep = this.level.winConditionConfig.exitPosition;
           if (player.position.x === ep.x && player.position.y === ep.y) {
-            this.completeLevelInternal();
+            this.triggerCompletion();
           }
         }
         break;
@@ -629,7 +673,7 @@ export class CampaignGame {
         if (player.alive && this.level.winConditionConfig?.goalPosition) {
           const gp = this.level.winConditionConfig.goalPosition;
           if (player.position.x === gp.x && player.position.y === gp.y) {
-            this.completeLevelInternal();
+            this.triggerCompletion();
           }
         }
         break;
@@ -637,7 +681,7 @@ export class CampaignGame {
       case 'survive_time': {
         const targetTicks = this.level.winConditionConfig?.surviveTimeTicks;
         if (targetTicks != null && this.gameState.tick - this.startTick >= targetTicks) {
-          this.completeLevelInternal();
+          this.triggerCompletion();
         }
         break;
       }

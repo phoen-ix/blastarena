@@ -89,6 +89,7 @@ services:
       - ./data/simulations:/app/simulations
       - ./data/replays:/app/replays
       - ./data/ai:/app/ai
+      - ./data/enemy-ai:/app/enemy-ai
     networks:
       - internal
     healthcheck:

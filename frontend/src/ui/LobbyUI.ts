@@ -263,7 +263,7 @@ export class LobbyUI {
 
           <div class="sidebar-section-label">Social</div>
           <button class="sidebar-nav-item" id="nav-friends">
-            <span class="nav-icon">&#9835;</span>
+            <span class="nav-icon">&#9829;</span>
             <span class="nav-label">Friends</span>
           </button>
           <button class="sidebar-nav-item" id="nav-messages">
@@ -315,7 +315,7 @@ export class LobbyUI {
             </div>
           </div>
           <button class="sidebar-nav-item" id="nav-logout">
-            <span class="nav-icon">&#8618;</span>
+            <span class="nav-icon">&#9211;</span>
             <span class="nav-label">Logout</span>
           </button>
         </div>

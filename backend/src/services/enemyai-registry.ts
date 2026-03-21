@@ -62,6 +62,12 @@ export class EnemyAIRegistry {
     let AIClass: EnemyAIConstructor | undefined;
     if (typeof mod.default === 'function' && mod.default.prototype?.decide) {
       AIClass = mod.default as EnemyAIConstructor;
+    } else if (
+      typeof mod === 'function' &&
+      (mod as unknown as { prototype: Record<string, unknown> }).prototype?.decide
+    ) {
+      // Handle module.exports = Class (mod itself is the constructor)
+      AIClass = mod as unknown as EnemyAIConstructor;
     } else {
       for (const val of Object.values(mod)) {
         if (

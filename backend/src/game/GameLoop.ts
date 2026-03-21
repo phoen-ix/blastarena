@@ -82,6 +82,47 @@ export class GameLoop {
     logger.info('Game loop stopped');
   }
 
+  pause(): void {
+    if (!this.running || !this.interval) return;
+    clearInterval(this.interval);
+    this.interval = null;
+    logger.info('Game loop paused');
+  }
+
+  resume(): void {
+    if (!this.running || this.interval) return;
+    const tickMs = 1000 / this.tickRate;
+    this.interval = setInterval(() => {
+      try {
+        if (this.countdownTicksRemaining > 0) {
+          this.countdownTicksRemaining--;
+          if (this.countdownTicksRemaining <= 0) {
+            this.gameState.status = 'playing';
+          }
+          const state = this.gameState.toTickState();
+          this.onTick(state);
+          return;
+        }
+
+        this.gameState.processTick();
+        const state = this.gameState.toTickState();
+        this.onTick(state);
+
+        if (this.gameState.status === 'finished') {
+          this.stop();
+          this.onGameOver();
+        }
+      } catch (err) {
+        logger.error({ err }, 'Game loop error');
+      }
+    }, tickMs);
+    logger.info('Game loop resumed');
+  }
+
+  isPaused(): boolean {
+    return this.running && this.interval === null;
+  }
+
   isRunning(): boolean {
     return this.running;
   }

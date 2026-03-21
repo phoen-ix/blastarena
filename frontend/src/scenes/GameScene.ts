@@ -1,7 +1,15 @@
 import Phaser from 'phaser';
 import { SocketClient } from '../network/SocketClient';
 import { AuthManager } from '../network/AuthManager';
-import { GameState, CampaignGameState, ReplayData, ReplayTickEvents, PlayerCosmeticData, TILE_SIZE, TICK_MS } from '@blast-arena/shared';
+import {
+  GameState,
+  CampaignGameState,
+  ReplayData,
+  ReplayTickEvents,
+  PlayerCosmeticData,
+  TILE_SIZE,
+  TICK_MS,
+} from '@blast-arena/shared';
 import { TileMapRenderer } from '../game/TileMap';
 import { PlayerSpriteRenderer } from '../game/PlayerSprite';
 import { BombSpriteRenderer } from '../game/BombSprite';
@@ -68,6 +76,11 @@ export class GameScene extends Phaser.Scene {
   private emoteRenderer: EmoteBubbleRenderer | null = null;
   private emoteKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
+  // Campaign pause
+  private paused: boolean = false;
+  private pauseOverlay: HTMLElement | null = null;
+  private pauseKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+
   // Spectator mode
   private freeCamX: number = 0;
   private freeCamY: number = 0;
@@ -101,9 +114,15 @@ export class GameScene extends Phaser.Scene {
       window.removeEventListener('keydown', this.emoteKeyHandler);
       this.emoteKeyHandler = null;
     }
+    if (this.pauseKeyHandler) {
+      window.removeEventListener('keydown', this.pauseKeyHandler);
+      this.pauseKeyHandler = null;
+    }
+    this.hidePauseOverlay();
     this.cleanupRenderers();
 
     // Reset state
+    this.paused = false;
     this.localPlayerDead = false;
     this.freeCamX = 0;
     this.freeCamY = 0;
@@ -145,15 +164,18 @@ export class GameScene extends Phaser.Scene {
     this.emoteRenderer = new EmoteBubbleRenderer(this);
 
     // Listen for emotes from other players
-    this.socketClient.on('game:emote' as any, ((data: { playerId: number; emoteId: EmoteId }) => {
-      if (!this.lastGameState || !this.emoteRenderer) return;
-      const player = this.lastGameState.players.find((p) => p.id === data.playerId);
-      if (player && player.alive) {
-        const px = player.position.x * TILE_SIZE + TILE_SIZE / 2;
-        const py = player.position.y * TILE_SIZE + TILE_SIZE / 2;
-        this.emoteRenderer.showEmote(data.playerId, data.emoteId, px, py);
-      }
-    }) as any);
+    this.socketClient.on(
+      'game:emote' as any,
+      ((data: { playerId: number; emoteId: EmoteId }) => {
+        if (!this.lastGameState || !this.emoteRenderer) return;
+        const player = this.lastGameState.players.find((p) => p.id === data.playerId);
+        if (player && player.alive) {
+          const px = player.position.x * TILE_SIZE + TILE_SIZE / 2;
+          const py = player.position.y * TILE_SIZE + TILE_SIZE / 2;
+          this.emoteRenderer.showEmote(data.playerId, data.emoteId, px, py);
+        }
+      }) as any,
+    );
 
     // Emote keys 1-6 (only when alive — spectator digit keys only fire when localPlayerDead)
     this.emoteKeyHandler = (e: KeyboardEvent) => {
@@ -180,7 +202,7 @@ export class GameScene extends Phaser.Scene {
       this.bombRenderer.setPlayerCosmetics(cosmeticsMap);
 
       // Store a deep copy of initial tiles for delta updates
-      this.storedTiles = initialState.map.tiles.map(row => [...row]);
+      this.storedTiles = initialState.map.tiles.map((row) => [...row]);
       this.tileMap = new TileMapRenderer(
         this,
         initialState.map.tiles,
@@ -200,8 +222,7 @@ export class GameScene extends Phaser.Scene {
 
       this.replayPlayer = new ReplayPlayer(replayData, {
         onFrame: (state: GameState) => this.updateState(state),
-        onTickEvents: (events: ReplayTickEvents) =>
-          this.handleReplayTickEvents(events),
+        onTickEvents: (events: ReplayTickEvents) => this.handleReplayTickEvents(events),
         onLogUpdate: (tick: number) => this.replayLogPanel?.updateTick(tick),
         onComplete: () => {
           /* pause at last frame */
@@ -217,10 +238,8 @@ export class GameScene extends Phaser.Scene {
         playerCount: replayData.gameOver.placements.length,
       };
 
-      this.replayControls = new ReplayControls(
-        this.replayPlayer,
-        matchInfo,
-        () => this.exitReplay(),
+      this.replayControls = new ReplayControls(this.replayPlayer, matchInfo, () =>
+        this.exitReplay(),
       );
       this.replayControls.mount();
 
@@ -287,35 +306,57 @@ export class GameScene extends Phaser.Scene {
       }
       this.enemyRenderer = new EnemySpriteRenderer(this);
 
-      this.socketClient.on('campaign:state' as any, ((state: CampaignGameState) => {
-        this.lastCampaignState = state;
-        this.updateState(state.gameState);
-        this.enemyRenderer?.update(state.enemies);
-      }) as any);
+      this.socketClient.on(
+        'campaign:state' as any,
+        ((state: CampaignGameState) => {
+          this.lastCampaignState = state;
+          this.updateState(state.gameState);
+          this.enemyRenderer?.update(state.enemies);
+        }) as any,
+      );
 
-      this.socketClient.on('campaign:levelComplete' as any, ((data: any) => {
-        this.registry.set('gameOverData', {
-          campaignResult: true,
-          success: true,
-          levelId: data.levelId,
-          timeSeconds: data.timeSeconds,
-          stars: data.stars,
-          nextLevelId: data.nextLevelId,
-        });
-        this.scene.stop('HUDScene');
-        this.scene.start('GameOverScene');
-      }) as any);
+      this.socketClient.on(
+        'campaign:levelComplete' as any,
+        ((data: any) => {
+          this.registry.set('gameOverData', {
+            campaignResult: true,
+            success: true,
+            levelId: data.levelId,
+            timeSeconds: data.timeSeconds,
+            stars: data.stars,
+            nextLevelId: data.nextLevelId,
+          });
+          this.scene.stop('HUDScene');
+          this.scene.start('GameOverScene');
+        }) as any,
+      );
 
-      this.socketClient.on('campaign:gameOver' as any, ((data: any) => {
-        this.registry.set('gameOverData', {
-          campaignResult: true,
-          success: false,
-          levelId: data.levelId,
-          reason: data.reason,
-        });
-        this.scene.stop('HUDScene');
-        this.scene.start('GameOverScene');
-      }) as any);
+      this.socketClient.on(
+        'campaign:gameOver' as any,
+        ((data: any) => {
+          this.registry.set('gameOverData', {
+            campaignResult: true,
+            success: false,
+            levelId: data.levelId,
+            reason: data.reason,
+          });
+          this.scene.stop('HUDScene');
+          this.scene.start('GameOverScene');
+        }) as any,
+      );
+
+      // Escape key to toggle pause menu
+      this.pauseKeyHandler = (e: KeyboardEvent) => {
+        if (e.code === 'Escape') {
+          e.preventDefault();
+          if (this.paused) {
+            this.resumeCampaign();
+          } else {
+            this.pauseCampaign();
+          }
+        }
+      };
+      window.addEventListener('keydown', this.pauseKeyHandler);
     } else {
       this.socketClient.on('game:state', ((state: GameState) => {
         this.updateState(state);
@@ -371,11 +412,11 @@ export class GameScene extends Phaser.Scene {
           this.effectSystem.onTilesDestroyed(destroyed);
         }
         // Update stored tiles from full state
-        this.storedTiles = state.map.tiles.map(row => [...row]);
+        this.storedTiles = state.map.tiles.map((row) => [...row]);
       }
     } else if (this.tileMap && state.map.tiles && state.map.tiles.length > 0) {
       // No stored tiles yet (e.g. simulation spectate joining mid-game)
-      this.storedTiles = state.map.tiles.map(row => [...row]);
+      this.storedTiles = state.map.tiles.map((row) => [...row]);
       const destroyed = this.tileMap.updateTiles(state.map.tiles);
       if (destroyed.length > 0) {
         this.effectSystem.onTilesDestroyed(destroyed);
@@ -553,8 +594,9 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Don't send inputs during countdown
+    // Don't send inputs during countdown or pause
     if (this.lastGameState?.status !== 'playing') return;
+    if (this.paused) return;
 
     // Poll gamepad before throttle to capture just-pressed actions
     const gpInput = this.gamepadManager.poll();
@@ -743,6 +785,66 @@ export class GameScene extends Phaser.Scene {
     this.emoteRenderer = null;
   }
 
+  private pauseCampaign(): void {
+    if (this.paused || !this.campaignMode) return;
+    if (this.lastGameState?.status !== 'playing') return;
+    this.socketClient.emit(
+      'campaign:pause' as any,
+      ((res: any) => {
+        if (!res?.success) return;
+        this.paused = true;
+        this.showPauseOverlay();
+      }) as any,
+    );
+  }
+
+  private resumeCampaign(): void {
+    if (!this.paused) return;
+    this.socketClient.emit(
+      'campaign:resume' as any,
+      ((res: any) => {
+        if (!res?.success) return;
+        this.paused = false;
+        this.hidePauseOverlay();
+      }) as any,
+    );
+  }
+
+  private showPauseOverlay(): void {
+    this.hidePauseOverlay();
+    const overlay = document.createElement('div');
+    overlay.className = 'pause-overlay';
+    overlay.innerHTML = `
+      <div class="pause-menu">
+        <h2 class="pause-title">PAUSED</h2>
+        <button class="btn btn-primary pause-btn" id="pause-continue">Continue</button>
+        <button class="btn btn-secondary pause-btn" id="pause-exit">Exit Level</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    this.pauseOverlay = overlay;
+
+    overlay.querySelector('#pause-continue')!.addEventListener('click', () => {
+      this.resumeCampaign();
+    });
+    overlay.querySelector('#pause-exit')!.addEventListener('click', () => {
+      this.paused = false;
+      this.hidePauseOverlay();
+      this.socketClient.emit('campaign:quit' as any);
+      this.registry.remove('campaignMode');
+      this.registry.set('openCampaign', true);
+      this.scene.stop('HUDScene');
+      this.scene.start('LobbyScene');
+    });
+  }
+
+  private hidePauseOverlay(): void {
+    if (this.pauseOverlay) {
+      this.pauseOverlay.remove();
+      this.pauseOverlay = null;
+    }
+  }
+
   shutdown(): void {
     this.socketClient.off('game:state' as any);
     this.socketClient.off('game:over' as any);
@@ -757,6 +859,12 @@ export class GameScene extends Phaser.Scene {
       window.removeEventListener('keydown', this.emoteKeyHandler);
       this.emoteKeyHandler = null;
     }
+    if (this.pauseKeyHandler) {
+      window.removeEventListener('keydown', this.pauseKeyHandler);
+      this.pauseKeyHandler = null;
+    }
+    this.hidePauseOverlay();
+    this.paused = false;
     this.campaignMode = false;
     this.lastCampaignState = null;
     this.replayPlayer?.destroy();

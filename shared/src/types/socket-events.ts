@@ -3,7 +3,16 @@ import { Room, RoomPlayer, CreateRoomRequest, RoomListItem } from './lobby';
 import { UserRole } from './auth';
 import { SimulationConfig, SimulationBatchStatus, SimulationGameResult } from './simulation';
 import { CampaignGameState, CampaignLevelSummary } from './campaign';
-import { Friend, FriendRequest, Party, PartyInvite, PartyChatMessage, LobbyChatMessage, DirectMessage, ActivityStatus } from './friends';
+import {
+  Friend,
+  FriendRequest,
+  Party,
+  PartyInvite,
+  PartyChatMessage,
+  LobbyChatMessage,
+  DirectMessage,
+  ActivityStatus,
+} from './friends';
 import { EmoteId } from '../constants/emotes';
 import { EloResult } from './leaderboard';
 import { AchievementUnlockEvent } from './achievements';
@@ -65,6 +74,8 @@ export interface ClientToServerEvents {
     callback: (response: { success: boolean; error?: string }) => void,
   ) => void;
   'campaign:input': (input: PlayerInput) => void;
+  'campaign:pause': (callback: (response: { success: boolean }) => void) => void;
+  'campaign:resume': (callback: (response: { success: boolean }) => void) => void;
   'campaign:quit': () => void;
   'campaign:buddyInput': (input: PlayerInput) => void; // stub — buddy mode foundation
 
@@ -120,9 +131,7 @@ export interface ClientToServerEvents {
     callback: (response: { success: boolean; party?: Party; error?: string }) => void,
   ) => void;
   'party:declineInvite': (data: { inviteId: string }) => void;
-  'party:leave': (
-    callback: (response: { success: boolean; error?: string }) => void,
-  ) => void;
+  'party:leave': (callback: (response: { success: boolean; error?: string }) => void) => void;
   'party:kick': (
     data: { userId: number },
     callback: (response: { success: boolean; error?: string }) => void,
@@ -209,20 +218,10 @@ export interface ServerToClientEvents {
     lastResult: SimulationGameResult | null;
   }) => void;
   'sim:completed': (data: { batchId: string; status: SimulationBatchStatus }) => void;
-  'campaign:gameStart': (data: {
-    state: CampaignGameState;
-    level: CampaignLevelSummary;
-  }) => void;
+  'campaign:gameStart': (data: { state: CampaignGameState; level: CampaignLevelSummary }) => void;
   'campaign:state': (state: CampaignGameState) => void;
-  'campaign:playerDied': (data: {
-    livesRemaining: number;
-    respawnPosition: Position;
-  }) => void;
-  'campaign:enemyDied': (data: {
-    enemyId: number;
-    position: Position;
-    isBoss: boolean;
-  }) => void;
+  'campaign:playerDied': (data: { livesRemaining: number; respawnPosition: Position }) => void;
+  'campaign:enemyDied': (data: { enemyId: number; position: Position; isBoss: boolean }) => void;
   'campaign:exitOpened': (data: { position: Position }) => void;
   'campaign:levelComplete': (data: {
     levelId: number;
@@ -230,13 +229,14 @@ export interface ServerToClientEvents {
     stars: number;
     nextLevelId: number | null;
   }) => void;
-  'campaign:gameOver': (data: {
-    levelId: number;
-    reason: string;
-  }) => void;
+  'campaign:gameOver': (data: { levelId: number; reason: string }) => void;
 
   // Friends
-  'friend:update': (data: { friends: Friend[]; incoming: FriendRequest[]; outgoing: FriendRequest[] }) => void;
+  'friend:update': (data: {
+    friends: Friend[];
+    incoming: FriendRequest[];
+    outgoing: FriendRequest[];
+  }) => void;
   'friend:requestReceived': (data: FriendRequest) => void;
   'friend:removed': (data: { userId: number }) => void;
   'friend:online': (data: { userId: number; activity: ActivityStatus }) => void;
