@@ -497,4 +497,119 @@ export class BootScene extends Phaser.Scene {
   create(): void {
     this.scene.start('MenuScene');
   }
+
+  /**
+   * Generate custom player textures for a specific color (and optional eye style).
+   * Called at game start for players with cosmetics. Skips if textures already exist.
+   */
+  static generateCustomPlayerTextures(scene: Phaser.Scene, hex: number, eyeStyle?: string): void {
+    const directions = ['down', 'up', 'left', 'right'];
+    const eyeOffsets: Record<string, { lx: number; ly: number; rx: number; ry: number; px: number; py: number }> = {
+      down:  { lx: -7, ly: 2, rx: 7, ry: 2, px: 0, py: 2 },
+      up:    { lx: -7, ly: -4, rx: 7, ry: -4, px: 0, py: -2 },
+      left:  { lx: -8, ly: -1, rx: -1, ry: -1, px: -2, py: 0 },
+      right: { lx: 1, ly: -1, rx: 8, ry: -1, px: 2, py: 0 },
+    };
+
+    const suffix = eyeStyle ? `${hex.toString(16)}_${eyeStyle}` : hex.toString(16);
+
+    for (const dir of directions) {
+      const key = `player_custom_${suffix}_${dir}`;
+      if (scene.textures.exists(key)) continue;
+
+      const gfx = scene.make.graphics({ x: 0, y: 0 });
+      const cx = 24, cy = 24;
+
+      const darkerColor = Phaser.Display.Color.IntegerToColor(hex).darken(20).color;
+      gfx.fillStyle(darkerColor, 1);
+      gfx.fillRoundedRect(2, 2, 44, 44, 6);
+      gfx.fillStyle(hex, 1);
+      gfx.fillRoundedRect(2, 2, 44, 36, 6);
+      gfx.lineStyle(2, 0xffffff, 0.4);
+      gfx.strokeRoundedRect(2, 2, 44, 44, 6);
+      gfx.fillStyle(0xffffff, 0.3);
+      gfx.fillRoundedRect(6, 5, 10, 6, 3);
+
+      const offsets = eyeOffsets[dir] || eyeOffsets.down;
+
+      if (eyeStyle === 'angry') {
+        // Angry eyes: narrower, red-tinted
+        gfx.fillStyle(0xff4444, 0.95);
+        gfx.fillEllipse(cx + offsets.lx, cy + offsets.ly, 10, 6);
+        gfx.fillEllipse(cx + offsets.rx, cy + offsets.ry, 10, 6);
+        gfx.fillStyle(0x111111, 1);
+        gfx.fillCircle(cx + offsets.lx + offsets.px, cy + offsets.ly + offsets.py, 2.5);
+        gfx.fillCircle(cx + offsets.rx + offsets.px, cy + offsets.ry + offsets.py, 2.5);
+      } else if (eyeStyle === 'cyclops') {
+        // Single centered eye
+        const centerX = (offsets.lx + offsets.rx) / 2;
+        const centerY = (offsets.ly + offsets.ry) / 2;
+        gfx.fillStyle(0xffffff, 0.95);
+        gfx.fillCircle(cx + centerX, cy + centerY, 7);
+        gfx.fillStyle(0x111111, 1);
+        gfx.fillCircle(cx + centerX + offsets.px, cy + centerY + offsets.py, 3);
+      } else if (eyeStyle === 'dot') {
+        // Small dot eyes
+        gfx.fillStyle(0xffffff, 0.95);
+        gfx.fillCircle(cx + offsets.lx, cy + offsets.ly, 3);
+        gfx.fillCircle(cx + offsets.rx, cy + offsets.ry, 3);
+        gfx.fillStyle(0x111111, 1);
+        gfx.fillCircle(cx + offsets.lx + offsets.px * 0.5, cy + offsets.ly + offsets.py * 0.5, 1.5);
+        gfx.fillCircle(cx + offsets.rx + offsets.px * 0.5, cy + offsets.ry + offsets.py * 0.5, 1.5);
+      } else {
+        // Default eyes (same as standard)
+        gfx.fillStyle(0xffffff, 0.95);
+        gfx.fillCircle(cx + offsets.lx, cy + offsets.ly, 5);
+        gfx.fillCircle(cx + offsets.rx, cy + offsets.ry, 5);
+        gfx.fillStyle(0x111111, 1);
+        gfx.fillCircle(cx + offsets.lx + offsets.px, cy + offsets.ly + offsets.py, 2.5);
+        gfx.fillCircle(cx + offsets.rx + offsets.px, cy + offsets.ry + offsets.py, 2.5);
+      }
+
+      gfx.generateTexture(key, 48, 48);
+      gfx.destroy();
+    }
+  }
+
+  /**
+   * Generate a custom bomb texture for a player's bomb skin.
+   * Called at game start for players with bomb skin cosmetics.
+   */
+  static generateCustomBombTexture(
+    scene: Phaser.Scene,
+    config: { baseColor: number; fuseColor: number; label: string },
+  ): void {
+    const key = `bomb_custom_${config.label}`;
+    if (scene.textures.exists(key)) return;
+
+    const gfx = scene.make.graphics({ x: 0, y: 0 });
+    const darkerColor = Phaser.Display.Color.IntegerToColor(config.baseColor).darken(25).color;
+
+    // Main body
+    gfx.fillStyle(darkerColor, 1);
+    gfx.fillCircle(24, 26, 16);
+    gfx.fillStyle(config.baseColor, 1);
+    gfx.fillCircle(24, 24, 16);
+
+    // Shine
+    gfx.fillStyle(0xffffff, 0.3);
+    gfx.fillCircle(18, 18, 5);
+
+    // Fuse
+    gfx.lineStyle(3, config.fuseColor, 1);
+    gfx.beginPath();
+    gfx.moveTo(24, 8);
+    gfx.lineTo(28, 4);
+    gfx.lineTo(32, 6);
+    gfx.stroke();
+
+    // Spark
+    gfx.fillStyle(0xffff00, 1);
+    gfx.fillCircle(32, 6, 3);
+    gfx.fillStyle(0xffffff, 1);
+    gfx.fillCircle(32, 6, 1.5);
+
+    gfx.generateTexture(key, 48, 48);
+    gfx.destroy();
+  }
 }

@@ -13,6 +13,8 @@ import { escapeHtml, escapeAttr } from '../utils/html';
 import { showCreateRoomModal } from './modals/CreateRoomModal';
 import { showHelpModal } from './modals/HelpModal';
 import { SettingsUI } from './SettingsUI';
+import { LeaderboardUI } from './LeaderboardUI';
+import { ProfilePanel } from './ProfilePanel';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 
 export class LobbyUI {
@@ -100,9 +102,11 @@ export class LobbyUI {
         <h1><span>BLAST</span>ARENA</h1>
         <div style="display:flex;gap:10px;align-items:center;">
           <span style="color:var(--text-dim);font-size:13px;">Welcome, <strong style="color:var(--text);">${escapeHtml(user?.username ?? '')}</strong></span>
+          <span id="rank-badge" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;display:none;"></span>
           ${user?.role === 'admin' || user?.role === 'moderator' ? '<button class="btn btn-ghost" id="admin-btn">Admin</button>' : ''}
           <button class="btn btn-primary" id="create-room-btn">+ New Room</button>
           <button class="btn" id="campaign-btn" style="background:linear-gradient(135deg, var(--primary), #ff8f35);color:#fff;font-weight:700;letter-spacing:0.5px;">Campaign</button>
+          <button class="btn btn-ghost" id="leaderboard-btn" style="color:var(--warning);">Leaderboard</button>
           <button class="btn btn-ghost" id="friends-btn" style="color:var(--accent);">Friends</button>
           <button class="btn btn-ghost" id="messages-btn">Messages</button>
           <button class="btn btn-ghost" id="party-btn">Party</button>
@@ -127,6 +131,16 @@ export class LobbyUI {
         this.show();
       });
       campaignUI.show();
+    });
+    const profilePanel = new ProfilePanel(this.notifications);
+    this.container.querySelector('#leaderboard-btn')!.addEventListener('click', () => {
+      this.hide();
+      const leaderboardUI = new LeaderboardUI(this.notifications, () => {
+        this.show();
+      }, (userId) => {
+        profilePanel.open(userId);
+      });
+      leaderboardUI.show();
     });
     this.container.querySelector('#friends-btn')!.addEventListener('click', () => {
       this.friendsPanel.toggle();
@@ -166,6 +180,17 @@ export class LobbyUI {
         adminUI.show();
       });
     }
+
+    // Load rank badge
+    ApiClient.get<{ rankTier: string; rankColor: string }>('/user/rank').then((rank) => {
+      const badge = this.container.querySelector('#rank-badge') as HTMLElement;
+      if (badge && rank.rankTier) {
+        badge.style.display = 'inline-block';
+        badge.style.background = rank.rankColor;
+        badge.style.color = '#fff';
+        badge.textContent = rank.rankTier;
+      }
+    }).catch(() => { /* ignore rank load failure */ });
   }
 
   private async loadRooms(): Promise<void> {

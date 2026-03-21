@@ -11,7 +11,8 @@ export async function getUserProfile(userId: number) {
             u.pending_email, u.created_at,
             s.total_matches, s.total_wins, s.total_kills, s.total_deaths,
             s.total_bombs, s.total_powerups, s.total_playtime,
-            s.win_streak, s.best_win_streak, s.elo_rating
+            s.win_streak, s.best_win_streak, s.elo_rating, s.peak_elo,
+            u.is_profile_public, u.accept_friend_requests
      FROM users u
      LEFT JOIN user_stats s ON s.user_id = u.id
      WHERE u.id = ?`,
@@ -42,7 +43,10 @@ export async function getUserProfile(userId: number) {
       winStreak: row.win_streak || 0,
       bestWinStreak: row.best_win_streak || 0,
       eloRating: row.elo_rating || 1000,
+      peakElo: row.peak_elo || 1000,
     },
+    isProfilePublic: row.is_profile_public ?? true,
+    acceptFriendRequests: row.accept_friend_requests ?? true,
   };
 }
 
@@ -179,4 +183,25 @@ export async function cancelEmailChange(userId: number): Promise<void> {
     'UPDATE users SET pending_email = NULL, email_change_token = NULL, email_change_expires = NULL WHERE id = ?',
     [userId],
   );
+}
+
+export async function updatePrivacySettings(
+  userId: number,
+  settings: { isProfilePublic?: boolean; acceptFriendRequests?: boolean },
+): Promise<void> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+
+  if (settings.isProfilePublic !== undefined) {
+    sets.push('is_profile_public = ?');
+    params.push(settings.isProfilePublic);
+  }
+  if (settings.acceptFriendRequests !== undefined) {
+    sets.push('accept_friend_requests = ?');
+    params.push(settings.acceptFriendRequests);
+  }
+
+  if (sets.length === 0) return;
+  params.push(userId);
+  await execute(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, params);
 }

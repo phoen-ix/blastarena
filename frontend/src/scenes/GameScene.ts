@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { SocketClient } from '../network/SocketClient';
 import { AuthManager } from '../network/AuthManager';
-import { GameState, CampaignGameState, ReplayData, ReplayTickEvents, TILE_SIZE, TICK_MS } from '@blast-arena/shared';
+import { GameState, CampaignGameState, ReplayData, ReplayTickEvents, PlayerCosmeticData, TILE_SIZE, TICK_MS } from '@blast-arena/shared';
 import { TileMapRenderer } from '../game/TileMap';
 import { PlayerSpriteRenderer } from '../game/PlayerSprite';
 import { BombSpriteRenderer } from '../game/BombSprite';
@@ -170,6 +170,15 @@ export class GameScene extends Phaser.Scene {
     window.addEventListener('keydown', this.emoteKeyHandler);
 
     if (initialState) {
+      // Build player cosmetics map for BombSpriteRenderer
+      const cosmeticsMap = new Map<number, PlayerCosmeticData>();
+      for (const player of initialState.players) {
+        if (player.cosmetics) {
+          cosmeticsMap.set(player.id, player.cosmetics);
+        }
+      }
+      this.bombRenderer.setPlayerCosmetics(cosmeticsMap);
+
       // Store a deep copy of initial tiles for delta updates
       this.storedTiles = initialState.map.tiles.map(row => [...row]);
       this.tileMap = new TileMapRenderer(

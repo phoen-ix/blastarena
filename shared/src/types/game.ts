@@ -1,3 +1,5 @@
+import type { PlayerCosmeticData } from './cosmetics';
+
 export type TileType = 'empty' | 'wall' | 'destructible' | 'spawn' | 'destructible_cracked' | 'teleporter_a' | 'teleporter_b' | 'conveyor_up' | 'conveyor_down' | 'conveyor_left' | 'conveyor_right' | 'exit' | 'goal';
 
 export interface Tile {
@@ -34,6 +36,7 @@ export interface PlayerState {
   isBot: boolean;
   kills: number;
   deaths: number;
+  cosmetics?: PlayerCosmeticData;
 }
 
 export interface BombState {

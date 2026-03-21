@@ -8,10 +8,13 @@ import * as adminService from '../services/admin';
 import * as replayService from '../services/replay';
 import * as settingsService from '../services/settings';
 import * as botaiService from '../services/botai';
+import * as seasonService from '../services/season';
+import * as achievementsService from '../services/achievements';
+import * as cosmeticsService from '../services/cosmetics';
 import { invalidateTransporter, sendTestEmail } from '../services/email';
 import { getSimulationManager, getIO } from '../game/registry';
 import { execute } from '../db/connection';
-import { SimulationConfig, GameDefaults, SimulationDefaults, EmailSettings, ChatMode } from '@blast-arena/shared';
+import { SimulationConfig, GameDefaults, SimulationDefaults, EmailSettings, ChatMode, RankConfig } from '@blast-arena/shared';
 import { getErrorMessage } from '@blast-arena/shared';
 import multer from 'multer';
 
@@ -958,6 +961,231 @@ router.delete('/admin/ai/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
     await botaiService.deleteAI(req.params.id, req.user!.userId);
     res.json({ message: 'AI deleted' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ===== Seasons =====
+
+router.get('/admin/seasons', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const result = await seasonService.getSeasons(page, limit);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+const seasonSchema = z.object({
+  name: z.string().min(1).max(100),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+router.post('/admin/seasons', adminOnlyMiddleware, validate(seasonSchema), async (req, res, next) => {
+  try {
+    const season = await seasonService.createSeason(req.body.name, req.body.startDate, req.body.endDate);
+    await execute('INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'season_create', 'season', season.id, `Created season: ${season.name}`]);
+    res.json(season);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/admin/seasons/:id', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    await seasonService.updateSeason(id, req.body);
+    await execute('INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'season_update', 'season', id, 'Updated season']);
+    const season = await seasonService.getSeasonById(id);
+    res.json(season);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/admin/seasons/:id', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    await seasonService.deleteSeason(id);
+    await execute('INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'season_delete', 'season', id, 'Deleted season']);
+    res.json({ message: 'Season deleted' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/admin/seasons/:id/activate', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    await seasonService.activateSeason(id);
+    await execute('INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'season_activate', 'season', id, 'Activated season']);
+    res.json({ message: 'Season activated' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const endSeasonSchema = z.object({
+  resetMode: z.enum(['hard', 'soft']),
+});
+
+router.post('/admin/seasons/:id/end', adminOnlyMiddleware, validate(endSeasonSchema), async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    await seasonService.endSeason(id, req.body.resetMode);
+    await execute('INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'season_end', 'season', id, `Ended season (${req.body.resetMode} reset)`]);
+    res.json({ message: 'Season ended' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ===== Rank Tiers =====
+
+router.get('/admin/settings/rank_tiers', adminOnlyMiddleware, async (_req, res, next) => {
+  try {
+    const config = await settingsService.getRankConfig();
+    res.json(config);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/admin/settings/rank_tiers', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const config = req.body as RankConfig;
+    if (!config.tiers || !Array.isArray(config.tiers)) {
+      return res.status(400).json({ error: 'Invalid rank config: tiers must be an array' });
+    }
+    await settingsService.setRankConfig(config);
+    await execute('INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'settings_update', 'setting', 0, 'Updated rank tiers']);
+    res.json(config);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ===== Achievements (admin CRUD) =====
+
+router.get('/admin/achievements', adminOnlyMiddleware, async (_req, res, next) => {
+  try {
+    const achievements = await achievementsService.getAllAchievements();
+    res.json({ achievements });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const achievementSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().min(1).max(500),
+  icon: z.string().max(10).optional(),
+  category: z.string().max(50).optional(),
+  conditionType: z.enum(['cumulative', 'per_game', 'mode_specific', 'campaign']),
+  conditionConfig: z.record(z.unknown()),
+  rewardType: z.enum(['cosmetic', 'title', 'none']).optional(),
+  rewardId: z.number().int().nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+router.post('/admin/achievements', adminOnlyMiddleware, validate(achievementSchema), async (req, res, next) => {
+  try {
+    const achievement = await achievementsService.createAchievement(req.body);
+    await execute('INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'achievement_create', 'achievement', achievement.id, `Created achievement: ${achievement.name}`]);
+    res.json(achievement);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/admin/achievements/:id', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    await achievementsService.updateAchievement(id, req.body);
+    await execute('INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'achievement_update', 'achievement', id, 'Updated achievement']);
+    const achievement = await achievementsService.getAchievementById(id);
+    res.json(achievement);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/admin/achievements/:id', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    await achievementsService.deleteAchievement(id);
+    await execute('INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'achievement_delete', 'achievement', id, 'Deleted achievement']);
+    res.json({ message: 'Achievement deleted' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ===== Cosmetics (admin CRUD) =====
+
+router.get('/admin/cosmetics', adminOnlyMiddleware, async (_req, res, next) => {
+  try {
+    const cosmetics = await cosmeticsService.getAllCosmetics();
+    res.json({ cosmetics });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const cosmeticSchema = z.object({
+  name: z.string().min(1).max(100),
+  type: z.enum(['color', 'eyes', 'trail', 'bomb_skin']),
+  config: z.record(z.unknown()),
+  rarity: z.enum(['common', 'rare', 'epic', 'legendary']).optional(),
+  unlockType: z.enum(['achievement', 'campaign_stars', 'default']).optional(),
+  unlockRequirement: z.record(z.unknown()).nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+router.post('/admin/cosmetics', adminOnlyMiddleware, validate(cosmeticSchema), async (req, res, next) => {
+  try {
+    const cosmetic = await cosmeticsService.createCosmetic(req.body);
+    await execute('INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'cosmetic_create', 'cosmetic', cosmetic.id, `Created cosmetic: ${cosmetic.name}`]);
+    res.json(cosmetic);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/admin/cosmetics/:id', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    await cosmeticsService.updateCosmetic(id, req.body);
+    await execute('INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'cosmetic_update', 'cosmetic', id, 'Updated cosmetic']);
+    const cosmetic = await cosmeticsService.getCosmeticById(id);
+    res.json(cosmetic);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/admin/cosmetics/:id', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    await cosmeticsService.deleteCosmetic(id);
+    await execute('INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'cosmetic_delete', 'cosmetic', id, 'Deleted cosmetic']);
+    res.json({ message: 'Cosmetic deleted' });
   } catch (err) {
     next(err);
   }

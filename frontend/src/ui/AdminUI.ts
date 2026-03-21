@@ -12,6 +12,8 @@ import { AnnouncementsTab } from './admin/AnnouncementsTab';
 import { SimulationsTab } from './admin/SimulationsTab';
 import { AITab } from './admin/AITab';
 import { CampaignTab } from './admin/CampaignTab';
+import { SeasonsTab } from './admin/SeasonsTab';
+import { AchievementsTab } from './admin/AchievementsTab';
 
 interface Tab {
   id: string;
@@ -96,6 +98,18 @@ export class AdminUI {
         label: 'Campaign',
         adminOnly: true,
         instance: new CampaignTab(notifications),
+      },
+      {
+        id: 'seasons',
+        label: 'Seasons',
+        adminOnly: true,
+        instance: new SeasonsTab(notifications),
+      },
+      {
+        id: 'achievements',
+        label: 'Achievements',
+        adminOnly: true,
+        instance: new AchievementsTab(notifications),
       },
     ];
 

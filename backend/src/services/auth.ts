@@ -7,6 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 import { AuthPayload, PublicUser, AuthResponse, UserRole } from '@blast-arena/shared';
 import { logger } from '../utils/logger';
 import { UserRow, RefreshTokenJoinRow, IdRow } from '../db/types';
+import * as cosmeticsService from './cosmetics';
 
 function toPublicUser(row: UserRow | RefreshTokenJoinRow): PublicUser {
   return {
@@ -66,6 +67,11 @@ export async function register(
 
   // Create user_stats row
   await execute('INSERT INTO user_stats (user_id) VALUES (?)', [result.insertId]);
+
+  // Grant default cosmetics (non-blocking)
+  cosmeticsService.unlockDefaultCosmetics(result.insertId).catch((err) => {
+    logger.error({ err }, 'Failed to unlock default cosmetics');
+  });
 
   // Send verification email (non-blocking)
   sendVerificationEmail(email, verifyToken).catch((err) => {

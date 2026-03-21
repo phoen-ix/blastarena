@@ -12,7 +12,7 @@ interface UserSearchRow extends RowDataPacket {
 export async function sendFriendRequest(fromUserId: number, toUsername: string): Promise<number> {
   // Look up target user
   const [targetUser] = await query<UserRow[]>(
-    'SELECT id, username FROM users WHERE username = ? AND is_deactivated = 0',
+    'SELECT id, username, accept_friend_requests FROM users WHERE username = ? AND is_deactivated = 0',
     [toUsername],
   );
   if (!targetUser) {
@@ -20,6 +20,11 @@ export async function sendFriendRequest(fromUserId: number, toUsername: string):
   }
   if (targetUser.id === fromUserId) {
     throw new Error('Cannot send friend request to yourself');
+  }
+
+  // Check if target accepts friend requests
+  if (targetUser.accept_friend_requests === false || targetUser.accept_friend_requests === 0) {
+    throw new Error('This user is not accepting friend requests');
   }
 
   // Check blocks both directions

@@ -2,7 +2,7 @@ import { AuthManager } from '../network/AuthManager';
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
 import { escapeHtml } from '../utils/html';
-import { getErrorMessage } from '@blast-arena/shared';
+import { getErrorMessage, Cosmetic, CosmeticType, EquippedCosmetics } from '@blast-arena/shared';
 import { getSettings, saveSettings, VisualSettings } from '../game/Settings';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 
@@ -21,6 +21,8 @@ export class SettingsUI {
   private tabs: Tab[] = [
     { id: 'account', label: 'Account' },
     { id: 'preferences', label: 'Preferences' },
+    { id: 'privacy', label: 'Privacy' },
+    { id: 'cosmetics', label: 'Cosmetics' },
   ];
 
   constructor(
@@ -105,10 +107,19 @@ export class SettingsUI {
   private async renderActiveTab(): Promise<void> {
     if (!this.contentEl) return;
 
-    if (this.activeTabId === 'account') {
-      await this.renderAccountTab();
-    } else {
-      this.renderPreferencesTab();
+    switch (this.activeTabId) {
+      case 'account':
+        await this.renderAccountTab();
+        break;
+      case 'preferences':
+        this.renderPreferencesTab();
+        break;
+      case 'privacy':
+        await this.renderPrivacyTab();
+        break;
+      case 'cosmetics':
+        await this.renderCosmeticsTab();
+        break;
     }
   }
 
@@ -327,6 +338,151 @@ export class SettingsUI {
       const current = getSettings();
       (current as any)[key] = target.checked;
       saveSettings(current);
+    });
+  }
+
+  private async renderPrivacyTab(): Promise<void> {
+    if (!this.contentEl) return;
+
+    let profile: any;
+    try {
+      profile = await ApiClient.get('/user/profile');
+    } catch (err: unknown) {
+      this.contentEl.innerHTML = `<div style="color:var(--danger);padding:20px;">Failed to load profile: ${escapeHtml(getErrorMessage(err))}</div>`;
+      return;
+    }
+
+    this.contentEl.innerHTML = `
+      <div style="max-width:500px;">
+        <h3 style="color:var(--text);font-family:var(--font-display);font-weight:700;margin-bottom:20px;">Privacy Settings</h3>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <label style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;">
+            <input type="checkbox" id="privacy-public-profile" ${profile.isProfilePublic ? 'checked' : ''}
+              style="width:18px;height:18px;accent-color:var(--primary);cursor:pointer;">
+            <div>
+              <div style="font-weight:600;font-size:14px;color:var(--text);">Public Profile</div>
+              <div style="font-size:12px;color:var(--text-muted);">Allow other players to view your stats, rank, and achievements</div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;">
+            <input type="checkbox" id="privacy-accept-friends" ${profile.acceptFriendRequests ? 'checked' : ''}
+              style="width:18px;height:18px;accent-color:var(--primary);cursor:pointer;">
+            <div>
+              <div style="font-weight:600;font-size:14px;color:var(--text);">Accept Friend Requests</div>
+              <div style="font-size:12px;color:var(--text-muted);">Allow other players to send you friend requests</div>
+            </div>
+          </label>
+        </div>
+        <div id="privacy-status" style="margin-top:12px;"></div>
+      </div>
+    `;
+
+    const savePrivacy = async (field: string, value: boolean) => {
+      const statusEl = this.contentEl!.querySelector('#privacy-status')!;
+      try {
+        await ApiClient.put('/user/privacy', { [field]: value });
+        statusEl.innerHTML = '<span style="color:var(--success);">Saved!</span>';
+        setTimeout(() => { statusEl.innerHTML = ''; }, 2000);
+      } catch (err: unknown) {
+        statusEl.innerHTML = `<span style="color:var(--danger);">${escapeHtml(getErrorMessage(err))}</span>`;
+      }
+    };
+
+    this.contentEl.querySelector('#privacy-public-profile')!.addEventListener('change', (e) => {
+      savePrivacy('isProfilePublic', (e.target as HTMLInputElement).checked);
+    });
+    this.contentEl.querySelector('#privacy-accept-friends')!.addEventListener('change', (e) => {
+      savePrivacy('acceptFriendRequests', (e.target as HTMLInputElement).checked);
+    });
+  }
+
+  private async renderCosmeticsTab(): Promise<void> {
+    if (!this.contentEl) return;
+
+    let allCosmetics: Cosmetic[] = [];
+    let myCosmetics: Cosmetic[] = [];
+    let equipped: EquippedCosmetics = { colorId: null, eyesId: null, trailId: null, bombSkinId: null };
+
+    try {
+      const [allResp, mineResp, equippedResp] = await Promise.all([
+        ApiClient.get<{ cosmetics: Cosmetic[] }>('/cosmetics'),
+        ApiClient.get<{ cosmetics: Cosmetic[] }>('/cosmetics/mine'),
+        ApiClient.get<EquippedCosmetics>('/cosmetics/equipped'),
+      ]);
+      allCosmetics = allResp.cosmetics;
+      myCosmetics = mineResp.cosmetics;
+      equipped = equippedResp;
+    } catch (err: unknown) {
+      this.contentEl.innerHTML = `<div style="color:var(--danger);padding:20px;">Failed to load cosmetics: ${escapeHtml(getErrorMessage(err))}</div>`;
+      return;
+    }
+
+    const ownedIds = new Set(myCosmetics.map((c) => c.id));
+    const slots: { key: keyof EquippedCosmetics; type: CosmeticType; label: string }[] = [
+      { key: 'colorId', type: 'color', label: 'Player Color' },
+      { key: 'eyesId', type: 'eyes', label: 'Eye Style' },
+      { key: 'trailId', type: 'trail', label: 'Movement Trail' },
+      { key: 'bombSkinId', type: 'bomb_skin', label: 'Bomb Skin' },
+    ];
+
+    const renderSlot = (slot: typeof slots[0]) => {
+      const items = allCosmetics.filter((c) => c.type === slot.type);
+      const equippedId = equipped[slot.key];
+
+      return `
+        <div style="margin-bottom:24px;">
+          <h4 style="color:var(--text);font-family:var(--font-display);font-weight:700;margin-bottom:10px;">${slot.label}</h4>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            <button class="cosmetic-item ${equippedId === null ? 'equipped' : ''}" data-slot="${slot.type}" data-cosmetic-id="null"
+              style="padding:8px 12px;border-radius:var(--radius-sm);border:2px solid ${equippedId === null ? 'var(--primary)' : 'var(--border)'};background:var(--bg-surface);color:var(--text);cursor:pointer;font-size:12px;">
+              None
+            </button>
+            ${items
+              .map((c) => {
+                const owned = ownedIds.has(c.id);
+                const isEquipped = equippedId === c.id;
+                const preview = c.type === 'color' && c.config.hex
+                  ? `<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${typeof c.config.hex === 'string' ? '#' + (c.config.hex as string).replace('0x', '') : '#fff'};vertical-align:middle;margin-right:4px;"></span>`
+                  : '';
+                return `
+                  <button class="cosmetic-item ${isEquipped ? 'equipped' : ''}" data-slot="${slot.type}" data-cosmetic-id="${c.id}"
+                    ${!owned ? 'disabled' : ''}
+                    style="padding:8px 12px;border-radius:var(--radius-sm);border:2px solid ${isEquipped ? 'var(--primary)' : 'var(--border)'};background:${owned ? 'var(--bg-surface)' : 'var(--bg-deep)'};color:${owned ? 'var(--text)' : 'var(--text-muted)'};cursor:${owned ? 'pointer' : 'not-allowed'};font-size:12px;opacity:${owned ? '1' : '0.5'};">
+                    ${preview}${escapeHtml(c.name)}
+                    ${!owned ? '<span style="font-size:10px;color:var(--text-muted);display:block;">Locked</span>' : ''}
+                  </button>`;
+              })
+              .join('')}
+          </div>
+        </div>
+      `;
+    };
+
+    this.contentEl.innerHTML = `
+      <div style="max-width:600px;">
+        <h3 style="color:var(--text);font-family:var(--font-display);font-weight:700;margin-bottom:20px;">Cosmetics</h3>
+        ${slots.map(renderSlot).join('')}
+        <div id="cosmetics-status" style="margin-top:8px;"></div>
+      </div>
+    `;
+
+    this.contentEl.querySelectorAll('.cosmetic-item').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const slot = (btn as HTMLElement).dataset.slot as CosmeticType;
+        const cosmeticIdStr = (btn as HTMLElement).dataset.cosmeticId!;
+        const cosmeticId = cosmeticIdStr === 'null' ? null : parseInt(cosmeticIdStr);
+
+        const statusEl = this.contentEl!.querySelector('#cosmetics-status')!;
+        try {
+          const newEquipped = await ApiClient.put<EquippedCosmetics>('/cosmetics/equip', { slot, cosmeticId });
+          equipped = newEquipped;
+          // Re-render to update visual state
+          await this.renderCosmeticsTab();
+          this.notifications.success('Cosmetic updated');
+        } catch (err: unknown) {
+          statusEl.innerHTML = `<span style="color:var(--danger);">${escapeHtml(getErrorMessage(err))}</span>`;
+        }
+      });
     });
   }
 

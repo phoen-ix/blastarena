@@ -23,6 +23,9 @@ import { logger } from '../utils/logger';
 import { GameLogger } from '../utils/gameLogger';
 import { ReplayRecorder } from '../utils/replayRecorder';
 import * as lobbyService from '../services/lobby';
+import * as cosmeticsService from '../services/cosmetics';
+import * as eloService from '../services/elo';
+import * as achievementsService from '../services/achievements';
 
 const DISCONNECT_GRACE_TICKS = 200; // 10 seconds at 20 tps
 
@@ -102,6 +105,17 @@ export class GameRoom {
         player.hasKick = true;
       }
     }
+
+    // Load cosmetics for human players (fire-and-forget, cosmetics are visual only)
+    const humanIds = room.players.map((rp) => rp.user.id);
+    cosmeticsService.getPlayerCosmeticsForGame(humanIds).then((cosmeticsMap) => {
+      for (const [userId, cosmeticData] of cosmeticsMap) {
+        const player = this.gameState.players.get(userId);
+        if (player) player.cosmetics = cosmeticData;
+      }
+    }).catch((err) => {
+      logger.error({ err }, 'Failed to load player cosmetics');
+    });
 
     // Replay recorder for game replay (conditional on room config)
     if (room.config.recordGame !== false) {
@@ -406,6 +420,58 @@ export class GameRoom {
               player.id,
             ],
           );
+        }
+
+        // Elo calculation (skip aborted matches)
+        if (matchStatus !== 'aborted') {
+          try {
+            const eloPlayers = [...this.gameState.players.values()]
+              .filter((p) => !p.isBot)
+              .map((p) => ({
+                userId: p.id,
+                placement: p.placement ?? 999,
+                team: p.team,
+                isWinner: p.id === state.winnerId || (state.winnerTeam !== null && p.team === state.winnerTeam),
+              }));
+
+            const eloResults = await eloService.processMatchElo(
+              this.room.config.gameMode,
+              eloPlayers,
+              this.matchId!,
+            );
+
+            if (eloResults.length > 0) {
+              this.io.to(`room:${this.code}`).emit('game:eloUpdate', eloResults);
+            }
+          } catch (eloErr) {
+            logger.error({ err: eloErr }, 'Failed to process Elo');
+          }
+
+          // Achievement evaluation for each human player
+          for (const player of this.gameState.players.values()) {
+            if (player.isBot) continue;
+            try {
+              const unlocked = await achievementsService.evaluateAfterGame({
+                userId: player.id,
+                gameMode: this.room.config.gameMode,
+                isWinner: player.id === state.winnerId || (state.winnerTeam !== null && player.team === state.winnerTeam),
+                kills: player.kills,
+                deaths: player.deaths,
+                selfKills: player.selfKills,
+                bombsPlaced: player.bombsPlaced,
+                powerupsCollected: player.powerupsCollected,
+                survivedSeconds: Math.floor(state.timeElapsed),
+                placement: player.placement ?? 999,
+                playerCount: this.gameState.players.size,
+              });
+
+              if (unlocked.achievements.length > 0) {
+                this.io.to(`user:${player.id}`).emit('achievement:unlocked', unlocked);
+              }
+            } catch (achErr) {
+              logger.error({ err: achErr, userId: player.id }, 'Failed to evaluate achievements');
+            }
+          }
         }
       } catch (err) {
         logger.error({ err }, 'Failed to save match results');

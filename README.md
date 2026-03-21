@@ -71,6 +71,14 @@ Three difficulty tiers optimized through 20,000+ simulation games:
 
 Admins can upload custom AI implementations as TypeScript files. See [docs/bot-ai-guide.md](docs/bot-ai-guide.md) for the developer guide and [docs/bot-ai-internals.md](docs/bot-ai-internals.md) for built-in AI details.
 
+## Leaderboard & Ranking
+
+Elo-based competitive ranking across all game modes. Standard Elo formula with adaptive K-factor. Seasonal system with admin-defined dates, history archiving, and hard/soft resets. Six rank tiers (Bronze through Champion) with optional sub-tiers (I/II/III) — all admin-configurable. Public leaderboard page with season filtering and clickable profiles. Rank badge displayed next to usernames in lobby. Elo deltas shown on game-over screen.
+
+## Achievements & Cosmetics
+
+Admin-configurable achievement system with four condition types: cumulative stats, per-game feats, mode-specific milestones, and campaign progress. Achievements can reward cosmetics. Four cosmetic types: player colors, eye styles, movement trails, and bomb skins. Unlocked via achievements or campaign stars, equipped in settings. Cosmetics visible to all players in-game (custom textures generated on-demand). Public profiles show rank, season history, achievements, and equipped cosmetics with a privacy toggle.
+
 ## Admin Panel
 
 | Tab | Access | Key Features |
@@ -84,6 +92,8 @@ Admins can upload custom AI implementations as TypeScript files. See [docs/bot-a
 | AI | Admin | Upload/manage custom bot AI implementations |
 | Campaign | Admin | Worlds, levels (visual editor), enemy types, JSON export/import |
 | Announcements | Staff | Toast broadcasts, persistent banners |
+| Seasons | Admin | Season CRUD, activate/end (hard/soft reset), rank tier config with color pickers |
+| Achievements | Admin | Achievement CRUD (4 condition types), cosmetic CRUD (4 types), reward linking |
 
 All actions audit-logged. See [docs/admin-and-systems.md](docs/admin-and-systems.md).
 
@@ -150,11 +160,11 @@ blast-arena/
 ├── shared/                  # Shared types, constants, utilities
 ├── backend/
 │   └── src/
-│       ├── routes/          # REST endpoints (auth, lobby, user, admin, campaign, friends, messages)
+│       ├── routes/          # REST endpoints (auth, lobby, user, admin, campaign, friends, messages, leaderboard, cosmetics)
 │       ├── game/            # Server game logic (GameLoop, GameState, BotAI, etc.)
 │       ├── simulation/      # Bot simulation system
 │       ├── db/              # MariaDB connection, migrations, redis
-│       ├── services/        # Auth, user, admin, lobby, email, replay, settings, friends, party, presence, messages
+│       ├── services/        # Auth, user, admin, lobby, email, replay, settings, friends, party, presence, messages, elo, season, leaderboard, achievements, cosmetics
 │       └── middleware/       # Auth, rate limiting, staff checks
 ├── frontend/
 │   ├── index.html           # HTML + full CSS design system (INFERNO theme)
@@ -171,7 +181,7 @@ blast-arena/
 ## Testing & Linting
 
 ```bash
-npm test                    # Run all test suites (1555 tests)
+npm test                    # Run all test suites (1817 tests)
 npm run lint                # ESLint across all workspaces
 npm run format:check        # Prettier format check
 ```

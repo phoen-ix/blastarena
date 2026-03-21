@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SocketClient } from '../network/SocketClient';
 import { ApiClient } from '../network/ApiClient';
+import { EloResult, AchievementUnlockEvent } from '@blast-arena/shared';
 
 const DEADZONE = 0.3;
 
@@ -13,6 +14,9 @@ export class GameOverScene extends Phaser.Scene {
   private prevLeft = false;
   private prevRight = false;
   private underline: Phaser.GameObjects.Graphics | null = null;
+  private eloPlacementData: Map<number, number> = new Map(); // userId -> y position
+  private eloColX = 0;
+  private achievementToasts: Phaser.GameObjects.Text[] = [];
 
   constructor() {
     super({ key: 'GameOverScene' });
@@ -27,6 +31,9 @@ export class GameOverScene extends Phaser.Scene {
     this.prevLeft = false;
     this.prevRight = false;
     this.underline = null;
+    this.eloPlacementData = new Map();
+    this.eloColX = 0;
+    this.achievementToasts = [];
 
     // Clear any leftover DOM overlays (countdown, HUD)
     const uiOverlay = document.getElementById('ui-overlay');
@@ -51,8 +58,23 @@ export class GameOverScene extends Phaser.Scene {
     };
     socketClient.on('room:state' as any, roomStateHandler as any);
 
+    // Listen for Elo update results
+    const eloHandler = (results: EloResult[]) => {
+      socketClient.off('game:eloUpdate' as any, eloHandler as any);
+      this.showEloResults(results);
+    };
+    socketClient.on('game:eloUpdate' as any, eloHandler as any);
+
+    // Listen for achievement unlocks
+    const achievementHandler = (data: AchievementUnlockEvent) => {
+      this.showAchievementUnlock(data);
+    };
+    socketClient.on('achievement:unlocked' as any, achievementHandler as any);
+
     this.events.on('shutdown', () => {
       socketClient.off('room:state' as any, roomStateHandler as any);
+      socketClient.off('game:eloUpdate' as any, eloHandler as any);
+      socketClient.off('achievement:unlocked' as any, achievementHandler as any);
     });
 
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.85);
@@ -156,9 +178,11 @@ export class GameOverScene extends Phaser.Scene {
       const teamNames = ['Red', 'Blue'];
 
       // Column layout
-      const colName = width * 0.35;
-      const colTeam = isTeamMode ? width * 0.6 : -1;
-      const colScore = width * 0.75;
+      const colName = width * 0.28;
+      const colTeam = isTeamMode ? width * 0.5 : -1;
+      const colScore = isTeamMode ? width * 0.63 : width * 0.58;
+      const colElo = isTeamMode ? width * 0.78 : width * 0.75;
+      this.eloColX = colElo;
 
       // Header
       const hs = {
@@ -170,6 +194,7 @@ export class GameOverScene extends Phaser.Scene {
       this.add.text(colName, 115, 'PLAYER', hs).setOrigin(0.5);
       if (isTeamMode) this.add.text(colTeam, 115, 'TEAM', hs).setOrigin(0.5);
       this.add.text(colScore, 115, 'SCORE', hs).setOrigin(0.5);
+      this.add.text(colElo, 115, 'ELO', hs).setOrigin(0.5);
 
       list.forEach((p: any, i: number) => {
         const y = startY + i * spacing;
@@ -199,6 +224,11 @@ export class GameOverScene extends Phaser.Scene {
         this.add
           .text(colScore, y, `${kills}`, { fontSize: '16px', color: dead ? '#555' : '#fff' })
           .setOrigin(0.5);
+
+        // Track position for Elo display (skip bots)
+        if (!p.isBot && p.userId) {
+          this.eloPlacementData.set(p.userId, y);
+        }
       });
     }
   }
@@ -398,6 +428,80 @@ export class GameOverScene extends Phaser.Scene {
       this.registry.remove('campaignMode');
       this.scene.start('LobbyScene');
     });
+  }
+
+  private showEloResults(results: EloResult[]): void {
+    for (const result of results) {
+      const y = this.eloPlacementData.get(result.userId);
+      if (y === undefined) continue;
+
+      const delta = result.delta;
+      const sign = delta >= 0 ? '+' : '';
+      const color = delta >= 0 ? '#00e676' : '#ff3355';
+      const text = this.add
+        .text(this.eloColX, y, `${sign}${delta}`, {
+          fontSize: '15px',
+          color,
+          fontFamily: 'DM Sans, sans-serif',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+        .setAlpha(0);
+
+      // Fade in
+      this.tweens.add({
+        targets: text,
+        alpha: 1,
+        y: y - 2,
+        duration: 400,
+        ease: 'Power2',
+      });
+    }
+  }
+
+  private showAchievementUnlock(data: AchievementUnlockEvent): void {
+    const width = this.cameras.main.width;
+
+    for (let i = 0; i < data.achievements.length; i++) {
+      const achievement = data.achievements[i];
+      const yOffset = 20 + i * 40;
+
+      const label = `${achievement.icon} ${achievement.name}`;
+      const toast = this.add
+        .text(width / 2, yOffset, label, {
+          fontSize: '16px',
+          color: '#ffdd44',
+          fontFamily: 'Chakra Petch, sans-serif',
+          fontStyle: 'bold',
+          backgroundColor: '#1a1a2e',
+          padding: { x: 12, y: 6 },
+        })
+        .setOrigin(0.5)
+        .setAlpha(0)
+        .setDepth(20);
+
+      this.achievementToasts.push(toast);
+
+      // Slide down + fade in, then fade out after delay
+      this.tweens.add({
+        targets: toast,
+        alpha: 1,
+        y: yOffset + 15,
+        duration: 500,
+        ease: 'Back.easeOut',
+        delay: i * 300,
+        onComplete: () => {
+          this.tweens.add({
+            targets: toast,
+            alpha: 0,
+            y: toast.y - 10,
+            duration: 800,
+            delay: 3000,
+            ease: 'Power2',
+          });
+        },
+      });
+    }
   }
 
   private updateButtonHighlight(): void {

@@ -1,6 +1,6 @@
 import { query, execute } from '../db/connection';
 import { SettingRow } from '../db/types';
-import { GameDefaults, SimulationDefaults, EmailSettings, ChatMode } from '@blast-arena/shared';
+import { GameDefaults, SimulationDefaults, EmailSettings, ChatMode, RankConfig, DEFAULT_RANK_CONFIG } from '@blast-arena/shared';
 
 export async function getSetting(key: string): Promise<string | null> {
   const rows = await query<SettingRow[]>(
@@ -101,4 +101,18 @@ export async function getEmoteMode(): Promise<ChatMode> {
     return value as ChatMode;
   }
   return 'everyone';
+}
+
+export async function getRankConfig(): Promise<RankConfig> {
+  const value = await getSetting('rank_tiers');
+  if (!value) return DEFAULT_RANK_CONFIG;
+  try {
+    return JSON.parse(value) as RankConfig;
+  } catch {
+    return DEFAULT_RANK_CONFIG;
+  }
+}
+
+export async function setRankConfig(config: RankConfig): Promise<void> {
+  await setSetting('rank_tiers', JSON.stringify(config));
 }

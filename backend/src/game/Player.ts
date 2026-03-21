@@ -1,4 +1,4 @@
-import { PlayerState, Position, Direction, PowerUpType } from '@blast-arena/shared';
+import { PlayerState, Position, Direction, PowerUpType, PlayerCosmeticData } from '@blast-arena/shared';
 import { DEFAULT_SPEED, DEFAULT_MAX_BOMBS, DEFAULT_FIRE_RANGE, MAX_SPEED, MAX_BOMBS, MAX_FIRE_RANGE, INVULNERABILITY_TICKS, MOVE_COOLDOWN_BASE } from '@blast-arena/shared';
 
 export class Player {
@@ -28,6 +28,9 @@ export class Player {
   public bombsPlaced: number = 0;
   public powerupsCollected: number = 0;
   public placement: number | null = null;
+
+  // Cosmetics (set once at game start, not per-tick)
+  public cosmetics?: PlayerCosmeticData;
 
   // Deathmatch respawn
   public respawnTick: number | null = null;
@@ -137,6 +140,7 @@ export class Player {
       isBot: this.isBot,
       kills: this.kills,
       deaths: this.deaths,
+      cosmetics: this.cosmetics,
     };
   }
 }

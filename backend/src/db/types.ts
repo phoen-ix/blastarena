@@ -58,6 +58,9 @@ export interface UserProfileRow extends RowDataPacket {
   win_streak: number | null;
   best_win_streak: number | null;
   elo_rating: number | null;
+  peak_elo: number | null;
+  is_profile_public: boolean;
+  accept_friend_requests: boolean;
 }
 
 /** User with email change fields */
@@ -246,6 +249,139 @@ export interface DirectMessageRow extends RowDataPacket {
   created_at: Date;
   // Joined fields
   sender_username?: string;
+}
+
+/** Season row */
+export interface SeasonRow extends RowDataPacket {
+  id: number;
+  name: string;
+  start_date: Date;
+  end_date: Date;
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/** Season Elo row */
+export interface SeasonEloRow extends RowDataPacket {
+  id: number;
+  user_id: number;
+  season_id: number;
+  elo_rating: number;
+  peak_elo: number;
+  matches_played: number;
+  // Joined fields
+  username?: string;
+  total_wins?: number;
+  total_kills?: number;
+}
+
+/** Elo history row */
+export interface EloHistoryRow extends RowDataPacket {
+  id: number;
+  user_id: number;
+  match_id: number;
+  season_id: number | null;
+  old_elo: number;
+  new_elo: number;
+  delta: number;
+  game_mode: string;
+  created_at: Date;
+}
+
+/** Public profile row */
+export interface PublicProfileRow extends RowDataPacket {
+  id: number;
+  username: string;
+  role: string;
+  created_at: Date;
+  is_profile_public: boolean;
+  total_matches: number;
+  total_wins: number;
+  total_kills: number;
+  total_deaths: number;
+  elo_rating: number;
+  peak_elo: number;
+  win_streak: number;
+  best_win_streak: number;
+}
+
+/** Cosmetic row */
+export interface CosmeticRow extends RowDataPacket {
+  id: number;
+  name: string;
+  type: string;
+  config: string;
+  rarity: string;
+  unlock_type: string;
+  unlock_requirement: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/** User cosmetic unlock row */
+export interface UserCosmeticRow extends RowDataPacket {
+  user_id: number;
+  cosmetic_id: number;
+  unlocked_at: Date;
+  // Joined fields from cosmetics table
+  name?: string;
+  type?: string;
+  config?: string;
+  rarity?: string;
+  unlock_type?: string;
+  unlock_requirement?: string | null;
+  is_active?: boolean;
+  sort_order?: number;
+}
+
+/** User equipped cosmetics row */
+export interface UserEquippedCosmeticsRow extends RowDataPacket {
+  user_id: number;
+  color_id: number | null;
+  eyes_id: number | null;
+  trail_id: number | null;
+  bomb_skin_id: number | null;
+  updated_at: Date;
+}
+
+/** Achievement row */
+export interface AchievementRow extends RowDataPacket {
+  id: number;
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  condition_type: string;
+  condition_config: string;
+  reward_type: string;
+  reward_id: number | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/** User achievement row */
+export interface UserAchievementRow extends RowDataPacket {
+  user_id: number;
+  achievement_id: number;
+  unlocked_at: Date | null;
+  progress: string | null;
+  updated_at: Date;
+  // Joined fields from achievements table
+  name?: string;
+  description?: string;
+  icon?: string;
+  category?: string;
+  condition_type?: string;
+  condition_config?: string;
+  reward_type?: string;
+  reward_id?: number | null;
+  is_active?: boolean;
+  sort_order?: number;
 }
 
 /** Admin user list row (user joined with stats) */

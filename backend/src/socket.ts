@@ -693,6 +693,24 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
                 stars,
                 nextLevelId,
               });
+
+              // Evaluate campaign achievements and star-based cosmetic unlocks
+              try {
+                const achievementsService = await import('./services/achievements');
+                const cosmeticsService = await import('./services/cosmetics');
+                const userState = await progressService.getUserState(socket.data.userId);
+                const totalStars = userState.totalStars;
+                const unlocked = await achievementsService.evaluateAfterCampaign(
+                  socket.data.userId, totalStars, level.id, level.worldId,
+                );
+                await cosmeticsService.checkCampaignStarUnlocks(socket.data.userId, totalStars);
+                if (unlocked.achievements.length > 0) {
+                  socket.emit('achievement:unlocked', unlocked);
+                }
+              } catch (achErr) {
+                logger.error({ err: achErr }, 'Failed to evaluate campaign achievements');
+              }
+
               socket.data.activeCampaignSession = undefined;
               campaignManager.endSession(game.sessionId);
             },

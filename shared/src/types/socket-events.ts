@@ -5,6 +5,8 @@ import { SimulationConfig, SimulationBatchStatus, SimulationGameResult } from '.
 import { CampaignGameState, CampaignLevelSummary } from './campaign';
 import { Friend, FriendRequest, Party, PartyInvite, PartyChatMessage, LobbyChatMessage, DirectMessage, ActivityStatus } from './friends';
 import { EmoteId } from '../constants/emotes';
+import { EloResult } from './leaderboard';
+import { AchievementUnlockEvent } from './achievements';
 
 // Client -> Server events
 export interface ClientToServerEvents {
@@ -249,6 +251,10 @@ export interface ServerToClientEvents {
 
   // Room invites
   'invite:room': (invite: PartyInvite) => void;
+
+  // Elo & Achievements
+  'game:eloUpdate': (results: EloResult[]) => void;
+  'achievement:unlocked': (data: AchievementUnlockEvent) => void;
 }
 
 // Inter-server events (if scaling later)

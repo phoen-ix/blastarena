@@ -1,15 +1,21 @@
 import Phaser from 'phaser';
-import { BombState, TILE_SIZE } from '@blast-arena/shared';
+import { BombState, PlayerCosmeticData, TILE_SIZE } from '@blast-arena/shared';
 import { getSettings } from './Settings';
+import { BootScene } from '../scenes/BootScene';
 
 export class BombSpriteRenderer {
   private scene: Phaser.Scene;
   private sprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private pulseTweens: Map<string, Phaser.Tweens.Tween> = new Map();
   private sparkEmitters: Map<string, Phaser.GameObjects.Particles.ParticleEmitter> = new Map();
+  private playerCosmetics: Map<number, PlayerCosmeticData> = new Map();
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+  }
+
+  setPlayerCosmetics(cosmetics: Map<number, PlayerCosmeticData>): void {
+    this.playerCosmetics = cosmetics;
   }
 
   update(bombs: BombState[]): void {
@@ -65,9 +71,20 @@ export class BombSpriteRenderer {
           }
         }
       } else {
-        // Create new bomb sprite — use different texture for remote bombs
+        // Create new bomb sprite — use different texture for remote bombs or custom skins
         const isRemote = bomb.bombType === 'remote';
-        const textureKey = isRemote ? 'bomb_remote' : 'bomb';
+        let textureKey = isRemote ? 'bomb_remote' : 'bomb';
+
+        // Check for custom bomb skin from owner's cosmetics
+        const ownerCosmetics = this.playerCosmetics.get(bomb.ownerId);
+        if (ownerCosmetics?.bombSkinConfig && !isRemote) {
+          const customKey = `bomb_custom_${ownerCosmetics.bombSkinConfig.label}`;
+          BootScene.generateCustomBombTexture(this.scene, ownerCosmetics.bombSkinConfig);
+          if (this.scene.textures.exists(customKey)) {
+            textureKey = customKey;
+          }
+        }
+
         const sprite = this.scene.add.sprite(posX, posY, textureKey);
         sprite.setDepth(5);
         this.sprites.set(bomb.id, sprite);

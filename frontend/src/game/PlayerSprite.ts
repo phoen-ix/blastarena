@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import { PlayerState, TILE_SIZE } from '@blast-arena/shared';
+import { PlayerState, PlayerCosmeticData, TILE_SIZE } from '@blast-arena/shared';
 import { getSettings } from './Settings';
-import { PLAYER_COLORS } from '../scenes/BootScene';
+import { PLAYER_COLORS, BootScene } from '../scenes/BootScene';
 
 // Team color indices: team 0 uses red-ish colors, team 1 uses blue-ish colors
 const TEAM_COLOR_INDICES: Record<number, number[]> = {
@@ -39,6 +39,12 @@ export class PlayerSpriteRenderer {
   /** Counter per team for distributing colors within a team */
   private teamPlayerCount: Record<number, number> = {};
 
+  /** Custom texture key overrides per player (from cosmetics) */
+  private customTexturePrefix: Map<number, string> = new Map();
+
+  /** Trail particle emitters per player */
+  private trailEmitters: Map<number, Phaser.GameObjects.Particles.ParticleEmitter> = new Map();
+
   constructor(scene: Phaser.Scene, localPlayerId: number) {
     this.scene = scene;
     this.localPlayerId = localPlayerId;
@@ -71,7 +77,7 @@ export class PlayerSpriteRenderer {
 
             // Get player color for death particles
             const colorIndex = this.playerColorIndex.get(player.id) ?? index % 8;
-            const playerColor = PLAYER_COLORS[colorIndex];
+            const playerColor = player.cosmetics?.colorHex ?? (colorIndex >= 0 ? PLAYER_COLORS[colorIndex] : 0xffffff);
 
             this.scene.tweens.add({
               targets: existing,
@@ -152,8 +158,16 @@ export class PlayerSpriteRenderer {
       let colorIndex = this.playerColorIndex.get(player.id);
 
       if (colorIndex === undefined) {
-        // Assign color based on team membership or individual index
-        if (player.team !== null && player.team !== undefined) {
+        // Priority: 1) cosmetic color, 2) team color, 3) index-based
+        if (player.cosmetics?.colorHex) {
+          // Generate custom textures if needed
+          BootScene.generateCustomPlayerTextures(this.scene, player.cosmetics.colorHex, player.cosmetics.eyeStyle);
+          const suffix = player.cosmetics.eyeStyle
+            ? `${player.cosmetics.colorHex.toString(16)}_${player.cosmetics.eyeStyle}`
+            : player.cosmetics.colorHex.toString(16);
+          this.customTexturePrefix.set(player.id, `player_custom_${suffix}`);
+          colorIndex = -1; // Sentinel: use custom prefix
+        } else if (player.team !== null && player.team !== undefined) {
           const teamColors = TEAM_COLOR_INDICES[player.team] || TEAM_COLOR_INDICES[0];
           const teamIdx = this.teamPlayerCount[player.team] || 0;
           colorIndex = teamColors[teamIdx % teamColors.length];
@@ -167,7 +181,8 @@ export class PlayerSpriteRenderer {
 
       if (!sprite) {
         const dir = player.direction || 'down';
-        const textureKey = `player_${colorIndex}_${dir}`;
+        const customPrefix = this.customTexturePrefix.get(player.id);
+        const textureKey = customPrefix ? `${customPrefix}_${dir}` : `player_${colorIndex}_${dir}`;
         sprite = this.scene.add.sprite(targetX, targetY, textureKey);
         sprite.setDepth(10);
         sprite.setDisplaySize(TILE_SIZE - 4, TILE_SIZE - 4);
@@ -215,9 +230,31 @@ export class PlayerSpriteRenderer {
       sprite.y = Phaser.Math.Linear(sprite.y, targetY, 0.45);
 
       // Update texture based on direction
-      const dirTexture = `player_${colorIndex}_${player.direction}`;
+      const customPrefix = this.customTexturePrefix.get(player.id);
+      const dirTexture = customPrefix ? `${customPrefix}_${player.direction}` : `player_${colorIndex}_${player.direction}`;
       if (sprite.texture.key !== dirTexture && this.scene.textures.exists(dirTexture)) {
         sprite.setTexture(dirTexture);
+      }
+
+      // Trail particles for cosmetic trails
+      if (player.cosmetics?.trailConfig && getSettings().particles) {
+        let emitter = this.trailEmitters.get(player.id);
+        if (!emitter && this.scene.textures.exists(player.cosmetics.trailConfig.particleKey)) {
+          emitter = this.scene.add.particles(0, 0, player.cosmetics.trailConfig.particleKey, {
+            speed: { min: 5, max: 15 },
+            scale: { start: 0.5, end: 0 },
+            lifespan: 400,
+            alpha: { start: 0.6, end: 0 },
+            frequency: player.cosmetics.trailConfig.frequency,
+            tint: player.cosmetics.trailConfig.tint,
+            emitting: true,
+          });
+          emitter.setDepth(5);
+          this.trailEmitters.set(player.id, emitter);
+        }
+        if (emitter) {
+          emitter.setPosition(sprite.x, sprite.y);
+        }
       }
 
       // Detect movement
@@ -378,10 +415,17 @@ export class PlayerSpriteRenderer {
       this.dustEmitters.delete(id);
     }
 
+    const trailEmitter = this.trailEmitters.get(id);
+    if (trailEmitter) {
+      trailEmitter.destroy();
+      this.trailEmitters.delete(id);
+    }
+
     this.prevShieldState.delete(id);
     this.prevPositions.delete(id);
     this.playerColorIndex.delete(id);
     this.playerTeams.delete(id);
+    this.customTexturePrefix.delete(id);
     this.activeMoveAnim.delete(id);
   }
 }

@@ -101,6 +101,21 @@ router.delete('/user/email', authMiddleware, async (req, res, next) => {
   }
 });
 
+const privacySchema = z.object({
+  isProfilePublic: z.boolean().optional(),
+  acceptFriendRequests: z.boolean().optional(),
+});
+
+router.put('/user/privacy', authMiddleware, validate(privacySchema), async (req, res, next) => {
+  try {
+    await userService.updatePrivacySettings(req.user!.userId, req.body);
+    const profile = await userService.getUserProfile(req.user!.userId);
+    res.json(profile);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/user/confirm-email/:token', async (req, res, next) => {
   try {
     await userService.confirmEmailChange(req.params.token);

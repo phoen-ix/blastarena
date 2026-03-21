@@ -74,6 +74,9 @@ describe('user service', () => {
         win_streak: 3,
         best_win_streak: 7,
         elo_rating: 1250,
+        peak_elo: 1300,
+        is_profile_public: true,
+        accept_friend_requests: true,
       };
       mockQuery.mockResolvedValueOnce([row]);
 
@@ -98,7 +101,10 @@ describe('user service', () => {
           winStreak: 3,
           bestWinStreak: 7,
           eloRating: 1250,
+          peakElo: 1300,
         },
+        isProfilePublic: true,
+        acceptFriendRequests: true,
       });
     });
 
@@ -121,6 +127,7 @@ describe('user service', () => {
         win_streak: null,
         best_win_streak: null,
         elo_rating: null,
+        peak_elo: null,
       };
       mockQuery.mockResolvedValueOnce([row]);
 
@@ -137,6 +144,7 @@ describe('user service', () => {
         winStreak: 0,
         bestWinStreak: 0,
         eloRating: 1000,
+        peakElo: 1000,
       });
     });
 
