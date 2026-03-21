@@ -92,10 +92,16 @@ Admin-configurable via `rank_tiers` JSON in `server_settings`. Default 6 tiers: 
 - GameOverScene: Elo delta display (+N green / -N red) next to each player in placements, achievement unlock toasts
 
 ## Achievements
-Admin-configurable via CRUD. 4 condition types: `cumulative` (checks user_stats), `per_game` (checks match data with operators >=, <=, ==, etc.), `mode_specific` (queries match_players JOIN matches), `campaign` (total_stars, levels_completed, world_complete). Each can reward a cosmetic. Evaluated once after each game-over (`evaluateAfterGame`) and campaign level completion (`evaluateAfterCampaign`). Unlocks emitted via `achievement:unlocked` socket event.
+Admin-configurable via CRUD. 4 condition types: `cumulative` (checks user_stats), `per_game` (checks match data with operators >=, <=, ==, etc.), `mode_specific` (queries match_players JOIN matches), `campaign` (total_stars, levels_completed, world_complete). Each can reward a cosmetic. Evaluated once after each game-over (`evaluateAfterGame`) and campaign level completion (`evaluateAfterCampaign`). Unlocks emitted via `achievement:unlocked` socket event. Ships with a default pack of 47 achievements + 25 cosmetic rewards (migration 017) covering combat, victory, dedication, mode mastery, and campaign categories.
 
 ## Cosmetics
 4 types: `color` (player hex), `eyes` (eye style), `trail` (particle emitter config), `bomb_skin` (base/fuse color + label). Unlocked via achievements, campaign stars, or default. Equipped in Settings → Cosmetics tab. Cosmetics included in `PlayerState.toState()` (NOT `toTickState()` — static per game). `getPlayerCosmeticsForGame(userIds[])` single JOIN query at game start.
+
+## Achievement & Cosmetic Export/Import
+JSON-based export/import following the campaign pattern. Export formats use `_format`/`_version` fields. Types: `AchievementExportData`, `AchievementBundleExportData`, `CosmeticExportData`, `AchievementImportConflict` in `shared/src/types/achievements.ts` and `shared/src/types/cosmetics.ts`.
+- **Backend endpoints** (`backend/src/routes/admin.ts`): `GET .../achievements/:id/export` (single), `GET .../achievements/export-all` (bundle with referenced cosmetics), `POST .../achievements/import` (two-phase: first call returns `conflicts` for referenced cosmetics, second call with `cosmeticIdMap` resolves via create/use-existing/skip). `GET .../cosmetics/:id/export`, `POST .../cosmetics/import`.
+- **Admin AchievementsTab**: Export All + Import buttons in achievements header, Export button per achievement row. Import Cosmetic button in cosmetics header, Export button per cosmetic row. Import modal with file picker (detects single vs bundle format), conflict resolution modal with radio buttons.
+- Download pattern: `Blob` + `createObjectURL` + click anchor (same as CampaignTab/AITab).
 
 ### Rendering Pipeline
 - BootScene: `generateCustomPlayerTextures(scene, hex, eyeStyle?)` and `generateCustomBombTexture(scene, config)` static methods for on-demand texture generation

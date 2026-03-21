@@ -14,7 +14,7 @@ import * as cosmeticsService from '../services/cosmetics';
 import { invalidateTransporter, sendTestEmail } from '../services/email';
 import { getSimulationManager, getIO } from '../game/registry';
 import { execute } from '../db/connection';
-import { SimulationConfig, GameDefaults, SimulationDefaults, EmailSettings, ChatMode, RankConfig } from '@blast-arena/shared';
+import { SimulationConfig, GameDefaults, SimulationDefaults, EmailSettings, ChatMode, RankConfig, AchievementExportData, AchievementBundleExportData, CosmeticExportData, AchievementImportConflict } from '@blast-arena/shared';
 import { getErrorMessage } from '@blast-arena/shared';
 import multer from 'multer';
 
@@ -1186,6 +1186,308 @@ router.delete('/admin/cosmetics/:id', adminOnlyMiddleware, async (req, res, next
     await execute('INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
       [req.user!.userId, 'cosmetic_delete', 'cosmetic', id, 'Deleted cosmetic']);
     res.json({ message: 'Cosmetic deleted' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ===== Achievement Export/Import =====
+
+router.get('/admin/achievements/:id/export', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    const achievement = await achievementsService.getAchievementById(id);
+    if (!achievement) {
+      res.status(404).json({ error: 'Achievement not found' });
+      return;
+    }
+
+    let reward: Omit<CosmeticExportData, '_format' | '_version'> | null = null;
+    if (achievement.rewardType === 'cosmetic' && achievement.rewardId) {
+      const cosmetic = await cosmeticsService.getCosmeticById(achievement.rewardId);
+      if (cosmetic) {
+        reward = {
+          name: cosmetic.name,
+          type: cosmetic.type,
+          config: cosmetic.config,
+          rarity: cosmetic.rarity,
+          unlockType: cosmetic.unlockType,
+          unlockRequirement: cosmetic.unlockRequirement,
+          sortOrder: cosmetic.sortOrder,
+        };
+      }
+    }
+
+    const exportData: AchievementExportData = {
+      _format: 'blast-arena-achievement',
+      _version: 1,
+      name: achievement.name,
+      description: achievement.description,
+      icon: achievement.icon,
+      category: achievement.category,
+      conditionType: achievement.conditionType,
+      conditionConfig: achievement.conditionConfig,
+      rewardType: achievement.rewardType,
+      reward,
+      sortOrder: achievement.sortOrder,
+    };
+
+    const filename = `achievement-${achievement.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.json`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.json(exportData);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/admin/achievements/export-all', adminOnlyMiddleware, async (_req, res, next) => {
+  try {
+    const achievements = await achievementsService.getAllAchievements();
+    const allCosmetics = await cosmeticsService.getAllCosmetics();
+    const cosmeticMap = new Map(allCosmetics.map(c => [c.id, c]));
+
+    const rewardCosmeticIds = new Set<number>();
+    for (const a of achievements) {
+      if (a.rewardType === 'cosmetic' && a.rewardId) {
+        rewardCosmeticIds.add(a.rewardId);
+      }
+    }
+
+    const bundleCosmetics: AchievementBundleExportData['cosmetics'] = [];
+    for (const cosId of rewardCosmeticIds) {
+      const c = cosmeticMap.get(cosId);
+      if (c) {
+        bundleCosmetics.push({
+          originalId: c.id,
+          data: {
+            name: c.name,
+            type: c.type,
+            config: c.config,
+            rarity: c.rarity,
+            unlockType: c.unlockType,
+            unlockRequirement: c.unlockRequirement,
+            sortOrder: c.sortOrder,
+          },
+        });
+      }
+    }
+
+    const bundleAchievements: AchievementBundleExportData['achievements'] = achievements.map(a => {
+      let reward: Omit<CosmeticExportData, '_format' | '_version'> | null = null;
+      if (a.rewardType === 'cosmetic' && a.rewardId) {
+        const c = cosmeticMap.get(a.rewardId);
+        if (c) {
+          reward = {
+            name: c.name,
+            type: c.type,
+            config: c.config,
+            rarity: c.rarity,
+            unlockType: c.unlockType,
+            unlockRequirement: c.unlockRequirement,
+            sortOrder: c.sortOrder,
+          };
+        }
+      }
+      return {
+        name: a.name,
+        description: a.description,
+        icon: a.icon,
+        category: a.category,
+        conditionType: a.conditionType,
+        conditionConfig: a.conditionConfig,
+        rewardType: a.rewardType,
+        reward,
+        sortOrder: a.sortOrder,
+      };
+    });
+
+    const exportData: AchievementBundleExportData = {
+      _format: 'blast-arena-achievement-bundle',
+      _version: 1,
+      achievements: bundleAchievements,
+      cosmetics: bundleCosmetics,
+    };
+
+    res.setHeader('Content-Disposition', 'attachment; filename="achievements-bundle.json"');
+    res.json(exportData);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/admin/achievements/import', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const { achievements: achData, cosmetics: cosData, cosmeticIdMap } = req.body as {
+      achievements: AchievementBundleExportData['achievements'];
+      cosmetics?: AchievementBundleExportData['cosmetics'];
+      cosmeticIdMap?: Record<string, 'create' | 'skip' | number>;
+    };
+
+    if (!achData || !Array.isArray(achData)) {
+      res.status(400).json({ error: 'Invalid import data: achievements array required' });
+      return;
+    }
+
+    // Phase 1: detect conflicts if no cosmeticIdMap provided
+    if (!cosmeticIdMap) {
+      const referencedCosmetics = cosData || [];
+      const allExisting = await cosmeticsService.getAllCosmetics();
+      const existingByName = new Map(allExisting.map(c => [c.name.toLowerCase(), c]));
+
+      const conflicts: AchievementImportConflict[] = [];
+      for (const entry of referencedCosmetics) {
+        const existing = existingByName.get(entry.data.name.toLowerCase());
+        conflicts.push({
+          originalCosmeticId: entry.originalId,
+          cosmeticName: entry.data.name,
+          existingId: existing?.id,
+          existingName: existing?.name,
+        });
+      }
+
+      if (conflicts.length > 0) {
+        res.json({ conflicts });
+        return;
+      }
+    }
+
+    // Phase 2: import with resolved cosmetic mapping
+    const idMap = new Map<number, number | null>(); // originalId -> new/existing ID or null (skip)
+
+    if (cosmeticIdMap && cosData) {
+      for (const entry of cosData) {
+        const key = String(entry.originalId);
+        const action = cosmeticIdMap[key];
+
+        if (action === 'create') {
+          const created = await cosmeticsService.createCosmetic({
+            name: entry.data.name,
+            type: entry.data.type,
+            config: entry.data.config,
+            rarity: entry.data.rarity,
+            unlockType: entry.data.unlockType,
+            unlockRequirement: entry.data.unlockRequirement,
+            sortOrder: entry.data.sortOrder,
+          });
+          idMap.set(entry.originalId, created.id);
+          await execute(
+            'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+            [req.user!.userId, 'cosmetic_import', 'cosmetic', created.id, `Imported cosmetic: ${created.name}`],
+          );
+        } else if (action === 'skip') {
+          idMap.set(entry.originalId, null);
+        } else if (typeof action === 'number') {
+          idMap.set(entry.originalId, action);
+        }
+      }
+    }
+
+    let created = 0;
+    for (const achEntry of achData) {
+      let rewardType = achEntry.rewardType;
+      let rewardId: number | null = null;
+
+      if (rewardType === 'cosmetic' && achEntry.reward) {
+        // Try to find by name match in the idMap via cosmetics data
+        const matchedCos = cosData?.find(c => c.data.name === achEntry.reward?.name);
+        if (matchedCos) {
+          const mappedId = idMap.get(matchedCos.originalId);
+          if (mappedId === null || mappedId === undefined) {
+            rewardType = 'none';
+          } else {
+            rewardId = mappedId;
+          }
+        } else {
+          // No cosmetic in bundle — try name match in DB
+          const allExisting = await cosmeticsService.getAllCosmetics();
+          const match = allExisting.find(c => c.name.toLowerCase() === achEntry.reward!.name.toLowerCase());
+          if (match) {
+            rewardId = match.id;
+          } else {
+            rewardType = 'none';
+          }
+        }
+      }
+
+      const achievement = await achievementsService.createAchievement({
+        name: achEntry.name,
+        description: achEntry.description,
+        icon: achEntry.icon,
+        category: achEntry.category,
+        conditionType: achEntry.conditionType,
+        conditionConfig: achEntry.conditionConfig,
+        rewardType,
+        rewardId,
+        sortOrder: achEntry.sortOrder,
+      });
+      await execute(
+        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user!.userId, 'achievement_import', 'achievement', achievement.id, `Imported achievement: ${achievement.name}`],
+      );
+      created++;
+    }
+
+    res.json({ message: `Imported ${created} achievement(s)`, created });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ===== Cosmetic Export/Import =====
+
+router.get('/admin/cosmetics/:id/export', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    const cosmetic = await cosmeticsService.getCosmeticById(id);
+    if (!cosmetic) {
+      res.status(404).json({ error: 'Cosmetic not found' });
+      return;
+    }
+
+    const exportData: CosmeticExportData = {
+      _format: 'blast-arena-cosmetic',
+      _version: 1,
+      name: cosmetic.name,
+      type: cosmetic.type,
+      config: cosmetic.config,
+      rarity: cosmetic.rarity,
+      unlockType: cosmetic.unlockType,
+      unlockRequirement: cosmetic.unlockRequirement,
+      sortOrder: cosmetic.sortOrder,
+    };
+
+    const filename = `cosmetic-${cosmetic.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.json`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.json(exportData);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/admin/cosmetics/import', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const data = req.body as CosmeticExportData;
+    if (!data.name || !data.type || !data.config) {
+      res.status(400).json({ error: 'Invalid cosmetic import data' });
+      return;
+    }
+
+    const cosmetic = await cosmeticsService.createCosmetic({
+      name: data.name,
+      type: data.type,
+      config: data.config,
+      rarity: data.rarity || 'common',
+      unlockType: data.unlockType || 'default',
+      unlockRequirement: data.unlockRequirement || null,
+      sortOrder: data.sortOrder || 0,
+    });
+
+    await execute(
+      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [req.user!.userId, 'cosmetic_import', 'cosmetic', cosmetic.id, `Imported cosmetic: ${cosmetic.name}`],
+    );
+
+    res.json(cosmetic);
   } catch (err) {
     next(err);
   }

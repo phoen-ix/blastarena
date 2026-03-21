@@ -8,6 +8,8 @@ import {
   CosmeticType,
   CosmeticRarity,
   CosmeticUnlockType,
+  AchievementBundleExportData,
+  AchievementImportConflict,
   getErrorMessage,
 } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr } from '../../utils/html';
@@ -30,25 +32,33 @@ const CUMULATIVE_STATS = [
   'total_kills',
   'total_wins',
   'total_matches',
-  'total_bombs_placed',
+  'total_deaths',
+  'total_bombs',
   'total_powerups',
   'total_playtime',
+  'win_streak',
+  'best_win_streak',
 ];
 
 const PER_GAME_STATS = [
   'kills',
   'deaths',
+  'self_kills',
   'bombs_placed',
   'powerups_collected',
   'survived_seconds',
   'placement',
+  'player_count',
+  'is_winner',
 ];
 
 const PER_GAME_OPERATORS = ['>=', '<=', '==', '>'];
 
 const GAME_MODES = ['ffa', 'teams', 'battle_royale', 'sudden_death', 'deathmatch', 'koth'];
 
-const CAMPAIGN_SUBTYPES = ['stars_earned', 'levels_completed', 'worlds_completed', 'bosses_beaten'];
+const MODE_SPECIFIC_STATS = ['wins', 'matches', 'kills'];
+
+const CAMPAIGN_SUBTYPES = ['total_stars', 'levels_completed'];
 
 const COSMETIC_TYPES: CosmeticType[] = ['color', 'eyes', 'trail', 'bomb_skin'];
 
@@ -139,7 +149,11 @@ export class AchievementsTab {
       <div class="admin-section">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
           <span style="color:var(--text-dim);font-size:13px;">${this.achievements.length} achievement${this.achievements.length !== 1 ? 's' : ''}</span>
-          <button class="btn btn-primary" id="ach-create">Create Achievement</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary" id="ach-export-all">Export All</button>
+            <button class="btn btn-secondary" id="ach-import">Import</button>
+            <button class="btn btn-primary" id="ach-create">Create Achievement</button>
+          </div>
         </div>
         <table class="admin-table">
           <thead>
@@ -162,6 +176,12 @@ export class AchievementsTab {
 
     content.querySelector('#ach-create')?.addEventListener('click', () => {
       this.showAchievementModal();
+    });
+    content.querySelector('#ach-export-all')?.addEventListener('click', () => {
+      this.exportAllAchievements();
+    });
+    content.querySelector('#ach-import')?.addEventListener('click', () => {
+      this.showImportAchievementsModal();
     });
     this.attachAchievementHandlers(content as HTMLElement);
   }
@@ -186,6 +206,7 @@ export class AchievementsTab {
         <td>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button class="btn-sm btn-secondary ach-edit" data-id="${a.id}">Edit</button>
+            <button class="btn-sm btn-secondary ach-export" data-id="${a.id}">Export</button>
             <button class="btn-sm btn-danger ach-delete" data-id="${a.id}" data-name="${escapeAttr(a.name)}">Delete</button>
           </div>
         </td>
@@ -199,6 +220,19 @@ export class AchievementsTab {
         const id = parseInt((btn as HTMLElement).dataset.id!);
         const ach = this.achievements.find((a) => a.id === id);
         if (ach) this.showAchievementModal(ach);
+      });
+    });
+
+    container.querySelectorAll('.ach-export').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = parseInt((btn as HTMLElement).dataset.id!);
+        try {
+          const data = await ApiClient.get<Record<string, unknown>>(`/admin/achievements/${id}/export`);
+          this.downloadExport(data, `achievement-${id}.json`);
+          this.notifications.success('Achievement exported');
+        } catch (err: unknown) {
+          this.notifications.error(getErrorMessage(err));
+        }
       });
     });
 
@@ -407,7 +441,7 @@ export class AchievementsTab {
           <div style="flex:1;">
             <label style="color:var(--text-dim);font-size:13px;">Stat</label>
             <select class="admin-select" id="am-cond-stat" style="margin-top:4px;width:100%;padding:8px 12px;font-size:14px;">
-              ${CUMULATIVE_STATS.map((s) => `<option value="${s}" ${cfg.stat === s ? 'selected' : ''}>${s}</option>`).join('')}
+              ${MODE_SPECIFIC_STATS.map((s) => `<option value="${s}" ${cfg.stat === s ? 'selected' : ''}>${s}</option>`).join('')}
             </select>
           </div>
           <div style="flex:0.5;">
@@ -484,7 +518,10 @@ export class AchievementsTab {
       <div class="admin-section">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
           <span style="color:var(--text-dim);font-size:13px;">${this.cosmetics.length} cosmetic${this.cosmetics.length !== 1 ? 's' : ''}</span>
-          <button class="btn btn-primary" id="cos-create">Create Cosmetic</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary" id="cos-import">Import</button>
+            <button class="btn btn-primary" id="cos-create">Create Cosmetic</button>
+          </div>
         </div>
         <table class="admin-table">
           <thead>
@@ -507,6 +544,9 @@ export class AchievementsTab {
     content.querySelector('#cos-create')?.addEventListener('click', () => {
       this.showCosmeticModal();
     });
+    content.querySelector('#cos-import')?.addEventListener('click', () => {
+      this.importCosmetic();
+    });
     this.attachCosmeticHandlers(content as HTMLElement);
   }
 
@@ -526,6 +566,7 @@ export class AchievementsTab {
         <td>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button class="btn-sm btn-secondary cos-edit" data-id="${c.id}">Edit</button>
+            <button class="btn-sm btn-secondary cos-export" data-id="${c.id}">Export</button>
             <button class="btn-sm btn-danger cos-delete" data-id="${c.id}" data-name="${escapeAttr(c.name)}">Delete</button>
           </div>
         </td>
@@ -539,6 +580,19 @@ export class AchievementsTab {
         const id = parseInt((btn as HTMLElement).dataset.id!);
         const cos = this.cosmetics.find((c) => c.id === id);
         if (cos) this.showCosmeticModal(cos);
+      });
+    });
+
+    container.querySelectorAll('.cos-export').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = parseInt((btn as HTMLElement).dataset.id!);
+        try {
+          const data = await ApiClient.get<Record<string, unknown>>(`/admin/cosmetics/${id}/export`);
+          this.downloadExport(data, `cosmetic-${id}.json`);
+          this.notifications.success('Cosmetic exported');
+        } catch (err: unknown) {
+          this.notifications.error(getErrorMessage(err));
+        }
       });
     });
 
@@ -798,6 +852,255 @@ export class AchievementsTab {
       return { baseColor, fuseColor, label: label || '' };
     }
     return {};
+  }
+
+  // ─── Export/Import ─────────────────────────────────────────────────
+
+  private downloadExport(data: unknown, filename: string): void {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  private async exportAllAchievements(): Promise<void> {
+    try {
+      const data = await ApiClient.get<AchievementBundleExportData>('/admin/achievements/export-all');
+      this.downloadExport(data, 'achievements-bundle.json');
+      this.notifications.success('Achievement bundle exported');
+    } catch (err: unknown) {
+      this.notifications.error(getErrorMessage(err));
+    }
+  }
+
+  private showImportAchievementsModal(): void {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:520px;">
+        <h2 style="margin-bottom:16px;">Import Achievements</h2>
+        <p style="color:var(--text-dim);font-size:13px;margin-bottom:12px;">
+          Select a JSON file (single achievement or achievement bundle).
+        </p>
+        <input type="file" accept=".json" id="ach-import-file" style="margin-bottom:12px;color:var(--text);">
+        <div id="ach-import-error" style="color:var(--danger);font-size:13px;display:none;margin-bottom:8px;"></div>
+        <div id="ach-import-preview" style="display:none;margin-bottom:12px;"></div>
+        <div class="modal-actions" style="margin-top:16px;">
+          <button class="btn btn-secondary" id="ach-import-cancel">Cancel</button>
+          <button class="btn btn-primary" id="ach-import-submit" disabled>Import</button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('ui-overlay')!.appendChild(overlay);
+
+    const fileInput = overlay.querySelector('#ach-import-file') as HTMLInputElement;
+    const errorEl = overlay.querySelector('#ach-import-error') as HTMLElement;
+    const previewEl = overlay.querySelector('#ach-import-preview') as HTMLElement;
+    const submitBtn = overlay.querySelector('#ach-import-submit') as HTMLButtonElement;
+
+    let parsedData: AchievementBundleExportData | null = null;
+
+    fileInput.addEventListener('change', async () => {
+      errorEl.style.display = 'none';
+      previewEl.style.display = 'none';
+      submitBtn.disabled = true;
+      parsedData = null;
+
+      const file = fileInput.files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const json = JSON.parse(text);
+
+        if (json._format === 'blast-arena-achievement-bundle') {
+          parsedData = json;
+          previewEl.innerHTML = `<span style="color:var(--accent);">Bundle: ${json.achievements?.length || 0} achievements, ${json.cosmetics?.length || 0} cosmetics</span>`;
+        } else if (json._format === 'blast-arena-achievement') {
+          // Wrap single achievement into bundle format
+          parsedData = {
+            _format: 'blast-arena-achievement-bundle',
+            _version: 1,
+            achievements: [{
+              name: json.name,
+              description: json.description,
+              icon: json.icon,
+              category: json.category,
+              conditionType: json.conditionType,
+              conditionConfig: json.conditionConfig,
+              rewardType: json.rewardType,
+              reward: json.reward,
+              sortOrder: json.sortOrder,
+            }],
+            cosmetics: json.reward ? [{
+              originalId: 0,
+              data: json.reward,
+            }] : [],
+          };
+          previewEl.innerHTML = `<span style="color:var(--accent);">Single achievement: ${escapeHtml(json.name)}</span>`;
+        } else {
+          errorEl.textContent = 'Invalid file format. Expected blast-arena-achievement or blast-arena-achievement-bundle.';
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        previewEl.style.display = 'block';
+        submitBtn.disabled = false;
+      } catch {
+        errorEl.textContent = 'Invalid JSON file';
+        errorEl.style.display = 'block';
+      }
+    });
+
+    overlay.querySelector('#ach-import-cancel')!.addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    submitBtn.addEventListener('click', async () => {
+      if (!parsedData) return;
+      submitBtn.disabled = true;
+
+      try {
+        // Phase 1: check for conflicts
+        const result = await ApiClient.post<{ conflicts?: AchievementImportConflict[]; message?: string; created?: number }>(
+          '/admin/achievements/import',
+          {
+            achievements: parsedData.achievements,
+            cosmetics: parsedData.cosmetics,
+          },
+        );
+
+        if (result.conflicts && result.conflicts.length > 0) {
+          overlay.remove();
+          this.showCosmeticConflictModal(result.conflicts, parsedData);
+        } else {
+          // No conflicts, or no cosmetics — all imported directly
+          overlay.remove();
+          this.notifications.success(result.message || 'Achievements imported');
+          await this.loadAchievements();
+        }
+      } catch (err: unknown) {
+        errorEl.textContent = getErrorMessage(err);
+        errorEl.style.display = 'block';
+        submitBtn.disabled = false;
+      }
+    });
+  }
+
+  private showCosmeticConflictModal(
+    conflicts: AchievementImportConflict[],
+    bundleData: AchievementBundleExportData,
+  ): void {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+
+    const rows = conflicts.map((c, i) => {
+      const existingInfo = c.existingId
+        ? `<span style="color:var(--accent);">Existing: "${escapeHtml(c.existingName || '')}" (ID ${c.existingId})</span>`
+        : '<span style="color:var(--text-dim);">No existing match</span>';
+
+      return `
+        <div style="padding:10px;background:var(--bg-elevated);border-radius:6px;margin-bottom:8px;">
+          <div style="font-weight:600;margin-bottom:6px;">${escapeHtml(c.cosmeticName)}</div>
+          <div style="font-size:12px;margin-bottom:8px;">${existingInfo}</div>
+          <div style="display:flex;gap:12px;font-size:13px;">
+            <label style="color:var(--text);">
+              <input type="radio" name="conflict-${i}" value="create" checked> Create new
+            </label>
+            ${c.existingId ? `<label style="color:var(--text);">
+              <input type="radio" name="conflict-${i}" value="${c.existingId}"> Use existing
+            </label>` : ''}
+            <label style="color:var(--text);">
+              <input type="radio" name="conflict-${i}" value="skip"> Skip (no reward)
+            </label>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:560px;max-height:85vh;overflow-y:auto;">
+        <h2 style="margin-bottom:8px;">Resolve Cosmetic Conflicts</h2>
+        <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;">
+          The following cosmetics are referenced by achievements in the import. Choose how to handle each:
+        </p>
+        ${rows}
+        <div class="modal-actions" style="margin-top:16px;">
+          <button class="btn btn-secondary" id="conflict-cancel">Cancel</button>
+          <button class="btn btn-primary" id="conflict-submit">Import</button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('ui-overlay')!.appendChild(overlay);
+
+    overlay.querySelector('#conflict-cancel')!.addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    overlay.querySelector('#conflict-submit')!.addEventListener('click', async () => {
+      const cosmeticIdMap: Record<string, 'create' | 'skip' | number> = {};
+      conflicts.forEach((c, i) => {
+        const selected = (overlay.querySelector(`input[name="conflict-${i}"]:checked`) as HTMLInputElement)?.value;
+        if (selected === 'create') {
+          cosmeticIdMap[String(c.originalCosmeticId)] = 'create';
+        } else if (selected === 'skip') {
+          cosmeticIdMap[String(c.originalCosmeticId)] = 'skip';
+        } else {
+          cosmeticIdMap[String(c.originalCosmeticId)] = parseInt(selected || '0');
+        }
+      });
+
+      try {
+        const result = await ApiClient.post<{ message: string; created: number }>(
+          '/admin/achievements/import',
+          {
+            achievements: bundleData.achievements,
+            cosmetics: bundleData.cosmetics,
+            cosmeticIdMap,
+          },
+        );
+        overlay.remove();
+        this.notifications.success(result.message);
+        await this.loadAchievements();
+      } catch (err: unknown) {
+        this.notifications.error(getErrorMessage(err));
+      }
+    });
+  }
+
+  private importCosmetic(): void {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const json = JSON.parse(text);
+
+        if (json._format && json._format !== 'blast-arena-cosmetic') {
+          this.notifications.error('Invalid file format. Expected blast-arena-cosmetic.');
+          return;
+        }
+
+        await ApiClient.post('/admin/cosmetics/import', json);
+        this.notifications.success('Cosmetic imported');
+        await this.loadCosmetics();
+      } catch (err: unknown) {
+        this.notifications.error(getErrorMessage(err));
+      }
+    });
+    input.click();
   }
 
   // ─── Shared utilities ────────────────────────────────────────────────

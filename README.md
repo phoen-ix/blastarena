@@ -77,7 +77,7 @@ Elo-based competitive ranking across all game modes. Standard Elo formula with a
 
 ## Achievements & Cosmetics
 
-Admin-configurable achievement system with four condition types: cumulative stats, per-game feats, mode-specific milestones, and campaign progress. Achievements can reward cosmetics. Four cosmetic types: player colors, eye styles, movement trails, and bomb skins. Unlocked via achievements or campaign stars, equipped in settings. Cosmetics visible to all players in-game (custom textures generated on-demand). Public profiles show rank, season history, achievements, and equipped cosmetics with a privacy toggle.
+Admin-configurable achievement system with four condition types: cumulative stats, per-game feats, mode-specific milestones, and campaign progress. Ships with a default pack of 47 achievements and 25 cosmetic rewards across combat, victory, dedication, mode mastery, and campaign categories. Achievements can reward cosmetics. Four cosmetic types: player colors, eye styles, movement trails, and bomb skins. Unlocked via achievements or campaign stars, equipped in settings. Cosmetics visible to all players in-game (custom textures generated on-demand). Export/import achievements and cosmetics as JSON (single or bundled) for sharing between instances. Public profiles show rank, season history, achievements, and equipped cosmetics with a privacy toggle.
 
 ## Admin Panel
 
@@ -93,7 +93,7 @@ Admin-configurable achievement system with four condition types: cumulative stat
 | Campaign | Admin | Worlds, levels (visual editor), enemy types, JSON export/import |
 | Announcements | Staff | Toast broadcasts, persistent banners |
 | Seasons | Admin | Season CRUD, activate/end (hard/soft reset), rank tier config with color pickers |
-| Achievements | Admin | Achievement CRUD (4 condition types), cosmetic CRUD (4 types), reward linking |
+| Achievements | Admin | Achievement CRUD (4 condition types), cosmetic CRUD (4 types), reward linking, JSON export/import |
 
 All actions audit-logged. See [docs/admin-and-systems.md](docs/admin-and-systems.md).
 

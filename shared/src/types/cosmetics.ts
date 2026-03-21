@@ -27,3 +27,15 @@ export interface PlayerCosmeticData {
   trailConfig?: { particleKey: string; tint: number; frequency: number };
   bombSkinConfig?: { baseColor: number; fuseColor: number; label: string };
 }
+
+export interface CosmeticExportData {
+  _format: 'blast-arena-cosmetic';
+  _version: 1;
+  name: string;
+  type: CosmeticType;
+  config: Record<string, unknown>;
+  rarity: CosmeticRarity;
+  unlockType: CosmeticUnlockType;
+  unlockRequirement: Record<string, unknown> | null;
+  sortOrder: number;
+}
