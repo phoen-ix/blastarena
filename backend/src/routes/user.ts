@@ -3,10 +3,14 @@ import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import * as userService from '../services/user';
+import * as buddyService from '../services/buddy';
 import {
-  USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH,
-  PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH,
-  validateUsername, validateEmail as validateEmailFn,
+  USERNAME_MIN_LENGTH,
+  USERNAME_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  validateUsername,
+  validateEmail as validateEmailFn,
   validatePassword,
 } from '@blast-arena/shared';
 
@@ -34,23 +38,28 @@ router.get('/user/profile', authMiddleware, async (req, res, next) => {
   }
 });
 
-router.put('/user/profile', authMiddleware, validate(updateProfileSchema), async (req, res, next) => {
-  try {
-    const { username } = req.body;
+router.put(
+  '/user/profile',
+  authMiddleware,
+  validate(updateProfileSchema),
+  async (req, res, next) => {
+    try {
+      const { username } = req.body;
 
-    if (username !== undefined) {
-      const usernameError = validateUsername(username);
-      if (usernameError) return res.status(400).json({ error: usernameError });
-      await userService.updateUsername(req.user!.userId, username);
+      if (username !== undefined) {
+        const usernameError = validateUsername(username);
+        if (usernameError) return res.status(400).json({ error: usernameError });
+        await userService.updateUsername(req.user!.userId, username);
+      }
+
+      // Return updated profile
+      const profile = await userService.getUserProfile(req.user!.userId);
+      res.json(profile);
+    } catch (err) {
+      next(err);
     }
-
-    // Return updated profile
-    const profile = await userService.getUserProfile(req.user!.userId);
-    res.json(profile);
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
 router.post('/user/email', authMiddleware, validate(changeEmailSchema), async (req, res, next) => {
   try {
@@ -62,7 +71,9 @@ router.post('/user/email', authMiddleware, validate(changeEmailSchema), async (r
       res.json({ message: 'Email address updated.' });
     } else {
       await userService.requestEmailChange(req.user!.userId, req.body.email);
-      res.json({ message: 'Confirmation email sent to your new address. The link expires in 24 hours.' });
+      res.json({
+        message: 'Confirmation email sent to your new address. The link expires in 24 hours.',
+      });
     }
   } catch (err) {
     next(err);
@@ -81,7 +92,9 @@ router.post(
       if (passwordError) return res.status(400).json({ error: passwordError });
 
       if (currentPassword === newPassword) {
-        return res.status(400).json({ error: 'New password must be different from current password' });
+        return res
+          .status(400)
+          .json({ error: 'New password must be different from current password' });
       }
 
       await userService.changePassword(req.user!.userId, currentPassword, newPassword);
@@ -115,6 +128,41 @@ router.put('/user/privacy', authMiddleware, validate(privacySchema), async (req,
     next(err);
   }
 });
+
+// --- Buddy Settings ---
+
+router.get('/user/buddy-settings', authMiddleware, async (req, res, next) => {
+  try {
+    const settings = await buddyService.getBuddySettings(req.user!.userId);
+    res.json(settings);
+  } catch (err) {
+    next(err);
+  }
+});
+
+const buddySettingsSchema = z.object({
+  name: z.string().min(1).max(20).optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional(),
+  size: z.number().min(0.4).max(0.8).optional(),
+});
+
+router.put(
+  '/user/buddy-settings',
+  authMiddleware,
+  validate(buddySettingsSchema),
+  async (req, res, next) => {
+    try {
+      await buddyService.saveBuddySettings(req.user!.userId, req.body);
+      const settings = await buddyService.getBuddySettings(req.user!.userId);
+      res.json(settings);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.get('/user/confirm-email/:token', async (req, res, next) => {
   try {

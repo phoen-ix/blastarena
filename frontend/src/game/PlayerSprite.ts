@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { PlayerState, PlayerCosmeticData, TILE_SIZE } from '@blast-arena/shared';
+import { PlayerState, TILE_SIZE } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 import { PLAYER_COLORS, BootScene } from '../scenes/BootScene';
 
@@ -45,9 +45,21 @@ export class PlayerSpriteRenderer {
   /** Trail particle emitters per player */
   private trailEmitters: Map<number, Phaser.GameObjects.Particles.ParticleEmitter> = new Map();
 
+  /** Buddy mode: player ID, size, and glow color */
+  private buddyPlayerId: number | null = null;
+  private buddySizePercent: number = 60;
+  private buddyGlowColor: number = 0x44aaff;
+  private buddyGlowGraphics: Map<number, Phaser.GameObjects.Graphics> = new Map();
+
   constructor(scene: Phaser.Scene, localPlayerId: number) {
     this.scene = scene;
     this.localPlayerId = localPlayerId;
+  }
+
+  setBuddyPlayer(playerId: number, sizePercent: number, glowColor: number): void {
+    this.buddyPlayerId = playerId;
+    this.buddySizePercent = sizePercent;
+    this.buddyGlowColor = glowColor;
   }
 
   update(players: PlayerState[]): void {
@@ -77,7 +89,9 @@ export class PlayerSpriteRenderer {
 
             // Get player color for death particles
             const colorIndex = this.playerColorIndex.get(player.id) ?? index % 8;
-            const playerColor = player.cosmetics?.colorHex ?? (colorIndex >= 0 ? PLAYER_COLORS[colorIndex] : 0xffffff);
+            const playerColor =
+              player.cosmetics?.colorHex ??
+              (colorIndex >= 0 ? PLAYER_COLORS[colorIndex] : 0xffffff);
 
             this.scene.tweens.add({
               targets: existing,
@@ -142,6 +156,13 @@ export class PlayerSpriteRenderer {
             this.shieldGraphics.delete(player.id);
           }
 
+          // Remove buddy glow graphic
+          const glowGfx = this.buddyGlowGraphics.get(player.id);
+          if (glowGfx) {
+            glowGfx.destroy();
+            this.buddyGlowGraphics.delete(player.id);
+          }
+
           // Clean up tracking maps
           this.prevShieldState.delete(player.id);
           this.prevPositions.delete(player.id);
@@ -161,7 +182,11 @@ export class PlayerSpriteRenderer {
         // Priority: 1) cosmetic color, 2) team color, 3) index-based
         if (player.cosmetics?.colorHex) {
           // Generate custom textures if needed
-          BootScene.generateCustomPlayerTextures(this.scene, player.cosmetics.colorHex, player.cosmetics.eyeStyle);
+          BootScene.generateCustomPlayerTextures(
+            this.scene,
+            player.cosmetics.colorHex,
+            player.cosmetics.eyeStyle,
+          );
           const suffix = player.cosmetics.eyeStyle
             ? `${player.cosmetics.colorHex.toString(16)}_${player.cosmetics.eyeStyle}`
             : player.cosmetics.colorHex.toString(16);
@@ -185,15 +210,20 @@ export class PlayerSpriteRenderer {
         const textureKey = customPrefix ? `${customPrefix}_${dir}` : `player_${colorIndex}_${dir}`;
         sprite = this.scene.add.sprite(targetX, targetY, textureKey);
         sprite.setDepth(10);
-        sprite.setDisplaySize(TILE_SIZE - 4, TILE_SIZE - 4);
+        const isBuddy = player.id === this.buddyPlayerId;
+        const displaySize = isBuddy
+          ? (TILE_SIZE - 4) * (this.buddySizePercent / 100)
+          : TILE_SIZE - 4;
+        sprite.setDisplaySize(displaySize, displaySize);
         this.sprites.set(player.id, sprite);
 
         // Create name label with team color tint
         const isTeamMode = player.team !== null && player.team !== undefined;
         const teamLabelColors = ['#ff6b7f', '#6bb8ff'];
         const labelColor = isTeamMode ? teamLabelColors[player.team!] : '#ffffff';
+        const labelOffset = isBuddy ? displaySize / 2 + 2 : TILE_SIZE / 2 + 2;
         const label = this.scene.add
-          .text(targetX, targetY - TILE_SIZE / 2 - 2, player.username, {
+          .text(targetX, targetY - labelOffset, player.username, {
             fontSize: '11px',
             color: labelColor,
             stroke: '#000000',
@@ -209,13 +239,7 @@ export class PlayerSpriteRenderer {
           teamGfx.setDepth(9);
           const teamColor = player.team === 0 ? 0xe94560 : 0x44aaff;
           teamGfx.fillStyle(teamColor, 0.35);
-          teamGfx.fillRoundedRect(
-            -TILE_SIZE / 2 + 1,
-            TILE_SIZE / 2 - 5,
-            TILE_SIZE - 2,
-            4,
-            2,
-          );
+          teamGfx.fillRoundedRect(-TILE_SIZE / 2 + 1, TILE_SIZE / 2 - 5, TILE_SIZE - 2, 4, 2);
           teamGfx.setPosition(targetX, targetY);
           this.teamIndicators.set(player.id, teamGfx);
         }
@@ -231,7 +255,9 @@ export class PlayerSpriteRenderer {
 
       // Update texture based on direction
       const customPrefix = this.customTexturePrefix.get(player.id);
-      const dirTexture = customPrefix ? `${customPrefix}_${player.direction}` : `player_${colorIndex}_${player.direction}`;
+      const dirTexture = customPrefix
+        ? `${customPrefix}_${player.direction}`
+        : `player_${colorIndex}_${player.direction}`;
       if (sprite.texture.key !== dirTexture && this.scene.textures.exists(dirTexture)) {
         sprite.setTexture(dirTexture);
       }
@@ -347,11 +373,39 @@ export class PlayerSpriteRenderer {
         }
       }
 
+      // Buddy glow aura
+      if (player.id === this.buddyPlayerId) {
+        let glowGfx = this.buddyGlowGraphics.get(player.id);
+        if (!glowGfx) {
+          glowGfx = this.scene.add.graphics();
+          glowGfx.setDepth(8); // Below player (10), above floor
+          this.buddyGlowGraphics.set(player.id, glowGfx);
+        }
+
+        const time = this.scene.time.now;
+        const pulse = 0.15 + 0.08 * Math.sin(time * 0.003);
+        const buddyDisplaySize = (TILE_SIZE - 4) * (this.buddySizePercent / 100);
+        const glowRadius = buddyDisplaySize / 2 + 6;
+
+        glowGfx.clear();
+        glowGfx.fillStyle(this.buddyGlowColor, pulse * 0.5);
+        glowGfx.fillCircle(0, 0, glowRadius + 4);
+        glowGfx.fillStyle(this.buddyGlowColor, pulse);
+        glowGfx.fillCircle(0, 0, glowRadius);
+        glowGfx.lineStyle(1.5, this.buddyGlowColor, pulse + 0.1);
+        glowGfx.strokeCircle(0, 0, glowRadius + 2);
+        glowGfx.setPosition(sprite.x, sprite.y);
+      }
+
       // Update label position to follow sprite
       const label = this.labels.get(player.id);
       if (label) {
+        const isBuddyPlayer = player.id === this.buddyPlayerId;
+        const labelYOffset = isBuddyPlayer
+          ? ((TILE_SIZE - 4) * (this.buddySizePercent / 100)) / 2 + 2
+          : TILE_SIZE / 2 + 2;
         label.x = sprite.x;
-        label.y = sprite.y - TILE_SIZE / 2 - 2;
+        label.y = sprite.y - labelYOffset;
       }
 
       // Update team indicator position (setPosition only — no clear/redraw)
@@ -374,6 +428,8 @@ export class PlayerSpriteRenderer {
     this.labels.clear();
     this.teamIndicators.clear();
     this.shieldGraphics.clear();
+    for (const glow of this.buddyGlowGraphics.values()) glow.destroy();
+    this.buddyGlowGraphics.clear();
     for (const emitter of this.dustEmitters.values()) emitter.destroy();
     this.dustEmitters.clear();
     this.playerColorIndex.clear();
@@ -407,6 +463,12 @@ export class PlayerSpriteRenderer {
     if (shieldGfx) {
       shieldGfx.destroy();
       this.shieldGraphics.delete(id);
+    }
+
+    const glowGfx = this.buddyGlowGraphics.get(id);
+    if (glowGfx) {
+      glowGfx.destroy();
+      this.buddyGlowGraphics.delete(id);
     }
 
     const dustEmitter = this.dustEmitters.get(id);

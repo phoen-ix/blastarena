@@ -9,12 +9,14 @@ import {
   EquippedCosmetics,
   THEME_IDS,
   THEME_NAMES,
+  BuddySettings,
 } from '@blast-arena/shared';
 import type { ThemeId } from '@blast-arena/shared';
 import { getSettings, saveSettings, VisualSettings } from '../game/Settings';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { themeManager } from '../themes/ThemeManager';
 import { THEME_DEFINITIONS } from '../themes/definitions';
+import { PLAYER_COLORS } from '../scenes/BootScene';
 
 interface Tab {
   id: string;
@@ -386,8 +388,31 @@ export class SettingsUI {
             </div>
           </div>
         </div>
+
+        <h3 class="content-section-title mt-6">Buddy Mode</h3>
+        <div id="buddy-settings-section" style="display:flex;flex-direction:column;gap:14px;">
+          <div class="form-group">
+            <label style="font-size:13px;color:var(--text-dim);display:block;margin-bottom:4px;">Buddy Name</label>
+            <input class="input" type="text" id="buddy-name-input" maxlength="20" placeholder="Buddy" style="width:100%;max-width:260px;">
+          </div>
+          <div class="form-group">
+            <label style="font-size:13px;color:var(--text-dim);display:block;margin-bottom:4px;">Buddy Color</label>
+            <div id="buddy-color-swatches" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+          </div>
+          <div class="form-group">
+            <label id="buddy-size-label" style="font-size:13px;color:var(--text-dim);display:block;margin-bottom:4px;">Buddy Size: 60%</label>
+            <input type="range" id="buddy-size-slider" min="40" max="80" step="5" value="60" style="width:100%;max-width:260px;accent-color:var(--primary);">
+          </div>
+          <div>
+            <button class="btn btn-primary btn-sm" id="buddy-save-btn">Save Buddy Settings</button>
+            <span id="buddy-save-status" style="font-size:13px;color:var(--success);margin-left:8px;display:none;">Saved!</span>
+          </div>
+        </div>
       </div>
     `;
+
+    // Load and populate buddy settings
+    this.loadBuddySettings();
 
     // Theme picker clicks
     this.contentEl.querySelector('#theme-picker')!.addEventListener('click', (e: Event) => {
@@ -414,6 +439,79 @@ export class SettingsUI {
       saveSettings(current);
       if (key === 'lobbyChat') {
         window.dispatchEvent(new CustomEvent('lobbychat-toggle'));
+      }
+    });
+  }
+
+  private async loadBuddySettings(): Promise<void> {
+    if (!this.contentEl) return;
+
+    let settings: BuddySettings;
+    try {
+      settings = await ApiClient.get<BuddySettings>('/user/buddy-settings');
+    } catch {
+      settings = { name: 'Buddy', color: '#44aaff', size: 0.6 };
+    }
+
+    const nameInput = this.contentEl.querySelector('#buddy-name-input') as HTMLInputElement;
+    const sizeSlider = this.contentEl.querySelector('#buddy-size-slider') as HTMLInputElement;
+    const sizeLabel = this.contentEl.querySelector('#buddy-size-label') as HTMLElement;
+    const swatchContainer = this.contentEl.querySelector('#buddy-color-swatches') as HTMLElement;
+    const saveBtn = this.contentEl.querySelector('#buddy-save-btn') as HTMLButtonElement;
+    const saveStatus = this.contentEl.querySelector('#buddy-save-status') as HTMLElement;
+
+    if (!nameInput || !sizeSlider || !swatchContainer || !saveBtn) return;
+
+    nameInput.value = settings.name;
+    sizeSlider.value = String(Math.round(settings.size * 100));
+    if (sizeLabel) sizeLabel.textContent = `Buddy Size: ${Math.round(settings.size * 100)}%`;
+
+    let selectedColor = settings.color;
+
+    // Build color swatches
+    const buildSwatches = () => {
+      swatchContainer.innerHTML = '';
+      for (const color of PLAYER_COLORS) {
+        const hex = '#' + color.toString(16).padStart(6, '0');
+        const swatch = document.createElement('div');
+        swatch.style.cssText = `
+          width:32px;height:32px;border-radius:50%;cursor:pointer;
+          background:${hex};
+          border:3px solid ${selectedColor === hex ? 'var(--text)' : 'transparent'};
+          box-shadow:${selectedColor === hex ? '0 0 0 2px var(--primary)' : 'none'};
+          transition:border-color 0.15s,box-shadow 0.15s;
+        `;
+        swatch.addEventListener('click', () => {
+          selectedColor = hex;
+          buildSwatches();
+        });
+        swatchContainer.appendChild(swatch);
+      }
+    };
+    buildSwatches();
+
+    sizeSlider.addEventListener('input', () => {
+      if (sizeLabel) sizeLabel.textContent = `Buddy Size: ${sizeSlider.value}%`;
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      saveBtn.disabled = true;
+      try {
+        await ApiClient.put('/user/buddy-settings', {
+          name: nameInput.value || 'Buddy',
+          color: selectedColor,
+          size: parseInt(sizeSlider.value, 10) / 100,
+        });
+        if (saveStatus) {
+          saveStatus.style.display = 'inline';
+          setTimeout(() => {
+            saveStatus.style.display = 'none';
+          }, 2000);
+        }
+      } catch (err: unknown) {
+        this.notifications.error('Failed to save: ' + getErrorMessage(err));
+      } finally {
+        saveBtn.disabled = false;
       }
     });
   }

@@ -371,8 +371,12 @@ export class HUDScene extends Phaser.Scene {
             scoreBadge = `<span style="margin-left:auto;font-size:11px;font-weight:700;color:${scoreColor};font-family:'Chakra Petch',monospace;">${isControlling ? '👑 ' : ''}${score}</span>`;
           }
 
+          const buddyTag = p.isBuddy
+            ? '<span style="color:var(--accent);font-size:10px;font-weight:700;margin-left:4px;">[BUDDY]</span>'
+            : '';
+
           return `${teamHeader}<div class="hud-player-item${dead ? ' dead' : ''}${clickable ? ' clickable' : ''}" data-player-id="${p.id}" style="${isKOTH ? 'display:flex;align-items:center;gap:4px;' : ''}">
-          <span>${teamDot}${p.isBot ? '🤖 ' : ''}${escapeHtml(p.username)}</span>
+          <span>${teamDot}${p.isBot ? '🤖 ' : ''}${escapeHtml(p.username)}${buddyTag}</span>
           ${scoreBadge}
         </div>`;
         })

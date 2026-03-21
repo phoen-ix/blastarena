@@ -53,6 +53,7 @@ export class CampaignGame {
   public readonly userIds: number[];
   public readonly usernames: string[];
   public readonly coopMode: boolean;
+  public readonly buddyMode: boolean;
   public readonly level: CampaignLevel;
 
   /** @deprecated Use userIds[0] instead. Kept for backward compat with CampaignGameManager. */
@@ -100,11 +101,13 @@ export class CampaignGame {
     enemyTypes: Map<number, EnemyTypeConfig>,
     callbacks: CampaignSessionCallbacks,
     carriedPowerups?: StartingPowerUps | null,
+    buddyMode?: boolean,
   ) {
     this.sessionId = uuidv4();
     this.userIds = userIds;
     this.usernames = usernames;
-    this.coopMode = userIds.length > 1;
+    this.coopMode = !buddyMode && userIds.length > 1;
+    this.buddyMode = buddyMode ?? false;
     this.level = level;
     this.enemyTypes = enemyTypes;
     this.callbacks = callbacks;
@@ -140,8 +143,8 @@ export class CampaignGame {
       reinforcedWalls: level.reinforcedWalls,
       enableMapEvents: false,
       customMap: gameMap,
-      // Co-op: friendly fire OFF so partner bombs don't hurt each other (self-damage still applies)
-      friendlyFire: this.coopMode ? false : true,
+      // Co-op/Buddy: friendly fire OFF so partner/buddy bombs don't hurt each other
+      friendlyFire: this.coopMode || this.buddyMode ? false : true,
     };
 
     this.gameState = new GameStateManager(gameConfig);
@@ -149,11 +152,20 @@ export class CampaignGame {
     // Add all human players
     const startPowerups = carriedPowerups ?? level.startingPowerups;
     for (let i = 0; i < userIds.length; i++) {
-      // In co-op, assign all players to team 0 (enables FF OFF mechanic)
-      const team = this.coopMode ? 0 : null;
-      const player = this.gameState.addPlayer(userIds[i], usernames[i], team);
+      const isBuddyPlayer = this.buddyMode && i === 1;
+      // In co-op/buddy, assign all players to team 0 (enables FF OFF mechanic)
+      const team = this.coopMode || this.buddyMode ? 0 : null;
+      const player = this.gameState.addPlayer(
+        userIds[i],
+        usernames[i],
+        team,
+        false,
+        isBuddyPlayer,
+        isBuddyPlayer ? userIds[0] : null,
+      );
 
-      if (startPowerups && player) {
+      // Don't apply starting power-ups to buddy (buddy has fixed stats)
+      if (startPowerups && player && !isBuddyPlayer) {
         this.applyStartingPowerups(player, startPowerups);
       }
     }
@@ -495,6 +507,7 @@ export class CampaignGame {
     // 4. Player-enemy contact collision (check ALL alive players)
     for (const player of this.gameState.players.values()) {
       if (!player.alive || player.invulnerableTicks > 0 || player.frozen) continue;
+      if (player.isBuddy) continue; // Buddy is immune to enemy contact
       for (const enemy of this.enemies.values()) {
         if (!enemy.alive || !enemy.typeConfig.contactDamage) continue;
         if (enemy.position.x === player.position.x && enemy.position.y === player.position.y) {
@@ -682,6 +695,7 @@ export class CampaignGame {
   private handlePlayerDeath(playerId: number): void {
     const player = this.gameState.players.get(playerId);
     if (!player) return;
+    if (player.isBuddy) return; // Buddy cannot die
 
     // Player might already be handled (pending respawn)
     if (!player.alive && this.respawnTicks.has(playerId)) return;
@@ -774,6 +788,7 @@ export class CampaignGame {
    */
   private checkLockIn(targetPos: Position): void {
     for (const player of this.gameState.players.values()) {
+      if (player.isBuddy) continue; // Buddy doesn't participate in lock-in
       if (
         player.alive &&
         !player.frozen &&
@@ -787,8 +802,10 @@ export class CampaignGame {
       }
     }
 
-    // Check if all alive players are locked in
-    const alivePlayers = Array.from(this.gameState.players.values()).filter((p) => p.alive);
+    // Check if all alive non-buddy players are locked in
+    const alivePlayers = Array.from(this.gameState.players.values()).filter(
+      (p) => p.alive && !p.isBuddy,
+    );
     if (alivePlayers.length > 0 && alivePlayers.every((p) => this.lockedInPlayers.has(p.id))) {
       this.triggerCompletion();
     }
@@ -844,6 +861,7 @@ export class CampaignGame {
       levelId: this.level.id,
       exitOpen: this.exitOpen,
       coopMode: this.coopMode,
+      buddyMode: this.buddyMode || undefined,
       respawnTimers: Object.keys(respawnTimers).length > 0 ? respawnTimers : undefined,
       lockedInPlayers: this.lockedInPlayers.size > 0 ? Array.from(this.lockedInPlayers) : undefined,
     };

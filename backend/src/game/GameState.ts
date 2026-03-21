@@ -194,11 +194,13 @@ export class GameStateManager {
     username: string,
     team: number | null = null,
     isBot: boolean = false,
+    isBuddy: boolean = false,
+    buddyOwnerId: number | null = null,
   ): Player {
     const spawnIndex =
       this.shuffledSpawnIndices[this.players.size % this.shuffledSpawnIndices.length];
     const spawnPos = this.map.spawnPoints[spawnIndex];
-    const player = new Player(id, username, spawnPos, team, isBot);
+    const player = new Player(id, username, spawnPos, team, isBot, isBuddy, buddyOwnerId);
     this.players.set(id, player);
     this.placementCounter++;
     if (isBot) {
@@ -379,6 +381,7 @@ export class GameStateManager {
     // 5. Check player-explosion collisions
     for (const player of this.players.values()) {
       if (!player.alive || player.invulnerableTicks > 0) continue;
+      if (player.isBuddy) continue; // Buddy is invulnerable
       // Winner is invulnerable during grace period
       if (isFinishing && this.winnerId === player.id) continue;
 
@@ -396,6 +399,11 @@ export class GameStateManager {
             player.team !== null &&
             owner.team === player.team
           ) {
+            continue;
+          }
+
+          // Buddy bombs never hurt their owner
+          if (owner && owner.isBuddy && owner.buddyOwnerId === player.id) {
             continue;
           }
 
@@ -440,7 +448,15 @@ export class GameStateManager {
             type: powerUp.type,
             position: { ...powerUp.position },
           });
-          player.applyPowerUp(powerUp.type);
+          // Buddy proxies power-ups to owner
+          if (player.isBuddy && player.buddyOwnerId !== null) {
+            const owner = this.players.get(player.buddyOwnerId);
+            if (owner && owner.alive) {
+              owner.applyPowerUp(powerUp.type);
+            }
+          } else {
+            player.applyPowerUp(powerUp.type);
+          }
           this.gameLogger?.logPowerupPickup(
             player.id,
             player.username,
@@ -558,6 +574,7 @@ export class GameStateManager {
       // Zone damage
       for (const player of this.players.values()) {
         if (!player.alive) continue;
+        if (player.isBuddy) continue; // Buddy is immune to zone damage
         if (!this.zone.isInsideZone(player.position.x, player.position.y)) {
           if (player.hasShield) {
             player.hasShield = false;
@@ -647,23 +664,39 @@ export class GameStateManager {
     // Movement (with cooldown)
     if (input.direction && player.canMove()) {
       player.direction = input.direction;
-      const bombPositions =
-        sharedBombPositions ?? Array.from(this.bombs.values()).map((b) => b.position);
 
-      const otherPlayerPositions: { x: number; y: number }[] = [];
-      for (const other of this.players.values()) {
-        if (other.id !== player.id && other.alive && !other.frozen) {
-          otherPlayerPositions.push(other.position);
+      let newPos: { x: number; y: number } | null = null;
+
+      if (player.isBuddy) {
+        // Buddy passes through destructible walls and bombs, doesn't collide with owner
+        newPos = this.collisionSystem.canBuddyMoveTo(
+          player.position.x,
+          player.position.y,
+          input.direction,
+        );
+      } else {
+        const bombPositions =
+          sharedBombPositions ?? Array.from(this.bombs.values()).map((b) => b.position);
+
+        const otherPlayerPositions: { x: number; y: number }[] = [];
+        for (const other of this.players.values()) {
+          if (other.id !== player.id && other.alive && !other.frozen) {
+            // Buddy and owner don't block each other
+            if (other.isBuddy && other.buddyOwnerId === player.id) continue;
+            if (player.isBuddy && player.buddyOwnerId === other.id) continue;
+            otherPlayerPositions.push(other.position);
+          }
         }
+
+        newPos = this.collisionSystem.canMoveTo(
+          player.position.x,
+          player.position.y,
+          input.direction,
+          bombPositions,
+          otherPlayerPositions,
+        );
       }
 
-      const newPos = this.collisionSystem.canMoveTo(
-        player.position.x,
-        player.position.y,
-        input.direction,
-        bombPositions,
-        otherPlayerPositions,
-      );
       if (newPos) {
         const from = { x: player.position.x, y: player.position.y };
         player.position = newPos;

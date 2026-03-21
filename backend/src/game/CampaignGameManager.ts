@@ -13,6 +13,7 @@ export class CampaignGameManager {
     enemyTypes: Map<number, EnemyTypeConfig>,
     callbacks: CampaignSessionCallbacks,
     carriedPowerups?: StartingPowerUps | null,
+    buddyMode?: boolean,
   ): CampaignGame {
     // End any existing session for ALL users
     for (const userId of userIds) {
@@ -29,6 +30,7 @@ export class CampaignGameManager {
       enemyTypes,
       callbacks,
       carriedPowerups,
+      buddyMode,
     );
     this.sessions.set(game.sessionId, game);
 

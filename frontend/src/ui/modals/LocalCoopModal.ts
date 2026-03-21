@@ -526,7 +526,7 @@ export function showLocalCoopModal(
   }
 }
 
-function createControlsSection(
+export function createControlsSection(
   label: string,
   selected: ControlPreset,
   onSelect: (preset: ControlPreset) => void,
@@ -569,7 +569,7 @@ function createControlsSection(
   return section;
 }
 
-function createCameraModeSection(
+export function createCameraModeSection(
   selected: CameraMode,
   onSelect: (mode: CameraMode) => void,
 ): HTMLElement {

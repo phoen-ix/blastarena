@@ -841,9 +841,17 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           const p2Id = data.localP2.userId ?? -(1000 + (Date.now() % 10000));
           userIds.push(p2Id);
           usernames.push(data.localP2.username);
+        } else if (data.buddyMode) {
+          // Buddy mode: P2 is an invulnerable support character
+          const buddyId = -(2000 + (Date.now() % 10000));
+          const buddySettings = await import('./services/buddy').then((m) =>
+            m.getBuddySettings(socket.data.userId),
+          );
+          userIds.push(buddyId);
+          usernames.push(buddySettings.name);
         }
 
-        const isCoopMode = userIds.length > 1;
+        const isCoopMode = userIds.length > 1 && !data.buddyMode;
         const campaignRoom = `campaign:${socket.data.userId}`;
 
         // Get carried powerups if level supports carry-over (use P1's powerups)
@@ -957,6 +965,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
             },
           },
           carriedPowerups,
+          data.buddyMode,
         );
 
         // Join campaign room
@@ -1011,6 +1020,19 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           }
         }
 
+        // Apply buddy color as cosmetic
+        if (data.buddyMode && userIds.length > 1) {
+          const buddyId = userIds[1];
+          const buddySettings = await import('./services/buddy').then((m) =>
+            m.getBuddySettings(socket.data.userId),
+          );
+          const player = game.getPlayer(buddyId);
+          if (player) {
+            const colorNum = parseInt(buddySettings.color.replace('#', ''), 16);
+            player.cosmetics = { colorHex: colorNum };
+          }
+        }
+
         // Update presence for all real players
         for (const uid of userIds) {
           if (uid > 0) {
@@ -1029,6 +1051,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
             levelId: level.id,
             exitOpen: false,
             coopMode: isCoopMode,
+            buddyMode: data.buddyMode || undefined,
           },
           level: levelSummary,
         };
@@ -1113,10 +1136,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       socket.data.activeCampaignSession = undefined;
     });
 
-    // Buddy mode input stub — no-op for now
-    socket.on('campaign:buddyInput', () => {
-      // Future: route to BuddyEntity in active campaign session
-    });
+    // Buddy mode input — routed through campaign:input with playerId (same as local co-op)
 
     // Disconnect
     socket.on('disconnect', async () => {

@@ -403,6 +403,14 @@ export interface UserAchievementRow extends RowDataPacket {
 }
 
 /** Admin user list row (user joined with stats) */
+export interface BuddySettingsRow extends RowDataPacket {
+  user_id: number;
+  buddy_name: string;
+  buddy_color: string;
+  buddy_size: number;
+  updated_at: Date;
+}
+
 export interface AdminUserRow extends RowDataPacket {
   id: number;
   username: string;

@@ -1,6 +1,19 @@
 import type { PlayerCosmeticData } from './cosmetics';
 
-export type TileType = 'empty' | 'wall' | 'destructible' | 'spawn' | 'destructible_cracked' | 'teleporter_a' | 'teleporter_b' | 'conveyor_up' | 'conveyor_down' | 'conveyor_left' | 'conveyor_right' | 'exit' | 'goal';
+export type TileType =
+  | 'empty'
+  | 'wall'
+  | 'destructible'
+  | 'spawn'
+  | 'destructible_cracked'
+  | 'teleporter_a'
+  | 'teleporter_b'
+  | 'conveyor_up'
+  | 'conveyor_down'
+  | 'conveyor_left'
+  | 'conveyor_right'
+  | 'exit'
+  | 'goal';
 
 export interface Tile {
   x: number;
@@ -10,7 +23,15 @@ export interface Tile {
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
 
-export type PowerUpType = 'bomb_up' | 'fire_up' | 'speed_up' | 'shield' | 'kick' | 'pierce_bomb' | 'remote_bomb' | 'line_bomb';
+export type PowerUpType =
+  | 'bomb_up'
+  | 'fire_up'
+  | 'speed_up'
+  | 'shield'
+  | 'kick'
+  | 'pierce_bomb'
+  | 'remote_bomb'
+  | 'line_bomb';
 
 export interface Position {
   x: number;
@@ -37,6 +58,8 @@ export interface PlayerState {
   kills: number;
   deaths: number;
   cosmetics?: PlayerCosmeticData;
+  isBuddy?: boolean;
+  buddyOwnerId?: number;
 }
 
 export interface BombState {

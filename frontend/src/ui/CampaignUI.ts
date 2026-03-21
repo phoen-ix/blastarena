@@ -7,6 +7,7 @@ import { PartyBar } from './PartyBar';
 import { escapeHtml } from '../utils/html';
 import { getErrorMessage } from '@blast-arena/shared';
 import { showLocalCoopModal } from './modals/LocalCoopModal';
+import { showBuddyModal, BuddyLaunchConfig } from './modals/BuddyModal';
 import { LocalCoopP2Identity } from '../game/LocalCoopInput';
 import game from '../main';
 
@@ -584,6 +585,22 @@ export class CampaignUI {
       });
       btnArea.appendChild(localCoopBtn);
 
+      // Buddy mode button: always available
+      const buddyBtn = document.createElement('button');
+      buddyBtn.className = 'btn btn-ghost';
+      buddyBtn.style.cssText = `
+        font-size: 13px;
+        padding: 8px 12px;
+        font-weight: 600;
+        color: var(--accent);
+      `;
+      buddyBtn.textContent = 'Buddy';
+      buddyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.showBuddySetup(level.id);
+      });
+      btnArea.appendChild(buddyBtn);
+
       rightSide.appendChild(btnArea);
     }
 
@@ -677,10 +694,25 @@ export class CampaignUI {
     );
   }
 
+  private showBuddySetup(levelId: number): void {
+    showBuddyModal(
+      (config: BuddyLaunchConfig) => {
+        game.registry.set('localCoopConfig', config);
+        game.registry.set('buddyMode', true);
+        game.registry.set('buddyConfig', config.buddySettings);
+        this.startLevel(levelId, false, true, true);
+      },
+      () => {
+        /* cancel — do nothing */
+      },
+    );
+  }
+
   private async startLevel(
     levelId: number,
     coopMode = false,
     localCoopMode = false,
+    buddyMode = false,
   ): Promise<void> {
     try {
       this.notifications.info('Loading level...');
@@ -703,8 +735,8 @@ export class CampaignUI {
         // Set registry flags for GameScene
         const registry = game.registry;
         registry.set('campaignMode', true);
-        registry.set('campaignCoopMode', coopMode || localCoopMode);
-        registry.set('localCoopMode', localCoopMode);
+        registry.set('campaignCoopMode', coopMode || localCoopMode || buddyMode);
+        registry.set('localCoopMode', localCoopMode || buddyMode);
         registry.set('initialGameState', data.state.gameState);
         registry.set('campaignEnemyTypes', enemyTypesResp.enemyTypes || []);
 
@@ -719,7 +751,9 @@ export class CampaignUI {
 
       // Build start data
       const startData: any = { levelId };
-      if (coopMode) {
+      if (buddyMode) {
+        startData.buddyMode = true;
+      } else if (coopMode) {
         startData.coopMode = true;
       } else if (localCoopMode) {
         startData.localCoopMode = true;

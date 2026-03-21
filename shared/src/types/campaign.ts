@@ -199,6 +199,7 @@ export interface CampaignGameState {
   levelId: number;
   exitOpen: boolean;
   coopMode: boolean;
+  buddyMode?: boolean;
   respawnTimers?: Record<number, number>; // playerId → ticks remaining until respawn
   lockedInPlayers?: number[]; // playerIds frozen on exit/goal tile
 }
@@ -276,10 +277,10 @@ export interface CoopStartData {
   enemyTypes: EnemyTypeConfig[];
 }
 
-// --- Buddy Mode (stub) ---
+// --- Buddy Mode ---
 
-export interface BuddyState {
-  position: Position;
-  direction: Direction;
-  active: boolean;
+export interface BuddySettings {
+  name: string; // max 20 chars
+  color: string; // hex '#rrggbb'
+  size: number; // 0.40 to 0.80
 }

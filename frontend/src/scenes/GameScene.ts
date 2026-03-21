@@ -79,6 +79,7 @@ export class GameScene extends Phaser.Scene {
   private localCoopMode: boolean = false;
   private localCoopInput: LocalCoopInput | null = null;
   private localP2Id: number = 0;
+  private buddyMode: boolean = false;
   private coopCameraMode: CameraMode = 'shared';
   private p2Camera: Phaser.Cameras.Scene2D.Camera | null = null;
   private splitDivider: Phaser.GameObjects.Graphics | null = null;
@@ -318,6 +319,8 @@ export class GameScene extends Phaser.Scene {
       this.campaignCoopMode = !!this.registry.get('campaignCoopMode');
       this.localCoopMode = !!this.registry.get('localCoopMode');
 
+      this.buddyMode = !!this.registry.get('buddyMode');
+
       // Set up local co-op input handler
       if (this.localCoopMode) {
         const coopConfig =
@@ -330,6 +333,18 @@ export class GameScene extends Phaser.Scene {
         if (initialState && initialState.players.length >= 2) {
           const p2 = initialState.players.find((p) => p.id !== this.localPlayerId);
           if (p2) this.localP2Id = p2.id;
+        }
+
+        // Set up buddy rendering (smaller sprite with glow)
+        if (this.buddyMode && this.localP2Id) {
+          const buddyConfig = this.registry.get('buddyConfig') as
+            | { name: string; color: string; size: number }
+            | undefined;
+          const sizePercent = buddyConfig ? Math.round(buddyConfig.size * 100) : 60;
+          const glowColor = buddyConfig
+            ? parseInt(buddyConfig.color.replace('#', ''), 16)
+            : 0x44aaff;
+          this.playerRenderer.setBuddyPlayer(this.localP2Id, sizePercent, glowColor);
         }
       }
 
@@ -1160,6 +1175,8 @@ export class GameScene extends Phaser.Scene {
       this.registry.remove('campaignCoopMode');
       this.registry.remove('localCoopMode');
       this.registry.remove('localCoopConfig');
+      this.registry.remove('buddyMode');
+      this.registry.remove('buddyConfig');
       this.registry.set('openCampaign', true);
       this.scene.stop('HUDScene');
       this.scene.start('LobbyScene');
@@ -1198,6 +1215,7 @@ export class GameScene extends Phaser.Scene {
     this.campaignMode = false;
     this.campaignCoopMode = false;
     this.localCoopMode = false;
+    this.buddyMode = false;
     this.localCoopInput?.destroy();
     this.localCoopInput = null;
     this.localP2Id = 0;

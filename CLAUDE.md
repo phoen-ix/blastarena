@@ -49,7 +49,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - **Unified CSS Classes**: `.panel-header`/`.panel-content` (panel structure), `.tab-bar`/`.tab-item` (tabs), `.data-table` (tables with sticky headers), `.form-grid`/`.form-group`/`.input`/`.select` (forms), `.toggle-switch` (replaces checkboxes), `.setting-row` (labeled settings), `.option-chip` (selectable chips), `.mini-stat` (stat cards), `.modal-header`/`.modal-body`/`.modal-footer` (modal structure), `.btn`/`.btn-primary`/`.btn-secondary`/`.btn-ghost`/`.btn-sm` (buttons).
 - **Composed rendering**: GameScene.ts delegates to renderer classes in `frontend/src/game/`:
   - `TileMap.ts` — tile grid, floor variants, destruction animation, teleporters/conveyors/cracked walls
-  - `PlayerSprite.ts` — directional eyes, shield aura, squash/stretch movement (`activeMoveAnim` Set prevents tween stacking), dust particles, death effects
+  - `PlayerSprite.ts` — directional eyes, shield aura, buddy glow aura, squash/stretch movement (`activeMoveAnim` Set prevents tween stacking), dust particles, death effects
   - `BombSprite.ts` — pulsing scale tween; remote bombs (blue) add alpha blink; fuse sparks, urgency flash
   - `ExplosionSprite.ts` — expansion wave, sustain pulse, fade phase, fire/smoke particles
   - `PowerUpSprite.ts` — floating animation, distinctive icons per type
@@ -85,6 +85,22 @@ Campaign with hand-crafted levels, enemies, and bosses. Supports solo, online co
 - **Registry flags**: `campaignMode`, `campaignCoopMode`, `localCoopMode`, `localCoopConfig`, `localCoopP2Identity` control frontend behavior (camera, input, HUD, P2 identity).
 - **Socket events**: `campaign:coopStart` (partner auto-join), `campaign:playerLockedIn` (lock-in visual), `campaign:partnerLeft` (quit/disconnect), `campaign:playerDied` now includes `playerId`.
 - **Next Level/Retry**: GameOverScene preserves co-op mode flags when restarting, so both players continue together.
+
+### Buddy Mode
+Campaign modifier for playing with a very young or inexperienced player. P2 acts as a "buddy" — a smaller, invulnerable support character. Builds on local co-op infrastructure (input handling, camera modes, split-screen) with buddy-specific game rules.
+- **Architecture**: Buddy is a `Player` instance with `isBuddy: boolean` flag (not a separate entity class). Reuses all existing player infrastructure with guard conditions in the tick loop.
+- **Invulnerability**: Buddy never dies — `Player.die()` guarded, explosion/zone/enemy contact damage all skip buddy.
+- **Movement**: Buddy passes through destructible walls and bombs via `CollisionSystem.canBuddyMoveTo()` (only indestructible walls and map bounds block). Buddy and P1 don't block each other (skip buddy↔owner in `otherPlayerPositions`).
+- **Power-up proxy**: Power-ups collected by buddy apply to P1's stats (lookup via `buddyOwnerId`). Buddy's own stats stay fixed.
+- **Limited bombs**: Buddy has 1 bomb, 1 fire range (fixed). Buddy bombs never hurt P1 (team 0 + FF-off + explicit owner guard).
+- **Win conditions**: Buddy excluded from lock-in checks and alive player counts — only P1 needs to reach exit/complete objectives.
+- **Visual**: Smaller sprite (configurable 40-80% via `setDisplaySize()`), pulsing glow aura (`Phaser.GameObjects.Graphics` at depth 8, slower oscillation than shield). `[BUDDY]` tag in HUD player list.
+- **Settings persistence**: Name (max 20 chars), color (hex), size (0.40-0.80) saved in `buddy_settings` DB table (migration 020). `GET/PUT /user/buddy-settings` endpoints with Zod validation. Controls saved in localStorage (shared with local co-op).
+- **Frontend**: "Buddy" button on campaign level cards (`CampaignUI.ts`). Pre-launch modal (`BuddyModal.ts`) with buddy summary/editor, control presets, camera mode. Settings > Preferences has a Buddy section for default configuration.
+- **Socket**: `buddyMode: true` in `campaign:start` data. Buddy ID is negative: `-(2000 + (Date.now() % 10000))`. Buddy settings loaded from DB for name/color. `isCoopMode` is false for buddy mode (buddy is NOT co-op — no shared lives, no partner quit handling).
+- **Registry flags**: Sets `buddyMode`, `campaignCoopMode`, `localCoopMode`, `localCoopConfig`, `buddyConfig` — reuses local co-op camera/input paths.
+- **Service**: `backend/src/services/buddy.ts` — `getBuddySettings()`, `saveBuddySettings()` with upsert pattern.
+- **Types**: `BuddySettings` in `shared/src/types/campaign.ts`. `isBuddy`/`buddyOwnerId` on `PlayerState`. `buddyMode` on `CampaignGameState` and `campaign:start` socket event.
 
 ## Campaign Export/Import
 JSON-based export/import for levels and enemy types. Export formats use `_format` and `_version` fields for validation. Types defined in `shared/src/types/campaign.ts` (`LevelExportData`, `EnemyTypeExportData`, `LevelBundleExportData`).

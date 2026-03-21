@@ -36,6 +36,10 @@ export class Player {
   public moveCooldown: number = 0;
   public readonly isBot: boolean;
 
+  // Buddy mode: invulnerable support character that proxies power-ups to owner
+  public readonly isBuddy: boolean;
+  public readonly buddyOwnerId: number | null;
+
   // Stats tracking
   public kills: number = 0;
   public deaths: number = 0;
@@ -59,12 +63,20 @@ export class Player {
     spawnPosition: Position,
     team: number | null = null,
     isBot: boolean = false,
+    isBuddy: boolean = false,
+    buddyOwnerId: number | null = null,
   ) {
     this.id = id;
     this.username = username;
     this.position = { ...spawnPosition };
     this.team = team;
     this.isBot = isBot;
+    this.isBuddy = isBuddy;
+    this.buddyOwnerId = buddyOwnerId;
+    if (isBuddy) {
+      this.maxBombs = 1;
+      this.fireRange = 1;
+    }
   }
 
   applyPowerUp(type: PowerUpType): void {
@@ -112,6 +124,7 @@ export class Player {
   }
 
   die(): void {
+    if (this.isBuddy) return; // Buddy is invulnerable
     this.alive = false;
     this.deaths++;
   }
@@ -165,6 +178,8 @@ export class Player {
       kills: this.kills,
       deaths: this.deaths,
       cosmetics: this.cosmetics,
+      isBuddy: this.isBuddy || undefined,
+      buddyOwnerId: this.buddyOwnerId ?? undefined,
     };
   }
 }

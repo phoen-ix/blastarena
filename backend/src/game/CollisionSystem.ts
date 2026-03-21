@@ -6,7 +6,12 @@ export class CollisionSystem {
   private height: number;
   private reinforcedWalls: boolean;
 
-  constructor(tiles: TileType[][], width: number, height: number, reinforcedWalls: boolean = false) {
+  constructor(
+    tiles: TileType[][],
+    width: number,
+    height: number,
+    reinforcedWalls: boolean = false,
+  ) {
     this.tiles = tiles;
     this.width = width;
     this.height = height;
@@ -20,33 +25,84 @@ export class CollisionSystem {
   isWalkable(x: number, y: number): boolean {
     if (x < 0 || x >= this.width || y < 0 || y >= this.height) return false;
     const tile = this.tiles[y][x];
-    return tile === 'empty' || tile === 'spawn'
-      || tile === 'teleporter_a' || tile === 'teleporter_b'
-      || tile === 'conveyor_up' || tile === 'conveyor_down'
-      || tile === 'conveyor_left' || tile === 'conveyor_right'
-      || tile === 'exit' || tile === 'goal';
+    return (
+      tile === 'empty' ||
+      tile === 'spawn' ||
+      tile === 'teleporter_a' ||
+      tile === 'teleporter_b' ||
+      tile === 'conveyor_up' ||
+      tile === 'conveyor_down' ||
+      tile === 'conveyor_left' ||
+      tile === 'conveyor_right' ||
+      tile === 'exit' ||
+      tile === 'goal'
+    );
   }
 
-  canMoveTo(fromX: number, fromY: number, direction: Direction, bombPositions: Position[], playerPositions: Position[] = []): Position | null {
+  canMoveTo(
+    fromX: number,
+    fromY: number,
+    direction: Direction,
+    bombPositions: Position[],
+    playerPositions: Position[] = [],
+  ): Position | null {
     let newX = fromX;
     let newY = fromY;
 
     switch (direction) {
-      case 'up': newY--; break;
-      case 'down': newY++; break;
-      case 'left': newX--; break;
-      case 'right': newX++; break;
+      case 'up':
+        newY--;
+        break;
+      case 'down':
+        newY++;
+        break;
+      case 'left':
+        newX--;
+        break;
+      case 'right':
+        newX++;
+        break;
     }
 
     if (!this.isWalkable(newX, newY)) return null;
 
     // Check for bombs blocking the path
-    const bombBlocking = bombPositions.some(b => b.x === newX && b.y === newY);
+    const bombBlocking = bombPositions.some((b) => b.x === newX && b.y === newY);
     if (bombBlocking) return null;
 
     // Check for other players blocking the path
-    const playerBlocking = playerPositions.some(p => p.x === newX && p.y === newY);
+    const playerBlocking = playerPositions.some((p) => p.x === newX && p.y === newY);
     if (playerBlocking) return null;
+
+    return { x: newX, y: newY };
+  }
+
+  /** Buddy can pass through destructible walls and bombs, but not indestructible walls or out of bounds */
+  canBuddyMoveTo(fromX: number, fromY: number, direction: Direction): Position | null {
+    let newX = fromX;
+    let newY = fromY;
+
+    switch (direction) {
+      case 'up':
+        newY--;
+        break;
+      case 'down':
+        newY++;
+        break;
+      case 'left':
+        newX--;
+        break;
+      case 'right':
+        newX++;
+        break;
+    }
+
+    // Out of bounds
+    if (newX < 0 || newX >= this.width || newY < 0 || newY >= this.height) return null;
+
+    // Only indestructible walls block the buddy
+    const tile = this.tiles[newY][newX];
+    if (tile === 'wall') return null;
 
     return { x: newX, y: newY };
   }

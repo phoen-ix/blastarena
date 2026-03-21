@@ -75,6 +75,7 @@ export interface ClientToServerEvents {
       coopMode?: boolean;
       localCoopMode?: boolean;
       localP2?: { userId?: number; username: string; guestColor?: number };
+      buddyMode?: boolean;
     },
     callback: (response: { success: boolean; error?: string }) => void,
   ) => void;
@@ -82,7 +83,6 @@ export interface ClientToServerEvents {
   'campaign:pause': (callback: (response: { success: boolean }) => void) => void;
   'campaign:resume': (callback: (response: { success: boolean }) => void) => void;
   'campaign:quit': () => void;
-  'campaign:buddyInput': (input: PlayerInput) => void; // stub — buddy mode foundation
 
   // Friends
   'friend:list': (
