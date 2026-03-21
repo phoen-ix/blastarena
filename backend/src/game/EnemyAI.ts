@@ -20,9 +20,42 @@ const OPPOSITE: Record<Direction, Direction> = {
   right: 'left',
 };
 
-interface EnemyAIResult {
+export interface EnemyAIResult {
   direction: Direction | null;
   placeBomb: boolean;
+}
+
+export interface EnemyAIContext {
+  self: {
+    position: Position;
+    hp: number;
+    maxHp: number;
+    direction: Direction;
+    alive: boolean;
+    typeConfig: {
+      speed: number;
+      canPassWalls: boolean;
+      canPassBombs: boolean;
+      canBomb: boolean;
+      contactDamage: boolean;
+      isBoss: boolean;
+      sizeMultiplier: number;
+    };
+    patrolPath: Position[];
+    patrolIndex: number;
+  };
+  players: { position: Position; alive: boolean }[];
+  tiles: TileType[][];
+  mapWidth: number;
+  mapHeight: number;
+  bombPositions: Position[];
+  otherEnemies: { position: Position; enemyTypeId: number; alive: boolean }[];
+  tick: number;
+  rng: () => number;
+}
+
+export interface IEnemyAI {
+  decide(context: EnemyAIContext): EnemyAIResult;
 }
 
 export function processEnemyAI(
@@ -234,8 +267,8 @@ function wallFollow(
     const nx = enemy.position.x + d.dx;
     const ny = enemy.position.y + d.dy;
     if (collisionSystem.isWalkable(nx, ny)) {
-      const bombBlocking = !enemy.typeConfig.canPassBombs &&
-        bombPositions.some((b) => b.x === nx && b.y === ny);
+      const bombBlocking =
+        !enemy.typeConfig.canPassBombs && bombPositions.some((b) => b.x === nx && b.y === ny);
       if (!bombBlocking) return tryDir;
     }
   }

@@ -92,7 +92,10 @@ export function loadBotAIInSandbox(code: string): Record<string, unknown> {
   return moduleObj.exports;
 }
 
-export async function compileBotAI(source: string): Promise<CompileResult> {
+/**
+ * Shared scan + build pipeline (steps 1-4). Used by both bot AI and enemy AI compilers.
+ */
+export async function scanAndBuildAI(source: string): Promise<CompileResult> {
   const errors: string[] = [];
 
   // 1. File size check
@@ -156,6 +159,16 @@ export async function compileBotAI(source: string): Promise<CompileResult> {
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, errors: [`TypeScript compilation failed: ${msg}`] };
   }
+
+  return { success: true, compiledCode, errors: [] };
+}
+
+export async function compileBotAI(source: string): Promise<CompileResult> {
+  // Steps 1-4: shared scan + build
+  const buildResult = await scanAndBuildAI(source);
+  if (!buildResult.success) return buildResult;
+
+  const compiledCode = buildResult.compiledCode!;
 
   // 5. Structure validation — run in VM sandbox, check exports
   try {

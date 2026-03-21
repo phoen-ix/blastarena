@@ -8,6 +8,7 @@ import * as adminService from '../services/admin';
 import * as replayService from '../services/replay';
 import * as settingsService from '../services/settings';
 import * as botaiService from '../services/botai';
+import * as enemyaiService from '../services/enemyai';
 import * as seasonService from '../services/season';
 import * as achievementsService from '../services/achievements';
 import * as cosmeticsService from '../services/cosmetics';
@@ -1243,6 +1244,143 @@ router.delete('/admin/ai/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
     await botaiService.deleteAI(req.params.id, req.user!.userId);
     res.json({ message: 'AI deleted' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Enemy AI Management ---
+
+const enemyAiUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 500 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!file.originalname.endsWith('.ts')) {
+      cb(new Error('Only TypeScript (.ts) files are accepted'));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+const enemyAiUpdateSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).optional(),
+  isActive: z.boolean().optional(),
+});
+
+router.get('/admin/enemy-ai/active', async (_req, res, next) => {
+  try {
+    const ais = await enemyaiService.listActiveEnemyAIs();
+    res.json({ ais });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/admin/enemy-ai', adminOnlyMiddleware, async (_req, res, next) => {
+  try {
+    const ais = await enemyaiService.listAllEnemyAIs();
+    res.json({ ais });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/admin/enemy-ai',
+  adminOnlyMiddleware,
+  enemyAiUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: 'No file uploaded' });
+        return;
+      }
+      const name = req.body.name?.trim();
+      if (!name) {
+        res.status(400).json({ error: 'Name is required' });
+        return;
+      }
+      const description = req.body.description?.trim() || '';
+      const result = await enemyaiService.uploadEnemyAI(
+        name,
+        description,
+        req.file.buffer,
+        req.file.originalname,
+        req.user!.userId,
+      );
+      if (result.errors) {
+        res.status(400).json({ error: 'Compilation/validation failed', errors: result.errors });
+        return;
+      }
+      res.json({ ai: result.entry });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.put(
+  '/admin/enemy-ai/:id',
+  adminOnlyMiddleware,
+  validate(enemyAiUpdateSchema),
+  async (req, res, next) => {
+    try {
+      await enemyaiService.updateEnemyAI(req.params.id, req.body, req.user!.userId);
+      res.json({ message: 'Enemy AI updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.put(
+  '/admin/enemy-ai/:id/upload',
+  adminOnlyMiddleware,
+  enemyAiUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: 'No file uploaded' });
+        return;
+      }
+      const result = await enemyaiService.reuploadEnemyAI(
+        req.params.id,
+        req.file.buffer,
+        req.file.originalname,
+        req.user!.userId,
+      );
+      if (!result.success) {
+        res.status(400).json({ error: 'Compilation/validation failed', errors: result.errors });
+        return;
+      }
+      res.json({ message: 'Enemy AI updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.get('/admin/enemy-ai/:id/download', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const source = await enemyaiService.downloadEnemyAISource(req.params.id);
+    if (!source) {
+      res.status(404).json({ error: 'Enemy AI source not found' });
+      return;
+    }
+    res.setHeader('Content-Type', 'text/typescript');
+    res.setHeader('Content-Disposition', `attachment; filename="${source.filename}"`);
+    res.send(source.content);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/admin/enemy-ai/:id', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    await enemyaiService.deleteEnemyAI(req.params.id, req.user!.userId);
+    res.json({ message: 'Enemy AI deleted' });
   } catch (err) {
     next(err);
   }

@@ -6,7 +6,7 @@ import * as path from 'path';
 
 const router = Router();
 
-const PUBLIC_DOCS = ['campaign.md', 'replay-system.md', 'bot-ai-guide.md'];
+const PUBLIC_DOCS = ['campaign.md', 'replay-system.md', 'bot-ai-guide.md', 'enemy-ai-guide.md'];
 const STAFF_DOCS = [
   'admin-and-systems.md',
   'infrastructure.md',

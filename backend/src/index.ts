@@ -22,8 +22,10 @@ async function main(): Promise<void> {
   // 4. Run migrations
   await runMigrations();
 
-  // 5. Initialize BotAI registry
+  // 5. Initialize AI registries
   await getBotAIRegistry().initialize();
+  const { getEnemyAIRegistry } = await import('./services/enemyai-registry');
+  await getEnemyAIRegistry().initialize();
 
   // 6. Create Express app
   const app = createApp();

@@ -135,6 +135,9 @@ Full-screen panel for admin/moderator roles. 11 tabs: Dashboard, Users, Matches,
 ## Bot AI Management
 Admin-only system for custom AI upload/management. Built-in AI as fallback. Three-layer sandbox: (1) source scan blocks dangerous module imports and global access patterns (`process`, `globalThis`, `__proto__`, `Reflect`, `Proxy`, etc.), (2) esbuild `bundle: true` with `blockImportsPlugin` rejects ALL import/require at build time, (3) `vm.runInContext()` executes code in isolated context with `codeGeneration: { strings: false }` (blocks `eval`/`Function`) and 5s timeout. `loadBotAIInSandbox()` exported from `botai-compiler.ts` — used by both compiler validation and registry runtime loading. `IBotAI` interface in `BotAI.ts`. Runtime crash recovery falls back to built-in. `botAiId` field in MatchConfig/SimulationConfig. See [docs/admin-and-systems.md](docs/admin-and-systems.md#bot-ai-management) and [docs/bot-ai-guide.md](docs/bot-ai-guide.md).
 
+## Enemy AI Management
+Custom AI scripting for campaign enemies, managed in the AI tab alongside Bot AI. Shares the same 3-layer sandbox pipeline (`scanAndBuildAI()` in `botai-compiler.ts`). `IEnemyAI` interface with `decide(context: EnemyAIContext): { direction, placeBomb }` — campaign-scoped context includes own state, player positions, tiles, bombs, other enemies, tick, and seeded RNG. Constructor receives `(difficulty: 'easy' | 'normal' | 'hard', typeConfig)`. `EnemyAIEntry` type in `shared/src/types/enemyai.ts`. DB table: `enemy_ais` (migration 019). Filesystem: `./data/enemy-ai/{uuid}/source.ts` + `compiled.js`. `EnemyAIRegistry` (`enemyai-registry.ts`) mirrors `BotAIRegistry`: in-memory loaded AIs, `createInstance()` returns `IEnemyAI | null` (null = fall back to built-in pattern). `CampaignGame` integration: `enemyAIs` Map stores per-enemy instances; tick loop checks custom AI first with try/catch crash recovery (on error: delete from map, fall back to `processEnemyAI()`). Boss phase interaction: speed/bomb/spawn effects still apply, `movementPattern` changes ignored for custom AI enemies. Spawned minions also get AI instances. `EnemyTypeConfig` has optional `enemyAiId` and `difficulty` fields. Export/import bundles AI source (`_version: 2`); import handles AI name conflicts with create/use-existing/skip resolution. See [docs/enemy-ai-guide.md](docs/enemy-ai-guide.md).
+
 ## Bot Simulation System
 Admin-only batch runner for bot-only games. Fast/real-time modes, queue system (max 10), live spectating. `getHistory(page, limit)` returns paginated `{ batches, total }`. See [docs/admin-and-systems.md](docs/admin-and-systems.md#bot-simulation-system).
 
@@ -180,7 +183,7 @@ Social features for the lobby: friend list, online presence, party grouping, and
 - `GET /messages/unread` — unread counts per sender (authMiddleware)
 - `GET /messages/:userId` — paginated conversation history (authMiddleware)
 - `PUT /messages/:userId/read` — mark messages as read (authMiddleware)
-- `GET /docs/:filename` — public docs: campaign.md, replay-system.md, bot-ai-guide.md (authMiddleware, whitelist-validated)
+- `GET /docs/:filename` — public docs: campaign.md, replay-system.md, bot-ai-guide.md, enemy-ai-guide.md (authMiddleware, whitelist-validated)
 - `GET /docs/admin/:filename` — staff docs: admin-and-systems.md, infrastructure.md, testing.md, performance-and-internals.md, bot-ai-internals.md, openapi.yaml (authMiddleware + staffMiddleware, whitelist-validated)
 
 ### Database
@@ -307,10 +310,11 @@ cd frontend && npx vitest run                   # Frontend only
 - See [docs/testing.md](docs/testing.md) for full inventory, mocking patterns, and guide for writing new tests
 
 ## Documentation
-Docs are accessible in-app via the Help view (sidebar → Help). Player-facing docs (campaign, replays, bot AI guide) appear in the Guides tab for all users. Staff-only docs appear in Level Editor and Admin Docs tabs. Docs are served via `/api/docs/` endpoints from the `docs/` directory (bind-mounted in dev, baked into Docker image for prod).
+Docs are accessible in-app via the Help view (sidebar → Help). Player-facing docs (campaign, replays, bot AI guide, enemy AI guide) appear in the Guides tab for all users. Staff-only docs appear in Level Editor and Admin Docs tabs. Docs are served via `/api/docs/` endpoints from the `docs/` directory (bind-mounted in dev, baked into Docker image for prod).
 
 - [Bot AI Developer Guide](docs/bot-ai-guide.md) — writing custom bot AIs
 - [Bot AI Internals](docs/bot-ai-internals.md) — built-in BotAI decision engine details
+- [Enemy AI Developer Guide](docs/enemy-ai-guide.md) — writing custom campaign enemy AIs
 - [Campaign System](docs/campaign.md) — enemies, levels, editor, progress
 - [Admin Panel & Systems](docs/admin-and-systems.md) — admin tabs, bot AI management, simulations, accounts
 - [Replay System](docs/replay-system.md) — recording, playback, controls, API

@@ -58,6 +58,7 @@ const GUIDE_DOCS = [
   { filename: 'campaign.md', title: 'Campaign Guide' },
   { filename: 'replay-system.md', title: 'Replay System' },
   { filename: 'bot-ai-guide.md', title: 'Bot AI Guide' },
+  { filename: 'enemy-ai-guide.md', title: 'Enemy AI Guide' },
 ];
 
 const STAFF_DOCS = [

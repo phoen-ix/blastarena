@@ -52,6 +52,8 @@ export interface EnemyTypeConfig {
   isBoss: boolean;
   sizeMultiplier: number;
   bossPhases?: BossPhaseConfig[];
+  enemyAiId?: string;
+  difficulty?: 'easy' | 'normal' | 'hard';
 }
 
 export interface EnemyTypeEntry {
@@ -228,23 +230,38 @@ export interface LevelExportData {
 
 export interface EnemyTypeExportData {
   _format: 'blast-arena-enemy-type';
-  _version: 1;
+  _version: 1 | 2;
   name: string;
   description: string;
   config: EnemyTypeConfig;
+  enemyAiSource?: string;
+  enemyAiName?: string;
 }
 
 export interface LevelBundleExportData {
   _format: 'blast-arena-level-bundle';
-  _version: 1;
+  _version: 1 | 2;
   level: Omit<LevelExportData, '_format' | '_version'>;
-  enemyTypes: { originalId: number; name: string; description: string; config: EnemyTypeConfig }[];
+  enemyTypes: {
+    originalId: number;
+    name: string;
+    description: string;
+    config: EnemyTypeConfig;
+    enemyAiSource?: string;
+    enemyAiName?: string;
+  }[];
 }
 
 export interface ImportConflict {
   originalId: number;
   name: string;
   existingId?: number;
+  existingName?: string;
+}
+
+export interface EnemyAIImportConflict {
+  aiName: string;
+  existingId?: string;
   existingName?: string;
 }
 

@@ -15,6 +15,7 @@ import {
   ENEMY_BODY_SHAPES,
   ENEMY_EYE_STYLES,
   MOVEMENT_PATTERNS,
+  EnemyAIEntry,
   getErrorMessage,
 } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr } from '../../utils/html';
@@ -680,11 +681,15 @@ export class CampaignTab {
       this.importEnemyType();
     });
 
-    // Generate canvas previews
+    // Generate canvas previews (try/catch so a bad sprite doesn't prevent handler attachment)
     this.enemyTypes.forEach((et) => {
       const canvas = content.querySelector(`#enemy-preview-${et.id}`) as HTMLCanvasElement;
       if (canvas) {
-        EnemyTextureGenerator.generatePreview(canvas, et.config.sprite, 48);
+        try {
+          EnemyTextureGenerator.generatePreview(canvas, et.config.sprite, 48);
+        } catch {
+          /* preview fails silently */
+        }
       }
     });
 
@@ -807,6 +812,21 @@ export class CampaignTab {
               </select>
             </div>
 
+            <div class="form-group">
+              <label class="camp-form-label">Custom AI</label>
+              <select id="enemy-ai-select" class="admin-input w-full">
+                <option value="">None (use movement pattern)</option>
+              </select>
+            </div>
+            <div class="form-group" id="enemy-difficulty-group" style="display:none">
+              <label class="camp-form-label">AI Difficulty</label>
+              <select id="enemy-difficulty" class="admin-input w-full">
+                <option value="easy">Easy</option>
+                <option value="normal" selected>Normal</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
+
             <div class="camp-checkbox-row">
               <label class="camp-checkbox-label">
                 <input type="checkbox" id="enemy-boss" ${config.isBoss ? 'checked' : ''}> Boss
@@ -881,6 +901,45 @@ export class CampaignTab {
 
     document.body.appendChild(overlay);
 
+    // Populate enemy AI dropdown
+    const aiSelect = overlay.querySelector('#enemy-ai-select') as HTMLSelectElement;
+    const diffGroup = overlay.querySelector('#enemy-difficulty-group') as HTMLElement;
+    const diffSelect = overlay.querySelector('#enemy-difficulty') as HTMLSelectElement;
+    const movementSelect = overlay.querySelector('#enemy-movement') as HTMLSelectElement;
+
+    ApiClient.get<{ ais: EnemyAIEntry[] }>('/admin/enemy-ai/active')
+      .then((res) => {
+        for (const ai of res.ais) {
+          const opt = document.createElement('option');
+          opt.value = ai.id;
+          opt.textContent = ai.name;
+          if (config.enemyAiId === ai.id) opt.selected = true;
+          aiSelect.appendChild(opt);
+        }
+        // Show difficulty if AI is pre-selected
+        if (config.enemyAiId) {
+          diffGroup.style.display = '';
+          diffSelect.value = config.difficulty || 'normal';
+          movementSelect.style.opacity = '0.5';
+          movementSelect.title = 'Overridden by custom AI';
+        }
+      })
+      .catch(() => {
+        /* ignore - dropdown stays with just "None" */
+      });
+
+    aiSelect.addEventListener('change', () => {
+      if (aiSelect.value) {
+        diffGroup.style.display = '';
+        movementSelect.style.opacity = '0.5';
+        movementSelect.title = 'Overridden by custom AI';
+      } else {
+        diffGroup.style.display = 'none';
+        movementSelect.style.opacity = '1';
+        movementSelect.title = '';
+      }
+    });
+
     // Initial preview
     const previewCanvas = overlay.querySelector('#enemy-modal-preview') as HTMLCanvasElement;
     this.updateEnemyPreview(overlay, previewCanvas);
@@ -934,6 +993,8 @@ export class CampaignTab {
         dropTable: config.dropTable,
         bombConfig: config.canBomb ? config.bombConfig : undefined,
         bossPhases: config.isBoss ? config.bossPhases : undefined,
+        enemyAiId: aiSelect.value || undefined,
+        difficulty: aiSelect.value ? (diffSelect.value as 'easy' | 'normal' | 'hard') : undefined,
         sprite: {
           bodyShape: (overlay.querySelector('#enemy-body-shape') as HTMLSelectElement)
             .value as EnemyBodyShape,

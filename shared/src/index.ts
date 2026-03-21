@@ -7,6 +7,7 @@ export * from './types/simulation';
 export * from './types/replay';
 export * from './types/settings';
 export * from './types/botai';
+export * from './types/enemyai';
 export * from './types/campaign';
 export * from './types/friends';
 export * from './types/leaderboard';

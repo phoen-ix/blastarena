@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS enemy_ais;

@@ -185,7 +185,10 @@ function sampleLevel(overrides: Record<string, any> = {}) {
     sortOrder: 0,
     mapWidth: 15,
     mapHeight: 13,
-    tiles: [['empty', 'wall'], ['empty', 'empty']],
+    tiles: [
+      ['empty', 'wall'],
+      ['empty', 'empty'],
+    ],
     fillMode: 'handcrafted',
     wallDensity: 0.65,
     playerSpawns: [{ x: 1, y: 1 }],
@@ -307,7 +310,10 @@ describe('GET /campaign/worlds/:worldId/levels', () => {
   const handler = getHandler('get', '/campaign/worlds/:worldId/levels');
 
   it('returns levels for a given world with user progress', async () => {
-    const levels = [{ id: 10, name: 'L1' }, { id: 11, name: 'L2' }];
+    const levels = [
+      { id: 10, name: 'L1' },
+      { id: 11, name: 'L2' },
+    ];
     mockListLevelsWithProgress.mockResolvedValue(levels);
 
     const req = mockReq({ params: { worldId: '3' }, user: { userId: 99 } });
@@ -500,10 +506,7 @@ describe('GET /admin/campaign/worlds', () => {
   const handler = getHandler('get', '/admin/campaign/worlds');
 
   it('returns all worlds including unpublished', async () => {
-    const worlds = [
-      sampleWorld({ isPublished: true }),
-      sampleWorld({ id: 2, isPublished: false }),
-    ];
+    const worlds = [sampleWorld({ isPublished: true }), sampleWorld({ id: 2, isPublished: false })];
     mockListWorlds.mockResolvedValue(worlds);
 
     const req = mockReq();
@@ -709,7 +712,10 @@ describe('GET /admin/campaign/levels', () => {
   const handler = getHandler('get', '/admin/campaign/levels');
 
   it('returns all levels for a world including unpublished', async () => {
-    const levels = [{ id: 10, name: 'L1' }, { id: 11, name: 'L2' }];
+    const levels = [
+      { id: 10, name: 'L1' },
+      { id: 11, name: 'L2' },
+    ];
     mockListLevels.mockResolvedValue(levels);
 
     const req = mockReq({ query: { worldId: '1' } });
@@ -1160,7 +1166,9 @@ describe('GET /admin/campaign/levels/:id/export', () => {
 
     expect(mockGetLevel).toHaveBeenCalledWith(10);
     expect(res._headers['Content-Type']).toBe('application/json');
-    expect(res._headers['Content-Disposition']).toBe('attachment; filename="level-Test_Level.json"');
+    expect(res._headers['Content-Disposition']).toBe(
+      'attachment; filename="level-Test_Level.json"',
+    );
 
     const body = res._json as any;
     expect(body._format).toBe('blast-arena-level');
@@ -1253,7 +1261,7 @@ describe('GET /admin/campaign/levels/:id/export-bundle', () => {
 
     const body = res._json as any;
     expect(body._format).toBe('blast-arena-level-bundle');
-    expect(body._version).toBe(1);
+    expect(body._version).toBe(2);
     expect(body.level.name).toBe('Bundle Level');
     // DB fields stripped from level
     expect(body.level.id).toBeUndefined();
@@ -1352,7 +1360,7 @@ describe('GET /admin/campaign/enemy-types/:id/export', () => {
 
     const body = res._json as any;
     expect(body._format).toBe('blast-arena-enemy-type');
-    expect(body._version).toBe(1);
+    expect(body._version).toBe(2);
     expect(body.name).toBe('Blob Monster');
     expect(body.config).toEqual(et.config);
     // DB fields should be stripped
@@ -1513,9 +1521,7 @@ describe('POST /admin/campaign/levels/import', () => {
           tiles: [['empty']],
           enemyPlacements: [{ enemyTypeId: 5, x: 1, y: 1 }],
         },
-        enemyTypes: [
-          { originalId: 5, name: 'Bundle Blob', description: '', config: {} },
-        ],
+        enemyTypes: [{ originalId: 5, name: 'Bundle Blob', description: '', config: {} }],
       },
     });
     const res = mockRes();
@@ -1545,9 +1551,7 @@ describe('POST /admin/campaign/levels/import', () => {
           tiles: [['empty']],
           enemyPlacements: [{ enemyTypeId: 99, x: 1, y: 1 }],
         },
-        enemyTypes: [
-          { originalId: 99, name: 'New Monster', description: '', config: {} },
-        ],
+        enemyTypes: [{ originalId: 99, name: 'New Monster', description: '', config: {} }],
       },
     });
     const res = mockRes();
@@ -1846,9 +1850,7 @@ describe('POST /admin/campaign/levels/import', () => {
           tiles: [['empty']],
           enemyPlacements: [{ enemyTypeId: 50, x: 1, y: 1 }],
         },
-        enemyTypes: [
-          { originalId: 50, name: 'Monster', config: { speed: 1 } },
-        ],
+        enemyTypes: [{ originalId: 50, name: 'Monster', config: { speed: 1 } }],
         enemyIdMap: { '50': 'create' },
       },
     });
@@ -1870,9 +1872,7 @@ describe('POST /admin/campaign/levels/import', () => {
           tiles: [['empty']],
           enemyPlacements: [{ enemyTypeId: 50, x: 1, y: 1 }],
         },
-        enemyTypes: [
-          { originalId: 999, name: 'Wrong', config: {} },
-        ],
+        enemyTypes: [{ originalId: 999, name: 'Wrong', config: {} }],
         enemyIdMap: { '50': 'create' },
       },
     });
@@ -2227,7 +2227,12 @@ describe('Router completeness', () => {
     const stack = (campaignRouter as any).stack as RouteLayer[];
     const registeredPaths = stack
       .filter((l) => l.route)
-      .map((l) => `${Object.keys(l.route.methods).find((m) => l.route.methods[m])?.toUpperCase()} ${l.route.path}`);
+      .map(
+        (l) =>
+          `${Object.keys(l.route.methods)
+            .find((m) => l.route.methods[m])
+            ?.toUpperCase()} ${l.route.path}`,
+      );
 
     const expectedPaths = [
       'GET /campaign/worlds',

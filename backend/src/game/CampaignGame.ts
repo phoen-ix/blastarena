@@ -21,7 +21,9 @@ import { GameLoop } from './GameLoop';
 import { Enemy } from './Enemy';
 import { Player } from './Player';
 import { Bomb } from './Bomb';
-import { processEnemyAI } from './EnemyAI';
+import { processEnemyAI, IEnemyAI, EnemyAIContext, EnemyAIResult } from './EnemyAI';
+import { getEnemyAIRegistry } from './registry';
+import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 
 // Simple seeded random for campaign
@@ -70,6 +72,9 @@ export class CampaignGame {
 
   // Enemy bombs tracked separately (they participate in standard bomb mechanics)
   private enemyBombIds: Set<string> = new Set();
+
+  // Custom AI instances per enemy
+  private enemyAIs: Map<number, IEnemyAI> = new Map();
 
   constructor(
     userId: number,
@@ -128,9 +133,17 @@ export class CampaignGame {
       if (!typeConfig) continue;
       // Deep copy config so boss phase mutations don't affect template
       const configCopy = JSON.parse(JSON.stringify(typeConfig)) as EnemyTypeConfig;
-      const enemy = new Enemy(typeId, { x: placement.x, y: placement.y }, configCopy, placement.patrolPath);
+      const enemy = new Enemy(
+        typeId,
+        { x: placement.x, y: placement.y },
+        configCopy,
+        placement.patrolPath,
+      );
       this.enemies.set(enemy.id, enemy);
     }
+
+    // Create custom AI instances for enemies with enemyAiId
+    this.initEnemyAIs();
 
     // Place visible power-ups on the map
     for (const pp of level.powerupPlacements) {
@@ -253,7 +266,11 @@ export class CampaignGame {
     }
 
     // Derive surviveTimeTicks from timeLimit if not set
-    if (this.level.winCondition === 'survive_time' && config.surviveTimeTicks == null && this.level.timeLimit > 0) {
+    if (
+      this.level.winCondition === 'survive_time' &&
+      config.surviveTimeTicks == null &&
+      this.level.timeLimit > 0
+    ) {
       config.surviveTimeTicks = this.level.timeLimit * TICK_RATE;
     }
   }
@@ -319,14 +336,39 @@ export class CampaignGame {
       enemy.tick();
 
       if (enemy.canMove()) {
-        const result = processEnemyAI(
-          enemy,
-          Array.from(this.gameState.players.values()),
-          this.gameState.collisionSystem,
-          bombPositions,
-          this.gameState.map.tiles,
-          () => this.rng.next(),
-        );
+        let result: EnemyAIResult;
+        const customAI = this.enemyAIs.get(enemy.id);
+
+        if (customAI) {
+          try {
+            const context = this.buildEnemyAIContext(enemy, bombPositions);
+            result = customAI.decide(context);
+          } catch (err: unknown) {
+            // Crash recovery: fall back to built-in pattern for this enemy
+            this.enemyAIs.delete(enemy.id);
+            logger.warn(
+              { enemyId: enemy.id, error: err instanceof Error ? err.message : String(err) },
+              'Custom enemy AI crashed, falling back to built-in',
+            );
+            result = processEnemyAI(
+              enemy,
+              Array.from(this.gameState.players.values()),
+              this.gameState.collisionSystem,
+              bombPositions,
+              this.gameState.map.tiles,
+              () => this.rng.next(),
+            );
+          }
+        } else {
+          result = processEnemyAI(
+            enemy,
+            Array.from(this.gameState.players.values()),
+            this.gameState.collisionSystem,
+            bombPositions,
+            this.gameState.map.tiles,
+            () => this.rng.next(),
+          );
+        }
 
         if (result.direction) {
           this.moveEnemy(enemy, result.direction, bombPositions);
@@ -391,6 +433,8 @@ export class CampaignGame {
             const configCopy = JSON.parse(JSON.stringify(spawnConfig)) as EnemyTypeConfig;
             const minion = new Enemy(spawn.enemyTypeId, { ...enemy.position }, configCopy);
             this.enemies.set(minion.id, minion);
+            // Init custom AI for spawned minion if applicable
+            this.initEnemyAIForEnemy(minion);
           }
         }
       }
@@ -398,6 +442,78 @@ export class CampaignGame {
 
     // 8. Win condition check
     this.checkWinCondition(player);
+  }
+
+  private initEnemyAIs(): void {
+    const registry = getEnemyAIRegistry();
+    for (const enemy of this.enemies.values()) {
+      this.initEnemyAIForEnemy(enemy, registry);
+    }
+  }
+
+  private initEnemyAIForEnemy(enemy: Enemy, registry = getEnemyAIRegistry()): void {
+    const config = enemy.typeConfig;
+    if (!config.enemyAiId || !registry.isLoaded(config.enemyAiId)) return;
+    try {
+      const ai = registry.createInstance(config.enemyAiId, config.difficulty || 'normal', {
+        speed: config.speed,
+        canPassWalls: config.canPassWalls,
+        canPassBombs: config.canPassBombs,
+        canBomb: config.canBomb,
+        contactDamage: config.contactDamage,
+        isBoss: config.isBoss,
+        sizeMultiplier: config.sizeMultiplier,
+      });
+      if (ai) this.enemyAIs.set(enemy.id, ai);
+    } catch (err: unknown) {
+      logger.warn(
+        {
+          enemyId: enemy.id,
+          aiId: config.enemyAiId,
+          error: err instanceof Error ? err.message : String(err),
+        },
+        'Failed to create enemy AI instance, using built-in pattern',
+      );
+    }
+  }
+
+  private buildEnemyAIContext(enemy: Enemy, bombPositions: Position[]): EnemyAIContext {
+    const alivePlayers = Array.from(this.gameState.players.values())
+      .filter((p) => p.alive)
+      .map((p) => ({ position: { ...p.position }, alive: true }));
+
+    const otherEnemies = Array.from(this.enemies.values())
+      .filter((e) => e.alive && e.id !== enemy.id)
+      .map((e) => ({ position: { ...e.position }, enemyTypeId: e.enemyTypeId, alive: true }));
+
+    return {
+      self: {
+        position: { ...enemy.position },
+        hp: enemy.hp,
+        maxHp: enemy.maxHp,
+        direction: enemy.direction,
+        alive: enemy.alive,
+        typeConfig: {
+          speed: enemy.typeConfig.speed,
+          canPassWalls: enemy.typeConfig.canPassWalls,
+          canPassBombs: enemy.typeConfig.canPassBombs,
+          canBomb: enemy.typeConfig.canBomb,
+          contactDamage: enemy.typeConfig.contactDamage,
+          isBoss: enemy.typeConfig.isBoss,
+          sizeMultiplier: enemy.typeConfig.sizeMultiplier,
+        },
+        patrolPath: [...enemy.patrolPath],
+        patrolIndex: enemy.patrolIndex,
+      },
+      players: alivePlayers,
+      tiles: this.gameState.map.tiles,
+      mapWidth: this.gameState.map.width,
+      mapHeight: this.gameState.map.height,
+      bombPositions: bombPositions.map((p) => ({ ...p })),
+      otherEnemies,
+      tick: this.gameState.tick,
+      rng: () => this.rng.next(),
+    };
   }
 
   private moveEnemy(enemy: Enemy, direction: Direction, bombPositions: Position[]): void {

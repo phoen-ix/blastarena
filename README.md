@@ -60,7 +60,7 @@ All optional, toggled per-room: **Reinforced Walls** (2-hit destructible walls),
 
 ## Solo Campaign
 
-Single-player campaign with hand-crafted levels grouped into worlds. Defeat enemies (5 movement patterns, boss phases), earn 1-3 stars per level, track progress. Admins create enemy types and levels via a visual editor with resizable maps, WASD/arrow panning, zoom, and prominent spawn point markers. Export/import levels and enemy types as JSON — export individual levels, bundled level+enemies, or enemy types; import with conflict resolution for enemy type ID remapping. Level editor returns directly to admin Campaign tab. Ships with "Training Grounds" (3 levels). See [docs/campaign.md](docs/campaign.md).
+Single-player campaign with hand-crafted levels grouped into worlds. Defeat enemies (5 built-in movement patterns, boss phases, or custom AI scripts), earn 1-3 stars per level, track progress. Admins create enemy types and levels via a visual editor with resizable maps, WASD/arrow panning, zoom, and prominent spawn point markers. Enemy types can optionally use custom AI scripts (TypeScript `decide()` method) that override built-in movement patterns — uploaded in the AI tab and assigned per enemy type with a difficulty setting. Export/import levels and enemy types as JSON (AI source bundled in exports). Ships with "Training Grounds" (3 levels). See [docs/campaign.md](docs/campaign.md) and [docs/enemy-ai-guide.md](docs/enemy-ai-guide.md).
 
 ## Bot AI
 
@@ -93,7 +93,7 @@ Admin-configurable achievement system with four condition types: cumulative stat
 | Rooms | Staff | Live rooms, spectate, kick, force close |
 | Logs | Admin | Audit trail with filters, click-to-expand detail rows |
 | Simulations | Admin | Batch bot-only games (1-1000), fast/realtime, queue |
-| AI | Admin | Upload/manage custom bot AI implementations |
+| AI | Admin | Upload/manage custom bot AI and enemy AI implementations |
 | Campaign | Admin | Worlds, levels (visual editor), enemy types, JSON export/import |
 | Announcements | Staff | Toast broadcasts, persistent banners |
 | Seasons | Admin | Season CRUD, activate/end (hard/soft reset), rank tier config with color pickers |

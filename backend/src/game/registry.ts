@@ -8,6 +8,10 @@ import {
 import { RoomManager } from './RoomManager';
 import { SimulationManager } from '../simulation/SimulationManager';
 import { BotAIRegistry, getBotAIRegistry as _getBotAIRegistry } from '../services/botai-registry';
+import {
+  EnemyAIRegistry,
+  getEnemyAIRegistry as _getEnemyAIRegistry,
+} from '../services/enemyai-registry';
 import { CampaignGameManager } from './CampaignGameManager';
 
 type TypedServer = Server<
@@ -39,6 +43,10 @@ export function getIO(): TypedServer {
 
 export function getBotAIRegistry(): BotAIRegistry {
   return _getBotAIRegistry();
+}
+
+export function getEnemyAIRegistry(): EnemyAIRegistry {
+  return _getEnemyAIRegistry();
 }
 
 export function getSimulationManager(): SimulationManager {
