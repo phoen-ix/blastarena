@@ -63,6 +63,14 @@ export class PlayerSpriteRenderer {
   }
 
   update(players: PlayerState[]): void {
+    // Auto-detect buddy from state if not explicitly set
+    if (!this.buddyPlayerId) {
+      const buddy = players.find((p) => p.isBuddy);
+      if (buddy) {
+        this.buddyPlayerId = buddy.id;
+      }
+    }
+
     const activeIds = new Set(players.map((p) => p.id));
 
     // Remove sprites for players no longer in the array
@@ -260,11 +268,12 @@ export class PlayerSpriteRenderer {
         : `player_${colorIndex}_${player.direction}`;
       if (sprite.texture.key !== dirTexture && this.scene.textures.exists(dirTexture)) {
         sprite.setTexture(dirTexture);
-        // setTexture resets display size — reapply for buddy's smaller sprite
-        if (player.id === this.buddyPlayerId) {
-          const buddySize = (TILE_SIZE - 4) * (this.buddySizePercent / 100);
-          sprite.setDisplaySize(buddySize, buddySize);
-        }
+      }
+
+      // Enforce buddy display size every frame (setTexture and tweens can reset it)
+      if (player.id === this.buddyPlayerId) {
+        const buddySize = (TILE_SIZE - 4) * (this.buddySizePercent / 100);
+        sprite.setDisplaySize(buddySize, buddySize);
       }
 
       // Trail particles for cosmetic trails
