@@ -5,13 +5,16 @@ import { TILE_SIZE } from '@blast-arena/shared';
 export class PowerUpRenderer {
   private scene: Phaser.Scene;
   private sprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  private _activeIds = new Set<string>();
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
   }
 
   update(powerUps: PowerUpState[]): void {
-    const activeIds = new Set(powerUps.map(p => p.id));
+    this._activeIds.clear();
+    for (const p of powerUps) this._activeIds.add(p.id);
+    const activeIds = this._activeIds;
 
     // Remove sprites for power-ups that no longer exist
     for (const [id, sprite] of this.sprites) {

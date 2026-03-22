@@ -118,6 +118,10 @@ export class GameStateManager {
   // Map events (dynamic)
   private mapEvents: { type: string; position?: Position; tick: number; warningTick?: number }[] =
     [];
+  private _mapEventsCache:
+    | { type: 'meteor' | 'powerup_rain'; position?: Position; tick: number; warningTick?: number }[]
+    | undefined;
+  private _mapEventsDirty = true;
   private nextMeteorTick: number = 0;
   private nextPowerupRainTick: number = 0;
 
@@ -301,9 +305,30 @@ export class GameStateManager {
         }
       }
 
-      // Pre-compute position arrays once for all processPlayerInput calls
+      // Pre-compute shared position data once for all processPlayerInput calls
       const sharedBombPositions: { x: number; y: number }[] = [];
-      for (const b of this.bombs.values()) sharedBombPositions.push(b.position);
+      const bombPosSet = new Set<string>();
+      for (const b of this.bombs.values()) {
+        sharedBombPositions.push(b.position);
+        bombPosSet.add(`${b.position.x},${b.position.y}`);
+      }
+
+      const sharedPlayerPositions: { x: number; y: number; id: number; buddyOwnerId?: number }[] =
+        [];
+      const alivePlayerPosSet = new Set<string>();
+      for (const p of this.players.values()) {
+        if (p.alive) {
+          alivePlayerPosSet.add(`${p.position.x},${p.position.y}`);
+          if (!p.frozen) {
+            sharedPlayerPositions.push({
+              x: p.position.x,
+              y: p.position.y,
+              id: p.id,
+              ...(p.isBuddy && p.buddyOwnerId != null ? { buddyOwnerId: p.buddyOwnerId } : {}),
+            });
+          }
+        }
+      }
 
       // 1. Process inputs
       for (const [playerId, player] of this.players) {
@@ -311,7 +336,14 @@ export class GameStateManager {
 
         const input = this.inputBuffer.getLatestInput(playerId);
         if (input) {
-          this.processPlayerInput(player, input, sharedBombPositions);
+          this.processPlayerInput(
+            player,
+            input,
+            sharedBombPositions,
+            sharedPlayerPositions,
+            bombPosSet,
+            alivePlayerPosSet,
+          );
         }
 
         player.tick();
@@ -319,18 +351,29 @@ export class GameStateManager {
     }
 
     // 2. Update bomb timers and slide kicked bombs
-    // Build position sets for O(1) slide collision checks
-    const bombPosSet = new Set<string>();
-    const playerPosSet = new Set<string>();
-    for (const b of this.bombs.values()) bombPosSet.add(`${b.position.x},${b.position.y}`);
-    for (const p of this.players.values()) {
-      if (p.alive) playerPosSet.add(`${p.position.x},${p.position.y}`);
+    // Build position sets for O(1) slide collision checks (only when bombs are sliding)
+    let slideBombPosSet: Set<string> | undefined;
+    let slidePlayerPosSet: Set<string> | undefined;
+    let hasSlidingBombs = false;
+    for (const b of this.bombs.values()) {
+      if (b.sliding) {
+        hasSlidingBombs = true;
+        break;
+      }
+    }
+    if (hasSlidingBombs) {
+      slideBombPosSet = new Set<string>();
+      slidePlayerPosSet = new Set<string>();
+      for (const b of this.bombs.values()) slideBombPosSet.add(`${b.position.x},${b.position.y}`);
+      for (const p of this.players.values()) {
+        if (p.alive) slidePlayerPosSet.add(`${p.position.x},${p.position.y}`);
+      }
     }
 
     const bombsToDetonate: Bomb[] = [];
     for (const bomb of this.bombs.values()) {
-      // Slide kicked bombs
-      if (bomb.sliding) {
+      // Slide kicked bombs (sets only built when hasSlidingBombs)
+      if (bomb.sliding && slideBombPosSet && slidePlayerPosSet) {
         const dx = bomb.sliding === 'left' ? -1 : bomb.sliding === 'right' ? 1 : 0;
         const dy = bomb.sliding === 'up' ? -1 : bomb.sliding === 'down' ? 1 : 0;
         const nextX = bomb.position.x + dx;
@@ -338,19 +381,18 @@ export class GameStateManager {
         const nextKey = `${nextX},${nextY}`;
 
         // Stop if hitting a wall, another bomb, or a player
-        // (bomb's own position is currentPos, not nextPos, so Set check is safe)
         const blocked =
           !this.collisionSystem.isWalkable(nextX, nextY) ||
-          bombPosSet.has(nextKey) ||
-          playerPosSet.has(nextKey);
+          slideBombPosSet.has(nextKey) ||
+          slidePlayerPosSet.has(nextKey);
 
         if (blocked) {
           bomb.sliding = null;
         } else {
           // Update position sets to reflect the move
-          bombPosSet.delete(`${bomb.position.x},${bomb.position.y}`);
+          slideBombPosSet.delete(`${bomb.position.x},${bomb.position.y}`);
           bomb.position = { x: nextX, y: nextY };
-          bombPosSet.add(nextKey);
+          slideBombPosSet.add(nextKey);
         }
       }
 
@@ -513,6 +555,7 @@ export class GameStateManager {
           const warningTick = this.tick;
           const impactTick = this.tick + 40; // 2 second warning
           this.mapEvents.push({ type: 'meteor', position: target, tick: impactTick, warningTick });
+          this._mapEventsDirty = true;
         }
         this.nextMeteorTick = this.tick + Math.floor((30 + this.rng.next() * 15) * TICK_RATE);
       }
@@ -537,6 +580,7 @@ export class GameStateManager {
           this.powerUps.set(powerUp.id, powerUp);
         }
         this.mapEvents.push({ type: 'powerup_rain', tick: this.tick });
+        this._mapEventsDirty = true;
         this.nextPowerupRainTick = this.tick + 60 * TICK_RATE;
       }
 
@@ -560,11 +604,14 @@ export class GameStateManager {
             this.destroyTileTracked(cell.x, cell.y);
           }
           this.mapEvents.splice(i, 1);
+          this._mapEventsDirty = true;
         }
       }
 
       // Clean old events
+      const prevLen = this.mapEvents.length;
       this.mapEvents = this.mapEvents.filter((e) => this.tick - e.tick < 200);
+      if (this.mapEvents.length !== prevLen) this._mapEventsDirty = true;
     }
 
     // 7. Update Battle Royale zone
@@ -627,6 +674,23 @@ export class GameStateManager {
     this._processingTick = false;
   }
 
+  /** Cached serialization of mapEvents — rebuilt only when events change */
+  private getSerializedMapEvents() {
+    if (this._mapEventsDirty) {
+      this._mapEventsCache =
+        this.mapEvents.length > 0
+          ? this.mapEvents.map((e) => ({
+              type: e.type as 'meteor' | 'powerup_rain',
+              position: e.position,
+              tick: e.tick,
+              warningTick: e.warningTick,
+            }))
+          : undefined;
+      this._mapEventsDirty = false;
+    }
+    return this._mapEventsCache;
+  }
+
   /** Destroy a tile and track the change for delta broadcasting */
   private destroyTileTracked(x: number, y: number): boolean {
     const result = this.collisionSystem.destroyTile(x, y);
@@ -642,24 +706,13 @@ export class GameStateManager {
     return result;
   }
 
-  private hasBombAt(x: number, y: number): boolean {
-    for (const b of this.bombs.values()) {
-      if (b.position.x === x && b.position.y === y) return true;
-    }
-    return false;
-  }
-
-  private hasAlivePlayerAt(x: number, y: number, excludeId?: number): boolean {
-    for (const p of this.players.values()) {
-      if (p.alive && p.position.x === x && p.position.y === y && p.id !== excludeId) return true;
-    }
-    return false;
-  }
-
   private processPlayerInput(
     player: Player,
     input: PlayerInput,
-    sharedBombPositions?: { x: number; y: number }[],
+    sharedBombPositions: { x: number; y: number }[],
+    sharedPlayerPositions: { x: number; y: number; id: number; buddyOwnerId?: number }[],
+    bombPosSet: Set<string>,
+    alivePlayerPosSet: Set<string>,
   ): void {
     // Movement (with cooldown)
     if (input.direction && player.canMove()) {
@@ -675,24 +728,16 @@ export class GameStateManager {
           input.direction,
         );
       } else {
-        const bombPositions =
-          sharedBombPositions ?? Array.from(this.bombs.values()).map((b) => b.position);
-
-        const otherPlayerPositions: { x: number; y: number }[] = [];
-        for (const other of this.players.values()) {
-          if (other.id !== player.id && other.alive && !other.frozen) {
-            // Buddy and owner don't block each other
-            if (other.isBuddy && other.buddyOwnerId === player.id) continue;
-            if (player.isBuddy && player.buddyOwnerId === other.id) continue;
-            otherPlayerPositions.push(other.position);
-          }
-        }
+        // Filter out self and own buddy from player positions
+        const otherPlayerPositions = sharedPlayerPositions.filter(
+          (sp) => sp.id !== player.id && sp.buddyOwnerId !== player.id,
+        );
 
         newPos = this.collisionSystem.canMoveTo(
           player.position.x,
           player.position.y,
           input.direction,
-          bombPositions,
+          sharedBombPositions,
           otherPlayerPositions,
         );
       }
@@ -751,10 +796,11 @@ export class GameStateManager {
         const dy = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
 
         // First, place a bomb at current position if possible
-        const hasBombAtCurrent = this.hasBombAt(player.position.x, player.position.y);
-        if (!hasBombAtCurrent) {
+        const currentKey = `${player.position.x},${player.position.y}`;
+        if (!bombPosSet.has(currentKey)) {
           const bomb = new Bomb(player.position, player.id, player.fireRange, bombType);
           this.bombs.set(bomb.id, bomb);
+          bombPosSet.add(currentKey);
           player.bombCount++;
           player.bombsPlaced++;
           this.gameLogger?.logBomb(
@@ -770,14 +816,16 @@ export class GameStateManager {
         let cx = player.position.x + dx;
         let cy = player.position.y + dy;
         while (player.canPlaceBomb()) {
+          const tileKey = `${cx},${cy}`;
           // Check if the tile is walkable, has no bomb, and has no player
           if (!this.collisionSystem.isWalkable(cx, cy)) break;
-          if (this.hasBombAt(cx, cy)) break;
-          if (this.hasAlivePlayerAt(cx, cy)) break;
+          if (bombPosSet.has(tileKey)) break;
+          if (alivePlayerPosSet.has(tileKey)) break;
 
           const pos: Position = { x: cx, y: cy };
           const bomb = new Bomb(pos, player.id, player.fireRange, bombType);
           this.bombs.set(bomb.id, bomb);
+          bombPosSet.add(tileKey);
           player.bombCount++;
           player.bombsPlaced++;
           this.gameLogger?.logBomb('place', player.id, player.username, pos, player.fireRange);
@@ -788,9 +836,11 @@ export class GameStateManager {
       } else {
         // Normal single bomb placement
         // Check if there's already a bomb at this position
-        if (!this.hasBombAt(player.position.x, player.position.y)) {
+        const posKey = `${player.position.x},${player.position.y}`;
+        if (!bombPosSet.has(posKey)) {
           const bomb = new Bomb(player.position, player.id, player.fireRange, bombType);
           this.bombs.set(bomb.id, bomb);
+          bombPosSet.add(posKey);
           player.bombCount++;
           player.bombsPlaced++;
           this.gameLogger?.logBomb(
@@ -980,15 +1030,7 @@ export class GameStateManager {
           }
         : undefined,
       kothScores: this.hillZone ? Object.fromEntries(this.kothScores) : undefined,
-      mapEvents:
-        this.mapEvents.length > 0
-          ? this.mapEvents.map((e) => ({
-              type: e.type as 'meteor' | 'powerup_rain',
-              position: e.position,
-              tick: e.tick,
-              warningTick: e.warningTick,
-            }))
-          : undefined,
+      mapEvents: this.getSerializedMapEvents(),
       status: this.status,
       winnerId: this.winnerId,
       winnerTeam: this.winnerTeam,
@@ -1025,15 +1067,7 @@ export class GameStateManager {
           }
         : undefined,
       kothScores: this.hillZone ? Object.fromEntries(this.kothScores) : undefined,
-      mapEvents:
-        this.mapEvents.length > 0
-          ? this.mapEvents.map((e) => ({
-              type: e.type as 'meteor' | 'powerup_rain',
-              position: e.position,
-              tick: e.tick,
-              warningTick: e.warningTick,
-            }))
-          : undefined,
+      mapEvents: this.getSerializedMapEvents(),
       status: this.status,
       winnerId: this.winnerId,
       winnerTeam: this.winnerTeam,

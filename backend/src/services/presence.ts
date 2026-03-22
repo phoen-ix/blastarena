@@ -31,9 +31,7 @@ export async function getPresence(userId: number): Promise<PresenceData | null> 
   }
 }
 
-export async function getPresenceBatch(
-  userIds: number[],
-): Promise<Map<number, PresenceData>> {
+export async function getPresenceBatch(userIds: number[]): Promise<Map<number, PresenceData>> {
   if (userIds.length === 0) return new Map();
   const redis = getRedis();
   const keys = userIds.map((id) => `${KEY_PREFIX}${id}`);
@@ -50,6 +48,23 @@ export async function getPresenceBatch(
     }
   }
   return result;
+}
+
+export async function setPresenceBatch(
+  entries: {
+    userId: number;
+    status: ActivityStatus;
+    extra?: { roomCode?: string; gameMode?: string };
+  }[],
+): Promise<void> {
+  if (entries.length === 0) return;
+  const redis = getRedis();
+  const pipeline = redis.pipeline();
+  for (const entry of entries) {
+    const data: PresenceData = { status: entry.status, ...entry.extra };
+    pipeline.set(`${KEY_PREFIX}${entry.userId}`, JSON.stringify(data), 'EX', PRESENCE_TTL);
+  }
+  await pipeline.exec();
 }
 
 export async function removePresence(userId: number): Promise<void> {

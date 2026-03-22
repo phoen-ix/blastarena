@@ -17,12 +17,20 @@ const mockReaddirSync = jest.fn<AnyFn>();
 const mockStatSync = jest.fn<AnyFn>();
 const mockReadFileSync = jest.fn<AnyFn>();
 const mockUnlinkSync = jest.fn<AnyFn>();
+const mockAccess = jest.fn<AnyFn>();
+const mockReaddir = jest.fn<AnyFn>();
+const mockStat = jest.fn<AnyFn>();
 jest.mock('fs', () => ({
   existsSync: mockExistsSync,
   readdirSync: mockReaddirSync,
   statSync: mockStatSync,
   readFileSync: mockReadFileSync,
   unlinkSync: mockUnlinkSync,
+  promises: {
+    access: mockAccess,
+    readdir: mockReaddir,
+    stat: mockStat,
+  },
 }));
 
 const mockGunzip = jest.fn<AnyFn>();
@@ -108,7 +116,7 @@ describe('Replay Service', () => {
 
   describe('listReplays', () => {
     it('should return empty when replay dir does not exist', async () => {
-      mockExistsSync.mockReturnValue(false);
+      mockAccess.mockRejectedValue(new Error('ENOENT'));
 
       const result = await listReplays();
 
@@ -117,8 +125,8 @@ describe('Replay Service', () => {
     });
 
     it('should return empty when dir has no replay files', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockReturnValue(['readme.txt', 'notes.json']);
+      mockAccess.mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['readme.txt', 'notes.json']);
 
       const result = await listReplays();
 
@@ -127,9 +135,8 @@ describe('Replay Service', () => {
     });
 
     it('should return empty when files do not match expected filename pattern', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockReturnValue(['bad_name.replay.json.gz', 'abc_test.replay.json.gz']);
-      mockStatSync.mockReturnValue({ size: 1024 });
+      mockAccess.mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['bad_name.replay.json.gz', 'abc_test.replay.json.gz']);
 
       const result = await listReplays();
 
@@ -138,12 +145,9 @@ describe('Replay Service', () => {
     });
 
     it('should query DB and return replay list for valid files', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockReturnValue([
-        '1_room1.replay.json.gz',
-        '2_room2.replay.json.gz',
-      ]);
-      mockStatSync.mockReturnValue({ size: 2048 });
+      mockAccess.mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['1_room1.replay.json.gz', '2_room2.replay.json.gz']);
+      mockStat.mockResolvedValue({ size: 2048 });
 
       const row1 = makeMatchRow({ id: 1 });
       const row2 = makeMatchRow({ id: 2, room_code: 'EFGH', winner_username: 'Player2' });
@@ -165,9 +169,9 @@ describe('Replay Service', () => {
     });
 
     it('should compute file size in KB correctly', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockReturnValue(['5_game.replay.json.gz']);
-      mockStatSync.mockReturnValue({ size: 5632 }); // 5632 / 1024 = 5.5 -> rounds to 6
+      mockAccess.mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['5_game.replay.json.gz']);
+      mockStat.mockResolvedValue({ size: 5632 }); // 5632 / 1024 = 5.5 -> rounds to 6
 
       mockQuery.mockResolvedValue([makeMatchRow({ id: 5 })]);
 
@@ -177,19 +181,15 @@ describe('Replay Service', () => {
     });
 
     it('should paginate results correctly', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockReturnValue([
+      mockAccess.mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue([
         '1_a.replay.json.gz',
         '2_b.replay.json.gz',
         '3_c.replay.json.gz',
       ]);
-      mockStatSync.mockReturnValue({ size: 1024 });
+      mockStat.mockResolvedValue({ size: 1024 });
 
-      const rows = [
-        makeMatchRow({ id: 1 }),
-        makeMatchRow({ id: 2 }),
-        makeMatchRow({ id: 3 }),
-      ];
+      const rows = [makeMatchRow({ id: 1 }), makeMatchRow({ id: 2 }), makeMatchRow({ id: 3 })];
       mockQuery.mockResolvedValue(rows);
 
       // Page 2 with limit 1 should return only the second item
@@ -201,9 +201,9 @@ describe('Replay Service', () => {
     });
 
     it('should return empty page when offset exceeds total', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockReturnValue(['1_a.replay.json.gz']);
-      mockStatSync.mockReturnValue({ size: 1024 });
+      mockAccess.mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['1_a.replay.json.gz']);
+      mockStat.mockResolvedValue({ size: 1024 });
       mockQuery.mockResolvedValue([makeMatchRow({ id: 1 })]);
 
       const result = await listReplays(5, 10);
@@ -213,9 +213,9 @@ describe('Replay Service', () => {
     });
 
     it('should convert Date started_at to ISO string', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockReturnValue(['1_a.replay.json.gz']);
-      mockStatSync.mockReturnValue({ size: 1024 });
+      mockAccess.mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['1_a.replay.json.gz']);
+      mockStat.mockResolvedValue({ size: 1024 });
 
       const date = new Date('2026-03-15T12:30:00Z');
       mockQuery.mockResolvedValue([makeMatchRow({ id: 1, started_at: date })]);
@@ -226,9 +226,9 @@ describe('Replay Service', () => {
     });
 
     it('should convert non-Date started_at to string', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockReturnValue(['1_a.replay.json.gz']);
-      mockStatSync.mockReturnValue({ size: 1024 });
+      mockAccess.mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['1_a.replay.json.gz']);
+      mockStat.mockResolvedValue({ size: 1024 });
 
       mockQuery.mockResolvedValue([makeMatchRow({ id: 1, started_at: '2026-03-15' })]);
 
@@ -238,9 +238,9 @@ describe('Replay Service', () => {
     });
 
     it('should use 0 for null duration', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockReturnValue(['1_a.replay.json.gz']);
-      mockStatSync.mockReturnValue({ size: 1024 });
+      mockAccess.mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['1_a.replay.json.gz']);
+      mockStat.mockResolvedValue({ size: 1024 });
 
       mockQuery.mockResolvedValue([makeMatchRow({ id: 1, duration: null })]);
 
@@ -250,11 +250,11 @@ describe('Replay Service', () => {
     });
 
     it('should use default page=1 and limit=20', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockReturnValue(
+      mockAccess.mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(
         Array.from({ length: 25 }, (_, i) => `${i + 1}_g.replay.json.gz`),
       );
-      mockStatSync.mockReturnValue({ size: 512 });
+      mockStat.mockResolvedValue({ size: 512 });
 
       const rows = Array.from({ length: 25 }, (_, i) => makeMatchRow({ id: i + 1 }));
       mockQuery.mockResolvedValue(rows);
@@ -340,7 +340,9 @@ describe('Replay Service', () => {
       const result = deleteReplay(10);
 
       expect(result).toBe(true);
-      expect(mockUnlinkSync).toHaveBeenCalledWith(expect.stringContaining('10_game.replay.json.gz'));
+      expect(mockUnlinkSync).toHaveBeenCalledWith(
+        expect.stringContaining('10_game.replay.json.gz'),
+      );
     });
 
     it('should return false when file is not found', () => {

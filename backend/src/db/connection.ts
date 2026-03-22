@@ -15,7 +15,7 @@ export async function createPool(): Promise<mysql.Pool> {
     password: config.DB_PASSWORD,
     waitForConnections: true,
     connectionLimit: 20,
-    queueLimit: 0,
+    queueLimit: 50,
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000,
   });

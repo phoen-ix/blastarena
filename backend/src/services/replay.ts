@@ -14,22 +14,30 @@ export async function listReplays(
   page: number = 1,
   limit: number = 20,
 ): Promise<{ replays: ReplayListItem[]; total: number }> {
-  if (!fs.existsSync(REPLAY_DIR)) {
+  try {
+    await fs.promises.access(REPLAY_DIR);
+  } catch {
     return { replays: [], total: 0 };
   }
 
-  const files = fs.readdirSync(REPLAY_DIR).filter((f) => f.endsWith('.replay.json.gz'));
+  const allFiles = await fs.promises.readdir(REPLAY_DIR);
+  const files = allFiles.filter((f) => f.endsWith('.replay.json.gz'));
 
   // Parse match IDs from filenames
   const fileMap = new Map<number, { filename: string; sizeKB: number }>();
+  const statPromises: Promise<void>[] = [];
   for (const file of files) {
     const match = file.match(/^(\d+)_/);
     if (match) {
       const matchId = parseInt(match[1]);
-      const stat = fs.statSync(path.join(REPLAY_DIR, file));
-      fileMap.set(matchId, { filename: file, sizeKB: Math.round(stat.size / 1024) });
+      statPromises.push(
+        fs.promises.stat(path.join(REPLAY_DIR, file)).then((stat) => {
+          fileMap.set(matchId, { filename: file, sizeKB: Math.round(stat.size / 1024) });
+        }),
+      );
     }
   }
+  await Promise.all(statPromises);
 
   if (fileMap.size === 0) {
     return { replays: [], total: 0 };
@@ -62,7 +70,8 @@ export async function listReplays(
       duration: row.duration || 0,
       playerCount: row.player_count,
       winnerName: row.winner_username,
-      createdAt: row.started_at instanceof Date ? row.started_at.toISOString() : String(row.started_at),
+      createdAt:
+        row.started_at instanceof Date ? row.started_at.toISOString() : String(row.started_at),
       fileSizeKB: file.sizeKB,
     };
   });

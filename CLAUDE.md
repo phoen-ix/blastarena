@@ -171,7 +171,17 @@ Gzipped JSON replays with tile diffs. See [docs/replay-system.md](docs/replay-sy
 - See [docs/infrastructure.md](docs/infrastructure.md)
 
 ## Performance Optimizations
-See [docs/performance-and-internals.md](docs/performance-and-internals.md).
+- `processPlayerInput()` receives shared position data (bomb positions, player positions, Sets) pre-computed once per tick — never rebuild per player
+- `Explosion.toState()` returns cells by reference (no deep copy) — cells are immutable after construction
+- Bomb slide position Sets only built when `hasSlidingBombs` is true (~5% of ticks)
+- `mapEvents` serialization cached with dirty flag — only rebuilt when events change (~1-2 times/min)
+- Frontend renderers (BombSprite, PowerUpSprite, emote positions) reuse class-level Sets/Maps instead of allocating per frame
+- `listReplays()` uses async `fs.promises` API — never blocks event loop
+- Presence updates use `setPresenceBatch()` for batched Redis pipeline (1 round-trip instead of N)
+- Socket room handlers use `socket.data.activeRoomCode` instead of `getPlayerRoom()` Redis lookup
+- Connection pool `queueLimit: 50` prevents unbounded queue under sustained DB pressure
+- `friendships(user_id, status)` composite index for friend queries
+- See [docs/performance-and-internals.md](docs/performance-and-internals.md)
 
 ## Code Quality & Tooling
 - ESLint v10 + `@typescript-eslint/recommended` via flat config (`eslint.config.mjs`); `no-explicit-any` as warning, `no-unused-vars` as error

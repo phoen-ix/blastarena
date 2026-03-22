@@ -215,25 +215,22 @@ describe('Explosion', () => {
       expect(state.ticksRemaining).toBe(EXPLOSION_DURATION_TICKS);
     });
 
-    it('should deep copy cells in toState', () => {
+    it('should return cells by reference (no deep copy — cells are immutable after construction)', () => {
       const explosion = new Explosion([{ x: 5, y: 5 }], 1);
       const state = explosion.toState();
-      state.cells[0].x = 999;
-      expect(explosion.cells[0].x).toBe(5);
+      // Cells are the same reference — no per-tick copy overhead
+      expect(state.cells).toBe(explosion.cells);
     });
 
-    it('should return independent state objects', () => {
-      const explosion = new Explosion(
-        [
-          { x: 1, y: 2 },
-          { x: 3, y: 4 },
-        ],
-        1,
-      );
-      const state1 = explosion.toState();
-      const state2 = explosion.toState();
-      state1.cells[0].x = 999;
-      expect(state2.cells[0].x).toBe(1);
+    it('should deep copy input cells in constructor', () => {
+      const input = [
+        { x: 1, y: 2 },
+        { x: 3, y: 4 },
+      ];
+      const explosion = new Explosion(input, 1);
+      input[0].x = 999;
+      // Constructor copies, so internal cells are independent from input
+      expect(explosion.cells[0].x).toBe(1);
     });
 
     it('should reflect updated ticksRemaining', () => {

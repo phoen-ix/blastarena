@@ -240,7 +240,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Leave room
     socket.on('room:leave', async () => {
-      const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
+      const roomCode = socket.data.activeRoomCode;
       if (!roomCode) return;
 
       // If game is running, notify the game room
@@ -286,7 +286,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Ready toggle
     socket.on('room:ready', async (data) => {
-      const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
+      const roomCode = socket.data.activeRoomCode;
       if (!roomCode) return;
 
       try {
@@ -302,7 +302,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Start game
     socket.on('room:start', async () => {
-      const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
+      const roomCode = socket.data.activeRoomCode;
       if (!roomCode) return;
 
       const room = await lobbyService.getRoom(roomCode);
@@ -345,16 +345,19 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         logger.info({ roomCode, players: room.players.length }, 'Game started');
         broadcastRoomList();
 
-        // Update presence for all players in the room to 'in_game'
+        // Update presence for all players in the room to 'in_game' (batched)
+        presenceService
+          .setPresenceBatch(
+            room.players.map((player) => ({
+              userId: player.user.id,
+              status: 'in_game' as const,
+              extra: { roomCode, gameMode: room.config.gameMode },
+            })),
+          )
+          .catch((err) => {
+            logger.warn({ err: getErrorMessage(err) }, 'Presence batch update failed');
+          });
         for (const player of room.players) {
-          presenceService
-            .setPresence(player.user.id, 'in_game', {
-              roomCode,
-              gameMode: room.config.gameMode,
-            })
-            .catch((err) => {
-              logger.warn({ err: getErrorMessage(err) }, 'Presence update failed');
-            });
           notifyFriendsOnline(io, player.user.id, 'in_game');
         }
       } catch (err) {
@@ -366,7 +369,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Restart room (play again)
     socket.on('room:restart', async (callback) => {
-      const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
+      const roomCode = socket.data.activeRoomCode;
       if (!roomCode) {
         callback({ success: false, error: 'Not in a room' });
         return;
@@ -407,7 +410,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Rematch voting
     socket.on('rematch:vote', async (data, callback) => {
-      const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
+      const roomCode = socket.data.activeRoomCode;
       if (!roomCode) return callback({ success: false, error: 'Not in a room' });
 
       const room = await lobbyService.getRoom(roomCode);
@@ -477,7 +480,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Set player team (host only, teams mode)
     socket.on('room:setTeam', async (data) => {
-      const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
+      const roomCode = socket.data.activeRoomCode;
       if (!roomCode) return;
 
       const room = await lobbyService.getRoom(roomCode);
@@ -499,7 +502,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Set bot team (host only, teams mode)
     socket.on('room:setBotTeam', async (data) => {
-      const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
+      const roomCode = socket.data.activeRoomCode;
       if (!roomCode) return;
 
       const room = await lobbyService.getRoom(roomCode);
@@ -1048,14 +1051,17 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           }
         }
 
-        // Update presence for all real players
-        for (const uid of userIds) {
-          if (uid > 0) {
-            presenceService.setPresence(uid, 'in_campaign').catch((err) => {
-              logger.warn({ err: getErrorMessage(err) }, 'Presence update failed');
-            });
-            notifyFriendsOnline(io, uid, 'in_campaign');
-          }
+        // Update presence for all real players (batched)
+        const realUserIds = userIds.filter((uid) => uid > 0);
+        presenceService
+          .setPresenceBatch(
+            realUserIds.map((uid) => ({ userId: uid, status: 'in_campaign' as const })),
+          )
+          .catch((err) => {
+            logger.warn({ err: getErrorMessage(err) }, 'Presence batch update failed');
+          });
+        for (const uid of realUserIds) {
+          notifyFriendsOnline(io, uid, 'in_campaign');
         }
 
         // Build initial state
@@ -1216,7 +1222,8 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         socket.data.activeCampaignSession = undefined;
       }
 
-      const roomCode = await lobbyService.getPlayerRoom(socket.data.userId);
+      const roomCode =
+        socket.data.activeRoomCode || (await lobbyService.getPlayerRoom(socket.data.userId));
       if (roomCode) {
         const gameRoom = roomManager.getRoom(roomCode);
         if (gameRoom && gameRoom.isRunning()) {

@@ -94,6 +94,7 @@ export class GameScene extends Phaser.Scene {
   // Emotes
   private emoteRenderer: EmoteBubbleRenderer | null = null;
   private emoteKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+  private _emotePositions = new Map<number, { x: number; y: number }>();
 
   // Campaign pause
   private paused: boolean = false;
@@ -534,16 +535,16 @@ export class GameScene extends Phaser.Scene {
 
     // Update emote bubble positions to follow players
     if (this.emoteRenderer && this.lastGameState) {
-      const positions = new Map<number, { x: number; y: number }>();
+      this._emotePositions.clear();
       for (const p of this.lastGameState.players) {
         if (p.alive) {
-          positions.set(p.id, {
+          this._emotePositions.set(p.id, {
             x: p.position.x * TILE_SIZE + TILE_SIZE / 2,
             y: p.position.y * TILE_SIZE + TILE_SIZE / 2,
           });
         }
       }
-      this.emoteRenderer.update(positions);
+      this.emoteRenderer.update(this._emotePositions);
     }
 
     // Drive replay playback from Phaser's frame loop

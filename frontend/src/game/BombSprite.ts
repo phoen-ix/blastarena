@@ -9,6 +9,7 @@ export class BombSpriteRenderer {
   private pulseTweens: Map<string, Phaser.Tweens.Tween> = new Map();
   private sparkEmitters: Map<string, Phaser.GameObjects.Particles.ParticleEmitter> = new Map();
   private playerCosmetics: Map<number, PlayerCosmeticData> = new Map();
+  private _activeIds = new Set<string>();
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -19,7 +20,9 @@ export class BombSpriteRenderer {
   }
 
   update(bombs: BombState[]): void {
-    const activeIds = new Set(bombs.map(b => b.id));
+    this._activeIds.clear();
+    for (const b of bombs) this._activeIds.add(b.id);
+    const activeIds = this._activeIds;
     const settings = getSettings();
 
     // Remove bombs that no longer exist
@@ -44,7 +47,7 @@ export class BombSpriteRenderer {
           // Flash red tint on/off - faster as timer counts down
           // At 19 ticks: slow flash; at 1 tick: very fast flash
           const flashRate = Math.max(1, Math.floor(bomb.ticksRemaining / 4));
-          const showTint = (bomb.ticksRemaining % (flashRate * 2)) < flashRate;
+          const showTint = bomb.ticksRemaining % (flashRate * 2) < flashRate;
           if (showTint) {
             existing.setTint(0xff2222);
           } else {
