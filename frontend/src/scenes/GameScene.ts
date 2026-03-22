@@ -55,6 +55,7 @@ export class GameScene extends Phaser.Scene {
   private mapEventRenderer!: MapEventRenderer;
 
   // Input
+  private addedKeys: Phaser.Input.Keyboard.Key[] = [];
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>;
   private spaceKey!: Phaser.Input.Keyboard.Key;
@@ -120,6 +121,28 @@ export class GameScene extends Phaser.Scene {
     super({ key: 'GameScene' });
   }
 
+  /**
+   * Wrapper for Phaser's keyboard.addKey that explicitly tracks keys added by this scene.
+   * This guarantees we can individually release these specific keys and unbind their
+   * browser captures (preventDefault) on shutdown.
+   * Avoids the "nuke everything" `clearCaptures()` API which could break other active scenes,
+   * while fixing bugs where GameScene's WASD captures persisted into HTML text inputs.
+   */
+  private addKey(keyCode: number): Phaser.Input.Keyboard.Key {
+    const key = this.input.keyboard!.addKey(keyCode);
+    this.addedKeys.push(key);
+    return key;
+  }
+
+  private removeAllTrackedKeys(): void {
+    if (!this.input.keyboard) return;
+    for (const key of this.addedKeys) {
+      this.input.keyboard.removeKey(key.keyCode);
+      this.input.keyboard.removeCapture(key.keyCode);
+    }
+    this.addedKeys = [];
+  }
+
   create(): void {
     UIGamepadNavigator.getInstance().setActive(false);
 
@@ -172,15 +195,23 @@ export class GameScene extends Phaser.Scene {
 
     // Setup Phaser input
     if (this.input.keyboard) {
-      this.cursors = this.input.keyboard.createCursorKeys();
-      this.wasd = {
-        up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-        down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-        left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-        right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+      this.addedKeys = [];
+      this.cursors = {
+        up: this.addKey(Phaser.Input.Keyboard.KeyCodes.UP),
+        down: this.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN),
+        left: this.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),
+        right: this.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),
+        space: this.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
+        shift: this.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
       };
-      this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-      this.detonateKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+      this.wasd = {
+        up: this.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+        down: this.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+        left: this.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+        right: this.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+      };
+      this.spaceKey = this.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+      this.detonateKey = this.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     }
 
     this.gamepadManager = new GamepadManager(this);
@@ -1253,6 +1284,7 @@ export class GameScene extends Phaser.Scene {
     this.replayControls = null;
     this.replayLogPanel = null;
     this.removeSpectatorListeners();
+    this.removeAllTrackedKeys();
     this.cleanupRenderers();
   }
 }
