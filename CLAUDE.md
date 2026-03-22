@@ -131,6 +131,7 @@ Full-screen panel for admin/moderator roles. 11 tabs: Dashboard, Users, Matches,
 - Phaser scene lifecycle: shutdown() must be registered via `this.events.once('shutdown', this.shutdown, this)` — Phaser does NOT auto-call shutdown(). Scenes defensively clean up stale state at top of create()
 - `tickEvents` buffer on GameStateManager accumulates per-tick events for fine-grained socket emission in GameRoom
 - Chain reaction tile snapshot: tiles snapshotted before processing detonations so chained bombs use original wall layout
+- Explosion damage cells exclude wall tiles — blast destroys walls but fire doesn't linger on those tiles (prevents walk-into-destroyed-wall kills). Pierce bombs still damage through/beyond walls
 - Shield has no time limit — lasts until consumed. After break, 10 ticks invulnerability. Extra pickups consumed but don't stack
 - Game start transitions instantly; `room:start` uses atomic `START_ROOM_LUA` script to prevent TOCTOU race (concurrent starts). Cosmetics are awaited before `game:start` broadcast to prevent visual flicker
 - "Back to Lobby" from game over clears currentRoom registry to prevent stale room UI

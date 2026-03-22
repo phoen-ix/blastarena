@@ -873,20 +873,26 @@ export class GameStateManager {
 
     // Calculate explosion cells (pass pierce flag)
     // Use tile snapshot if provided to prevent chain reactions blasting through already-destroyed walls
+    const tilesForCalc = tileSnapshot || this.map.tiles;
     const cells = getExplosionCells(
       bomb.position.x,
       bomb.position.y,
       bomb.fireRange,
       this.map.width,
       this.map.height,
-      tileSnapshot || this.map.tiles,
+      tilesForCalc,
       bomb.isPierce,
     );
 
-    // Create explosion
-    const explosion = new Explosion(cells, bomb.ownerId);
+    // Create explosion with only non-wall cells — blast stops at walls and destroys them,
+    // but fire doesn't linger on those tiles (prevents walk-into-destroyed-wall kills)
+    const damageCells = cells.filter((c) => {
+      const tile = tilesForCalc[c.y][c.x];
+      return tile !== 'destructible' && tile !== 'destructible_cracked';
+    });
+    const explosion = new Explosion(damageCells, bomb.ownerId);
     this.explosions.set(explosion.id, explosion);
-    this.tickEvents.explosions.push({ cells: [...cells], ownerId: bomb.ownerId });
+    this.tickEvents.explosions.push({ cells: [...damageCells], ownerId: bomb.ownerId });
 
     // Destroy walls and possibly spawn power-ups
     let destroyedWalls = 0;
