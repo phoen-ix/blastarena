@@ -5,6 +5,7 @@ import {
   PlayerInput,
   Position,
   PowerUpType,
+  Direction,
 } from '@blast-arena/shared';
 import { getExplosionCells } from '@blast-arena/shared';
 import { DEFAULT_WALL_DENSITY, DEFAULT_POWERUP_DROP_RATE, TICK_RATE } from '@blast-arena/shared';
@@ -79,6 +80,8 @@ export class GameStateManager {
   public winnerId: number | null = null;
   public winnerTeam: number | null = null;
   public roundTime: number;
+  /** Positions where random power-up drops are suppressed (campaign hidden power-ups) */
+  public reservedPowerUpTiles: Set<string> = new Set();
 
   // KOTH properties
   public hillZone: { x: number; y: number; width: number; height: number } | null = null;
@@ -348,6 +351,9 @@ export class GameStateManager {
 
         player.tick();
       }
+
+      // 1b. Process conveyor belt forced movement
+      this.processConveyors(sharedBombPositions, sharedPlayerPositions);
     }
 
     // 2. Update bomb timers and slide kicked bombs
@@ -747,6 +753,7 @@ export class GameStateManager {
         player.position = newPos;
         player.applyMoveCooldown();
         this.gameLogger?.logMovement(player.id, player.username, from, newPos, input.direction);
+        this.applyTeleporter(player);
       } else if (player.hasKick) {
         // Try to kick a bomb in the movement direction
         const dx = input.direction === 'left' ? -1 : input.direction === 'right' ? 1 : 0;
@@ -855,6 +862,77 @@ export class GameStateManager {
     }
   }
 
+  /** Teleport entity if standing on a teleporter tile (A→B or B→A) */
+  applyTeleporter(entity: { position: Position; applyMoveCooldown: () => void }): void {
+    const tile = this.collisionSystem.getTileAt(entity.position.x, entity.position.y);
+    if (tile !== 'teleporter_a' && tile !== 'teleporter_b') return;
+
+    const targetType: TileType = tile === 'teleporter_a' ? 'teleporter_b' : 'teleporter_a';
+    const targets: Position[] = [];
+    for (let y = 0; y < this.map.height; y++) {
+      for (let x = 0; x < this.map.width; x++) {
+        if (this.map.tiles[y][x] === targetType) {
+          targets.push({ x, y });
+        }
+      }
+    }
+    if (targets.length === 0) return;
+
+    const dest = targets[Math.floor(this.rng.next() * targets.length)];
+    entity.position = { x: dest.x, y: dest.y };
+    entity.applyMoveCooldown();
+  }
+
+  /** Push players standing on conveyor tiles in the conveyor's direction */
+  private processConveyors(
+    bombPositions: { x: number; y: number }[],
+    playerPositions: { x: number; y: number; id: number; buddyOwnerId?: number }[],
+  ): void {
+    for (const player of this.players.values()) {
+      if (!player.alive || !player.canMove()) continue;
+
+      const tile = this.collisionSystem.getTileAt(player.position.x, player.position.y);
+      let dir: Direction | null = null;
+      switch (tile) {
+        case 'conveyor_up':
+          dir = 'up';
+          break;
+        case 'conveyor_down':
+          dir = 'down';
+          break;
+        case 'conveyor_left':
+          dir = 'left';
+          break;
+        case 'conveyor_right':
+          dir = 'right';
+          break;
+      }
+      if (!dir) continue;
+
+      // Filter out self and own buddy from player positions
+      const otherPlayerPositions = playerPositions.filter(
+        (sp) => sp.id !== player.id && sp.buddyOwnerId !== player.id,
+      );
+
+      const newPos = player.isBuddy
+        ? this.collisionSystem.canBuddyMoveTo(player.position.x, player.position.y, dir)
+        : this.collisionSystem.canMoveTo(
+            player.position.x,
+            player.position.y,
+            dir,
+            bombPositions,
+            otherPlayerPositions,
+          );
+
+      if (newPos) {
+        player.position = newPos;
+        player.direction = dir;
+        player.applyMoveCooldown();
+        this.applyTeleporter(player);
+      }
+    }
+  }
+
   private detonateBomb(bomb: Bomb, tileSnapshot?: TileType[][]): void {
     this.bombs.delete(bomb.id);
 
@@ -899,7 +977,12 @@ export class GameStateManager {
     for (const cell of cells) {
       if (this.destroyTileTracked(cell.x, cell.y)) {
         destroyedWalls++;
-        if (this.enabledPowerUps.length > 0 && this.rng.next() < this.powerUpDropRate) {
+        const posKey = `${cell.x},${cell.y}`;
+        if (
+          !this.reservedPowerUpTiles.has(posKey) &&
+          this.enabledPowerUps.length > 0 &&
+          this.rng.next() < this.powerUpDropRate
+        ) {
           const type = this.getRandomEnabledPowerUp();
           const powerUp = new PowerUp(cell, type);
           this.powerUps.set(powerUp.id, powerUp);

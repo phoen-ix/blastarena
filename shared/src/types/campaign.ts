@@ -90,6 +90,12 @@ export interface PowerUpPlacement {
   hidden: boolean;
 }
 
+export interface CoveredTile {
+  x: number;
+  y: number;
+  type: TileType;
+}
+
 export interface StartingPowerUps {
   bombUp?: number;
   fireUp?: number;
@@ -126,6 +132,7 @@ export interface CampaignLevel {
   powerupDropRate: number;
   reinforcedWalls: boolean;
   hazardTiles: boolean;
+  coveredTiles: CoveredTile[];
   isPublished: boolean;
 }
 

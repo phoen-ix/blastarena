@@ -100,6 +100,9 @@ export class CampaignGame {
   // Hidden power-ups: revealed when the wall at that position is destroyed
   private hiddenPowerups: Map<string, PowerUpType> = new Map();
 
+  // Covered tiles: special tiles hidden under destructible walls, revealed on destruction
+  private coveredTiles: Map<string, TileType> = new Map();
+
   // Enemy bombs tracked separately (they participate in standard bomb mechanics)
   private enemyBombIds: Set<string> = new Set();
 
@@ -205,10 +208,16 @@ export class CampaignGame {
     // Create custom AI instances for enemies with enemyAiId
     this.initEnemyAIs();
 
-    // Place visible power-ups on the map
+    // Load covered tiles (special tiles hidden under destructible walls)
+    for (const ct of level.coveredTiles ?? []) {
+      this.coveredTiles.set(`${ct.x},${ct.y}`, ct.type);
+    }
+
+    // Place visible power-ups on the map; hidden ones revealed when wall is destroyed
     for (const pp of level.powerupPlacements) {
       if (pp.hidden) {
         this.hiddenPowerups.set(`${pp.x},${pp.y}`, pp.type);
+        this.gameState.reservedPowerUpTiles.add(`${pp.x},${pp.y}`);
       } else {
         this.gameState.spawnPowerUpAt(pp.x, pp.y, pp.type);
       }
@@ -540,19 +549,29 @@ export class CampaignGame {
       }
     }
 
-    // 6. Hidden power-up reveals
-    for (const [key, type] of this.hiddenPowerups) {
-      const [xStr, yStr] = key.split(',');
-      const x = parseInt(xStr, 10);
-      const y = parseInt(yStr, 10);
+    // 6. Covered tile reveals (special tiles hidden under destructible walls)
+    for (const [key, type] of this.coveredTiles) {
+      const [x, y] = key.split(',').map(Number);
       const tile = this.gameState.collisionSystem.getTileAt(x, y);
-      if (tile === 'empty' || tile === 'spawn') {
-        this.gameState.spawnPowerUpAt(x, y, type);
-        this.hiddenPowerups.delete(key);
+      if (tile === 'empty') {
+        this.gameState.map.tiles[y][x] = type;
+        this.gameState.collisionSystem.updateTiles(this.gameState.map.tiles);
+        this.coveredTiles.delete(key);
       }
     }
 
-    // 7. Boss phase transitions
+    // 7. Hidden power-up reveals
+    for (const [key, type] of this.hiddenPowerups) {
+      const [x, y] = key.split(',').map(Number);
+      const tile = this.gameState.collisionSystem.getTileAt(x, y);
+      if (tile !== 'wall' && tile !== 'destructible' && tile !== 'destructible_cracked') {
+        this.gameState.spawnPowerUpAt(x, y, type);
+        this.hiddenPowerups.delete(key);
+        this.gameState.reservedPowerUpTiles.delete(key);
+      }
+    }
+
+    // 8. Boss phase transitions
     for (const enemy of this.enemies.values()) {
       if (!enemy.alive || !enemy.typeConfig.isBoss) continue;
       const phase = enemy.checkBossPhaseTransition();
@@ -674,11 +693,13 @@ export class CampaignGame {
           enemy.position = { x: nx, y: ny };
           enemy.direction = direction;
           enemy.applyMoveCooldown();
+          this.gameState.applyTeleporter(enemy);
         }
       } else if (newPos) {
         enemy.position = newPos;
         enemy.direction = direction;
         enemy.applyMoveCooldown();
+        this.gameState.applyTeleporter(enemy);
       }
     }
   }

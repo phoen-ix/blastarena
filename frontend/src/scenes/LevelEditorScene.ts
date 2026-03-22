@@ -11,6 +11,12 @@ type EditorTool =
   | 'spawn'
   | 'exit'
   | 'goal'
+  | 'teleporter_a'
+  | 'teleporter_b'
+  | 'conveyor_up'
+  | 'conveyor_down'
+  | 'conveyor_left'
+  | 'conveyor_right'
   | 'enemy'
   | 'powerup'
   | 'eraser';
@@ -47,6 +53,8 @@ export class LevelEditorScene extends Phaser.Scene {
 
   private enemies: PlacedEnemy[] = [];
   private powerups: PlacedPowerUp[] = [];
+  private coveredTiles: Map<string, TileType> = new Map();
+  private coveredTileSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private nextEntityId = 1;
 
   private currentTool: EditorTool = 'empty';
@@ -97,6 +105,8 @@ export class LevelEditorScene extends Phaser.Scene {
     this.levelId = this.registry.get('editorLevelId') ?? null;
     this.enemies = [];
     this.powerups = [];
+    this.coveredTiles = new Map();
+    this.coveredTileSprites = new Map();
     this.tileSprites = [];
     this.nextEntityId = 1;
     this.undoStack = [];
@@ -166,6 +176,11 @@ export class LevelEditorScene extends Phaser.Scene {
               y: pp.y,
               hidden: pp.hidden,
             });
+          }
+
+          // Restore covered tiles
+          for (const ct of this.level.coveredTiles ?? []) {
+            this.coveredTiles.set(`${ct.x},${ct.y}`, ct.type);
           }
         }
       } catch {
@@ -239,9 +254,16 @@ export class LevelEditorScene extends Phaser.Scene {
           pu.y * TILE_SIZE + TILE_SIZE / 2,
           key,
         );
-        pu.sprite.setDepth(5);
-        if (pu.hidden) pu.sprite.setAlpha(0.4);
+        pu.sprite.setDepth(6);
       }
+    }
+
+    // Rebuild covered tile overlay sprites
+    for (const s of this.coveredTileSprites.values()) s.destroy();
+    this.coveredTileSprites.clear();
+    for (const [key, type] of this.coveredTiles) {
+      const [x, y] = key.split(',').map(Number);
+      this.setCoveredTile(x, y, type);
     }
   }
 
@@ -335,6 +357,18 @@ export class LevelEditorScene extends Phaser.Scene {
         return 'exit';
       case 'goal':
         return 'goal';
+      case 'teleporter_a':
+        return 'teleporter_a';
+      case 'teleporter_b':
+        return 'teleporter_b';
+      case 'conveyor_up':
+        return 'conveyor_up';
+      case 'conveyor_down':
+        return 'conveyor_down';
+      case 'conveyor_left':
+        return 'conveyor_left';
+      case 'conveyor_right':
+        return 'conveyor_right';
       case 'spawn':
         return `floor_${(x + y) % 4}`;
       default:
@@ -474,17 +508,67 @@ export class LevelEditorScene extends Phaser.Scene {
 
     if (tx < 0 || tx >= this.mapWidth || ty < 0 || ty >= this.mapHeight) return;
 
+    const posKey = `${tx},${ty}`;
+    const currentTile = this.tiles[ty][tx];
+
     switch (this.currentTool) {
-      case 'empty':
+      case 'empty': {
+        // Placing empty on a wall with a covered tile: restore the covered tile
+        const covered = this.coveredTiles.get(posKey);
+        if (covered) {
+          this.tiles[ty][tx] = covered;
+          this.removeCoveredTile(tx, ty);
+        } else {
+          this.tiles[ty][tx] = 'empty';
+        }
+        this.updateTileSprite(tx, ty);
+        this.syncPowerupHiddenState(tx, ty);
+        break;
+      }
       case 'wall':
-      case 'destructible':
-      case 'spawn':
-      case 'exit':
-      case 'goal':
-        this.tiles[ty][tx] = this.currentTool as TileType;
+        // Indestructible wall: remove power-ups and covered tiles (will never break)
+        this.removePowerupsAt(tx, ty);
+        this.removeCoveredTile(tx, ty);
+        this.tiles[ty][tx] = 'wall';
         this.updateTileSprite(tx, ty);
         break;
+      case 'destructible': {
+        // Placing a destructible wall on a special tile: store original as covered
+        if (this.isSpecialTile(currentTile)) {
+          this.setCoveredTile(tx, ty, currentTile);
+        }
+        this.tiles[ty][tx] = 'destructible';
+        this.updateTileSprite(tx, ty);
+        this.syncPowerupHiddenState(tx, ty);
+        break;
+      }
+      case 'spawn':
+        this.removeCoveredTile(tx, ty);
+        this.tiles[ty][tx] = 'spawn';
+        this.updateTileSprite(tx, ty);
+        this.syncPowerupHiddenState(tx, ty);
+        break;
+      case 'exit':
+      case 'goal':
+      case 'teleporter_a':
+      case 'teleporter_b':
+      case 'conveyor_up':
+      case 'conveyor_down':
+      case 'conveyor_left':
+      case 'conveyor_right': {
+        // Placing a special tile on a destructible wall: store as covered tile
+        const isWall = currentTile === 'destructible' || currentTile === 'destructible_cracked';
+        if (isWall) {
+          this.setCoveredTile(tx, ty, this.currentTool as TileType);
+        } else {
+          this.removeCoveredTile(tx, ty);
+          this.tiles[ty][tx] = this.currentTool as TileType;
+          this.updateTileSprite(tx, ty);
+        }
+        break;
+      }
       case 'eraser':
+        this.removeCoveredTile(tx, ty);
         this.tiles[ty][tx] = 'empty';
         this.updateTileSprite(tx, ty);
         // Remove entities at this position
@@ -512,15 +596,16 @@ export class LevelEditorScene extends Phaser.Scene {
           this.enemies.push(enemy);
         }
         break;
-      case 'powerup':
+      case 'powerup': {
         // Remove existing powerup at this tile
         this.removePowerupsAt(tx, ty);
+        const isWallTile = currentTile === 'destructible' || currentTile === 'destructible_cracked';
         const pu: PlacedPowerUp = {
           id: this.nextEntityId++,
           type: this.selectedPowerUpType,
           x: tx,
           y: ty,
-          hidden: false,
+          hidden: isWallTile,
         };
         const puKey = `powerup_${pu.type}`;
         if (this.textures.exists(puKey)) {
@@ -529,10 +614,11 @@ export class LevelEditorScene extends Phaser.Scene {
             ty * TILE_SIZE + TILE_SIZE / 2,
             puKey,
           );
-          pu.sprite.setDepth(5);
+          pu.sprite.setDepth(6);
         }
         this.powerups.push(pu);
         break;
+      }
     }
   }
 
@@ -567,6 +653,56 @@ export class LevelEditorScene extends Phaser.Scene {
     });
   }
 
+  /** Check if a tile type is a "special" tile that can be covered by a destructible wall */
+  private isSpecialTile(tile: TileType): boolean {
+    return (
+      tile !== 'empty' &&
+      tile !== 'wall' &&
+      tile !== 'destructible' &&
+      tile !== 'destructible_cracked' &&
+      tile !== 'spawn'
+    );
+  }
+
+  /** Store a special tile as covered by the destructible wall at this position */
+  private setCoveredTile(x: number, y: number, type: TileType): void {
+    const key = `${x},${y}`;
+    // Remove existing overlay sprite
+    this.coveredTileSprites.get(key)?.destroy();
+    this.coveredTiles.set(key, type);
+    // Create overlay sprite showing the covered tile on top of the wall
+    const texture = this.getTileTexture(type, x, y);
+    if (this.textures.exists(texture)) {
+      const sprite = this.add.sprite(
+        x * TILE_SIZE + TILE_SIZE / 2,
+        y * TILE_SIZE + TILE_SIZE / 2,
+        texture,
+      );
+      sprite.setDepth(4); // Above tile (3) but below entities (5+)
+      sprite.setAlpha(0.7);
+      this.coveredTileSprites.set(key, sprite);
+    }
+  }
+
+  /** Remove a covered tile and its overlay sprite */
+  private removeCoveredTile(x: number, y: number): void {
+    const key = `${x},${y}`;
+    this.coveredTileSprites.get(key)?.destroy();
+    this.coveredTileSprites.delete(key);
+    this.coveredTiles.delete(key);
+  }
+
+  /** Sync power-up hidden state based on current tile type */
+  private syncPowerupHiddenState(x: number, y: number): void {
+    const tile = this.tiles[y][x];
+    const isWall = tile === 'destructible' || tile === 'destructible_cracked';
+    for (const pu of this.powerups) {
+      if (pu.x === x && pu.y === y) {
+        pu.hidden = isWall;
+      }
+    }
+  }
+
   private serializeState(): string {
     return JSON.stringify({
       mapWidth: this.mapWidth,
@@ -574,6 +710,10 @@ export class LevelEditorScene extends Phaser.Scene {
       tiles: this.tiles,
       enemies: this.enemies.map((e) => ({ enemyTypeId: e.enemyTypeId, x: e.x, y: e.y })),
       powerups: this.powerups.map((p) => ({ type: p.type, x: p.x, y: p.y, hidden: p.hidden })),
+      coveredTiles: Array.from(this.coveredTiles.entries()).map(([k, type]) => {
+        const [x, y] = k.split(',').map(Number);
+        return { x, y, type };
+      }),
     });
   }
 
@@ -607,8 +747,11 @@ export class LevelEditorScene extends Phaser.Scene {
     // Clear existing entity sprites
     for (const e of this.enemies) e.sprite?.destroy();
     for (const p of this.powerups) p.sprite?.destroy();
+    for (const s of this.coveredTileSprites.values()) s.destroy();
     this.enemies = [];
     this.powerups = [];
+    this.coveredTiles.clear();
+    this.coveredTileSprites.clear();
 
     if (dimensionsChanged) {
       this.rebuildAfterResize();
@@ -644,10 +787,14 @@ export class LevelEditorScene extends Phaser.Scene {
           pu.y * TILE_SIZE + TILE_SIZE / 2,
           puKey,
         );
-        pu.sprite.setDepth(5);
-        if (pu.hidden) pu.sprite.setAlpha(0.4);
+        pu.sprite.setDepth(6);
       }
       this.powerups.push(pu);
+    }
+
+    // Restore covered tiles
+    for (const ct of state.coveredTiles ?? []) {
+      this.setCoveredTile(ct.x, ct.y, ct.type);
     }
 
     // Update dimension inputs if they exist
@@ -727,6 +874,14 @@ export class LevelEditorScene extends Phaser.Scene {
       return true;
     });
 
+    // Remove out-of-bounds covered tiles
+    for (const [key] of this.coveredTiles) {
+      const [x, y] = key.split(',').map(Number);
+      if (x >= newWidth || y >= newHeight) {
+        this.removeCoveredTile(x, y);
+      }
+    }
+
     this.rebuildAfterResize();
 
     // Update input values in case odd-rounding changed them
@@ -755,6 +910,15 @@ export class LevelEditorScene extends Phaser.Scene {
       { label: 'Exit', tool: 'exit' },
       { label: 'Goal', tool: 'goal' },
       { label: 'Eraser', tool: 'eraser' },
+    ]);
+
+    this.addToolSection('Hazard', [
+      { label: 'Teleporter A', tool: 'teleporter_a' },
+      { label: 'Teleporter B', tool: 'teleporter_b' },
+      { label: 'Conveyor \u2191', tool: 'conveyor_up' },
+      { label: 'Conveyor \u2193', tool: 'conveyor_down' },
+      { label: 'Conveyor \u2190', tool: 'conveyor_left' },
+      { label: 'Conveyor \u2192', tool: 'conveyor_right' },
     ]);
 
     // Enemy tools
@@ -1085,6 +1249,10 @@ export class LevelEditorScene extends Phaser.Scene {
         y: p.y,
         hidden: p.hidden,
       })),
+      coveredTiles: Array.from(this.coveredTiles.entries()).map(([k, type]) => {
+        const [x, y] = k.split(',').map(Number);
+        return { x, y, type };
+      }),
       lives: this.levelLives,
       timeLimit: this.levelTimeLimit,
       parTime: this.levelParTime,
@@ -1146,6 +1314,10 @@ export class LevelEditorScene extends Phaser.Scene {
       powerupDropRate: this.level?.powerupDropRate ?? 0.3,
       reinforcedWalls: this.level?.reinforcedWalls ?? false,
       hazardTiles: this.level?.hazardTiles ?? false,
+      coveredTiles: Array.from(this.coveredTiles.entries()).map(([k, type]) => {
+        const [x, y] = k.split(',').map(Number);
+        return { x, y, type };
+      }),
     };
 
     const json = JSON.stringify(data, null, 2);
@@ -1184,6 +1356,7 @@ export class LevelEditorScene extends Phaser.Scene {
     }
     for (const e of this.enemies) e.sprite?.destroy();
     for (const p of this.powerups) p.sprite?.destroy();
+    for (const s of this.coveredTileSprites.values()) s.destroy();
     this.gridOverlay?.destroy();
     this.spawnOverlay?.destroy();
     for (const label of this.spawnLabels) label.destroy();

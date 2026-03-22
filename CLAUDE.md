@@ -118,7 +118,7 @@ Full-screen panel for admin/moderator roles. 11 tabs: Dashboard, Users, Matches,
 
 ## Game Architecture
 - 20 tick/sec server game loop (GameLoop.ts → GameState.ts)
-- GameState.processTick(): bot AI → inputs → movement → bomb slide → bomb timers → explosions → collisions → power-ups → KOTH scoring → map events → zone → deathmatch respawns → time check → win check
+- GameState.processTick(): bot AI → inputs → movement → conveyors → bomb slide → bomb timers → explosions → collisions → power-ups → KOTH scoring → map events → zone → deathmatch respawns → time check → win check
 - Bomb kick: player with hasKick walking into a bomb sets bomb.sliding direction; sliding bombs advance 1 tile/tick until blocked; kicking applies movement cooldown
 - Spawn position randomization: Fisher-Yates shuffle using seeded RNG (`shuffledSpawnIndices`), deterministic for replays
 - Self-kills subtract 1 from kill score (owner.kills decremented, owner.selfKills incremented)
@@ -164,7 +164,8 @@ Full-screen panel for admin/moderator roles. 11 tabs: Dashboard, Users, Matches,
 ### Map Features
 - **Reinforced walls** (optional): 2 hits — first cracks (`destructible_cracked`), second destroys
 - **Dynamic map events** (optional): Meteor strikes every 30-45s (2s warning), power-up rain every 60s
-- **Hazard tiles** (optional): Teleporter pairs (A/B, instant transport), conveyor belts (force movement)
+- **Hazard tiles** (optional): Teleporter pairs (A↔B, seeded-RNG destination selection, works for players and campaign enemies), conveyor belts (auto-push in direction when movement cooldown ready, chain into teleporters)
+- **Covered tiles**: Special tiles (exit, goal, teleporters, conveyors) hidden under destructible walls via `coveredTiles` array. Editor shows overlay at 0.7 alpha; gameplay reveals tile type when wall destroyed. `reservedPowerUpTiles` Set prevents random power-up drops at positions with hidden power-ups
 
 ## Replay System
 Gzipped JSON replays with tile diffs. See [docs/replay-system.md](docs/replay-system.md).
@@ -225,7 +226,7 @@ npm test                    # Run all workspace tests (backend + frontend)
 npx jest --config tests/backend/jest.config.ts  # Backend only (from project root)
 cd frontend && npx vitest run                   # Frontend only
 ```
-- 1846 tests: 1804 backend (Jest, 55 suites) + 42 frontend (Vitest, 3 suites)
+- 1851 tests: 1809 backend (Jest, 55 suites) + 42 frontend (Vitest, 3 suites)
 - See [docs/testing.md](docs/testing.md) for full inventory, mocking patterns, and guide for writing new tests
 
 ## Documentation

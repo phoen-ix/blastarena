@@ -132,6 +132,7 @@ function createMinimalLevel(overrides: Partial<CampaignLevel> = {}): CampaignLev
     powerupDropRate: 0.3,
     reinforcedWalls: false,
     hazardTiles: false,
+    coveredTiles: [],
     isPublished: true,
     ...overrides,
   };

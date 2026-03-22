@@ -54,6 +54,7 @@ function levelRowToEntry(row: CampaignLevelRow): CampaignLevel {
     powerupDropRate: Number(row.powerup_drop_rate),
     reinforcedWalls: !!row.reinforced_walls,
     hazardTiles: !!row.hazard_tiles,
+    coveredTiles: safeJsonParse(row.covered_tiles, []),
     isPublished: !!row.is_published,
   };
 }
@@ -309,6 +310,7 @@ export async function updateLevel(id: number, data: Partial<CampaignLevel>): Pro
     winConditionConfig: 'win_condition_config',
     startingPowerups: 'starting_powerups',
     availablePowerupTypes: 'available_powerup_types',
+    coveredTiles: 'covered_tiles',
   };
 
   for (const [key, col] of Object.entries(jsonFields)) {

@@ -2705,6 +2705,17 @@ components:
           type: boolean
         hazardTiles:
           type: boolean
+        coveredTiles:
+          type: array
+          items:
+            type: object
+            properties:
+              x:
+                type: integer
+              y:
+                type: integer
+              type:
+                type: string
         isPublished:
           type: boolean
 
@@ -3000,6 +3011,17 @@ components:
           type: boolean
         hazardTiles:
           type: boolean
+        coveredTiles:
+          type: array
+          items:
+            type: object
+            properties:
+              x:
+                type: integer
+              y:
+                type: integer
+              type:
+                type: string
         isPublished:
           type: boolean
 

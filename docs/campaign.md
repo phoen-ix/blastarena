@@ -45,11 +45,15 @@ Each level has a configurable `parTime` (seconds, 0=none). Stars: 3=zero deaths,
 
 ## Hidden Power-Ups
 
-Power-ups marked `hidden: true` are placed under destructible walls; revealed when the wall is destroyed.
+Power-ups marked `hidden: true` are placed under destructible walls; revealed when the wall is destroyed. `reservedPowerUpTiles` Set on `GameStateManager` prevents random power-up drops at positions with hidden power-ups.
+
+## Covered Tiles
+
+Special tiles (exit, goal, teleporters, conveyors) can be hidden under destructible walls via the `coveredTiles` array on `CampaignLevel`. In the editor, covered tiles display as overlays at 0.7 alpha on top of the wall sprite. During gameplay, `CampaignGame.campaignTick()` checks destroyed wall positions and restores the covered tile type. Covered tiles are processed before hidden power-ups so both can coexist on the same position.
 
 ## Campaign Game Session
 
-`CampaignGame.ts` wraps `GameStateManager` with `customMap` (bypasses `generateMap()`). Extended tick order: enemy AI -> movement -> enemy-explosion collision -> player-enemy contact -> hidden powerup reveals -> boss phases -> win condition check.
+`CampaignGame.ts` wraps `GameStateManager` with `customMap` (bypasses `generateMap()`). Extended tick order: enemy AI -> movement -> enemy-explosion collision -> player-enemy contact -> covered tile reveals -> hidden powerup reveals -> boss phases -> win condition check.
 
 `GameStateManager.checkWinCondition()` and time limit check skip `campaign` mode — CampaignGame handles its own.
 
@@ -63,6 +67,8 @@ Power-ups marked `hidden: true` are placed under destructible walls; revealed wh
 
 - `exit` — trapdoor texture, conditionally walkable (unlocks after prerequisite kills)
 - `goal` — gold star texture, always walkable
+- `teleporter_a` / `teleporter_b` — stepping on A teleports to a random B tile (and vice versa). Uses seeded RNG. Applies to players and campaign enemies. Movement cooldown applied after teleport
+- `conveyor_up/down/left/right` — auto-pushes players in the conveyor's direction when movement cooldown is ready. Processed after player inputs in `processTick()`. Conveyor pushing onto a teleporter triggers the chain effect. Enemies are not affected by conveyors (they use their own AI-driven movement)
 
 Added to `TileType` union, `CollisionSystem.isWalkable()`, `TileMap.getTileTexture()`, `BootScene.generateTextures()`.
 
@@ -83,7 +89,8 @@ Added to `TileType` union, `CollisionSystem.isWalkable()`, `TileMap.getTileTextu
 ## Level Editor
 
 `LevelEditorScene.ts` — full Phaser scene with DOM overlay:
-- Tool palette (tiles, enemies, power-ups), click-to-place, paint mode (drag)
+- Tool palette (tiles, hazard tiles, enemies, power-ups), click-to-place, paint mode (drag)
+- Hazard section: Teleporter A/B, Conveyor up/down/left/right — placeable directly or under destructible walls (covered tile system)
 - Camera viewport offset so toolbar doesn't obscure the map
 - Zoom (scroll), pan (right/middle-click drag or WASD/arrow keys)
 - Map dimension controls (width/height, odd 7-51) with content-preserving resize
@@ -111,6 +118,7 @@ Two views:
 - Seed migration `009_campaign_seed.sql` — 3 enemy types + "Training Grounds" world with 3 levels
 - Migration `010_campaign_par_time.sql` — adds `par_time` column to `campaign_levels`
 - Migration `011_fix_campaign_tile_types.sql` — fixes seed tile types (`'indestructible'` -> `'wall'`)
+- Migration `023_covered_tiles.sql` — adds `covered_tiles` JSON column to `campaign_levels`
 
 ## API Endpoints
 

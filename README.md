@@ -57,7 +57,7 @@ Walk into a bomb with the Kick power-up to send it sliding. Click a player name 
 
 ## Map Features
 
-All optional, toggled per-room: **Reinforced Walls** (2-hit destructible walls), **Map Events** (meteor strikes, power-up rain), **Hazard Tiles** (teleporter pairs, conveyor belts).
+All optional, toggled per-room: **Reinforced Walls** (2-hit destructible walls), **Map Events** (meteor strikes, power-up rain), **Hazard Tiles** (teleporter pairs with random A↔B transport, conveyor belts that auto-push players). Special tiles and power-ups can be hidden under destructible walls — revealed when the wall is destroyed.
 
 ## Campaign
 
@@ -208,12 +208,12 @@ blast-arena/
 ## Testing & Linting
 
 ```bash
-npm test                    # Run all test suites (1848 tests)
+npm test                    # Run all test suites (1851 tests)
 npm run lint                # ESLint across all workspaces
 npm run format:check        # Prettier format check
 ```
 
-1848 tests across 58 suites: game logic (452), services (721), routes (486), middleware (36), simulation (69), utilities (72), frontend (42). See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
+1851 tests across 58 suites: game logic (455), services (721), routes (486), middleware (36), simulation (69), utilities (72), frontend (42). See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
 
 ## Documentation
 
