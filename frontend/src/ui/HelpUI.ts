@@ -3,7 +3,7 @@ import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { POWERUP_DEFINITIONS, GAME_MODES, UserRole } from '@blast-arena/shared';
-import { renderPowerUpCanvas, POWERUP_EMOJI_MAP } from '../utils/powerUpCanvas';
+import { renderPowerUpCanvas } from '../utils/powerUpCanvas';
 import { marked } from 'marked';
 
 interface HelpTab {
@@ -269,8 +269,7 @@ export class HelpUI {
       const row = document.createElement('div');
       row.className = 'help-powerup-row';
 
-      const emoji = POWERUP_EMOJI_MAP[type] || '?';
-      const canvas = renderPowerUpCanvas(def.color, emoji, 48);
+      const canvas = renderPowerUpCanvas(def.color, type, 48);
       canvas.className = 'help-powerup-icon';
       row.appendChild(canvas);
 

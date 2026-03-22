@@ -1,13 +1,4 @@
-export const POWERUP_EMOJI_MAP: Record<string, string> = {
-  bomb_up: '\u{1F4A3}',
-  fire_up: '\u{1F525}',
-  speed_up: '\u26A1',
-  shield: '\u{1F6E1}\uFE0F',
-  kick: '\u{1F462}',
-  pierce_bomb: '\u{1F4A5}',
-  remote_bomb: '\u{1F4E1}',
-  line_bomb: '\u{1F9E8}',
-};
+import { POWERUP_ICON_DRAWERS } from './powerUpIcons';
 
 function canvasRoundRect(
   ctx: CanvasRenderingContext2D,
@@ -30,7 +21,7 @@ function canvasRoundRect(
   ctx.closePath();
 }
 
-export function renderPowerUpCanvas(color: string, emoji: string, size = 48): HTMLCanvasElement {
+export function renderPowerUpCanvas(color: string, type: string, size = 48): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -59,12 +50,12 @@ export function renderPowerUpCanvas(color: string, emoji: string, size = 48): HT
   canvasRoundRect(ctx, 4 * scale, 4 * scale, 40 * scale, 40 * scale, 8 * scale);
   ctx.stroke();
 
-  // Emoji icon
+  // Procedural icon
   ctx.globalAlpha = 1;
-  ctx.font = `${Math.round(22 * scale)}px serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(emoji, center, center + 1 * scale);
+  const drawIcon = POWERUP_ICON_DRAWERS[type];
+  if (drawIcon) {
+    drawIcon(ctx, center, center, scale);
+  }
 
   return canvas;
 }

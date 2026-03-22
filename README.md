@@ -57,7 +57,7 @@ Walk into a bomb with the Kick power-up to send it sliding. Click a player name 
 
 ## Map Features
 
-All optional, toggled per-room: **Reinforced Walls** (2-hit destructible walls), **Map Events** (meteor strikes, power-up rain), **Hazard Tiles** (teleporter pairs with random A↔B transport, conveyor belts that auto-push players). Special tiles and power-ups can be hidden under destructible walls — revealed when the wall is destroyed.
+All optional, toggled per-room: **Reinforced Walls** (2-hit destructible walls), **Map Events** (meteor strikes with 2-second visual warning — pulsing crosshair, exclamation mark, growing shadow — followed by a falling meteor animation with screen shake and particle effects; power-up rain every 60s), **Hazard Tiles** (teleporter pairs with random A↔B transport, conveyor belts that auto-push players). Special tiles and power-ups can be hidden under destructible walls — revealed when the wall is destroyed.
 
 ## Campaign
 

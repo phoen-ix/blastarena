@@ -28,6 +28,7 @@ import { ReplayLogPanel } from '../game/ReplayLogPanel';
 import { EnemySpriteRenderer } from '../game/EnemySprite';
 import { EnemyTextureGenerator } from '../game/EnemyTextureGenerator';
 import { EmoteBubbleRenderer } from '../game/EmoteBubble';
+import { MapEventRenderer } from '../game/MapEventRenderer';
 import {
   LocalCoopInput,
   LocalCoopConfig,
@@ -51,6 +52,7 @@ export class GameScene extends Phaser.Scene {
   private hillZoneRenderer!: HillZoneRenderer;
   private effectSystem!: EffectSystem;
   private countdownOverlay!: CountdownOverlay;
+  private mapEventRenderer!: MapEventRenderer;
 
   // Input
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -192,6 +194,7 @@ export class GameScene extends Phaser.Scene {
     this.zoneRenderer = new ShrinkingZoneRenderer(this);
     this.hillZoneRenderer = new HillZoneRenderer(this);
     this.countdownOverlay = new CountdownOverlay(this);
+    this.mapEventRenderer = new MapEventRenderer(this);
     this.emoteRenderer = new EmoteBubbleRenderer(this);
 
     // Listen for emotes from other players
@@ -510,6 +513,9 @@ export class GameScene extends Phaser.Scene {
     if (state.hillZone) {
       this.hillZoneRenderer.update(state.hillZone, state.kothScores);
     }
+
+    // Update map events (meteors, etc.)
+    this.mapEventRenderer.update(state.mapEvents, state.tick);
 
     // Update effect system alive state
     const me = state.players.find((p) => p.id === this.localPlayerId);
@@ -1126,6 +1132,7 @@ export class GameScene extends Phaser.Scene {
     this.hillZoneRenderer?.destroy();
     this.effectSystem?.destroy();
     this.countdownOverlay?.destroy();
+    this.mapEventRenderer?.destroy();
     this.gamepadManager?.destroy();
     this.enemyRenderer?.destroy();
     this.enemyRenderer = null;

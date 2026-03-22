@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { themeManager } from '../themes/ThemeManager';
+import { POWERUP_ICON_DRAWERS } from '../utils/powerUpIcons';
 
 export const PLAYER_COLORS = [
   0xe94560, 0x44aaff, 0x44ff44, 0xff8800, 0xcc44ff, 0xffff44, 0xff44ff, 0x44ffff,
@@ -49,6 +50,7 @@ export class BootScene extends Phaser.Scene {
     this.generateExplosionTexture();
     this.generatePowerUpTextures();
     this.generateParticleTextures();
+    this.generateMeteorTexture();
   }
 
   private generatePlayerTextures(): void {
@@ -394,15 +396,15 @@ export class BootScene extends Phaser.Scene {
   }
 
   private generatePowerUpTextures(): void {
-    const defs: Record<string, { color: string; emoji: string }> = {
-      bomb_up: { color: '#ff4444', emoji: '💣' },
-      fire_up: { color: '#ff8800', emoji: '🔥' },
-      speed_up: { color: '#44aaff', emoji: '⚡' },
-      shield: { color: '#44ff44', emoji: '🛡️' },
-      kick: { color: '#cc44ff', emoji: '👢' },
-      pierce_bomb: { color: '#ff2222', emoji: '💥' },
-      remote_bomb: { color: '#4488ff', emoji: '📡' },
-      line_bomb: { color: '#ffaa44', emoji: '🧨' },
+    const defs: Record<string, { color: string }> = {
+      bomb_up: { color: '#ff4444' },
+      fire_up: { color: '#ff8800' },
+      speed_up: { color: '#44aaff' },
+      shield: { color: '#44ff44' },
+      kick: { color: '#cc44ff' },
+      pierce_bomb: { color: '#ff2222' },
+      remote_bomb: { color: '#4488ff' },
+      line_bomb: { color: '#ffaa44' },
     };
 
     for (const [type, def] of Object.entries(defs)) {
@@ -431,12 +433,12 @@ export class BootScene extends Phaser.Scene {
       this.canvasRoundRect(ctx, 4, 4, 40, 40, 8);
       ctx.stroke();
 
-      // Emoji icon
+      // Procedural icon
       ctx.globalAlpha = 1;
-      ctx.font = '22px serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(def.emoji, 24, 25);
+      const drawIcon = POWERUP_ICON_DRAWERS[type];
+      if (drawIcon) {
+        drawIcon(ctx, 24, 24, 1);
+      }
 
       this.textures.addCanvas(`powerup_${type}`, canvas);
     }
@@ -514,6 +516,34 @@ export class BootScene extends Phaser.Scene {
     shieldGfx.fillCircle(4, 4, 2);
     shieldGfx.generateTexture('particle_shield', 8, 8);
     shieldGfx.destroy();
+  }
+
+  private generateMeteorTexture(): void {
+    const gfx = this.make.graphics({ x: 0, y: 0 });
+    // Fiery rock body
+    gfx.fillStyle(0x663311, 1);
+    gfx.fillCircle(24, 24, 18);
+    gfx.fillStyle(0x884422, 1);
+    gfx.fillCircle(22, 22, 14);
+    // Craggy surface detail
+    gfx.fillStyle(0x553300, 0.8);
+    gfx.fillCircle(28, 18, 6);
+    gfx.fillCircle(16, 28, 5);
+    gfx.fillCircle(30, 28, 4);
+    // Hot glow on leading edge
+    gfx.fillStyle(0xff6600, 0.7);
+    gfx.fillCircle(18, 16, 8);
+    gfx.fillStyle(0xffaa00, 0.5);
+    gfx.fillCircle(16, 14, 5);
+    gfx.fillStyle(0xffdd44, 0.3);
+    gfx.fillCircle(15, 13, 3);
+    // Fire trail
+    gfx.fillStyle(0xff4400, 0.5);
+    gfx.fillEllipse(32, 8, 14, 8);
+    gfx.fillStyle(0xff6600, 0.3);
+    gfx.fillEllipse(36, 4, 10, 6);
+    gfx.generateTexture('meteor', 48, 48);
+    gfx.destroy();
   }
 
   create(): void {
