@@ -33,6 +33,7 @@ import { setupDMHandlers, cleanupDMLimiters } from './handlers/dmHandlers';
 import * as settingsService from './services/settings';
 import * as presenceService from './services/presence';
 import * as partyService from './services/party';
+import { z } from 'zod';
 
 type TypedServer = Server<
   ClientToServerEvents,
@@ -47,6 +48,53 @@ const ROOM_CLEANUP_INTERVAL_MS = 30000;
 
 // Per-player emote cooldown
 const emoteLastUsed = new Map<number, number>();
+
+// MatchConfig validation for room:create socket events
+const VALID_GAME_MODES = [
+  'ffa',
+  'teams',
+  'battle_royale',
+  'sudden_death',
+  'deathmatch',
+  'king_of_the_hill',
+] as const;
+const VALID_POWERUP_TYPES = [
+  'bomb_up',
+  'fire_up',
+  'speed_up',
+  'shield',
+  'kick',
+  'pierce_bomb',
+  'remote_bomb',
+  'line_bomb',
+] as const;
+
+const matchConfigSchema = z.object({
+  gameMode: z.enum(VALID_GAME_MODES),
+  maxPlayers: z.number().int().min(2).max(8),
+  mapWidth: z.number().int().min(9).max(51),
+  mapHeight: z.number().int().min(9).max(51),
+  mapSeed: z.number().int().optional(),
+  roundTime: z.number().int().min(30).max(600),
+  teams: z.number().int().min(2).max(2).optional(),
+  wallDensity: z.number().min(0).max(1).optional(),
+  enabledPowerUps: z.array(z.enum(VALID_POWERUP_TYPES)).optional(),
+  powerUpDropRate: z.number().min(0).max(1).optional(),
+  botCount: z.number().int().min(0).max(7).optional(),
+  botDifficulty: z.enum(['easy', 'normal', 'hard']).optional(),
+  botTeams: z.array(z.union([z.number().int().min(0).max(1), z.null()])).optional(),
+  friendlyFire: z.boolean().optional(),
+  hazardTiles: z.boolean().optional(),
+  enableMapEvents: z.boolean().optional(),
+  reinforcedWalls: z.boolean().optional(),
+  recordGame: z.boolean().optional(),
+  botAiId: z.string().optional(),
+});
+
+const createRoomRequestSchema = z.object({
+  name: z.string().min(1).max(50),
+  config: matchConfigSchema,
+});
 
 // Rematch vote tracking per room
 const rematchVotes = new Map<
@@ -114,6 +162,21 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     });
   }
 
+  /** Clean up stale room membership (e.g. player refreshed during a game) */
+  async function cleanupStaleRoom(
+    socket: Parameters<Parameters<typeof io.on<'connection'>>[1]>[0],
+  ): Promise<void> {
+    const existingRoom = await lobbyService.getPlayerRoom(socket.data.userId);
+    if (!existingRoom) return;
+
+    const existingGameRoom = roomManager.getRoom(existingRoom);
+    if (existingGameRoom && existingGameRoom.isRunning()) {
+      existingGameRoom.handlePlayerDisconnect(socket.data.userId);
+    }
+    await lobbyService.leaveRoom(existingRoom, socket.data.userId);
+    socket.leave(`room:${existingRoom}`);
+  }
+
   io.on('connection', async (socket) => {
     logger.info({ userId: socket.data.userId, username: socket.data.username }, 'Socket connected');
 
@@ -173,18 +236,18 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     socket.on('room:create', async (data, callback) => {
       if (!createLimiter(socket.id)) return;
       try {
-        // Clean up stale room membership (e.g. player refreshed during a game)
-        const existingRoom = await lobbyService.getPlayerRoom(socket.data.userId);
-        if (existingRoom) {
-          const existingGameRoom = roomManager.getRoom(existingRoom);
-          if (existingGameRoom && existingGameRoom.isRunning()) {
-            existingGameRoom.handlePlayerDisconnect(socket.data.userId);
-          }
-          await lobbyService.leaveRoom(existingRoom, socket.data.userId);
-          socket.leave(`room:${existingRoom}`);
+        const parsed = createRoomRequestSchema.safeParse(data);
+        if (!parsed.success) {
+          return callback({ success: false, error: 'Invalid room configuration' });
         }
 
-        const room = await lobbyService.createRoom(currentUser, data.name, data.config);
+        await cleanupStaleRoom(socket);
+
+        const room = await lobbyService.createRoom(
+          currentUser,
+          parsed.data.name,
+          parsed.data.config,
+        );
         socket.join(`room:${room.code}`);
         socket.data.activeRoomCode = room.code;
         callback({ success: true, room });
@@ -206,16 +269,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     socket.on('room:join', async (data, callback) => {
       if (!joinLimiter(socket.id)) return;
       try {
-        // Clean up stale room membership (e.g. player refreshed during a game)
-        const existingRoom = await lobbyService.getPlayerRoom(socket.data.userId);
-        if (existingRoom) {
-          const existingGameRoom = roomManager.getRoom(existingRoom);
-          if (existingGameRoom && existingGameRoom.isRunning()) {
-            existingGameRoom.handlePlayerDisconnect(socket.data.userId);
-          }
-          await lobbyService.leaveRoom(existingRoom, socket.data.userId);
-          socket.leave(`room:${existingRoom}`);
-        }
+        await cleanupStaleRoom(socket);
 
         const room = await lobbyService.joinRoom(data.code, currentUser);
         socket.join(`room:${room.code}`);
@@ -243,45 +297,49 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       const roomCode = socket.data.activeRoomCode;
       if (!roomCode) return;
 
-      // If game is running, notify the game room
-      const gameRoom = roomManager.getRoom(roomCode);
-      if (gameRoom) {
-        gameRoom.handlePlayerDisconnect(socket.data.userId);
-      }
+      try {
+        // If game is running, notify the game room
+        const gameRoom = roomManager.getRoom(roomCode);
+        if (gameRoom) {
+          gameRoom.handlePlayerDisconnect(socket.data.userId);
+        }
 
-      const room = await lobbyService.leaveRoom(roomCode, socket.data.userId);
-      socket.leave(`room:${roomCode}`);
-      socket.data.activeRoomCode = undefined;
-      if (room) {
-        io.to(`room:${roomCode}`).emit('room:playerLeft', socket.data.userId);
-        io.to(`room:${roomCode}`).emit('room:state', room);
-      }
+        const room = await lobbyService.leaveRoom(roomCode, socket.data.userId);
+        socket.leave(`room:${roomCode}`);
+        socket.data.activeRoomCode = undefined;
+        if (room) {
+          io.to(`room:${roomCode}`).emit('room:playerLeft', socket.data.userId);
+          io.to(`room:${roomCode}`).emit('room:state', room);
+        }
 
-      // Clean up rematch votes for the leaving player
-      for (const [code, voteState] of rematchVotes) {
-        if (voteState.votes.has(socket.data.userId)) {
-          voteState.votes.delete(socket.data.userId);
-          voteState.humanPlayerIds.delete(socket.data.userId);
-          if (voteState.humanPlayerIds.size === 0) {
-            clearTimeout(voteState.timeout);
-            rematchVotes.delete(code);
-          } else {
-            const threshold = Math.floor(voteState.humanPlayerIds.size / 2) + 1;
-            const votesArray = [...voteState.votes.entries()].map(([userId, v]) => ({
-              userId,
-              username: v.username,
-              vote: v.vote,
-            }));
-            io.to(`room:${code}`).emit('rematch:update', {
-              votes: votesArray,
-              threshold,
-              totalPlayers: voteState.humanPlayerIds.size,
-            });
+        // Clean up rematch votes for the leaving player
+        for (const [code, voteState] of rematchVotes) {
+          if (voteState.votes.has(socket.data.userId)) {
+            voteState.votes.delete(socket.data.userId);
+            voteState.humanPlayerIds.delete(socket.data.userId);
+            if (voteState.humanPlayerIds.size === 0) {
+              clearTimeout(voteState.timeout);
+              rematchVotes.delete(code);
+            } else {
+              const threshold = Math.floor(voteState.humanPlayerIds.size / 2) + 1;
+              const votesArray = [...voteState.votes.entries()].map(([userId, v]) => ({
+                userId,
+                username: v.username,
+                vote: v.vote,
+              }));
+              io.to(`room:${code}`).emit('rematch:update', {
+                votes: votesArray,
+                threshold,
+                totalPlayers: voteState.humanPlayerIds.size,
+              });
+            }
           }
         }
-      }
 
-      broadcastRoomList();
+        broadcastRoomList();
+      } catch (err: unknown) {
+        logger.error({ err, userId: socket.data.userId }, 'Error leaving room');
+      }
     });
 
     // Ready toggle
@@ -665,6 +723,13 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       for (const s of sockets) {
         await lobbyService.leaveRoom(data.roomCode, s.data.userId);
         s.leave(`room:${data.roomCode}`);
+      }
+
+      // Clear any pending rematch votes for this room
+      const existingVotes = rematchVotes.get(data.roomCode);
+      if (existingVotes) {
+        clearTimeout(existingVotes.timeout);
+        rematchVotes.delete(data.roomCode);
       }
 
       roomManager.removeRoom(data.roomCode);

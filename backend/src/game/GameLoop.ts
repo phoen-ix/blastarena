@@ -7,6 +7,8 @@ import { logger } from '../utils/logger';
 // "GO!" appears at 1800ms — that's when gameplay should begin
 const COUNTDOWN_TICKS = Math.round(1.8 * TICK_RATE); // 36 ticks
 
+const MAX_CONSECUTIVE_ERRORS = 10;
+
 export class GameLoop {
   private gameState: GameStateManager;
   private interval: ReturnType<typeof setInterval> | null = null;
@@ -16,6 +18,7 @@ export class GameLoop {
   private running: boolean = false;
   private countdownTicksRemaining: number = COUNTDOWN_TICKS;
   private skipCountdown: boolean = false;
+  private consecutiveErrors: number = 0;
 
   constructor(
     gameState: GameStateManager,
@@ -57,13 +60,20 @@ export class GameLoop {
         this.gameState.processTick();
         const state = this.gameState.toTickState();
         this.onTick(state);
+        this.consecutiveErrors = 0;
 
         if (this.gameState.status === 'finished') {
           this.stop();
           this.onGameOver();
         }
       } catch (err) {
-        logger.error({ err }, 'Game loop error');
+        this.consecutiveErrors++;
+        logger.error({ err, consecutiveErrors: this.consecutiveErrors }, 'Game loop error');
+        if (this.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          logger.error('Game loop circuit breaker tripped — stopping game');
+          this.stop();
+          this.onGameOver();
+        }
       }
     }, tickMs);
 
@@ -107,13 +117,20 @@ export class GameLoop {
         this.gameState.processTick();
         const state = this.gameState.toTickState();
         this.onTick(state);
+        this.consecutiveErrors = 0;
 
         if (this.gameState.status === 'finished') {
           this.stop();
           this.onGameOver();
         }
       } catch (err) {
-        logger.error({ err }, 'Game loop error');
+        this.consecutiveErrors++;
+        logger.error({ err, consecutiveErrors: this.consecutiveErrors }, 'Game loop error');
+        if (this.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          logger.error('Game loop circuit breaker tripped — stopping game');
+          this.stop();
+          this.onGameOver();
+        }
       }
     }, tickMs);
     logger.info('Game loop resumed');

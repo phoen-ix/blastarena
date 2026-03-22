@@ -33,9 +33,137 @@ export class FriendsView implements ILobbyView {
 
   async render(container: HTMLElement): Promise<void> {
     this.container = container;
+    this.setupDelegatedListeners();
     this.renderContent();
     this.loadFriends();
     this.loadBlocked();
+  }
+
+  /** Set up delegated event handlers once — survive innerHTML rebuilds */
+  private setupDelegatedListeners(): void {
+    if (!this.container) return;
+    const sc = this.deps.socketClient;
+
+    this.container.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
+      if (!btn) {
+        // Tab switching
+        const tab = (e.target as HTMLElement).closest('.tab-item') as HTMLElement | null;
+        if (tab?.dataset.tab) {
+          this.activeTab = tab.dataset.tab as 'friends' | 'requests' | 'blocked';
+          this.searchResults = [];
+          this.renderContent();
+        }
+        return;
+      }
+
+      switch (btn.dataset.action) {
+        case 'add': {
+          const username = btn.dataset.username!;
+          sc.emit('friend:request', { username }, (res) => {
+            if (res.success) {
+              this.deps.notifications.success(`Friend request sent to ${username}`);
+              this.searchResults = [];
+              this.loadFriends();
+            } else {
+              this.deps.notifications.error(res.error || 'Failed to send request');
+            }
+          });
+          break;
+        }
+        case 'accept': {
+          const fromUserId = parseInt(btn.dataset.fromId!);
+          sc.emit('friend:accept', { fromUserId }, (res) => {
+            if (res.success) {
+              this.deps.notifications.success('Friend request accepted');
+              this.incoming = this.incoming.filter((r) => r.fromUserId !== fromUserId);
+              this.loadFriends();
+            } else {
+              this.deps.notifications.error(res.error || 'Failed');
+            }
+          });
+          break;
+        }
+        case 'decline': {
+          const fromUserId = parseInt(btn.dataset.fromId!);
+          sc.emit('friend:decline', { fromUserId }, (res) => {
+            if (res.success) {
+              this.incoming = this.incoming.filter((r) => r.fromUserId !== fromUserId);
+              this.renderContent();
+            }
+          });
+          break;
+        }
+        case 'cancel': {
+          const toUserId = parseInt(btn.dataset.toId!);
+          sc.emit('friend:cancel', { toUserId }, (res) => {
+            if (res.success) {
+              this.outgoing = this.outgoing.filter((r) => r.fromUserId !== toUserId);
+              this.renderContent();
+            }
+          });
+          break;
+        }
+        case 'remove': {
+          const friendId = parseInt(btn.dataset.friendId!);
+          sc.emit('friend:remove', { friendId }, (res) => {
+            if (res.success) {
+              this.friends = this.friends.filter((f) => f.userId !== friendId);
+              this.renderContent();
+            }
+          });
+          break;
+        }
+        case 'unblock': {
+          const userId = parseInt(btn.dataset.userId!);
+          sc.emit('friend:unblock', { userId }, (res) => {
+            if (res.success) {
+              this.blocked = this.blocked.filter((b) => b.userId !== userId);
+              this.renderContent();
+            }
+          });
+          break;
+        }
+        case 'join': {
+          const roomCode = btn.dataset.room!;
+          sc.emit('room:join', { code: roomCode }, (res) => {
+            if (!res.success) {
+              this.deps.notifications.error(res.error || 'Failed to join');
+            }
+          });
+          break;
+        }
+        case 'message': {
+          const userId = parseInt(btn.dataset.userId!);
+          const username = btn.dataset.username!;
+          this.onMessageFriend(userId, username);
+          break;
+        }
+        case 'invite': {
+          const targetUserId = parseInt(btn.dataset.userId!);
+          sc.emit('invite:room', { userId: targetUserId }, (res) => {
+            if (res.success) {
+              this.deps.notifications.success('Invite sent');
+            } else {
+              this.deps.notifications.error(res.error || 'Failed to invite');
+            }
+          });
+          break;
+        }
+        case 'search': {
+          const input = this.container?.querySelector('#friend-search-input') as HTMLInputElement;
+          if (input) this.handleSearch(input.value);
+          break;
+        }
+      }
+    });
+
+    this.container.addEventListener('keydown', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.id === 'friend-search-input' && e.key === 'Enter') {
+        this.handleSearch((target as HTMLInputElement).value);
+      }
+    });
   }
 
   destroy(): void {
@@ -137,7 +265,7 @@ export class FriendsView implements ILobbyView {
           </div>
           <div class="friends-search-bar">
             <input type="text" class="input" id="friend-search-input" placeholder="Search by username..." maxlength="20" aria-label="Search friends by username">
-            <button class="btn btn-primary" id="friend-search-btn">Add Friend</button>
+            <button class="btn btn-primary" data-action="search">Add Friend</button>
           </div>
         </div>
         <div class="friends-grid" id="friends-list-content">
@@ -146,24 +274,7 @@ export class FriendsView implements ILobbyView {
       </div>
     `;
 
-    // Tab switching
-    this.container.querySelectorAll('.tab-item').forEach((tab) => {
-      tab.addEventListener('click', () => {
-        this.activeTab = (tab.getAttribute('data-tab') as typeof this.activeTab) ?? 'friends';
-        this.searchResults = [];
-        this.renderContent();
-      });
-    });
-
-    // Search
-    const searchInput = this.container.querySelector('#friend-search-input') as HTMLInputElement;
-    const searchBtn = this.container.querySelector('#friend-search-btn')!;
-    searchBtn.addEventListener('click', () => this.handleSearch(searchInput.value));
-    searchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') this.handleSearch(searchInput.value);
-    });
-
-    this.attachActionListeners();
+    // Listeners are delegated via setupDelegatedListeners() — no per-render attachment needed
   }
 
   private renderActiveTab(): string {
@@ -217,10 +328,10 @@ export class FriendsView implements ILobbyView {
               <div class="friend-card-activity ${isOnline ? (f.activity === 'in_game' || f.activity === 'in_campaign' ? 'in-game' : 'active') : ''}">${activityLabel}</div>
             </div>
             <div class="friend-card-actions">
-              ${f.activity === 'in_lobby' && f.roomCode ? `<button class="btn btn-primary btn-sm friend-join-btn" data-room="${escapeHtml(f.roomCode || '')}">Join</button>` : ''}
-              <button class="btn btn-ghost btn-sm friend-msg-btn" data-user-id="${f.userId}" data-username="${escapeHtml(f.username)}">Msg</button>
-              <button class="btn btn-ghost btn-sm friend-invite-btn" data-user-id="${f.userId}">Invite</button>
-              <button class="btn btn-ghost btn-sm btn-danger-text friend-remove-btn" data-friend-id="${f.userId}">Remove</button>
+              ${f.activity === 'in_lobby' && f.roomCode ? `<button class="btn btn-primary btn-sm" data-action="join" data-room="${escapeHtml(f.roomCode || '')}">Join</button>` : ''}
+              <button class="btn btn-ghost btn-sm" data-action="message" data-user-id="${f.userId}" data-username="${escapeHtml(f.username)}">Msg</button>
+              <button class="btn btn-ghost btn-sm" data-action="invite" data-user-id="${f.userId}">Invite</button>
+              <button class="btn btn-ghost btn-sm btn-danger-text" data-action="remove" data-friend-id="${f.userId}">Remove</button>
             </div>
           </div>
         `;
@@ -243,8 +354,8 @@ export class FriendsView implements ILobbyView {
               <div class="friend-card-activity">Wants to be friends</div>
             </div>
             <div class="friend-card-actions">
-              <button class="btn btn-primary btn-sm friend-accept-btn" data-from-id="${r.fromUserId}">Accept</button>
-              <button class="btn btn-ghost btn-sm btn-danger-text friend-decline-btn" data-from-id="${r.fromUserId}">Decline</button>
+              <button class="btn btn-primary btn-sm" data-action="accept" data-from-id="${r.fromUserId}">Accept</button>
+              <button class="btn btn-ghost btn-sm btn-danger-text" data-action="decline" data-from-id="${r.fromUserId}">Decline</button>
             </div>
           </div>
         `,
@@ -264,7 +375,7 @@ export class FriendsView implements ILobbyView {
               <div class="friend-card-activity">Pending</div>
             </div>
             <div class="friend-card-actions">
-              <button class="btn btn-ghost btn-sm btn-danger-text friend-cancel-btn" data-to-id="${r.fromUserId}">Cancel</button>
+              <button class="btn btn-ghost btn-sm btn-danger-text" data-action="cancel" data-to-id="${r.fromUserId}">Cancel</button>
             </div>
           </div>
         `,
@@ -293,7 +404,7 @@ export class FriendsView implements ILobbyView {
             <div class="friend-card-name">${escapeHtml(b.username)}</div>
           </div>
           <div class="friend-card-actions">
-            <button class="btn btn-ghost btn-sm friend-unblock-btn" data-user-id="${b.userId}">Unblock</button>
+            <button class="btn btn-ghost btn-sm" data-action="unblock" data-user-id="${b.userId}">Unblock</button>
           </div>
         </div>
       `,
@@ -311,7 +422,7 @@ export class FriendsView implements ILobbyView {
             <div class="friend-card-name">${escapeHtml(u.username)}</div>
           </div>
           <div class="friend-card-actions">
-            <button class="btn btn-primary btn-sm friend-add-btn" data-username="${escapeHtml(u.username)}">Add Friend</button>
+            <button class="btn btn-primary btn-sm" data-action="add" data-username="${escapeHtml(u.username)}">Add Friend</button>
           </div>
         </div>
       `,
@@ -336,136 +447,13 @@ export class FriendsView implements ILobbyView {
       const listEl = this.container?.querySelector('#friends-list-content');
       if (listEl) {
         listEl.innerHTML = this.renderSearchResults();
-        this.attachActionListeners();
       }
     } catch {
       this.deps.notifications.error('Search failed');
     }
   }
 
-  private attachActionListeners(): void {
-    if (!this.container) return;
-    const sc = this.deps.socketClient;
-
-    // Add friend
-    this.container.querySelectorAll('.friend-add-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const username = btn.getAttribute('data-username')!;
-        sc.emit('friend:request', { username }, (res) => {
-          if (res.success) {
-            this.deps.notifications.success(`Friend request sent to ${username}`);
-            this.searchResults = [];
-            this.loadFriends();
-          } else {
-            this.deps.notifications.error(res.error || 'Failed to send request');
-          }
-        });
-      });
-    });
-
-    // Accept
-    this.container.querySelectorAll('.friend-accept-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const fromUserId = parseInt(btn.getAttribute('data-from-id')!);
-        sc.emit('friend:accept', { fromUserId }, (res) => {
-          if (res.success) {
-            this.deps.notifications.success('Friend request accepted');
-            this.incoming = this.incoming.filter((r) => r.fromUserId !== fromUserId);
-            this.loadFriends();
-          } else {
-            this.deps.notifications.error(res.error || 'Failed');
-          }
-        });
-      });
-    });
-
-    // Decline
-    this.container.querySelectorAll('.friend-decline-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const fromUserId = parseInt(btn.getAttribute('data-from-id')!);
-        sc.emit('friend:decline', { fromUserId }, (res) => {
-          if (res.success) {
-            this.incoming = this.incoming.filter((r) => r.fromUserId !== fromUserId);
-            this.renderContent();
-          }
-        });
-      });
-    });
-
-    // Cancel outgoing
-    this.container.querySelectorAll('.friend-cancel-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const toUserId = parseInt(btn.getAttribute('data-to-id')!);
-        sc.emit('friend:cancel', { toUserId }, (res) => {
-          if (res.success) {
-            this.outgoing = this.outgoing.filter((r) => r.fromUserId !== toUserId);
-            this.renderContent();
-          }
-        });
-      });
-    });
-
-    // Remove friend
-    this.container.querySelectorAll('.friend-remove-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const friendId = parseInt(btn.getAttribute('data-friend-id')!);
-        sc.emit('friend:remove', { friendId }, (res) => {
-          if (res.success) {
-            this.friends = this.friends.filter((f) => f.userId !== friendId);
-            this.renderContent();
-          }
-        });
-      });
-    });
-
-    // Unblock
-    this.container.querySelectorAll('.friend-unblock-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const userId = parseInt(btn.getAttribute('data-user-id')!);
-        sc.emit('friend:unblock', { userId }, (res) => {
-          if (res.success) {
-            this.blocked = this.blocked.filter((b) => b.userId !== userId);
-            this.renderContent();
-          }
-        });
-      });
-    });
-
-    // Join room
-    this.container.querySelectorAll('.friend-join-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const roomCode = btn.getAttribute('data-room')!;
-        sc.emit('room:join', { code: roomCode }, (res) => {
-          if (!res.success) {
-            this.deps.notifications.error(res.error || 'Failed to join');
-          }
-        });
-      });
-    });
-
-    // Message friend
-    this.container.querySelectorAll('.friend-msg-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const userId = parseInt(btn.getAttribute('data-user-id')!);
-        const username = btn.getAttribute('data-username')!;
-        this.onMessageFriend(userId, username);
-      });
-    });
-
-    // Invite
-    this.container.querySelectorAll('.friend-invite-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const targetUserId = parseInt(btn.getAttribute('data-user-id')!);
-        sc.emit('invite:room', { userId: targetUserId }, (res) => {
-          if (res.success) {
-            this.deps.notifications.success('Invite sent');
-          } else {
-            this.deps.notifications.error(res.error || 'Failed to invite');
-          }
-        });
-      });
-    });
-  }
+  // Action listeners are delegated via setupDelegatedListeners()
 
   private getActivityLabel(activity: ActivityStatus): string {
     switch (activity) {

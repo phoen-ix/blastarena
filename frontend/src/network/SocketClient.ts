@@ -132,7 +132,13 @@ export class SocketClient {
         const res = await fetch(`${API_URL}/health`, { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
-        if (data.buildId) {
+        if (data.buildId && data.status === 'ok') {
+          // Verify the page itself loads (not nginx 502.html) before reloading
+          const pageRes = await fetch(window.location.href, { cache: 'no-store' });
+          if (!pageRes.ok) return;
+          const body = await pageRes.text();
+          if (!body.includes('game-container')) return; // Still serving error page
+
           console.log('Backend is back, reloading page...');
           this.stopHealthPoll();
           window.location.reload();

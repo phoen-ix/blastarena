@@ -31,6 +31,15 @@ export class RoomsView implements ILobbyView {
       </div>
     `;
 
+    // Delegated click handler on room list — set up once per render()
+    const list = container.querySelector('#room-list')!;
+    list.addEventListener('click', (e) => {
+      const card = (e.target as HTMLElement).closest('.room-card') as HTMLElement | null;
+      if (card?.dataset.code) {
+        this.joinRoom(card.dataset.code);
+      }
+    });
+
     this.loadBanner();
 
     if (this.cachedRooms) {
@@ -91,13 +100,6 @@ export class RoomsView implements ILobbyView {
     `,
       )
       .join('');
-
-    list.querySelectorAll('.room-card').forEach((card) => {
-      card.addEventListener('click', () => {
-        const code = card.getAttribute('data-code')!;
-        this.joinRoom(code);
-      });
-    });
   }
 
   private async joinRoom(code: string): Promise<void> {

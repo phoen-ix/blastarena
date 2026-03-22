@@ -173,6 +173,15 @@ Gzipped JSON replays with tile diffs. See [docs/replay-system.md](docs/replay-sy
 - HTTP security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (restrictive)
 - Email addresses normalized to lowercase on register and email change
 - Campaign JSON fields (`enemy_placements`, `powerup_placements`, `starting_powerups`) parsed via `safeJsonParse()` with fallback to empty arrays
+- `room:create` socket event validates `MatchConfig` via Zod schema (game mode, map dimensions, player count, power-ups, etc.)
+- Nginx proxy timeouts set to 300s for `/api/` to tolerate slow backend starts during rebuilds
+- Health poll verifies full page loads (checks for `game-container` in body) before triggering reload — prevents landing on 502.html during partial restarts
+- Backend healthcheck `start_period: 300s` accommodates long Docker rebuilds
+- Game loop circuit breaker: stops after 10 consecutive tick failures to prevent infinite error spam
+- `admin:closeRoom` clears rematch vote timeouts to prevent orphaned timer leaks
+- `room:leave` handler wrapped in try-catch to prevent unhandled promise rejections
+- Stale room cleanup extracted to `cleanupStaleRoom()` helper — shared by room:create and room:join
+- Frontend views (RoomUI, RoomsView, FriendsView, MessagesView) use event delegation instead of per-render listener attachment
 - See [docs/infrastructure.md](docs/infrastructure.md)
 
 ## Performance Optimizations

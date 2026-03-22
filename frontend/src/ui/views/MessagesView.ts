@@ -48,6 +48,7 @@ export class MessagesView implements ILobbyView {
 
   async render(container: HTMLElement): Promise<void> {
     this.container = container;
+    this.setupDelegatedListeners();
     await this.loadConversations();
 
     if (this.initialTarget) {
@@ -56,6 +57,66 @@ export class MessagesView implements ILobbyView {
     } else {
       this.renderView();
     }
+  }
+
+  /** Set up delegated event handlers once — survive innerHTML rebuilds */
+  private setupDelegatedListeners(): void {
+    if (!this.container) return;
+
+    // Conversation list clicks
+    this.container.addEventListener('click', (e) => {
+      const convItem = (e.target as HTMLElement).closest(
+        '.messages-conv-item',
+      ) as HTMLElement | null;
+      if (convItem) {
+        const userId = parseInt(convItem.dataset.convUserId!);
+        const username = convItem.dataset.convUsername!;
+        this.openConversation(userId, username);
+        return;
+      }
+
+      // Send button
+      const sendBtn = (e.target as HTMLElement).closest('[data-msg-send]');
+      if (sendBtn) {
+        this.sendMessage();
+      }
+    });
+
+    // Enter key in message input
+    this.container.addEventListener('keydown', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.matches('[data-msg-input]') && e.key === 'Enter') {
+        this.sendMessage();
+      }
+    });
+  }
+
+  private sendMessage(): void {
+    const input = this.container?.querySelector('[data-msg-input]') as HTMLInputElement;
+    if (!input) return;
+
+    const text = input.value.trim();
+    if (!text || !this.activeConversation) return;
+
+    this.deps.socketClient.emit(
+      'dm:send',
+      { toUserId: this.activeConversation.userId, message: text },
+      (res) => {
+        if (res.success && res.message) {
+          this.messages.push(res.message);
+          this.renderMessages();
+          this.scrollToBottom();
+          const conv = this.conversations.find((c) => c.userId === this.activeConversation?.userId);
+          if (conv) {
+            conv.lastMessage = text;
+            conv.lastMessageAt = res.message.createdAt;
+          }
+        } else {
+          this.deps.notifications.error(res.error || 'Failed to send message');
+        }
+      },
+    );
+    input.value = '';
   }
 
   destroy(): void {
@@ -220,7 +281,7 @@ export class MessagesView implements ILobbyView {
 
     if (this.activeConversation) {
       this.renderMessages();
-      this.bindMessageInput();
+      this.focusMessageInput();
       this.scrollToBottom();
     }
   }
@@ -266,13 +327,7 @@ export class MessagesView implements ILobbyView {
       })
       .join('');
 
-    listEl.querySelectorAll('.messages-conv-item').forEach((item) => {
-      item.addEventListener('click', () => {
-        const userId = parseInt((item as HTMLElement).dataset.convUserId!);
-        const username = (item as HTMLElement).dataset.convUsername!;
-        this.openConversation(userId, username);
-      });
-    });
+    // Click listeners are delegated via setupDelegatedListeners()
   }
 
   private renderMessages(): void {
@@ -303,44 +358,9 @@ export class MessagesView implements ILobbyView {
       .join('');
   }
 
-  private bindMessageInput(): void {
+  private focusMessageInput(): void {
     const input = this.container?.querySelector('[data-msg-input]') as HTMLInputElement;
-    const sendBtn = this.container?.querySelector('[data-msg-send]');
-    if (!input || !sendBtn) return;
-
-    const send = () => {
-      const text = input.value.trim();
-      if (!text || !this.activeConversation) return;
-
-      this.deps.socketClient.emit(
-        'dm:send',
-        { toUserId: this.activeConversation.userId, message: text },
-        (res) => {
-          if (res.success && res.message) {
-            this.messages.push(res.message);
-            this.renderMessages();
-            this.scrollToBottom();
-            const conv = this.conversations.find(
-              (c) => c.userId === this.activeConversation?.userId,
-            );
-            if (conv) {
-              conv.lastMessage = text;
-              conv.lastMessageAt = res.message.createdAt;
-            }
-          } else {
-            this.deps.notifications.error(res.error || 'Failed to send message');
-          }
-        },
-      );
-      input.value = '';
-    };
-
-    sendBtn.addEventListener('click', send);
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') send();
-    });
-
-    requestAnimationFrame(() => input.focus());
+    if (input) requestAnimationFrame(() => input.focus());
   }
 
   private scrollToBottom(): void {

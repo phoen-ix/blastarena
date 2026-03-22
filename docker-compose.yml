@@ -97,7 +97,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 30s
+      start_period: 300s
     logging:
       driver: json-file
       options:
@@ -117,6 +117,12 @@ services:
         condition: service_healthy
     networks:
       - internal
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     logging:
       driver: json-file
       options:

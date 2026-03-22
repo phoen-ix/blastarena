@@ -50,7 +50,7 @@ export class RoomUI {
       id: 'room',
       elements: () => [
         ...this.container.querySelectorAll<HTMLElement>(
-          '#room-back, .team-select, .bot-team-select, #room-ready, #room-start',
+          '[data-action="back"], .team-select, .bot-team-select, [data-action="ready"], [data-action="start"]',
         ),
       ],
       onBack: () => {
@@ -89,6 +89,40 @@ export class RoomUI {
       if (player) player.ready = data.ready;
       this.render();
     });
+
+    // Delegated event handlers — set up once, survive innerHTML rebuilds
+    this.container.addEventListener('click', (e) => {
+      const target = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
+      if (!target) return;
+
+      switch (target.dataset.action) {
+        case 'back':
+          this.socketClient.emit('room:leave');
+          this.hide();
+          this.onLeave();
+          break;
+        case 'start':
+          this.socketClient.emit('room:start');
+          break;
+        case 'ready':
+          this.socketClient.emit('room:ready', { ready: !this.isReady() });
+          break;
+        case 'invite-info':
+          this.notifications.info('Use the Friends panel (lobby) to invite friends to this room');
+          break;
+      }
+    });
+
+    this.container.addEventListener('change', (e) => {
+      const target = e.target as HTMLSelectElement;
+      if (target.classList.contains('team-select')) {
+        const userId = parseInt(target.dataset.userId!);
+        this.socketClient.emit('room:setTeam', { userId, team: parseInt(target.value) });
+      } else if (target.classList.contains('bot-team-select')) {
+        const botIndex = parseInt(target.dataset.botIndex!);
+        this.socketClient.emit('room:setBotTeam', { botIndex, team: parseInt(target.value) });
+      }
+    });
   }
 
   private removeListeners(): void {
@@ -125,12 +159,12 @@ export class RoomUI {
     this.container.innerHTML = `
       <div class="lobby-header">
         <div style="display:flex;align-items:center;gap:16px;">
-          <button class="btn btn-ghost" id="room-back" style="padding:8px 14px;">← Back</button>
+          <button class="btn btn-ghost" data-action="back" style="padding:8px 14px;">← Back</button>
           <h1>${escapeHtml(this.room.name)}</h1>
           <span class="room-mode" style="font-size:12px;padding:4px 12px;">${modeLabel}</span>
         </div>
         <div style="display:flex;gap:12px;align-items:center;">
-          <button class="btn btn-ghost" id="room-invite-friend" style="padding:6px 14px;font-size:12px;color:var(--accent);">Invite Friend</button>
+          <button class="btn btn-ghost" data-action="invite-info" style="padding:6px 14px;font-size:12px;color:var(--accent);">Invite Friend</button>
           <span style="color:var(--text-dim);font-size:13px;">Room Code: <strong style="color:var(--text);letter-spacing:2px;font-family:var(--font-mono);">${this.room.code}</strong></span>
         </div>
       </div>
@@ -150,13 +184,13 @@ export class RoomUI {
             ${
               isHost
                 ? `
-              <button class="btn btn-primary" id="room-start" ${canStart ? '' : 'disabled'}
+              <button class="btn btn-primary" data-action="start" ${canStart ? '' : 'disabled'}
                 style="flex:1;padding:14px;font-size:16px;font-family:var(--font-display);letter-spacing:1px;text-transform:uppercase;">
                 ${this.room.players.length < 2 && botCount < 1 ? 'Need Players or Bots' : !allReady ? 'Waiting for Players...' : 'Start Game'}
               </button>
             `
                 : `
-              <button class="btn ${isReady ? 'btn-secondary' : 'btn-primary'}" id="room-ready"
+              <button class="btn ${isReady ? 'btn-secondary' : 'btn-primary'}" data-action="ready"
                 style="flex:1;padding:14px;font-size:16px;font-family:var(--font-display);letter-spacing:1px;text-transform:uppercase;">
                 ${isReady ? 'Not Ready' : 'Ready'}
               </button>
@@ -233,55 +267,6 @@ export class RoomUI {
         </div>
       </div>
     `;
-
-    // Invite friend button
-    const inviteFriendBtn = this.container.querySelector('#room-invite-friend');
-    if (inviteFriendBtn) {
-      inviteFriendBtn.addEventListener('click', () => {
-        this.notifications.info('Use the Friends panel (lobby) to invite friends to this room');
-      });
-    }
-
-    // Event listeners
-    this.container.querySelector('#room-back')!.addEventListener('click', () => {
-      this.socketClient.emit('room:leave');
-      this.hide();
-      this.onLeave();
-    });
-
-    const startBtn = this.container.querySelector('#room-start');
-    if (startBtn) {
-      startBtn.addEventListener('click', () => {
-        this.socketClient.emit('room:start');
-      });
-    }
-
-    const readyBtn = this.container.querySelector('#room-ready');
-    if (readyBtn) {
-      readyBtn.addEventListener('click', () => {
-        this.socketClient.emit('room:ready', { ready: !isReady });
-      });
-    }
-
-    // Team assignment dropdowns (host only, teams mode)
-    this.container.querySelectorAll('.team-select').forEach((select) => {
-      select.addEventListener('change', (e) => {
-        const el = e.target as HTMLSelectElement;
-        const userId = parseInt(el.dataset.userId!);
-        const team = parseInt(el.value);
-        this.socketClient.emit('room:setTeam', { userId, team });
-      });
-    });
-
-    // Bot team assignment dropdowns (host only, teams mode)
-    this.container.querySelectorAll('.bot-team-select').forEach((select) => {
-      select.addEventListener('change', (e) => {
-        const el = e.target as HTMLSelectElement;
-        const botIndex = parseInt(el.dataset.botIndex!);
-        const team = parseInt(el.value);
-        this.socketClient.emit('room:setBotTeam', { botIndex, team });
-      });
-    });
   }
 
   private renderPlayer(player: RoomPlayer, index: number): string {

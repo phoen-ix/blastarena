@@ -176,7 +176,7 @@ Documentation served via backend API from `docs/` directory (bind-mounted in dev
 | Real-time | Socket.io |
 | Database | MariaDB 11 + Redis 7 |
 | Auth | JWT + bcrypt + httpOnly cookies |
-| Security | HTTP security headers, parameterized queries, rate limiting |
+| Security | HTTP security headers, parameterized queries, rate limiting, Zod socket event validation |
 | Validation | Zod |
 | Container | Docker Compose |
 
@@ -208,12 +208,12 @@ blast-arena/
 ## Testing & Linting
 
 ```bash
-npm test                    # Run all test suites (1846 tests)
+npm test                    # Run all test suites (1848 tests)
 npm run lint                # ESLint across all workspaces
 npm run format:check        # Prettier format check
 ```
 
-1846 tests across 58 suites: game logic (450), services (721), routes (486), middleware (36), simulation (69), utilities (72), frontend (42). See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
+1848 tests across 58 suites: game logic (452), services (721), routes (486), middleware (36), simulation (69), utilities (72), frontend (42). See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
 
 ## Documentation
 
