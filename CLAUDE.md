@@ -75,6 +75,7 @@ Campaign modifier — P2 is a smaller, invulnerable support character for young/
 - Power-ups collected by buddy apply to P1's stats via `buddyOwnerId`. Buddy has fixed 1 bomb, 1 fire range
 - Excluded from lock-in checks and alive player counts — only P1 needs to complete objectives
 - `isCoopMode` is false for buddy mode (no shared lives, no partner quit handling)
+- Campaign retry (GameOverScene) must preserve and re-send `buddyMode` flag — check buddy before localCoop in the if/else chain since buddy mode is exclusive with co-op
 - Buddy ID: `-(2000 + (Date.now() % 10000))`. Sprite size enforced every frame to survive texture swaps and tweens
 
 ### Export/Import
@@ -128,7 +129,9 @@ Full-screen panel for admin/moderator roles. 11 tabs: Dashboard, Users, Matches,
 - Spectate-follow breaks only on new keydown or mouse drag (not stale keysDown state); blur handler clears keysDown
 - HUD spectate click uses mousedown event delegation on stable container (not click — unreliable with innerHTML rebuilds)
 - HUDScene forces `localPlayerDead = true` when `simulationSpectate` or `replayMode` registry flags are set
-- Phaser scene lifecycle: shutdown() must be registered via `this.events.once('shutdown', this.shutdown, this)` — Phaser does NOT auto-call shutdown(). Scenes defensively clean up stale state at top of create()
+- Phaser scene lifecycle: shutdown() must be registered via `this.events.once('shutdown', this.shutdown, this)` — Phaser does NOT auto-call shutdown(). Phaser reuses scene instances — constructor runs once, `create()` runs on every scene start. ALL session-specific instance properties (caches, dirty-check values, DOM refs) MUST be reset at top of create() or they carry stale values from the previous game
+- HUDScene listens for campaign state via Phaser event (`campaignStateUpdate`) emitted by GameScene — never register HUDScene directly on the socket for `campaign:state`, because GameScene's blanket `off('campaign:state')` cleanup would remove HUDScene's listener too
+- SocketClient.off() without a handler removes all listeners for that event (Socket.io component-emitter `arguments.length === 1` check). Always store and pass specific handler references for targeted removal
 - `tickEvents` buffer on GameStateManager accumulates per-tick events for fine-grained socket emission in GameRoom
 - Chain reaction tile snapshot: tiles snapshotted before processing detonations so chained bombs use original wall layout
 - Explosion damage cells exclude wall tiles — blast destroys walls but fire doesn't linger on those tiles (prevents walk-into-destroyed-wall kills). Pierce bombs still damage through/beyond walls
@@ -136,6 +139,7 @@ Full-screen panel for admin/moderator roles. 11 tabs: Dashboard, Users, Matches,
 - Game start transitions instantly; `room:start` uses atomic `START_ROOM_LUA` script to prevent TOCTOU race (concurrent starts). Cosmetics are awaited before `game:start` broadcast to prevent visual flicker
 - "Back to Lobby" from game over clears currentRoom registry to prevent stale room UI
 - Play Again: room:restart resets to 'waiting'; other players auto-navigate via room:state listener
+- Campaign game over button: "Play Again" on success, "Retry" on failure
 
 ## Game Reference
 

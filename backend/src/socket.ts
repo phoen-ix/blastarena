@@ -806,6 +806,16 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     socket.on('campaign:start', async (data, callback) => {
       try {
         const campaignManager = getCampaignGameManager();
+
+        // End any existing campaign session IMMEDIATELY — before async operations,
+        // to prevent the old game loop from emitting events during the async gap
+        if (socket.data.activeCampaignSession) {
+          campaignManager.endSession(socket.data.activeCampaignSession);
+          socket.data.activeCampaignSession = undefined;
+          const campaignRoom = `campaign:${socket.data.userId}`;
+          socket.leave(campaignRoom);
+        }
+
         const campaignService = await import('./services/campaign');
         const enemyTypeService = await import('./services/enemy-type');
         const progressService = await import('./services/campaign-progress');

@@ -20,6 +20,7 @@ export class HUDScene extends Phaser.Scene {
     | null = null;
   private killFeedEntries: { text: string; time: number; el?: HTMLElement }[] = [];
   private stateUpdateHandler: ((state: GameState) => void) | null = null;
+  private campaignStateHandler: ((state: CampaignGameState) => void) | null = null;
   private previousStats: {
     maxBombs: number;
     fireRange: number;
@@ -75,15 +76,26 @@ export class HUDScene extends Phaser.Scene {
 
     this.killFeedEntries = [];
     this.previousStats = null;
+    this.statEls = null;
+    this.playerListCache.clear();
+    this.lastCampaignLives = -1;
+    this.lastCampaignEnemyCount = -1;
+    this.campaignHudEl?.remove();
+    this.campaignHudEl = null;
 
     this.socketClient = this.registry.get('socketClient');
+
+    // Hide timer initially for campaign levels with no time limit (prevents 1-frame "3:00" flicker)
+    const initialState = this.registry.get('initialGameState') as GameState | undefined;
+    const hideTimer =
+      !!this.registry.get('campaignMode') && initialState && initialState.roundTime >= 99999;
 
     // Main HUD container
     this.hudContainer = document.createElement('div');
     this.hudContainer.className = 'hud-container';
     this.hudContainer.innerHTML = `
       <div class="hud-top">
-        <div class="hud-timer" id="hud-timer">3:00</div>
+        <div class="hud-timer" id="hud-timer"${hideTimer ? ' style="display:none;"' : ''}>3:00</div>
       </div>
       <div class="hud-spectator-banner" id="hud-spectator" style="display:none;">
         SPECTATOR — WASD/Arrows/D-Pad to pan, 1-9/LB/RB or click to follow
@@ -161,13 +173,12 @@ export class HUDScene extends Phaser.Scene {
       const overlay = document.getElementById('ui-overlay');
       overlay?.appendChild(this.campaignHudEl);
 
-      // Listen for campaign state updates
-      const sc = this.registry.get('socketClient');
-      if (sc) {
-        sc.on('campaign:state', (state: CampaignGameState) => {
-          this.updateCampaignHUD(state);
-        });
-      }
+      // Listen for campaign state updates via Phaser event from GameScene
+      // (not directly on socket — avoids shared-listener cleanup issues across scenes)
+      this.campaignStateHandler = (state: CampaignGameState) => {
+        this.updateCampaignHUD(state);
+      };
+      gameScene.events.on('campaignStateUpdate', this.campaignStateHandler);
     }
   }
 
@@ -493,6 +504,11 @@ export class HUDScene extends Phaser.Scene {
     if (this.playerDiedHandler && this.socketClient) {
       this.socketClient.off('game:playerDied', this.playerDiedHandler);
       this.playerDiedHandler = null;
+    }
+    if (this.campaignStateHandler) {
+      const gameScene = this.scene.get('GameScene');
+      gameScene?.events.off('campaignStateUpdate', this.campaignStateHandler);
+      this.campaignStateHandler = null;
     }
     if (this.spectatorChat) {
       this.spectatorChat.destroy();

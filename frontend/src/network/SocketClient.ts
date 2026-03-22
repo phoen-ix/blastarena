@@ -93,7 +93,13 @@ export class SocketClient {
     handler?: (...args: EventParams<ServerToClientEvents[E]>) => void,
   ): void {
     if (!this.socket) return;
-    (this.socket.off as Function).call(this.socket, event, handler);
+    if (handler) {
+      (this.socket.off as Function).call(this.socket, event, handler);
+    } else {
+      // Call with exactly 1 argument so component-emitter's
+      // `arguments.length === 1` check triggers "remove all listeners for event"
+      (this.socket.off as Function).call(this.socket, event);
+    }
   }
   /* eslint-enable @typescript-eslint/no-unsafe-function-type */
 

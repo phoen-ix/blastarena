@@ -402,9 +402,10 @@ export class GameOverScene extends Phaser.Scene {
       }
     }
 
-    // Retry button
+    // Play Again (on success) / Retry (on failure)
+    const retryLabel = success ? '[ Play Again ]' : '[ Retry ]';
     const retryBtn = this.add
-      .text(width / 2, height - 40, '[ Retry ]', {
+      .text(width / 2, height - 40, retryLabel, {
         fontSize: '20px',
         color: colors.textHex,
         fontFamily: 'Chakra Petch, sans-serif',
@@ -506,6 +507,7 @@ export class GameOverScene extends Phaser.Scene {
   private startCampaignLevel(levelId: number, socketClient: SocketClient): void {
     const isCoopMode = !!this.registry.get('campaignCoopMode');
     const isLocalCoopMode = !!this.registry.get('localCoopMode');
+    const isBuddyMode = !!this.registry.get('buddyMode');
 
     // Fetch enemy types, then emit campaign:start and transition directly to GameScene
     ApiClient.get<any>('/campaign/enemy-types')
@@ -520,6 +522,9 @@ export class GameOverScene extends Phaser.Scene {
           registry.set('campaignMode', true);
           registry.set('campaignCoopMode', isCoopMode || isLocalCoopMode);
           registry.set('localCoopMode', isLocalCoopMode);
+          if (isBuddyMode) {
+            registry.set('buddyMode', true);
+          }
           registry.set('initialGameState', data.state.gameState);
           registry.set('campaignEnemyTypes', enemyTypesResp.enemyTypes || []);
 
@@ -528,7 +533,7 @@ export class GameOverScene extends Phaser.Scene {
         };
         socketClient.on('campaign:gameStart', gameStartHandler);
 
-        // Build start data preserving co-op mode
+        // Build start data preserving co-op mode — check buddy first (exclusive with localCoop)
         const startData: {
           levelId: number;
           coopMode?: boolean;
@@ -536,7 +541,9 @@ export class GameOverScene extends Phaser.Scene {
           localP2?: { userId?: number; username: string; guestColor?: number };
           buddyMode?: boolean;
         } = { levelId };
-        if (isCoopMode && !isLocalCoopMode) {
+        if (isBuddyMode) {
+          startData.buddyMode = true;
+        } else if (isCoopMode && !isLocalCoopMode) {
           startData.coopMode = true;
         } else if (isLocalCoopMode) {
           startData.localCoopMode = true;

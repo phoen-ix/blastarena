@@ -1487,4 +1487,62 @@ describe('GameStateManager', () => {
       expect(bomb.position).toEqual({ x: 4, y: 3 });
     });
   });
+
+  // ─────────────────────────────────────────────────
+  // Buddy Mode
+  // ─────────────────────────────────────────────────
+  describe('Buddy Mode', () => {
+    it('should allow owner to walk onto buddy tile (no collision)', () => {
+      gs = new GameStateManager({ ...BASE_CONFIG, friendlyFire: false });
+      const owner = gs.addPlayer(1, 'Owner', 0);
+      const buddy = gs.addPlayer(-2001, 'Buddy', 0, false, true, 1);
+      startPlaying(gs);
+
+      // Place owner and buddy adjacent
+      placePlayer(owner, 3, 3);
+      placePlayer(buddy, 4, 3);
+      clearCooldown(owner);
+      makeVulnerable(owner);
+
+      // Owner moves right, toward buddy
+      gs.inputBuffer.addInput(1, moveInput('right'));
+      gs.processTick();
+
+      expect(owner.position).toEqual({ x: 4, y: 3 });
+    });
+
+    it('should allow buddy to walk onto owner tile (no collision)', () => {
+      gs = new GameStateManager({ ...BASE_CONFIG, friendlyFire: false });
+      const owner = gs.addPlayer(1, 'Owner', 0);
+      const buddy = gs.addPlayer(-2001, 'Buddy', 0, false, true, 1);
+      startPlaying(gs);
+
+      placePlayer(owner, 4, 3);
+      placePlayer(buddy, 3, 3);
+      clearCooldown(buddy);
+
+      // Buddy moves right, toward owner
+      gs.inputBuffer.addInput(-2001, moveInput('right'));
+      gs.processTick();
+
+      expect(buddy.position).toEqual({ x: 4, y: 3 });
+    });
+
+    it('should still block owner from walking onto other non-buddy player', () => {
+      gs = new GameStateManager({ ...BASE_CONFIG, friendlyFire: false });
+      const p1 = gs.addPlayer(1, 'P1', 0);
+      const p2 = gs.addPlayer(2, 'P2', 0);
+      startPlaying(gs);
+
+      placePlayer(p1, 3, 3);
+      placePlayer(p2, 4, 3);
+      clearCooldown(p1);
+
+      gs.inputBuffer.addInput(1, moveInput('right'));
+      gs.processTick();
+
+      // Should NOT move — P2 blocks
+      expect(p1.position).toEqual({ x: 3, y: 3 });
+    });
+  });
 });

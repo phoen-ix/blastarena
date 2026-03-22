@@ -90,6 +90,7 @@ export class GameScene extends Phaser.Scene {
   private p2PartnerArrow: Phaser.GameObjects.Graphics | null = null;
   private enemyRenderer: EnemySpriteRenderer | null = null;
   private lastCampaignState: CampaignGameState | null = null;
+  private campaignStateHandler: ((state: CampaignGameState) => void) | null = null;
 
   // Emotes
   private emoteRenderer: EmoteBubbleRenderer | null = null;
@@ -129,6 +130,15 @@ export class GameScene extends Phaser.Scene {
     this.socketClient.off('game:state');
     this.socketClient.off('game:over');
     this.socketClient.off('game:emote');
+    // Remove only OUR campaign:state handler — HUDScene also listens on this event
+    if (this.campaignStateHandler) {
+      this.socketClient.off('campaign:state', this.campaignStateHandler);
+      this.campaignStateHandler = null;
+    }
+    this.socketClient.off('campaign:levelComplete');
+    this.socketClient.off('campaign:gameOver');
+    this.socketClient.off('campaign:playerLockedIn');
+    this.socketClient.off('campaign:partnerLeft');
     this.removeSpectatorListeners();
     if (this.emoteKeyHandler) {
       window.removeEventListener('keydown', this.emoteKeyHandler);
@@ -346,11 +356,15 @@ export class GameScene extends Phaser.Scene {
       }
       this.enemyRenderer = new EnemySpriteRenderer(this);
 
-      this.socketClient.on('campaign:state', (state) => {
+      this.campaignStateHandler = (state: CampaignGameState) => {
         this.lastCampaignState = state;
         this.updateState(state.gameState);
         this.enemyRenderer?.update(state.enemies);
-      });
+        // Emit campaign state as Phaser event so HUDScene can listen without
+        // needing its own socket listener (avoids shared-listener cleanup bugs)
+        this.events.emit('campaignStateUpdate', state);
+      };
+      this.socketClient.on('campaign:state', this.campaignStateHandler);
 
       this.socketClient.on('campaign:levelComplete', (data) => {
         this.registry.set('gameOverData', {
@@ -1184,7 +1198,11 @@ export class GameScene extends Phaser.Scene {
     this.socketClient.off('sim:state');
     this.socketClient.off('sim:gameTransition');
     this.socketClient.off('sim:completed');
-    this.socketClient.off('campaign:state');
+    // Remove only OUR campaign:state handler — HUDScene also listens on this event
+    if (this.campaignStateHandler) {
+      this.socketClient.off('campaign:state', this.campaignStateHandler);
+      this.campaignStateHandler = null;
+    }
     this.socketClient.off('campaign:levelComplete');
     this.socketClient.off('campaign:gameOver');
     this.socketClient.off('campaign:playerLockedIn');
