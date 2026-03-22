@@ -122,6 +122,9 @@ const levelSchema = z.object({
   powerupDropRate: z.number().min(0).max(1).optional(),
   reinforcedWalls: z.boolean().optional(),
   hazardTiles: z.boolean().optional(),
+  coveredTiles: z
+    .array(z.object({ x: z.number().int(), y: z.number().int(), type: z.string() }))
+    .optional(),
   isPublished: z.boolean().optional(),
 });
 
