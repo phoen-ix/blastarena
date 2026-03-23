@@ -48,14 +48,6 @@ export function getExplosionCells(
 
       const tile = tiles[ny][nx];
       if (tile === 'wall') break;
-      // Closed gates block explosions like walls
-      if (
-        tile === 'gate_red' ||
-        tile === 'gate_blue' ||
-        tile === 'gate_green' ||
-        tile === 'gate_yellow'
-      )
-        break;
 
       cells.push({ x: nx, y: ny });
 

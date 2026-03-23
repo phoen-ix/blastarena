@@ -84,7 +84,7 @@ Environmental puzzle system with switches, gates, and crumbling floors. 18 new t
   - `toggle`: flips on step-on or blast
   - `pressure`: active while occupied by player/bomb; deactivates when vacated
   - `oneshot`: activates permanently on first step-on or blast
-- **Gates** (4 colors × 2 states): `gate_red` (closed, impassable like wall) / `gate_red_open` (walkable). Linked to switches by color (OR logic: any active switch of color → gates open). Block explosions when closed
+- **Gates** (4 colors × 2 states): `gate_red` (closed, impassable like wall) / `gate_red_open` (walkable). Linked to switches by color (OR logic: any active switch of color → gates open). Explosions pass through gates in both states (only movement is blocked when closed)
 - **Crumbling floor**: `crumbling` → `pit` after entity steps off (10-tick delay). Enemies trigger crumbling (unless `canPassWalls`), buddy does NOT trigger
 - `GameStateManager.setTileTracked(x, y, type)` for puzzle tile state changes (records tileDiff + updates collision)
 - `CampaignGame.processPuzzleTiles()` runs in campaignTick between hidden power-up reveals and boss phases
