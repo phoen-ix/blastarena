@@ -1526,6 +1526,21 @@ export class LevelEditorScene extends Phaser.Scene {
     activeBtn.style.borderColor = 'var(--primary)';
   }
 
+  private showToast(message: string, type: 'success' | 'error' = 'success'): void {
+    const toast = document.createElement('div');
+    const bg = type === 'success' ? 'var(--primary)' : '#d94444';
+    toast.textContent = message;
+    toast.style.cssText = `position:fixed;top:20px;left:50%;transform:translateX(-50%);background:${bg};color:#fff;padding:8px 20px;border-radius:6px;font-size:13px;font-family:'DM Sans',sans-serif;z-index:10000;opacity:0;transition:opacity 0.3s;pointer-events:none;`;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => {
+      toast.style.opacity = '1';
+    });
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 300);
+    }, 2000);
+  }
+
   private async saveLevel(): Promise<void> {
     const apiClient = ApiClient;
 
@@ -1575,9 +1590,9 @@ export class LevelEditorScene extends Phaser.Scene {
       if (this.levelId) {
         await apiClient.put(`/admin/campaign/levels/${this.levelId}`, levelData);
       }
-      alert('Level saved!');
+      this.showToast('Level saved!', 'success');
     } catch (err) {
-      alert('Save failed: ' + (err as Error).message);
+      this.showToast('Save failed: ' + (err as Error).message, 'error');
     }
   }
 

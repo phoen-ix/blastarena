@@ -90,6 +90,7 @@ Environmental puzzle system with switches, gates, and crumbling floors. 18 new t
 - `CampaignGame.processPuzzleTiles()` runs in campaignTick between hidden power-up reveals and boss phases
 - Editor: Puzzle palette section with color selector, variant selector (toggle/pressure/oneshot), link mode (switch → gate). `drawPuzzleLinks()` shows colored lines between linked switches/gates. Color/variant buttons use `.puzzle-color-btn`/`.puzzle-variant-btn` classes to survive `highlightActiveTool()` resets
 - Editor map resize: `resizeMap()` clears old perimeter `wall` tiles that become interior when growing, then enforces new perimeter walls
+- Editor save uses non-blocking `showToast()` (fade-in/out, 2s) instead of `alert()` — green for success, red for errors
 - `PuzzleConfig` stored in `campaign_levels.puzzle_config` JSON column (migration 024). `shared/src/utils/puzzle.ts` exports helpers: `isSwitchTile`, `isGateTile`, `isGateClosed`, `getSwitchColor`, `getGateColor`, `getSwitchTile`, `getGateTile`, `PUZZLE_COLORS`, `PUZZLE_COLOR_VALUES`, `CRUMBLE_DELAY_TICKS`
 - Switches/gates can be covered tiles (hidden under destructible walls). Buddy blocked by closed gates and pits
 
