@@ -81,9 +81,9 @@ Campaign modifier — P2 is a smaller, invulnerable support character for young/
 ### Puzzle Tiles (Campaign Only)
 Environmental puzzle system with switches, gates, and crumbling floors. 18 new tile types, campaign-only.
 - **Switches** (4 colors × 2 states): `switch_red` / `switch_red_active` etc. Three variants stored in `puzzleConfig.switchVariants` (key="x,y"):
-  - `toggle`: flips on step-on or blast
-  - `pressure`: active while occupied by player/bomb; deactivates when vacated
-  - `oneshot`: activates permanently on first step-on or blast
+  - `toggle`: flips on step-on or blast (rising-edge detection — reacts only on first tick of explosion via `prevSwitchBlasted` set)
+  - `pressure`: active while occupied by player/bomb; blast activates on first tick only
+  - `oneshot`: activates permanently on first step-on or blast (rising-edge)
 - **Gates** (4 colors × 2 states): `gate_red` (closed, impassable like wall) / `gate_red_open` (walkable). Linked to switches by color (OR logic: any active switch of color → gates open). Explosions pass through gates in both states (only movement is blocked when closed)
 - **Crumbling floor**: `crumbling` → `pit` after entity steps off (10-tick delay). Enemies trigger crumbling (unless `canPassWalls`), buddy does NOT trigger
 - `GameStateManager.setTileTracked(x, y, type)` for puzzle tile state changes (records tileDiff + updates collision)

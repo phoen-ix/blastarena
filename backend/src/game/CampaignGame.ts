@@ -120,6 +120,7 @@ export class CampaignGame {
   private crumblingVisited: Map<string, number> = new Map(); // "x,y" → tick when entity last stood on it
   private crumblingOccupied: Set<string> = new Set(); // positions currently occupied
   private prevSwitchOccupied: Set<string> = new Set(); // switch positions occupied last tick
+  private prevSwitchBlasted: Set<string> = new Set(); // switch positions blasted last tick
 
   // Enemy bombs tracked separately (they participate in standard bomb mechanics)
   private enemyBombIds: Set<string> = new Set();
@@ -887,6 +888,8 @@ export class CampaignGame {
       const isOccupied = currentOccupied.has(key);
       const wasOccupied = this.prevSwitchOccupied.has(key);
       const isBlasted = explodedPositions.has(key);
+      const wasBlasted = this.prevSwitchBlasted.has(key);
+      const blastHit = isBlasted && !wasBlasted; // rising edge — first tick of explosion
       const color = getSwitchColor(
         this.gameState.map.tiles[Number(key.split(',')[1])][Number(key.split(',')[0])],
       );
@@ -896,23 +899,23 @@ export class CampaignGame {
 
       switch (variant) {
         case 'toggle': {
-          // Flip on step-on (transition from unoccupied to occupied) or blast hit
+          // Flip on step-on (transition) or blast hit (first tick only)
           const steppedOn = isOccupied && !wasOccupied;
-          if (steppedOn || isBlasted) {
+          if (steppedOn || blastHit) {
             newActive = !wasActive;
           }
           break;
         }
         case 'pressure': {
-          // Active while occupied; blast activates for one tick
-          newActive = isOccupied || isBlasted;
+          // Active while occupied; blast activates only on first tick
+          newActive = isOccupied || blastHit;
           break;
         }
         case 'oneshot': {
           // Once activated, stays active forever
           if (!wasActive) {
             const steppedOn = isOccupied && !wasOccupied;
-            if (steppedOn || isBlasted) {
+            if (steppedOn || blastHit) {
               newActive = true;
             }
           }
@@ -963,11 +966,15 @@ export class CampaignGame {
       }
     }
 
-    // Update previous occupied set for next tick
+    // Update previous occupied/blasted sets for next tick
     this.prevSwitchOccupied = new Set<string>();
+    this.prevSwitchBlasted = new Set<string>();
     for (const key of this.switchStates.keys()) {
       if (currentOccupied.has(key)) {
         this.prevSwitchOccupied.add(key);
+      }
+      if (explodedPositions.has(key)) {
+        this.prevSwitchBlasted.add(key);
       }
     }
   }
