@@ -522,9 +522,12 @@ export class CampaignGame {
     if (!this.replayRecorder) return;
     // Record standard game state + tile diffs
     const gameState = state.gameState;
+    // Override timeElapsed with campaign-adjusted time (excludes countdown ticks)
+    const campaignElapsed = (this.gameState.tick - this.startTick) / TICK_RATE;
     const replayState = {
       ...gameState,
       map: { ...gameState.map, tiles: this.gameState.map.tiles },
+      timeElapsed: campaignElapsed,
     };
     this.replayRecorder.recordTick(replayState, this.gameState.tickEvents);
     // Attach campaign-specific data to the frame
