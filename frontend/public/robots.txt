@@ -3,4 +3,4 @@ Allow: /
 Disallow: /api/
 Disallow: /socket.io/
 
-Sitemap: /sitemap.xml
+Sitemap: https://www.blastarena.at/sitemap.xml
