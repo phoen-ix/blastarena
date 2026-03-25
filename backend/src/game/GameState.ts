@@ -956,33 +956,38 @@ export class GameStateManager {
     }
 
     for (const bomb of this.bombs.values()) {
+      const tile = this.collisionSystem.getTileAt(bomb.position.x, bomb.position.y);
+      let convDir: Direction | null = null;
+      switch (tile) {
+        case 'conveyor_up':
+          convDir = 'up';
+          break;
+        case 'conveyor_down':
+          convDir = 'down';
+          break;
+        case 'conveyor_left':
+          convDir = 'left';
+          break;
+        case 'conveyor_right':
+          convDir = 'right';
+          break;
+      }
+      if (!convDir) continue;
+
+      if (bomb.sliding) {
+        // Redirect sliding (kicked) bombs to match conveyor direction
+        bomb.sliding = convDir;
+        continue;
+      }
+
+      // Push stationary bombs with cooldown
       if (bomb.conveyorCooldown > 0) {
         bomb.conveyorCooldown--;
         continue;
       }
-      // Don't push bombs that are already sliding from a kick
-      if (bomb.sliding) continue;
 
-      const tile = this.collisionSystem.getTileAt(bomb.position.x, bomb.position.y);
-      let dir: Direction | null = null;
-      switch (tile) {
-        case 'conveyor_up':
-          dir = 'up';
-          break;
-        case 'conveyor_down':
-          dir = 'down';
-          break;
-        case 'conveyor_left':
-          dir = 'left';
-          break;
-        case 'conveyor_right':
-          dir = 'right';
-          break;
-      }
-      if (!dir) continue;
-
-      const dx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
-      const dy = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
+      const dx = convDir === 'left' ? -1 : convDir === 'right' ? 1 : 0;
+      const dy = convDir === 'up' ? -1 : convDir === 'down' ? 1 : 0;
       const nextX = bomb.position.x + dx;
       const nextY = bomb.position.y + dy;
       const nextKey = `${nextX},${nextY}`;
