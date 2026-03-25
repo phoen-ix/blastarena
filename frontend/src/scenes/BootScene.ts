@@ -260,42 +260,76 @@ export class BootScene extends Phaser.Scene {
       tpGfx.destroy();
     }
 
-    // Conveyor textures
-    const arrowDirs: Record<string, number> = {
+    // Conveyor textures — animated moving stripes
+    const CONVEYOR_FRAMES = 4;
+    const CONVEYOR_FPS = 8;
+    const STRIPE_W = 8; // stripe band width; full cycle = STRIPE_W * 2 = 16px
+    const conveyorDirs: Record<string, { horizontal: boolean; positive: boolean }> = {
+      up: { horizontal: false, positive: false },
+      down: { horizontal: false, positive: true },
+      left: { horizontal: true, positive: false },
+      right: { horizontal: true, positive: true },
+    };
+    const chevronAngles: Record<string, number> = {
       up: -Math.PI / 2,
       down: Math.PI / 2,
       left: Math.PI,
       right: 0,
     };
-    for (const [dir, angle] of Object.entries(arrowDirs)) {
-      const convGfx = this.make.graphics({ x: 0, y: 0 });
-      convGfx.fillStyle(0x2a2a3e, 1);
-      convGfx.fillRect(0, 0, 48, 48);
-      convGfx.fillStyle(0x3a3a4e, 0.5);
-      convGfx.fillRect(2, 2, 44, 44);
-      // Draw 3 arrows
-      convGfx.lineStyle(2, 0x88aacc, 0.6);
-      for (let offset = -12; offset <= 12; offset += 12) {
-        const cx = 24 + Math.cos(angle + Math.PI / 2) * offset * 0.3;
-        const cy = 24 + Math.sin(angle + Math.PI / 2) * offset * 0.3;
-        const ax = Math.cos(angle) * 8;
-        const ay = Math.sin(angle) * 8;
+    for (const [dir, { horizontal, positive }] of Object.entries(conveyorDirs)) {
+      for (let f = 0; f < CONVEYOR_FRAMES; f++) {
+        const gfx = this.make.graphics({ x: 0, y: 0 });
+        // Background
+        gfx.fillStyle(0x2a2a3e, 1);
+        gfx.fillRect(0, 0, 48, 48);
+        gfx.fillStyle(0x3a3a4e, 0.5);
+        gfx.fillRect(2, 2, 44, 44);
+        // Stripe offset: each frame shifts by (cycle / frames) pixels
+        const cycle = STRIPE_W * 2;
+        const rawOffset = (f / CONVEYOR_FRAMES) * cycle;
+        const offset = positive ? rawOffset : -rawOffset;
+        // Draw stripe bands perpendicular to movement
+        gfx.fillStyle(0x88aacc, 0.35);
+        if (horizontal) {
+          // Vertical stripe bands moving left/right
+          for (let sx = -cycle; sx < 48 + cycle; sx += cycle) {
+            const x0 = sx + (((offset % cycle) + cycle) % cycle);
+            gfx.fillRect(x0, 0, STRIPE_W, 48);
+          }
+        } else {
+          // Horizontal stripe bands moving up/down
+          for (let sy = -cycle; sy < 48 + cycle; sy += cycle) {
+            const y0 = sy + (((offset % cycle) + cycle) % cycle);
+            gfx.fillRect(0, y0, 48, STRIPE_W);
+          }
+        }
+        // Small center chevron arrow for direction hint
+        const angle = chevronAngles[dir];
+        const ax = Math.cos(angle) * 5;
+        const ay = Math.sin(angle) * 5;
         const px = Math.cos(angle + Math.PI / 2);
         const py = Math.sin(angle + Math.PI / 2);
-        convGfx.beginPath();
-        convGfx.moveTo(cx - ax, cy - ay);
-        convGfx.lineTo(cx + ax, cy + ay);
-        convGfx.strokePath();
-        // Arrowhead
-        convGfx.beginPath();
-        convGfx.moveTo(cx + ax, cy + ay);
-        convGfx.lineTo(cx + ax * 0.3 + px * 4, cy + ay * 0.3 + py * 4);
-        convGfx.moveTo(cx + ax, cy + ay);
-        convGfx.lineTo(cx + ax * 0.3 - px * 4, cy + ay * 0.3 - py * 4);
-        convGfx.strokePath();
+        gfx.lineStyle(2, 0x88aacc, 0.5);
+        gfx.beginPath();
+        gfx.moveTo(24 + ax, 24 + ay);
+        gfx.lineTo(24 - ax * 0.4 + px * 4, 24 - ay * 0.4 + py * 4);
+        gfx.moveTo(24 + ax, 24 + ay);
+        gfx.lineTo(24 - ax * 0.4 - px * 4, 24 - ay * 0.4 - py * 4);
+        gfx.strokePath();
+        // Frame 0 keeps the base key for backward compatibility
+        const key = f === 0 ? `conveyor_${dir}` : `conveyor_${dir}_${f}`;
+        gfx.generateTexture(key, 48, 48);
+        gfx.destroy();
       }
-      convGfx.generateTexture(`conveyor_${dir}`, 48, 48);
-      convGfx.destroy();
+      // Create looping animation
+      this.anims.create({
+        key: `conveyor_${dir}_anim`,
+        frames: Array.from({ length: CONVEYOR_FRAMES }, (_, i) => ({
+          key: i === 0 ? `conveyor_${dir}` : `conveyor_${dir}_${i}`,
+        })),
+        frameRate: CONVEYOR_FPS,
+        repeat: -1,
+      });
     }
 
     // Exit tile (trapdoor)

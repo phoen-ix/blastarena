@@ -225,6 +225,7 @@ export interface CampaignGameState {
   exitOpen: boolean;
   coopMode: boolean;
   buddyMode?: boolean;
+  theme?: string;
   respawnTimers?: Record<number, number>; // playerId → ticks remaining until respawn
   lockedInPlayers?: number[]; // playerIds frozen on exit/goal tile
 }

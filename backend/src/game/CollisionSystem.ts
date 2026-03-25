@@ -48,7 +48,16 @@ export class CollisionSystem {
       tile === 'gate_blue_open' ||
       tile === 'gate_green_open' ||
       tile === 'gate_yellow_open' ||
-      tile === 'crumbling'
+      tile === 'crumbling' ||
+      // Hazard tiles (campaign only)
+      tile === 'vine' ||
+      tile === 'quicksand' ||
+      tile === 'ice' ||
+      tile === 'mud' ||
+      tile === 'spikes' ||
+      tile === 'spikes_active' ||
+      tile === 'dark_rift'
+      // Note: 'lava' is intentionally NOT walkable (impassable like wall)
     );
   }
 
@@ -118,6 +127,7 @@ export class CollisionSystem {
     if (
       tile === 'wall' ||
       tile === 'pit' ||
+      tile === 'lava' ||
       tile === 'gate_red' ||
       tile === 'gate_blue' ||
       tile === 'gate_green' ||
@@ -146,6 +156,10 @@ export class CollisionSystem {
       return true;
     }
     if ((tile as string) === 'destructible_cracked') {
+      this.tiles[y][x] = 'empty';
+      return true;
+    }
+    if (tile === 'vine') {
       this.tiles[y][x] = 'empty';
       return true;
     }

@@ -742,6 +742,9 @@ export class CampaignUI {
         registry.set('localCoopMode', localCoopMode || buddyMode);
         registry.set('initialGameState', data.state.gameState);
         registry.set('campaignEnemyTypes', enemyTypesResp.enemyTypes || []);
+        if (data.state.theme) {
+          registry.set('campaignTheme', data.state.theme);
+        }
 
         // Transition to GameScene + HUDScene
         const activeScene = game.scene.getScene('LobbyScene') || game.scene.getScene('MenuScene');

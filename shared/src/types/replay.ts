@@ -75,6 +75,7 @@ export interface CampaignReplayMeta {
   worldName: string;
   coopMode: boolean;
   buddyMode?: boolean;
+  theme?: string;
   enemyTypes: EnemyTypeEntry[];
   lives: number;
   winCondition: CampaignWinCondition;

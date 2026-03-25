@@ -12,10 +12,14 @@ import {
   isGateTile,
   getSwitchColor,
   getGateColor,
+  CampaignWorldTheme,
+  HAZARD_TILES_BY_THEME,
+  HAZARD_TILE_NAMES,
 } from '@blast-arena/shared';
 import { EnemyTextureGenerator } from '../game/EnemyTextureGenerator';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { ApiClient } from '../network/ApiClient';
+import { generateThemedTileTextures, generateHazardTileTextures } from '../utils/campaignThemes';
 
 type EditorTool =
   | 'empty'
@@ -33,6 +37,13 @@ type EditorTool =
   | 'puzzle_switch'
   | 'puzzle_gate'
   | 'crumbling'
+  | 'vine'
+  | 'quicksand'
+  | 'ice'
+  | 'lava'
+  | 'mud'
+  | 'spikes'
+  | 'dark_rift'
   | 'enemy'
   | 'powerup'
   | 'eraser';
@@ -78,6 +89,7 @@ export class LevelEditorScene extends Phaser.Scene {
   private switchVariant: SwitchVariant = 'toggle';
   private puzzleSwitchVariants: Map<string, SwitchVariant> = new Map();
   private puzzleLinkGraphics: Phaser.GameObjects.Graphics | null = null;
+  private worldTheme: CampaignWorldTheme = 'classic';
 
   private currentTool: EditorTool = 'empty';
   private selectedEnemyTypeId: number = 0;
@@ -219,6 +231,27 @@ export class LevelEditorScene extends Phaser.Scene {
       }
     }
 
+    // Fetch world theme
+    const worldId = this.level?.worldId ?? this.registry.get('editorWorldId');
+    if (worldId) {
+      try {
+        const worldResp = await apiClient.get<{ world: { theme?: string } }>(
+          `/admin/campaign/worlds/${worldId}`,
+        );
+        if (worldResp.world?.theme) {
+          this.worldTheme = worldResp.world.theme as CampaignWorldTheme;
+        }
+      } catch {
+        // default to classic
+      }
+    }
+
+    // Generate themed textures for the editor
+    if (this.worldTheme !== 'classic') {
+      generateThemedTileTextures(this, this.worldTheme);
+    }
+    generateHazardTileTextures(this);
+
     // Initialize empty map if no level loaded
     if (this.tiles.length === 0) {
       this.initEmptyMap();
@@ -260,6 +293,10 @@ export class LevelEditorScene extends Phaser.Scene {
           texture,
         );
         sprite.setDepth(0);
+        if (this.isConveyorType(this.tiles[y][x])) {
+          const animKey = `${this.tiles[y][x]}_anim`;
+          if (this.anims.exists(animKey)) sprite.play(animKey);
+        }
         this.tileSprites[y][x] = sprite;
       }
     }
@@ -449,13 +486,14 @@ export class LevelEditorScene extends Phaser.Scene {
   }
 
   private getTileTexture(type: TileType, x: number, y: number): string {
+    const themed = this.worldTheme && this.worldTheme !== 'classic';
     switch (type) {
       case 'wall':
-        return 'wall';
+        return themed ? 'themed_wall' : 'wall';
       case 'destructible':
-        return 'destructible';
+        return themed ? 'themed_destructible' : 'destructible';
       case 'destructible_cracked':
-        return 'destructible_cracked';
+        return themed ? 'themed_destructible_cracked' : 'destructible_cracked';
       case 'exit':
         return 'exit';
       case 'goal':
@@ -491,10 +529,20 @@ export class LevelEditorScene extends Phaser.Scene {
       case 'crumbling':
       case 'pit':
         return type;
+      // Hazard tiles — texture key matches tile type name
+      case 'vine':
+      case 'quicksand':
+      case 'ice':
+      case 'lava':
+      case 'mud':
+      case 'spikes':
+      case 'spikes_active':
+      case 'dark_rift':
+        return type;
       case 'spawn':
-        return `floor_${(x + y) % 4}`;
+        return themed ? `themed_floor_${(x + y) % 4}` : `floor_${(x + y) % 4}`;
       default:
-        return `floor_${(x + y) % 4}`;
+        return themed ? `themed_floor_${(x + y) % 4}` : `floor_${(x + y) % 4}`;
     }
   }
 
@@ -727,6 +775,23 @@ export class LevelEditorScene extends Phaser.Scene {
         }
         break;
       }
+      case 'vine':
+      case 'quicksand':
+      case 'ice':
+      case 'lava':
+      case 'mud':
+      case 'spikes':
+      case 'dark_rift': {
+        const isWallHz = currentTile === 'destructible' || currentTile === 'destructible_cracked';
+        if (isWallHz) {
+          this.setCoveredTile(tx, ty, this.currentTool as TileType);
+        } else {
+          this.removeCoveredTile(tx, ty);
+          this.tiles[ty][tx] = this.currentTool as TileType;
+          this.updateTileSprite(tx, ty);
+        }
+        break;
+      }
       case 'eraser':
         this.removeCoveredTile(tx, ty);
         this.puzzleSwitchVariants.delete(posKey);
@@ -785,8 +850,17 @@ export class LevelEditorScene extends Phaser.Scene {
   }
 
   private updateTileSprite(x: number, y: number, skipOverlay?: boolean): void {
-    const texture = this.getTileTexture(this.tiles[y][x], x, y);
-    this.tileSprites[y]?.[x]?.setTexture(texture);
+    const tileType = this.tiles[y][x];
+    const texture = this.getTileTexture(tileType, x, y);
+    const sprite = this.tileSprites[y]?.[x];
+    if (sprite) {
+      sprite.stop();
+      sprite.setTexture(texture);
+      if (this.isConveyorType(tileType)) {
+        const animKey = `${tileType}_anim`;
+        if (this.anims.exists(animKey)) sprite.play(animKey);
+      }
+    }
     if (!skipOverlay) this.drawSpawnOverlay();
   }
 
@@ -826,6 +900,15 @@ export class LevelEditorScene extends Phaser.Scene {
     );
   }
 
+  private isConveyorType(type: TileType | string): boolean {
+    return (
+      type === 'conveyor_up' ||
+      type === 'conveyor_down' ||
+      type === 'conveyor_left' ||
+      type === 'conveyor_right'
+    );
+  }
+
   /** Store a special tile as covered by the destructible wall at this position */
   private setCoveredTile(x: number, y: number, type: TileType): void {
     const key = `${x},${y}`;
@@ -842,6 +925,10 @@ export class LevelEditorScene extends Phaser.Scene {
       );
       sprite.setDepth(4); // Above tile (3) but below entities (5+)
       sprite.setAlpha(0.7);
+      if (this.isConveyorType(type)) {
+        const animKey = `${type}_anim`;
+        if (this.anims.exists(animKey)) sprite.play(animKey);
+      }
       this.coveredTileSprites.set(key, sprite);
     }
   }
@@ -1205,6 +1292,74 @@ export class LevelEditorScene extends Phaser.Scene {
 
     this.editorContainer.appendChild(puzzleSection);
 
+    // Hazard tile tools section (theme-filtered)
+    const themeHazards = HAZARD_TILES_BY_THEME[this.worldTheme] || [];
+    const allHazardTiles = Object.keys(HAZARD_TILE_NAMES);
+    if (allHazardTiles.length > 0) {
+      const hazardSection = document.createElement('div');
+      hazardSection.style.marginTop = '8px';
+      const hazardLabel = document.createElement('div');
+      hazardLabel.textContent = 'Theme Hazards';
+      hazardLabel.style.cssText =
+        'font-weight:bold;font-size:12px;color:var(--text-dim);margin-bottom:4px;';
+      hazardSection.appendChild(hazardLabel);
+
+      let showAll = false;
+      const hazardBtnsContainer = document.createElement('div');
+
+      const renderHazardButtons = () => {
+        hazardBtnsContainer.innerHTML = '';
+        const tilesToShow = showAll ? allHazardTiles : themeHazards;
+        if (tilesToShow.length === 0) {
+          const noTiles = document.createElement('div');
+          noTiles.textContent =
+            this.worldTheme === 'classic' || this.worldTheme === 'sky'
+              ? 'No hazard tiles for this theme'
+              : 'No hazard tiles available';
+          noTiles.style.cssText = 'font-size:10px;color:var(--text-dim);padding:2px 0;';
+          hazardBtnsContainer.appendChild(noTiles);
+          return;
+        }
+        for (const tile of tilesToShow) {
+          const btn = document.createElement('button');
+          btn.textContent = HAZARD_TILE_NAMES[tile] || tile;
+          btn.style.cssText =
+            'display:block;width:100%;padding:4px 6px;margin-bottom:2px;background:var(--bg-surface);border:1px solid var(--bg-hover);color:var(--text);cursor:pointer;text-align:left;font-size:11px;border-radius:3px;';
+          btn.addEventListener('click', () => {
+            this.currentTool = tile as EditorTool;
+            this.highlightActiveTool(btn);
+          });
+          hazardBtnsContainer.appendChild(btn);
+        }
+      };
+
+      renderHazardButtons();
+      hazardSection.appendChild(hazardBtnsContainer);
+
+      // "Show All" toggle
+      if (themeHazards.length < allHazardTiles.length) {
+        const toggleRow = document.createElement('div');
+        toggleRow.style.cssText = 'display:flex;align-items:center;gap:4px;margin-top:4px;';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = 'hazard-show-all';
+        checkbox.style.cssText = 'margin:0;cursor:pointer;';
+        checkbox.addEventListener('change', () => {
+          showAll = checkbox.checked;
+          renderHazardButtons();
+        });
+        const lbl = document.createElement('label');
+        lbl.htmlFor = 'hazard-show-all';
+        lbl.textContent = 'Show all themes';
+        lbl.style.cssText = 'font-size:10px;color:var(--text-dim);cursor:pointer;';
+        toggleRow.appendChild(checkbox);
+        toggleRow.appendChild(lbl);
+        hazardSection.appendChild(toggleRow);
+      }
+
+      this.editorContainer.appendChild(hazardSection);
+    }
+
     // Enemy tools
     if (this.enemyTypes.length > 0) {
       const enemySection = document.createElement('div');
@@ -1289,6 +1444,7 @@ export class LevelEditorScene extends Phaser.Scene {
     backBtn.style.cssText = 'padding:6px 12px;font-size:13px;';
     backBtn.addEventListener('click', () => {
       this.registry.remove('editorLevelId');
+      this.registry.remove('editorWorldId');
       this.scene.start('LobbyScene');
     });
     actionSection.appendChild(backBtn);

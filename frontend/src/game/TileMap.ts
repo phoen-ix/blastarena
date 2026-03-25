@@ -9,11 +9,19 @@ export class TileMapRenderer {
   private previousTiles: TileType[][] = [];
   private width: number;
   private height: number;
+  private theme?: string;
 
-  constructor(scene: Phaser.Scene, tiles: TileType[][], width: number, height: number) {
+  constructor(
+    scene: Phaser.Scene,
+    tiles: TileType[][],
+    width: number,
+    height: number,
+    theme?: string,
+  ) {
     this.scene = scene;
     this.width = width;
     this.height = height;
+    this.theme = theme;
     this.createTiles(tiles);
   }
 
@@ -34,18 +42,40 @@ export class TileMapRenderer {
         );
         this.tileSprites[y][x] = sprite;
         this.previousTiles[y][x] = tileType;
+        if (this.isConveyorTile(tileType)) {
+          this.playConveyorAnim(sprite, tileType);
+        }
       }
     }
   }
 
+  private isConveyorTile(type: TileType | undefined): boolean {
+    return (
+      type === 'conveyor_up' ||
+      type === 'conveyor_down' ||
+      type === 'conveyor_left' ||
+      type === 'conveyor_right'
+    );
+  }
+
+  private playConveyorAnim(sprite: Phaser.GameObjects.Sprite, type: TileType): void {
+    const settings = getSettings();
+    if (!settings.animations) return;
+    const animKey = `${type}_anim`;
+    if (this.scene.anims.exists(animKey)) {
+      sprite.play(animKey);
+    }
+  }
+
   private getTileTexture(type: TileType, x: number, y: number): string {
+    const themed = this.theme && this.theme !== 'classic';
     switch (type) {
       case 'wall':
-        return 'wall';
+        return themed ? 'themed_wall' : 'wall';
       case 'destructible':
-        return 'destructible';
+        return themed ? 'themed_destructible' : 'destructible';
       case 'destructible_cracked' as TileType:
-        return 'destructible_cracked';
+        return themed ? 'themed_destructible_cracked' : 'destructible_cracked';
       case 'teleporter_a' as TileType:
         return 'teleporter_a';
       case 'teleporter_b' as TileType:
@@ -82,10 +112,20 @@ export class TileMapRenderer {
       case 'crumbling' as TileType:
       case 'pit' as TileType:
         return type;
+      // Hazard tiles — texture key matches tile type name
+      case 'vine' as TileType:
+      case 'quicksand' as TileType:
+      case 'ice' as TileType:
+      case 'lava' as TileType:
+      case 'mud' as TileType:
+      case 'spikes' as TileType:
+      case 'spikes_active' as TileType:
+      case 'dark_rift' as TileType:
+        return type;
       case 'empty':
       case 'spawn':
       default:
-        return `floor_${(x + y) % 4}`;
+        return themed ? `themed_floor_${(x + y) % 4}` : `floor_${(x + y) % 4}`;
     }
   }
 
@@ -102,7 +142,9 @@ export class TileMapRenderer {
 
         // A destructible block was destroyed (changed to empty/spawn)
         const wasDestructible =
-          prevType === 'destructible' || prevType === ('destructible_cracked' as TileType);
+          prevType === 'destructible' ||
+          prevType === ('destructible_cracked' as TileType) ||
+          prevType === ('vine' as TileType);
         const isNowEmpty = newType === 'empty' || newType === 'spawn';
 
         if (wasDestructible && isNowEmpty) {
@@ -221,7 +263,12 @@ export class TileMapRenderer {
           // Non-destructive tile change (e.g. conveyor placed, teleporter toggled,
           // switch state change — simple texture swap)
           const newTexture = this.getTileTexture(newType, x, y);
-          this.tileSprites[y][x].setTexture(newTexture);
+          const sprite = this.tileSprites[y][x];
+          sprite.stop();
+          sprite.setTexture(newTexture);
+          if (this.isConveyorTile(newType)) {
+            this.playConveyorAnim(sprite, newType);
+          }
         }
 
         this.previousTiles[y][x] = newType;

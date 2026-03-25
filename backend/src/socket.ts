@@ -961,6 +961,10 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
         const nextLevelId = await campaignService.getNextLevel(level.id);
 
+        // Fetch world for theme (also used for replay recording below)
+        const world = await campaignService.getWorld(level.worldId);
+        const worldTheme = world?.theme || 'classic';
+
         // Emit helper: broadcast to campaign room (both players) or single socket
         const campaignBroadcast = io.to(campaignRoom);
         const emitToCampaign = <E extends keyof ServerToClientEvents>(
@@ -1097,11 +1101,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           },
           carriedPowerups,
           data.buddyMode,
+          worldTheme,
         );
 
         // Enable replay recording if recordings are enabled
         if (await settingsService.isRecordingEnabled()) {
-          const world = await campaignService.getWorld(level.worldId);
           // Build EnemyTypeEntry[] from the Map for replay metadata
           const enemyTypeEntries = Array.from(enemyTypes.entries()).map(([id, config]) => ({
             id,
@@ -1118,6 +1122,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
             worldName: world?.name ?? 'Unknown',
             coopMode: isCoopMode,
             buddyMode: data.buddyMode,
+            theme: worldTheme,
             enemyTypes: enemyTypeEntries,
             lives: level.lives,
             winCondition: level.winCondition,
@@ -1213,6 +1218,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           exitOpen: false,
           coopMode: isCoopMode,
           buddyMode: data.buddyMode || undefined,
+          theme: worldTheme !== 'classic' ? worldTheme : undefined,
         };
         const initialState = {
           state: campaignState,

@@ -8,6 +8,7 @@ import {
   ReplayData,
   ReplayTickEvents,
   PlayerCosmeticData,
+  CampaignWorldTheme,
   TILE_SIZE,
   TICK_MS,
 } from '@blast-arena/shared';
@@ -28,6 +29,7 @@ import { ReplayLogPanel } from '../game/ReplayLogPanel';
 import { EnemySpriteRenderer } from '../game/EnemySprite';
 import { EnemyTextureGenerator } from '../game/EnemyTextureGenerator';
 import { EmoteBubbleRenderer } from '../game/EmoteBubble';
+import { generateThemedTileTextures, generateHazardTileTextures } from '../utils/campaignThemes';
 import { MapEventRenderer } from '../game/MapEventRenderer';
 import {
   LocalCoopInput,
@@ -267,11 +269,22 @@ export class GameScene extends Phaser.Scene {
 
       // Store a deep copy of initial tiles for delta updates
       this.storedTiles = initialState.map.tiles.map((row) => [...row]);
+      const campaignTheme = this.registry.get('campaignTheme') as string | undefined;
+
+      // Generate themed tile textures on demand (BootScene runs before theme is known)
+      if (campaignTheme && campaignTheme !== 'classic') {
+        generateThemedTileTextures(this, campaignTheme as CampaignWorldTheme);
+        if (!this.textures.exists('vine')) {
+          generateHazardTileTextures(this);
+        }
+      }
+
       this.tileMap = new TileMapRenderer(
         this,
         initialState.map.tiles,
         initialState.map.width,
         initialState.map.height,
+        campaignTheme,
       );
       this.updateState(initialState);
     }
@@ -290,6 +303,15 @@ export class GameScene extends Phaser.Scene {
         this.campaignMode = true;
         EnemyTextureGenerator.generateForLevel(this, replayData.campaign.enemyTypes);
         this.enemyRenderer = new EnemySpriteRenderer(this);
+        // Generate themed textures for replay playback
+        const replayTheme = replayData.campaign.theme;
+        if (replayTheme && replayTheme !== 'classic') {
+          this.registry.set('campaignTheme', replayTheme);
+          generateThemedTileTextures(this, replayTheme as CampaignWorldTheme);
+          if (!this.textures.exists('vine')) {
+            generateHazardTileTextures(this);
+          }
+        }
       }
 
       this.replayPlayer = new ReplayPlayer(replayData, {
@@ -851,6 +873,7 @@ export class GameScene extends Phaser.Scene {
     this.registry.remove('replayData');
     this.registry.remove('initialGameState');
     this.registry.remove('campaignMode');
+    this.registry.remove('campaignTheme');
     this.scene.stop('HUDScene');
     this.scene.start('LobbyScene');
   }
@@ -1251,6 +1274,7 @@ export class GameScene extends Phaser.Scene {
       this.registry.remove('localCoopConfig');
       this.registry.remove('buddyMode');
       this.registry.remove('buddyConfig');
+      this.registry.remove('campaignTheme');
       this.registry.set('openCampaign', true);
       this.scene.stop('HUDScene');
       this.scene.start('LobbyScene');
@@ -1285,6 +1309,9 @@ export class GameScene extends Phaser.Scene {
           }
           this.registry.set('initialGameState', data.state.gameState);
           this.registry.set('campaignEnemyTypes', enemyTypesResp.enemyTypes || []);
+          if (data.state.theme) {
+            this.registry.set('campaignTheme', data.state.theme);
+          }
 
           this.scene.start('GameScene');
           this.scene.launch('HUDScene');
@@ -1324,6 +1351,7 @@ export class GameScene extends Phaser.Scene {
             this.registry.remove('campaignMode');
             this.registry.remove('campaignCoopMode');
             this.registry.remove('localCoopMode');
+            this.registry.remove('campaignTheme');
             this.registry.set('openCampaign', true);
             this.scene.stop('HUDScene');
             this.scene.start('LobbyScene');
@@ -1334,6 +1362,7 @@ export class GameScene extends Phaser.Scene {
         this.registry.remove('campaignMode');
         this.registry.remove('campaignCoopMode');
         this.registry.remove('localCoopMode');
+        this.registry.remove('campaignTheme');
         this.registry.set('openCampaign', true);
         this.scene.stop('HUDScene');
         this.scene.start('LobbyScene');

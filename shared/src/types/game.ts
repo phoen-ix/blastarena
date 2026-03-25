@@ -34,7 +34,16 @@ export type TileType =
   | 'gate_yellow_open'
   // Crumbling floor (walkable once, then collapses to pit)
   | 'crumbling'
-  | 'pit';
+  | 'pit'
+  // Hazard tiles (campaign only, theme-specific)
+  | 'vine'
+  | 'quicksand'
+  | 'ice'
+  | 'lava'
+  | 'mud'
+  | 'spikes'
+  | 'spikes_active'
+  | 'dark_rift';
 
 export interface Tile {
   x: number;

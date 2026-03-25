@@ -17,6 +17,7 @@ import {
   TICK_RATE,
   CAMPAIGN_RESPAWN_TICKS,
   CAMPAIGN_RESPAWN_INVULNERABILITY,
+  MOVE_COOLDOWN_BASE,
 } from '@blast-arena/shared';
 import {
   isSwitchTile,
@@ -27,6 +28,12 @@ import {
   getGateColor,
   getGateTile,
   CRUMBLE_DELAY_TICKS,
+} from '@blast-arena/shared';
+import {
+  CampaignWorldTheme,
+  QUICKSAND_KILL_TICKS,
+  SPIKE_SAFE_TICKS,
+  SPIKE_CYCLE_TICKS,
 } from '@blast-arena/shared';
 import { GameStateManager, GameConfig } from './GameState';
 import { GameLoop } from './GameLoop';
@@ -170,6 +177,17 @@ export class CampaignGame {
   private prevSwitchOccupied: Set<string> = new Set(); // switch positions occupied last tick
   private prevSwitchBlasted: Set<string> = new Set(); // switch positions blasted last tick
 
+  // Hazard tile state
+  private worldTheme: CampaignWorldTheme = 'classic';
+  private quicksandTimers: Map<number, number> = new Map(); // playerId -> ticks on quicksand
+  private enemyQuicksandTimers: Map<number, number> = new Map(); // enemyId -> ticks
+  private iceSliding: Map<number, Direction> = new Map(); // playerId -> slide direction
+  private enemyIceSliding: Map<number, Direction> = new Map(); // enemyId -> slide direction
+  private spikePhase: number = 0; // global cycle counter
+  private spikePositions: Array<{ x: number; y: number }> = []; // cached on init
+  private prevPlayerPositions: Map<number, string> = new Map(); // "x,y" for movement detection
+  private prevEnemyPositions: Map<number, string> = new Map();
+
   // Enemy bombs tracked separately (they participate in standard bomb mechanics)
   private enemyBombIds: Set<string> = new Set();
 
@@ -191,6 +209,7 @@ export class CampaignGame {
     callbacks: CampaignSessionCallbacks,
     carriedPowerups?: StartingPowerUps | null,
     buddyMode?: boolean,
+    theme?: string,
   ) {
     this.sessionId = uuidv4();
     this.userIds = userIds;
@@ -203,6 +222,7 @@ export class CampaignGame {
     this.lives = level.lives;
     this.maxLives = level.lives;
     this.rng = new SeededRandom(Date.now());
+    this.worldTheme = (theme as CampaignWorldTheme) || 'classic';
 
     Enemy.resetIdCounter();
 
@@ -291,12 +311,16 @@ export class CampaignGame {
     }
 
     // Initialize switch states from tile grid (detect pre-placed switches)
+    // Also cache spike positions for hazard tile processing
     for (let y = 0; y < level.mapHeight; y++) {
       for (let x = 0; x < level.mapWidth; x++) {
         const tile = this.gameState.map.tiles[y][x];
         if (isSwitchTile(tile)) {
           const key = `${x},${y}`;
           this.switchStates.set(key, isSwitchActive(tile));
+        }
+        if (tile === 'spikes' || tile === 'spikes_active') {
+          this.spikePositions.push({ x, y });
         }
       }
     }
@@ -566,6 +590,15 @@ export class CampaignGame {
       return;
     }
 
+    // Apply speed modifiers for players on slowing tiles (processTick already applied normal cooldown)
+    for (const player of this.gameState.players.values()) {
+      if (!player.alive || player.moveCooldown <= 0) continue;
+      const tile = this.gameState.collisionSystem.getTileAt(player.position.x, player.position.y);
+      if (tile === 'vine' || tile === 'quicksand' || tile === 'mud') {
+        player.moveCooldown = Math.max(player.moveCooldown, MOVE_COOLDOWN_BASE * 2);
+      }
+    }
+
     // 1. Handle per-player respawn
     for (const [playerId, respawnTick] of this.respawnTicks) {
       if (tick >= respawnTick) {
@@ -671,6 +704,19 @@ export class CampaignGame {
       }
     }
 
+    // 2b. Apply speed modifiers for enemies on slowing tiles
+    for (const enemy of this.enemies.values()) {
+      if (!enemy.alive || enemy.moveCooldown <= 0 || enemy.typeConfig.canPassWalls) continue;
+      const tile = this.gameState.collisionSystem.getTileAt(enemy.position.x, enemy.position.y);
+      if (tile === 'vine' || tile === 'quicksand' || tile === 'mud') {
+        const baseCooldown = Math.max(
+          1,
+          Math.round(MOVE_COOLDOWN_BASE / Math.max(0.01, enemy.typeConfig.speed)),
+        );
+        enemy.moveCooldown = Math.max(enemy.moveCooldown, baseCooldown * 2);
+      }
+    }
+
     // 3. Enemy-explosion collision
     for (const explosion of this.gameState.explosions.values()) {
       for (const enemy of this.enemies.values()) {
@@ -729,6 +775,9 @@ export class CampaignGame {
     // 7.5. Puzzle tile processing (switches, gates, crumbling floors)
     this.processPuzzleTiles();
 
+    // 7.6. Hazard tile processing (theme-specific tiles)
+    this.processHazardTiles();
+
     // 8. Boss phase transitions
     for (const enemy of this.enemies.values()) {
       if (!enemy.alive || !enemy.typeConfig.isBoss) continue;
@@ -758,7 +807,17 @@ export class CampaignGame {
       }
     }
 
-    // 10. Update enemy positions for next tick's bomb slide collision checks
+    // 10. Cache positions for next tick's hazard tile movement detection
+    for (const player of this.gameState.players.values()) {
+      this.prevPlayerPositions.set(player.id, `${player.position.x},${player.position.y}`);
+    }
+    for (const enemy of this.enemies.values()) {
+      if (enemy.alive) {
+        this.prevEnemyPositions.set(enemy.id, `${enemy.position.x},${enemy.position.y}`);
+      }
+    }
+
+    // 11. Update enemy positions for next tick's bomb slide collision checks
     this.updateEnemyPositions();
   }
 
@@ -1253,8 +1312,313 @@ export class CampaignGame {
       exitOpen: this.exitOpen,
       coopMode: this.coopMode,
       buddyMode: this.buddyMode || undefined,
+      theme: this.worldTheme !== 'classic' ? this.worldTheme : undefined,
       respawnTimers: Object.keys(respawnTimers).length > 0 ? respawnTimers : undefined,
       lockedInPlayers: this.lockedInPlayers.size > 0 ? Array.from(this.lockedInPlayers) : undefined,
     };
+  }
+
+  // ==================== Hazard Tile Processing ====================
+
+  private processHazardTiles(): void {
+    this.processQuicksandTiles();
+    this.processIceSliding();
+    this.processLavaDetonation();
+    this.processSpikeTiles();
+    this.processDarkRiftTiles();
+    // Vine: speed effect handled in campaignTick speed modifiers, destruction via CollisionSystem.destroyTile
+    // Mud: speed effect handled in campaignTick speed modifiers, no other logic
+  }
+
+  private processQuicksandTiles(): void {
+    // Players
+    for (const player of this.gameState.players.values()) {
+      if (!player.alive || player.isBuddy) continue;
+      const tile = this.gameState.collisionSystem.getTileAt(player.position.x, player.position.y);
+      if (tile === 'quicksand') {
+        const timer = (this.quicksandTimers.get(player.id) ?? 0) + 1;
+        this.quicksandTimers.set(player.id, timer);
+        if (timer >= QUICKSAND_KILL_TICKS) {
+          if (player.hasShield) {
+            // Shield absorbs the kill, reset timer
+            player.hasShield = false;
+            player.invulnerableTicks = 10;
+            this.quicksandTimers.set(player.id, 0);
+          } else if (player.invulnerableTicks <= 0) {
+            this.handlePlayerDeath(player.id);
+            this.quicksandTimers.delete(player.id);
+          }
+        }
+      } else {
+        this.quicksandTimers.delete(player.id);
+      }
+    }
+
+    // Enemies
+    for (const enemy of this.enemies.values()) {
+      if (!enemy.alive || enemy.typeConfig.canPassWalls) continue;
+      const tile = this.gameState.collisionSystem.getTileAt(enemy.position.x, enemy.position.y);
+      if (tile === 'quicksand') {
+        const timer = (this.enemyQuicksandTimers.get(enemy.id) ?? 0) + 1;
+        this.enemyQuicksandTimers.set(enemy.id, timer);
+        if (timer >= QUICKSAND_KILL_TICKS) {
+          const died = enemy.takeDamage(enemy.hp);
+          if (died) this.onEnemyDied(enemy);
+          this.enemyQuicksandTimers.delete(enemy.id);
+        }
+      } else {
+        this.enemyQuicksandTimers.delete(enemy.id);
+      }
+    }
+  }
+
+  private processIceSliding(): void {
+    const bombPositions = Array.from(this.gameState.bombs.values()).map((b) => b.position);
+
+    // Detect players who just moved onto ice
+    for (const player of this.gameState.players.values()) {
+      if (!player.alive || player.frozen) continue;
+      if (this.iceSliding.has(player.id)) continue; // Already sliding
+      const tile = this.gameState.collisionSystem.getTileAt(player.position.x, player.position.y);
+      if (tile !== 'ice') continue;
+      const prevKey = this.prevPlayerPositions.get(player.id);
+      const curKey = `${player.position.x},${player.position.y}`;
+      if (prevKey !== curKey) {
+        // Player just moved onto ice — start sliding in their current direction
+        this.iceSliding.set(player.id, player.direction);
+      }
+    }
+
+    // Process player ice sliding
+    for (const [playerId, direction] of this.iceSliding) {
+      const player = this.gameState.players.get(playerId);
+      if (!player || !player.alive) {
+        this.iceSliding.delete(playerId);
+        continue;
+      }
+
+      // Filter out self and own buddy from player positions
+      const playerPositions = Array.from(this.gameState.players.values())
+        .filter((p) => p.alive && p.id !== playerId && p.buddyOwnerId !== playerId)
+        .map((p) => p.position);
+
+      const newPos = player.isBuddy
+        ? this.gameState.collisionSystem.canBuddyMoveTo(
+            player.position.x,
+            player.position.y,
+            direction,
+          )
+        : this.gameState.collisionSystem.canMoveTo(
+            player.position.x,
+            player.position.y,
+            direction,
+            bombPositions,
+            playerPositions,
+          );
+
+      if (newPos) {
+        player.position = newPos;
+        player.applyMoveCooldown();
+        const newTile = this.gameState.collisionSystem.getTileAt(newPos.x, newPos.y);
+        if (newTile !== 'ice') {
+          this.iceSliding.delete(playerId); // Reached non-ice tile, stop sliding
+        }
+        // Apply teleporter if landed on one
+        this.gameState.applyTeleporter(player);
+      } else {
+        this.iceSliding.delete(playerId); // Blocked, stop sliding
+      }
+    }
+
+    // Detect enemies who just moved onto ice
+    for (const enemy of this.enemies.values()) {
+      if (!enemy.alive || enemy.typeConfig.canPassWalls) continue;
+      if (this.enemyIceSliding.has(enemy.id)) continue;
+      const tile = this.gameState.collisionSystem.getTileAt(enemy.position.x, enemy.position.y);
+      if (tile !== 'ice') continue;
+      const prevKey = this.prevEnemyPositions.get(enemy.id);
+      const curKey = `${enemy.position.x},${enemy.position.y}`;
+      if (prevKey !== curKey) {
+        this.enemyIceSliding.set(enemy.id, enemy.direction);
+      }
+    }
+
+    // Process enemy ice sliding
+    for (const [enemyId, direction] of this.enemyIceSliding) {
+      const enemy = this.enemies.get(enemyId);
+      if (!enemy || !enemy.alive) {
+        this.enemyIceSliding.delete(enemyId);
+        continue;
+      }
+
+      const newPos = this.gameState.collisionSystem.canMoveTo(
+        enemy.position.x,
+        enemy.position.y,
+        direction,
+        enemy.typeConfig.canPassBombs ? [] : bombPositions,
+      );
+
+      if (newPos) {
+        enemy.position = newPos;
+        enemy.applyMoveCooldown();
+        const newTile = this.gameState.collisionSystem.getTileAt(newPos.x, newPos.y);
+        if (newTile !== 'ice') {
+          this.enemyIceSliding.delete(enemyId);
+        }
+      } else {
+        this.enemyIceSliding.delete(enemyId);
+      }
+    }
+
+    // Ice affects kicked bombs: sliding bombs on ice move an extra tile
+    for (const bomb of this.gameState.bombs.values()) {
+      if (!bomb.sliding) continue;
+      const tile = this.gameState.collisionSystem.getTileAt(bomb.position.x, bomb.position.y);
+      if (tile !== 'ice') continue;
+
+      // Advance bomb one extra tile in sliding direction
+      const dx = bomb.sliding === 'left' ? -1 : bomb.sliding === 'right' ? 1 : 0;
+      const dy = bomb.sliding === 'up' ? -1 : bomb.sliding === 'down' ? 1 : 0;
+      const nextX = bomb.position.x + dx;
+      const nextY = bomb.position.y + dy;
+      if (this.gameState.collisionSystem.isWalkable(nextX, nextY)) {
+        // Check for other bombs blocking
+        let blocked = false;
+        for (const other of this.gameState.bombs.values()) {
+          if (other.id !== bomb.id && other.position.x === nextX && other.position.y === nextY) {
+            blocked = true;
+            break;
+          }
+        }
+        if (!blocked) {
+          bomb.position = { x: nextX, y: nextY };
+        }
+      }
+    }
+  }
+
+  private processLavaDetonation(): void {
+    for (const bomb of this.gameState.bombs.values()) {
+      const { x, y } = bomb.position;
+      const adjacent: TileType[] = [
+        this.gameState.collisionSystem.getTileAt(x - 1, y),
+        this.gameState.collisionSystem.getTileAt(x + 1, y),
+        this.gameState.collisionSystem.getTileAt(x, y - 1),
+        this.gameState.collisionSystem.getTileAt(x, y + 1),
+      ];
+      if (adjacent.some((t) => t === 'lava')) {
+        // Force immediate detonation on next tick's bomb processing
+        bomb.ticksRemaining = Math.min(bomb.ticksRemaining, 1);
+      }
+    }
+  }
+
+  private processSpikeTiles(): void {
+    if (this.spikePositions.length === 0) return;
+
+    const prevPhase = this.spikePhase;
+    this.spikePhase = (this.spikePhase + 1) % SPIKE_CYCLE_TICKS;
+
+    // Transition from safe to lethal
+    if (prevPhase < SPIKE_SAFE_TICKS && this.spikePhase >= SPIKE_SAFE_TICKS) {
+      for (const pos of this.spikePositions) {
+        this.gameState.setTileTracked(pos.x, pos.y, 'spikes_active');
+      }
+    }
+
+    // Transition from lethal to safe (wrap around)
+    if (prevPhase >= SPIKE_SAFE_TICKS && this.spikePhase < SPIKE_SAFE_TICKS) {
+      for (const pos of this.spikePositions) {
+        this.gameState.setTileTracked(pos.x, pos.y, 'spikes');
+      }
+    }
+
+    // Kill entities on active spikes
+    if (this.spikePhase >= SPIKE_SAFE_TICKS) {
+      for (const player of this.gameState.players.values()) {
+        if (!player.alive || player.isBuddy || player.invulnerableTicks > 0 || player.frozen)
+          continue;
+        const tile = this.gameState.collisionSystem.getTileAt(player.position.x, player.position.y);
+        if (tile === 'spikes_active') {
+          if (player.hasShield) {
+            player.hasShield = false;
+            player.invulnerableTicks = 10;
+          } else {
+            this.handlePlayerDeath(player.id);
+          }
+        }
+      }
+
+      for (const enemy of this.enemies.values()) {
+        if (!enemy.alive || enemy.typeConfig.canPassWalls) continue;
+        const tile = this.gameState.collisionSystem.getTileAt(enemy.position.x, enemy.position.y);
+        if (tile === 'spikes_active') {
+          const died = enemy.takeDamage(1);
+          if (died) this.onEnemyDied(enemy);
+        }
+      }
+    }
+  }
+
+  private processDarkRiftTiles(): void {
+    // Players
+    for (const player of this.gameState.players.values()) {
+      if (!player.alive || player.frozen) continue;
+      const tile = this.gameState.collisionSystem.getTileAt(player.position.x, player.position.y);
+      if (tile !== 'dark_rift') continue;
+
+      // Only teleport if player just moved here (not standing still)
+      const prevKey = this.prevPlayerPositions.get(player.id);
+      const curKey = `${player.position.x},${player.position.y}`;
+      if (prevKey === curKey) continue;
+
+      // Find all empty tiles for random teleport destination
+      const emptyTiles: Position[] = [];
+      for (let y = 0; y < this.gameState.map.height; y++) {
+        for (let x = 0; x < this.gameState.map.width; x++) {
+          const t = this.gameState.collisionSystem.getTileAt(x, y);
+          if (
+            (t === 'empty' || t === 'spawn') &&
+            !(x === player.position.x && y === player.position.y)
+          ) {
+            emptyTiles.push({ x, y });
+          }
+        }
+      }
+      if (emptyTiles.length > 0) {
+        const dest = emptyTiles[Math.floor(this.rng.next() * emptyTiles.length)];
+        player.position = { x: dest.x, y: dest.y };
+        player.applyMoveCooldown();
+      }
+    }
+
+    // Enemies
+    for (const enemy of this.enemies.values()) {
+      if (!enemy.alive || enemy.typeConfig.canPassWalls) continue;
+      const tile = this.gameState.collisionSystem.getTileAt(enemy.position.x, enemy.position.y);
+      if (tile !== 'dark_rift') continue;
+
+      const prevKey = this.prevEnemyPositions.get(enemy.id);
+      const curKey = `${enemy.position.x},${enemy.position.y}`;
+      if (prevKey === curKey) continue;
+
+      const emptyTiles: Position[] = [];
+      for (let y = 0; y < this.gameState.map.height; y++) {
+        for (let x = 0; x < this.gameState.map.width; x++) {
+          const t = this.gameState.collisionSystem.getTileAt(x, y);
+          if (
+            (t === 'empty' || t === 'spawn') &&
+            !(x === enemy.position.x && y === enemy.position.y)
+          ) {
+            emptyTiles.push({ x, y });
+          }
+        }
+      }
+      if (emptyTiles.length > 0) {
+        const dest = emptyTiles[Math.floor(this.rng.next() * emptyTiles.length)];
+        enemy.position = { x: dest.x, y: dest.y };
+        enemy.applyMoveCooldown();
+      }
+    }
   }
 }

@@ -413,7 +413,7 @@ export class CampaignTab {
             if (contentEl) this.renderWorldsTable(contentEl);
           }
           // Launch editor for the new level
-          this.launchLevelEditor(res.id);
+          this.launchLevelEditor(res.id, worldId);
         } catch (err: unknown) {
           this.notifications.error(getErrorMessage(err));
         }
@@ -474,10 +474,17 @@ export class CampaignTab {
 
     // Delete level
     content.querySelectorAll('.camp-delete-level').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = Number((btn as HTMLElement).dataset.id);
-        const name = (btn as HTMLElement).dataset.name || '';
-        this.showDeleteConfirmation('level', id, name);
+        const name = (btn as HTMLElement).dataset.name || 'this level';
+        if (!confirm(`Delete level "${name}"?`)) return;
+        try {
+          await ApiClient.delete(`/admin/campaign/levels/${id}`);
+          this.notifications.success('Level deleted');
+          await this.loadWorlds();
+        } catch (err: unknown) {
+          this.notifications.error(getErrorMessage(err));
+        }
       });
     });
 
@@ -556,8 +563,11 @@ export class CampaignTab {
     }
   }
 
-  private launchLevelEditor(levelId: number): void {
+  private launchLevelEditor(levelId: number, worldId?: number): void {
     game.registry.set('editorLevelId', levelId);
+    if (worldId) {
+      game.registry.set('editorWorldId', worldId);
+    }
     game.registry.set('returnToAdmin', 'campaign');
 
     // Clear admin UI DOM, then start the editor scene

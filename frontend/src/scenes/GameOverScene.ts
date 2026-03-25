@@ -440,6 +440,7 @@ export class GameOverScene extends Phaser.Scene {
       this.registry.remove('campaignCoopMode');
       this.registry.remove('localCoopMode');
       this.registry.remove('localCoopConfig');
+      this.registry.remove('campaignTheme');
       this.registry.set('openCampaign', true);
       this.scene.start('LobbyScene');
     });
@@ -527,6 +528,9 @@ export class GameOverScene extends Phaser.Scene {
           }
           registry.set('initialGameState', data.state.gameState);
           registry.set('campaignEnemyTypes', enemyTypesResp.enemyTypes || []);
+          if (data.state.theme) {
+            registry.set('campaignTheme', data.state.theme);
+          }
 
           this.scene.start('GameScene');
           this.scene.launch('HUDScene');
@@ -567,6 +571,7 @@ export class GameOverScene extends Phaser.Scene {
             this.registry.remove('campaignMode');
             this.registry.remove('campaignCoopMode');
             this.registry.remove('localCoopMode');
+            this.registry.remove('campaignTheme');
             this.scene.start('LobbyScene');
           }
         });
