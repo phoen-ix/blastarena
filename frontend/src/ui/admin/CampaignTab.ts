@@ -1629,6 +1629,9 @@ export class CampaignTab {
       registry.set('initialGameState', initialState);
       registry.set('replayMode', true);
       registry.set('replayData', replayData);
+      if (replayData.campaign) {
+        registry.set('campaignMode', true);
+      }
 
       // Start GameScene and HUDScene
       const activeScene = game.scene.getScene('LobbyScene') || game.scene.getScene('MenuScene');

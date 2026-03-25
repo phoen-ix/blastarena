@@ -850,6 +850,7 @@ export class GameScene extends Phaser.Scene {
     this.registry.remove('replayMode');
     this.registry.remove('replayData');
     this.registry.remove('initialGameState');
+    this.registry.remove('campaignMode');
     this.scene.stop('HUDScene');
     this.scene.start('LobbyScene');
   }

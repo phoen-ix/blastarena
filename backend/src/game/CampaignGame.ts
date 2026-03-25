@@ -36,6 +36,7 @@ import { Bomb } from './Bomb';
 import { processEnemyAI, IEnemyAI, EnemyAIContext, EnemyAIResult } from './EnemyAI';
 import { getEnemyAIRegistry } from './registry';
 import { ReplayRecorder } from '../utils/replayRecorder';
+import { GameLogger } from '../utils/gameLogger';
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -95,6 +96,11 @@ export class CampaignGame {
     this.replayRecorder = new ReplayRecorder(this.sessionId, 'campaign', initialState);
     this.replayRecorder.setSessionId(this.sessionId);
     this.replayRecorder.setCampaignMeta(meta);
+
+    // Wire up game logger so replay captures kill/bomb/powerup log entries
+    const gameLogger = new GameLogger(this.sessionId, 'campaign', this.userIds.length);
+    gameLogger.replayRecorder = this.replayRecorder;
+    this.gameState.gameLogger = gameLogger;
   }
 
   public finalizeReplay(
@@ -117,6 +123,8 @@ export class CampaignGame {
 
     const reason = result === 'completed' ? 'Level completed' : 'Game over';
     const winnerId = result === 'completed' ? this.userIds[0] : null;
+
+    this.gameState.gameLogger?.close();
 
     this.replayRecorder.finalize({
       winnerId,
