@@ -8,7 +8,12 @@ import {
   Direction,
 } from '@blast-arena/shared';
 import { getExplosionCells } from '@blast-arena/shared';
-import { DEFAULT_WALL_DENSITY, DEFAULT_POWERUP_DROP_RATE, TICK_RATE } from '@blast-arena/shared';
+import {
+  DEFAULT_WALL_DENSITY,
+  DEFAULT_POWERUP_DROP_RATE,
+  TICK_RATE,
+  MOVE_COOLDOWN_BASE,
+} from '@blast-arena/shared';
 import {
   DEATHMATCH_RESPAWN_TICKS,
   DEATHMATCH_KILL_TARGET,
@@ -893,7 +898,7 @@ export class GameStateManager {
     entity.applyMoveCooldown();
   }
 
-  /** Push players standing on conveyor tiles in the conveyor's direction */
+  /** Push players and bombs standing on conveyor tiles in the conveyor's direction */
   private processConveyors(
     bombPositions: { x: number; y: number }[],
     playerPositions: { x: number; y: number; id: number; buddyOwnerId?: number }[],
@@ -939,6 +944,60 @@ export class GameStateManager {
         player.direction = dir;
         player.applyMoveCooldown();
         this.applyTeleporter(player);
+      }
+    }
+
+    // Push bombs on conveyor tiles
+    const bombPosSet = new Set<string>();
+    for (const b of this.bombs.values()) bombPosSet.add(`${b.position.x},${b.position.y}`);
+    const playerPosSet = new Set<string>();
+    for (const p of this.players.values()) {
+      if (p.alive) playerPosSet.add(`${p.position.x},${p.position.y}`);
+    }
+
+    for (const bomb of this.bombs.values()) {
+      if (bomb.conveyorCooldown > 0) {
+        bomb.conveyorCooldown--;
+        continue;
+      }
+      // Don't push bombs that are already sliding from a kick
+      if (bomb.sliding) continue;
+
+      const tile = this.collisionSystem.getTileAt(bomb.position.x, bomb.position.y);
+      let dir: Direction | null = null;
+      switch (tile) {
+        case 'conveyor_up':
+          dir = 'up';
+          break;
+        case 'conveyor_down':
+          dir = 'down';
+          break;
+        case 'conveyor_left':
+          dir = 'left';
+          break;
+        case 'conveyor_right':
+          dir = 'right';
+          break;
+      }
+      if (!dir) continue;
+
+      const dx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
+      const dy = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
+      const nextX = bomb.position.x + dx;
+      const nextY = bomb.position.y + dy;
+      const nextKey = `${nextX},${nextY}`;
+
+      const blocked =
+        !this.collisionSystem.isWalkable(nextX, nextY) ||
+        bombPosSet.has(nextKey) ||
+        playerPosSet.has(nextKey) ||
+        (this.campaignEnemyPositions !== null && this.campaignEnemyPositions.has(nextKey));
+
+      if (!blocked) {
+        bombPosSet.delete(`${bomb.position.x},${bomb.position.y}`);
+        bomb.position = { x: nextX, y: nextY };
+        bombPosSet.add(nextKey);
+        bomb.conveyorCooldown = MOVE_COOLDOWN_BASE;
       }
     }
   }

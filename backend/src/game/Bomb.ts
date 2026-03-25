@@ -13,9 +13,15 @@ export class Bomb {
   public readonly fireRange: number;
   public ticksRemaining: number;
   public sliding: Direction | null = null;
+  public conveyorCooldown: number = 0;
   public readonly bombType: BombType;
 
-  constructor(position: Position, ownerId: number, fireRange: number, bombType: BombType = 'normal') {
+  constructor(
+    position: Position,
+    ownerId: number,
+    fireRange: number,
+    bombType: BombType = 'normal',
+  ) {
     this.id = uuidv4();
     this.position = { ...position };
     this.ownerId = ownerId;
