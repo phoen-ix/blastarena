@@ -99,6 +99,7 @@ export class GameStateManager {
   private finishTick: number | null = null;
   public finishReason: string = '';
   public gameLogger: GameLogger | null = null;
+  public campaignEnemyPositions: Set<string> | null = null;
   public reinforcedWalls: boolean;
   public enableMapEvents: boolean;
   private static readonly FINISH_DELAY_TICKS = 30; // 1.5s grace period to show final explosions
@@ -386,11 +387,12 @@ export class GameStateManager {
         const nextY = bomb.position.y + dy;
         const nextKey = `${nextX},${nextY}`;
 
-        // Stop if hitting a wall, another bomb, or a player
+        // Stop if hitting a wall, another bomb, a player, or a campaign enemy
         const blocked =
           !this.collisionSystem.isWalkable(nextX, nextY) ||
           slideBombPosSet.has(nextKey) ||
-          slidePlayerPosSet.has(nextKey);
+          slidePlayerPosSet.has(nextKey) ||
+          (this.campaignEnemyPositions !== null && this.campaignEnemyPositions.has(nextKey));
 
         if (blocked) {
           bomb.sliding = null;

@@ -321,6 +321,7 @@ export class CampaignGame {
   }
 
   start(): void {
+    this.updateEnemyPositions();
     this.gameLoop.start();
   }
 
@@ -756,6 +757,19 @@ export class CampaignGame {
         this.completeLevelInternal();
       }
     }
+
+    // 10. Update enemy positions for next tick's bomb slide collision checks
+    this.updateEnemyPositions();
+  }
+
+  private updateEnemyPositions(): void {
+    const positions = new Set<string>();
+    for (const enemy of this.enemies.values()) {
+      if (enemy.alive) {
+        positions.add(`${enemy.position.x},${enemy.position.y}`);
+      }
+    }
+    this.gameState.campaignEnemyPositions = positions;
   }
 
   private initEnemyAIs(): void {
