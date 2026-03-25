@@ -4,12 +4,10 @@ import {
   LeaderboardResponse,
   PublicProfile,
   RankConfig,
-  RankTier,
   DEFAULT_RANK_CONFIG,
   Season,
-  SeasonSummary,
 } from '@blast-arena/shared';
-import { PublicProfileRow, SeasonEloRow, CountRow, SeasonRow } from '../db/types';
+import { PublicProfileRow, CountRow } from '../db/types';
 import { RowDataPacket } from 'mysql2';
 import * as seasonService from './season';
 import * as cosmeticsService from './cosmetics';
@@ -207,10 +205,11 @@ export async function getPublicProfile(userId: number): Promise<PublicProfile | 
   const rankConfig = await getRankConfig();
   const rank = getRankForElo(row.elo_rating, rankConfig);
 
-  const [seasonHistory, achievements, equippedCosmetics] = await Promise.all([
+  const [seasonHistory, achievements, equippedCosmetics, cosmeticDataMap] = await Promise.all([
     seasonService.getUserSeasonHistory(userId),
     achievementsService.getUserAchievementsPublic(userId),
     cosmeticsService.getEquippedCosmetics(userId),
+    cosmeticsService.getPlayerCosmeticsForGame([userId]),
   ]);
 
   return {
@@ -241,6 +240,7 @@ export async function getPublicProfile(userId: number): Promise<PublicProfile | 
     })),
     achievements,
     equippedCosmetics,
+    cosmeticData: cosmeticDataMap.get(userId),
   };
 }
 
@@ -274,7 +274,9 @@ export async function getUserRank(userId: number): Promise<{
   let seasonElo: number | null = null;
   const activeSeason = await seasonService.getActiveSeason();
   if (activeSeason) {
-    interface SeasonEloVal extends RowDataPacket { elo_rating: number; }
+    interface SeasonEloVal extends RowDataPacket {
+      elo_rating: number;
+    }
     const seRows = await query<SeasonEloVal[]>(
       'SELECT elo_rating FROM season_elo WHERE user_id = ? AND season_id = ?',
       [userId, activeSeason.id],
@@ -285,5 +287,13 @@ export async function getUserRank(userId: number): Promise<{
   const level = rows.length > 0 ? rows[0].level || 1 : 1;
   const totalXp = rows.length > 0 ? rows[0].total_xp || 0 : 0;
 
-  return { eloRating: elo, peakElo, rankTier: rank.name, rankColor: rank.color, seasonElo, level, totalXp };
+  return {
+    eloRating: elo,
+    peakElo,
+    rankTier: rank.name,
+    rankColor: rank.color,
+    seasonElo,
+    level,
+    totalXp,
+  };
 }

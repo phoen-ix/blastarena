@@ -1,16 +1,8 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
 import { escapeHtml } from '../../utils/html';
+import { drawPlayerSprite, getPlayerColorHex } from '../../utils/playerCanvas';
 import type { PublicProfile, AchievementProgress } from '@blast-arena/shared';
-
-const AVATAR_COLORS = [
-  'var(--primary)',
-  'var(--info)',
-  'var(--success)',
-  'var(--warning)',
-  '#bb44ff',
-  'var(--accent)',
-];
 
 export class ProfileView implements ILobbyView {
   readonly viewId = 'profile';
@@ -78,7 +70,12 @@ export class ProfileView implements ILobbyView {
       p.role !== 'user'
         ? `<span class="profile-role-badge" style="color:${roleColor}">${escapeHtml(p.role)}</span>`
         : '';
-    const color = AVATAR_COLORS[p.id % AVATAR_COLORS.length];
+    // Resolve player color: cosmetic color > fallback by player index
+    const cosmeticHex = p.cosmeticData?.colorHex;
+    const playerColor = cosmeticHex
+      ? `#${cosmeticHex.toString(16).padStart(6, '0')}`
+      : getPlayerColorHex(p.id);
+    const eyeStyle = p.cosmeticData?.eyeStyle;
     const joinDate = new Date(p.createdAt).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -95,9 +92,7 @@ export class ProfileView implements ILobbyView {
         <div class="profile-page-content">
           <div class="profile-page-header-card">
             <div class="profile-page-identity">
-              <div class="profile-page-avatar" style="background:${color}">
-                ${escapeHtml(p.username.charAt(0).toUpperCase())}
-              </div>
+              <canvas id="profile-avatar-canvas" width="56" height="56" style="width:56px;height:56px;border-radius:var(--radius);flex-shrink:0;"></canvas>
               <div class="profile-page-name-group">
                 <div class="profile-page-username">${escapeHtml(p.username)}${roleBadge}</div>
                 <div class="profile-page-join">Joined ${joinDate}</div>
@@ -137,6 +132,17 @@ export class ProfileView implements ILobbyView {
         </div>
       </div>
     `;
+
+    // Draw player sprite on avatar canvas
+    const avatarCanvas = this.container.querySelector(
+      '#profile-avatar-canvas',
+    ) as HTMLCanvasElement;
+    if (avatarCanvas) {
+      const ctx = avatarCanvas.getContext('2d');
+      if (ctx) {
+        drawPlayerSprite(ctx, 0, 0, 56, playerColor, eyeStyle);
+      }
+    }
 
     this.bindActions();
   }

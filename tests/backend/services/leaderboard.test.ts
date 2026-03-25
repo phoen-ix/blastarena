@@ -25,8 +25,10 @@ jest.mock('../../../backend/src/services/season', () => ({
 }));
 
 const mockGetEquippedCosmetics = jest.fn<AnyFn>();
+const mockGetPlayerCosmeticsForGame = jest.fn<AnyFn>();
 jest.mock('../../../backend/src/services/cosmetics', () => ({
   getEquippedCosmetics: mockGetEquippedCosmetics,
+  getPlayerCosmeticsForGame: mockGetPlayerCosmeticsForGame,
 }));
 
 const mockGetUserAchievementsPublic = jest.fn<AnyFn>();
@@ -51,6 +53,7 @@ describe('Leaderboard Service', () => {
     mockGetUserSeasonHistory.mockResolvedValue([]);
     mockGetUserAchievementsPublic.mockResolvedValue([]);
     mockGetEquippedCosmetics.mockResolvedValue({});
+    mockGetPlayerCosmeticsForGame.mockResolvedValue(new Map());
     mockGetSetting.mockResolvedValue(null);
   });
 
@@ -221,7 +224,10 @@ describe('Leaderboard Service', () => {
     it('should return paginated entries with default page and limit', async () => {
       mockGetSetting.mockResolvedValue(null); // uses DEFAULT_RANK_CONFIG
 
-      const rows = [leaderboardRow(), leaderboardRow({ user_id: 2, username: 'player2', elo_rating: 1400 })];
+      const rows = [
+        leaderboardRow(),
+        leaderboardRow({ user_id: 2, username: 'player2', elo_rating: 1400 }),
+      ];
       mockQuery
         .mockResolvedValueOnce(rows) // data rows
         .mockResolvedValueOnce([{ total: 2 }]); // count
@@ -244,9 +250,7 @@ describe('Leaderboard Service', () => {
       mockGetSetting.mockResolvedValue(null);
 
       const row = leaderboardRow({ user_id: 3, username: 'player3' });
-      mockQuery
-        .mockResolvedValueOnce([row])
-        .mockResolvedValueOnce([{ total: 15 }]);
+      mockQuery.mockResolvedValueOnce([row]).mockResolvedValueOnce([{ total: 15 }]);
 
       const result = await getLeaderboard({ page: 2, limit: 5 });
 
@@ -259,9 +263,7 @@ describe('Leaderboard Service', () => {
     it('should cap limit to 100', async () => {
       mockGetSetting.mockResolvedValue(null);
 
-      mockQuery
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ total: 0 }]);
+      mockQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0 }]);
 
       const result = await getLeaderboard({ limit: 999 });
 
@@ -270,12 +272,16 @@ describe('Leaderboard Service', () => {
 
     it('should query season_elo when seasonId is provided', async () => {
       mockGetSetting.mockResolvedValue(null);
-      const season = { id: 5, name: 'Season 5', startDate: '2026-01-01', endDate: '2026-03-31', isActive: false };
+      const season = {
+        id: 5,
+        name: 'Season 5',
+        startDate: '2026-01-01',
+        endDate: '2026-03-31',
+        isActive: false,
+      };
       mockGetSeasonById.mockResolvedValue(season);
 
-      mockQuery
-        .mockResolvedValueOnce([leaderboardRow()])
-        .mockResolvedValueOnce([{ total: 1 }]);
+      mockQuery.mockResolvedValueOnce([leaderboardRow()]).mockResolvedValueOnce([{ total: 1 }]);
 
       const result = await getLeaderboard({ seasonId: 5 });
 
@@ -290,12 +296,16 @@ describe('Leaderboard Service', () => {
 
     it('should use active season when no seasonId is given and active season exists', async () => {
       mockGetSetting.mockResolvedValue(null);
-      const activeSeason = { id: 3, name: 'Season 3', startDate: '2026-01-01', endDate: '2026-06-30', isActive: true };
+      const activeSeason = {
+        id: 3,
+        name: 'Season 3',
+        startDate: '2026-01-01',
+        endDate: '2026-06-30',
+        isActive: true,
+      };
       mockGetActiveSeason.mockResolvedValue(activeSeason);
 
-      mockQuery
-        .mockResolvedValueOnce([leaderboardRow()])
-        .mockResolvedValueOnce([{ total: 1 }]);
+      mockQuery.mockResolvedValueOnce([leaderboardRow()]).mockResolvedValueOnce([{ total: 1 }]);
 
       const result = await getLeaderboard({});
 
@@ -310,9 +320,7 @@ describe('Leaderboard Service', () => {
       mockGetSetting.mockResolvedValue(null);
       mockGetActiveSeason.mockResolvedValue(null);
 
-      mockQuery
-        .mockResolvedValueOnce([leaderboardRow()])
-        .mockResolvedValueOnce([{ total: 1 }]);
+      mockQuery.mockResolvedValueOnce([leaderboardRow()]).mockResolvedValueOnce([{ total: 1 }]);
 
       const result = await getLeaderboard({});
 
@@ -326,9 +334,7 @@ describe('Leaderboard Service', () => {
     it('should return empty entries when no rows match', async () => {
       mockGetSetting.mockResolvedValue(null);
 
-      mockQuery
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ total: 0 }]);
+      mockQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0 }]);
 
       const result = await getLeaderboard({});
 

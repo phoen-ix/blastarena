@@ -1,12 +1,15 @@
 import { NotificationUI } from './NotificationUI';
 import { ApiClient } from '../network/ApiClient';
 import { escapeHtml } from '../utils/html';
+import { drawPlayerSprite, getPlayerColorHex } from '../utils/playerCanvas';
 import type { PublicProfile, AchievementProgress } from '@blast-arena/shared';
 
 export class ProfilePanel {
   private container: HTMLElement;
   private notifications: NotificationUI;
   private isOpen: boolean = false;
+  private _avatarColor: string = '';
+  private _avatarEyeStyle: string | undefined;
 
   constructor(notifications: NotificationUI) {
     this.notifications = notifications;
@@ -24,6 +27,7 @@ export class ProfilePanel {
     try {
       const profile = await ApiClient.get<PublicProfile>(`/user/${userId}/public`);
       this.container.innerHTML = this.renderProfile(profile);
+      this.drawAvatarCanvas();
       // Load achievement progress for own profile
       this.loadAchievementProgress();
     } catch {
@@ -43,6 +47,14 @@ export class ProfilePanel {
         <h3 class="panel-header-title">${title}</h3>
         <button class="profile-panel-close panel-header-close">&times;</button>
       </div>`;
+  }
+
+  private drawAvatarCanvas(): void {
+    const canvas = this.container.querySelector('#profile-panel-avatar') as HTMLCanvasElement;
+    if (canvas && this._avatarColor) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) drawPlayerSprite(ctx, 0, 0, 44, this._avatarColor, this._avatarEyeStyle);
+    }
   }
 
   private renderLoading(): string {
@@ -90,24 +102,18 @@ export class ProfilePanel {
   }
 
   private renderIdentity(p: PublicProfile, roleBadge: string): string {
-    const colors = [
-      'var(--primary)',
-      'var(--info)',
-      'var(--success)',
-      'var(--warning)',
-      '#bb44ff',
-      'var(--accent)',
-    ];
-    const color = colors[p.id % colors.length];
+    const cosmeticHex = p.cosmeticData?.colorHex;
+    this._avatarColor = cosmeticHex
+      ? `#${cosmeticHex.toString(16).padStart(6, '0')}`
+      : getPlayerColorHex(p.id);
+    this._avatarEyeStyle = p.cosmeticData?.eyeStyle;
     const joinDate = new Date(p.createdAt).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
     });
     return `
       <div class="profile-identity">
-        <div class="profile-avatar" style="background:${color}">
-          ${escapeHtml(p.username.charAt(0).toUpperCase())}
-        </div>
+        <canvas id="profile-panel-avatar" width="44" height="44" style="width:44px;height:44px;border-radius:var(--radius);flex-shrink:0;"></canvas>
         <div>
           <div class="profile-username">
             ${escapeHtml(p.username)}${roleBadge}

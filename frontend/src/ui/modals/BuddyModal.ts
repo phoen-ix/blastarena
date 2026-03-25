@@ -7,6 +7,7 @@ import { createControlsSection, createCameraModeSection } from './LocalCoopModal
 import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 import { PLAYER_COLORS } from '../../scenes/BootScene';
 import { ApiClient } from '../../network/ApiClient';
+import { drawPlayerSprite, playerColorToHex } from '../../utils/playerCanvas';
 import type { BuddySettings } from '@blast-arena/shared';
 
 const SECTION_HEADING_STYLE = `
@@ -27,91 +28,6 @@ const BUDDY_DEFAULTS: BuddySettings = {
   color: '#44aaff',
   size: 0.6,
 };
-
-/** Draw a player sprite icon using Canvas2D (matches BootScene's Phaser rendering) */
-function drawPlayerSprite(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number,
-  hexColor: string,
-): void {
-  const r = size * 0.12;
-  const pad = size * 0.04;
-
-  // Body darker bottom
-  const darkerColor = darkenHex(hexColor, 0.7);
-  ctx.fillStyle = darkerColor;
-  roundRect(ctx, x + pad, y + pad, size - pad * 2, size - pad * 2, r);
-  ctx.fill();
-
-  // Body lighter top
-  ctx.fillStyle = hexColor;
-  roundRect(ctx, x + pad, y + pad, size - pad * 2, size * 0.75, r);
-  ctx.fill();
-
-  // Border
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-  ctx.lineWidth = Math.max(1, size * 0.04);
-  roundRect(ctx, x + pad, y + pad, size - pad * 2, size - pad * 2, r);
-  ctx.stroke();
-
-  // Highlight shine
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  roundRect(ctx, x + size * 0.12, y + size * 0.1, size * 0.22, size * 0.13, size * 0.06);
-  ctx.fill();
-
-  // Eyes (white sclera)
-  const eyeR = size * 0.1;
-  const cx = x + size / 2;
-  const cy = y + size / 2;
-  ctx.fillStyle = 'rgba(255,255,255,0.95)';
-  ctx.beginPath();
-  ctx.arc(cx - size * 0.15, cy + size * 0.04, eyeR, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(cx + size * 0.15, cy + size * 0.04, eyeR, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Pupils
-  ctx.fillStyle = '#111';
-  const pupilR = size * 0.05;
-  ctx.beginPath();
-  ctx.arc(cx - size * 0.15, cy + size * 0.08, pupilR, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(cx + size * 0.15, cy + size * 0.08, pupilR, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function roundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-): void {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-}
-
-function darkenHex(hex: string, factor: number): string {
-  const c = hex.replace('#', '');
-  const r = Math.round(parseInt(c.substring(0, 2), 16) * factor);
-  const g = Math.round(parseInt(c.substring(2, 4), 16) * factor);
-  const b = Math.round(parseInt(c.substring(4, 6), 16) * factor);
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-}
 
 export function showBuddyModal(
   onStart: (config: BuddyLaunchConfig) => void,
@@ -156,9 +72,7 @@ export function showBuddyModal(
       render();
     });
 
-  function colorToHex(color: number): string {
-    return '#' + color.toString(16).padStart(6, '0');
-  }
+  const colorToHex = playerColorToHex;
 
   function createBuddySummary(): HTMLElement {
     const section = document.createElement('div');

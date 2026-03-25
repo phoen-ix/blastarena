@@ -71,6 +71,7 @@ export interface PublicProfile {
   seasonHistory: SeasonSummary[];
   achievements: UserAchievementPublic[];
   equippedCosmetics: EquippedCosmetics;
+  cosmeticData?: PlayerCosmeticData;
 }
 
 export interface SeasonSummary {
@@ -90,8 +91,8 @@ export interface EloResult {
 
 // Imported types referenced in PublicProfile — re-exported from their own modules
 import type { UserAchievementPublic } from './achievements';
-import type { EquippedCosmetics } from './cosmetics';
-export type { UserAchievementPublic, EquippedCosmetics };
+import type { EquippedCosmetics, PlayerCosmeticData } from './cosmetics';
+export type { UserAchievementPublic, EquippedCosmetics, PlayerCosmeticData };
 
 export const DEFAULT_RANK_TIERS: RankTier[] = [
   { name: 'Bronze', minElo: 0, maxElo: 999, color: '#cd7f32' },
