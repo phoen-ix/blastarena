@@ -131,6 +131,7 @@
       --shadow-xl: 0 16px 48px rgba(0,0,0,0.5), 0 8px 16px rgba(0,0,0,0.3);
       --shadow-glow-primary: 0 0 16px rgba(255, 107, 53, 0.15);
       --shadow-glow-accent: 0 0 16px rgba(0, 212, 170, 0.15);
+      --primary-contrast: #000;
     }
 
     /* ================================================
@@ -210,6 +211,7 @@
       --bg-elevated: #ffffff; --bg-hover: #e8ecf0; --bg-card: #ffffff; --bg-input: #f0f2f5;
       --border: #d0d5dd; --border-bright: #b8c0cc;
       --primary: #2563eb; --primary-hover: #3b82f6;
+      --primary-contrast: #fff;
       --primary-dim: rgba(37, 99, 235, 0.08);
       --primary-glow: 0 0 20px rgba(37, 99, 235, 0.12);
       --accent: #0d9488; --accent-dim: rgba(13, 148, 136, 0.08);
@@ -576,7 +578,7 @@
       font-size: 12px;
     }
     .auth-footer-links a {
-      color: var(--text-muted);
+      color: var(--text-dim);
       text-decoration: none;
       cursor: pointer;
       transition: color var(--transition);
@@ -612,7 +614,7 @@
 
     .btn-primary {
       background: var(--primary);
-      color: #fff;
+      color: var(--primary-contrast);
       box-shadow: var(--shadow-glow-primary);
     }
 
