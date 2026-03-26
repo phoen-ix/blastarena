@@ -61,7 +61,8 @@ export class TileMapRenderer {
   private playConveyorAnim(sprite: Phaser.GameObjects.Sprite, type: TileType): void {
     const settings = getSettings();
     if (!settings.animations) return;
-    const animKey = `${type}_anim`;
+    const prefix = this.theme && this.theme !== 'classic' ? 'themed_' : '';
+    const animKey = `${prefix}${type}_anim`;
     if (this.scene.anims.exists(animKey)) {
       sprite.play(animKey);
     }
@@ -77,22 +78,18 @@ export class TileMapRenderer {
       case 'destructible_cracked' as TileType:
         return themed ? 'themed_destructible_cracked' : 'destructible_cracked';
       case 'teleporter_a' as TileType:
-        return 'teleporter_a';
       case 'teleporter_b' as TileType:
-        return 'teleporter_b';
+        return themed ? `themed_${type}` : type;
       case 'conveyor_up' as TileType:
-        return 'conveyor_up';
       case 'conveyor_down' as TileType:
-        return 'conveyor_down';
       case 'conveyor_left' as TileType:
-        return 'conveyor_left';
       case 'conveyor_right' as TileType:
-        return 'conveyor_right';
+        return themed ? `themed_${type}` : type;
       case 'exit' as TileType:
-        return 'exit';
+        return themed ? 'themed_exit' : 'exit';
       case 'goal' as TileType:
-        return 'goal';
-      // Puzzle tiles — texture key matches tile type name
+        return themed ? 'themed_goal' : 'goal';
+      // Puzzle tiles
       case 'switch_red' as TileType:
       case 'switch_blue' as TileType:
       case 'switch_green' as TileType:
@@ -109,7 +106,9 @@ export class TileMapRenderer {
       case 'gate_blue_open' as TileType:
       case 'gate_green_open' as TileType:
       case 'gate_yellow_open' as TileType:
+        return themed ? `themed_${type}` : type;
       case 'crumbling' as TileType:
+        return themed ? 'themed_crumbling' : 'crumbling';
       case 'pit' as TileType:
         return type;
       // Hazard tiles — texture key matches tile type name

@@ -54,7 +54,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - **Real-time lobby**: Room list auto-updates via `room:list` socket broadcast on every room mutation
 
 ## Campaign System
-Campaign with hand-crafted levels, enemies, and bosses. Supports solo, online co-op (2 players via party), and local co-op (same keyboard/gamepads). 9 world themes (classic, forest, desert, ice, volcano, void, castle, swamp, sky) with per-theme color palettes and themed tile textures generated in `frontend/src/utils/campaignThemes.ts`. Theme stored on `CampaignGameState.theme` and `CampaignReplayMeta.theme`.
+Campaign with hand-crafted levels, enemies, and bosses. Supports solo, online co-op (2 players via party), and local co-op (same keyboard/gamepads). 9 world themes (classic, forest, desert, ice, volcano, void, castle, swamp, sky) with per-theme color palettes and themed tile textures generated in `frontend/src/utils/campaignThemes.ts`. Themed textures cover all tile types: walls, destructibles, floors, teleporters, conveyors (with themed animations), switches, gates, crumbling, exit, and goal tiles. Theme stored on `CampaignGameState.theme` and `CampaignReplayMeta.theme`.
 - `CampaignGame` wraps `GameStateManager` with `customMap`. `checkWinCondition()`/time limit skip `campaign` mode. Frontend uses `campaignMode` registry flag for `campaign:state`/`campaign:input` events
 - Has 3-2-1-GO countdown (36 ticks) and 30-tick grace period after win condition. `startTick` set on first 'playing' tick so countdown doesn't count toward level time. Hard 60-minute safety cap (`3600s` from `startTick`) terminates via `gameOverInternal()` for levels with no time limit
 - Pause: `campaign:pause`/`campaign:resume` events; input blocked while paused; pause blocked during countdown. Pause menu: Continue, Restart Level (quits + re-launches same level via `restartCampaignLevel()`), Exit Level
@@ -91,6 +91,7 @@ Environmental puzzle system with switches, gates, and crumbling floors. 18 new t
 - Editor: Puzzle palette section with color selector, variant selector (toggle/pressure/oneshot), link mode (switch → gate). `drawPuzzleLinks()` shows colored lines between linked switches/gates. Color/variant buttons use `.puzzle-color-btn`/`.puzzle-variant-btn` classes to survive `highlightActiveTool()` resets
 - Editor map resize: `resizeMap()` clears old perimeter `wall` tiles that become interior when growing, then enforces new perimeter walls
 - Editor save uses non-blocking `showToast()` (fade-in/out, 2s) instead of `alert()` — green for success, red for errors
+- Editor tracks dirty state (`isDirty` flag) — unsaved changes prompt a modal (Save & Exit / Discard / Cancel) on back navigation; `beforeunload` handler warns on browser close/refresh
 - `PuzzleConfig` stored in `campaign_levels.puzzle_config` JSON column (migration 024). `shared/src/utils/puzzle.ts` exports helpers: `isSwitchTile`, `isGateTile`, `isGateClosed`, `getSwitchColor`, `getGateColor`, `getSwitchTile`, `getGateTile`, `PUZZLE_COLORS`, `PUZZLE_COLOR_VALUES`, `CRUMBLE_DELAY_TICKS`
 - Switches/gates can be covered tiles (hidden under destructible walls). Buddy blocked by closed gates and pits
 
@@ -156,7 +157,7 @@ Full-screen panel for admin/moderator roles. 11 tabs: Dashboard, Users, Matches,
 - Game start transitions instantly; `room:start` uses atomic `START_ROOM_LUA` script to prevent TOCTOU race (concurrent starts). Cosmetics are awaited before `game:start` broadcast to prevent visual flicker
 - "Back to Lobby" from game over clears currentRoom registry to prevent stale room UI
 - Play Again: room:restart resets to 'waiting'; other players auto-navigate via room:state listener
-- Campaign game over button: "Play Again" on success, "Retry" on failure
+- Campaign game over button: "Play Again" on success, "Retry" on failure. When next level exists, 3-button layout (Play Again | Next Level | Campaign) with wider spacing; otherwise 2-button layout
 
 ## Game Reference
 

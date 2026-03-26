@@ -123,6 +123,11 @@ export class LevelEditorScene extends Phaser.Scene {
     d: Phaser.Input.Keyboard.Key;
   } | null = null;
 
+  // Dirty state tracking
+  private isDirty = false;
+  private savedState: string = '';
+  private beforeUnloadHandler: ((e: BeforeUnloadEvent) => void) | null = null;
+
   // DOM overlay
   private editorContainer: HTMLElement | null = null;
   private isPanning = false;
@@ -152,6 +157,8 @@ export class LevelEditorScene extends Phaser.Scene {
 
     this.events.once('shutdown', this.shutdown, this);
 
+    this.isDirty = false;
+
     // Load enemy types
     this.loadData().then(() => {
       this.buildGrid();
@@ -160,6 +167,13 @@ export class LevelEditorScene extends Phaser.Scene {
       this.setupCamera();
       this.setupInput();
       this.buildEditorUI();
+      this.savedState = this.serializeState();
+      this.beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+        if (this.isDirty) {
+          e.preventDefault();
+        }
+      };
+      window.addEventListener('beforeunload', this.beforeUnloadHandler);
       this.pushGamepadContext();
     });
   }
@@ -286,7 +300,8 @@ export class LevelEditorScene extends Phaser.Scene {
         );
         sprite.setDepth(0);
         if (this.isConveyorType(this.tiles[y][x])) {
-          const animKey = `${this.tiles[y][x]}_anim`;
+          const prefix = this.worldTheme && this.worldTheme !== 'classic' ? 'themed_' : '';
+          const animKey = `${prefix}${this.tiles[y][x]}_anim`;
           if (this.anims.exists(animKey)) sprite.play(animKey);
         }
         this.tileSprites[y][x] = sprite;
@@ -487,21 +502,17 @@ export class LevelEditorScene extends Phaser.Scene {
       case 'destructible_cracked':
         return themed ? 'themed_destructible_cracked' : 'destructible_cracked';
       case 'exit':
-        return 'exit';
+        return themed ? 'themed_exit' : 'exit';
       case 'goal':
-        return 'goal';
+        return themed ? 'themed_goal' : 'goal';
       case 'teleporter_a':
-        return 'teleporter_a';
       case 'teleporter_b':
-        return 'teleporter_b';
+        return themed ? `themed_${type}` : type;
       case 'conveyor_up':
-        return 'conveyor_up';
       case 'conveyor_down':
-        return 'conveyor_down';
       case 'conveyor_left':
-        return 'conveyor_left';
       case 'conveyor_right':
-        return 'conveyor_right';
+        return themed ? `themed_${type}` : type;
       case 'switch_red':
       case 'switch_blue':
       case 'switch_green':
@@ -518,7 +529,9 @@ export class LevelEditorScene extends Phaser.Scene {
       case 'gate_blue_open':
       case 'gate_green_open':
       case 'gate_yellow_open':
+        return themed ? `themed_${type}` : type;
       case 'crumbling':
+        return themed ? 'themed_crumbling' : 'crumbling';
       case 'pit':
         return type;
       // Hazard tiles — texture key matches tile type name
@@ -849,7 +862,8 @@ export class LevelEditorScene extends Phaser.Scene {
       sprite.stop();
       sprite.setTexture(texture);
       if (this.isConveyorType(tileType)) {
-        const animKey = `${tileType}_anim`;
+        const prefix = this.worldTheme && this.worldTheme !== 'classic' ? 'themed_' : '';
+        const animKey = `${prefix}${tileType}_anim`;
         if (this.anims.exists(animKey)) sprite.play(animKey);
       }
     }
@@ -918,7 +932,8 @@ export class LevelEditorScene extends Phaser.Scene {
       sprite.setDepth(4); // Above tile (3) but below entities (5+)
       sprite.setAlpha(0.7);
       if (this.isConveyorType(type)) {
-        const animKey = `${type}_anim`;
+        const prefix = this.worldTheme && this.worldTheme !== 'classic' ? 'themed_' : '';
+        const animKey = `${prefix}${type}_anim`;
         if (this.anims.exists(animKey)) sprite.play(animKey);
       }
       this.coveredTileSprites.set(key, sprite);
@@ -959,10 +974,86 @@ export class LevelEditorScene extends Phaser.Scene {
     });
   }
 
+  private markDirty(): void {
+    this.isDirty = true;
+  }
+
+  private navigateBack(): void {
+    if (this.isDirty) {
+      this.showUnsavedModal();
+    } else {
+      this.doNavigateBack();
+    }
+  }
+
+  private doNavigateBack(): void {
+    this.registry.remove('editorLevelId');
+    this.registry.remove('editorWorldId');
+    this.scene.start('LobbyScene');
+  }
+
+  private showUnsavedModal(): void {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Unsaved Changes');
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:400px;">
+        <div class="modal-header">
+          <h2>Unsaved Changes</h2>
+        </div>
+        <div class="modal-body">
+          <p style="color:var(--text-dim);margin:0;">You have unsaved changes. Do you want to save before leaving?</p>
+        </div>
+        <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+          <button class="btn btn-ghost" id="unsaved-cancel">Cancel</button>
+          <button class="btn btn-secondary" id="unsaved-discard">Discard</button>
+          <button class="btn btn-primary" id="unsaved-save">Save &amp; Exit</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('ui-overlay')!.appendChild(overlay);
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    const onKeydown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        overlay.remove();
+        window.removeEventListener('keydown', onKeydown);
+      }
+    };
+    window.addEventListener('keydown', onKeydown);
+
+    overlay.querySelector('#unsaved-cancel')!.addEventListener('click', () => {
+      overlay.remove();
+      window.removeEventListener('keydown', onKeydown);
+    });
+
+    overlay.querySelector('#unsaved-discard')!.addEventListener('click', () => {
+      overlay.remove();
+      window.removeEventListener('keydown', onKeydown);
+      this.isDirty = false;
+      this.doNavigateBack();
+    });
+
+    overlay.querySelector('#unsaved-save')!.addEventListener('click', async () => {
+      overlay.remove();
+      window.removeEventListener('keydown', onKeydown);
+      await this.saveLevel();
+      if (!this.isDirty) {
+        this.doNavigateBack();
+      }
+    });
+  }
+
   private saveUndoState(): void {
     this.undoStack.push(this.serializeState());
     if (this.undoStack.length > 50) this.undoStack.shift();
     this.redoStack = [];
+    this.markDirty();
   }
 
   private undo(): void {
@@ -970,6 +1061,7 @@ export class LevelEditorScene extends Phaser.Scene {
     this.redoStack.push(this.serializeState());
     const prev = JSON.parse(this.undoStack.pop()!);
     this.restoreState(prev);
+    this.isDirty = this.serializeState() !== this.savedState;
   }
 
   private redo(): void {
@@ -977,6 +1069,7 @@ export class LevelEditorScene extends Phaser.Scene {
     this.undoStack.push(this.serializeState());
     const next = JSON.parse(this.redoStack.pop()!);
     this.restoreState(next);
+    this.isDirty = this.serializeState() !== this.savedState;
   }
 
   private restoreState(state: any): void {
@@ -1434,11 +1527,7 @@ export class LevelEditorScene extends Phaser.Scene {
     backBtn.textContent = 'Back';
     backBtn.className = 'btn btn-ghost';
     backBtn.style.cssText = 'padding:6px 12px;font-size:13px;';
-    backBtn.addEventListener('click', () => {
-      this.registry.remove('editorLevelId');
-      this.registry.remove('editorWorldId');
-      this.scene.start('LobbyScene');
-    });
+    backBtn.addEventListener('click', () => this.navigateBack());
     actionSection.appendChild(backBtn);
 
     this.editorContainer.appendChild(actionSection);
@@ -1541,6 +1630,7 @@ export class LevelEditorScene extends Phaser.Scene {
     nameInput.style.cssText = inputStyle;
     nameInput.addEventListener('change', () => {
       this.levelName = nameInput.value;
+      this.markDirty();
     });
     section.appendChild(nameInput);
 
@@ -1557,6 +1647,7 @@ export class LevelEditorScene extends Phaser.Scene {
     livesInput.style.cssText = inputStyle;
     livesInput.addEventListener('change', () => {
       this.levelLives = parseInt(livesInput.value, 10) || 3;
+      this.markDirty();
     });
     section.appendChild(livesInput);
 
@@ -1573,6 +1664,7 @@ export class LevelEditorScene extends Phaser.Scene {
     timeInput.style.cssText = inputStyle;
     timeInput.addEventListener('change', () => {
       this.levelTimeLimit = parseInt(timeInput.value, 10) || 0;
+      this.markDirty();
     });
     section.appendChild(timeInput);
 
@@ -1589,6 +1681,7 @@ export class LevelEditorScene extends Phaser.Scene {
     parInput.style.cssText = inputStyle;
     parInput.addEventListener('change', () => {
       this.levelParTime = parseInt(parInput.value, 10) || 0;
+      this.markDirty();
     });
     section.appendChild(parInput);
     const parHint = document.createElement('div');
@@ -1618,6 +1711,7 @@ export class LevelEditorScene extends Phaser.Scene {
     }
     winSelect.addEventListener('change', () => {
       this.levelWinCondition = winSelect.value;
+      this.markDirty();
     });
     section.appendChild(winSelect);
 
@@ -1629,6 +1723,7 @@ export class LevelEditorScene extends Phaser.Scene {
     pubCheck.checked = this.levelIsPublished;
     pubCheck.addEventListener('change', () => {
       this.levelIsPublished = pubCheck.checked;
+      this.markDirty();
     });
     pubRow.appendChild(pubCheck);
     const pubLabel = document.createElement('span');
@@ -1738,6 +1833,8 @@ export class LevelEditorScene extends Phaser.Scene {
       if (this.levelId) {
         await apiClient.put(`/admin/campaign/levels/${this.levelId}`, levelData);
       }
+      this.savedState = this.serializeState();
+      this.isDirty = false;
       this.showToast('Level saved!', 'success');
     } catch (err) {
       this.showToast('Save failed: ' + (err as Error).message, 'error');
@@ -1818,14 +1915,15 @@ export class LevelEditorScene extends Phaser.Scene {
         if (!this.editorContainer) return [];
         return [...this.editorContainer.querySelectorAll<HTMLElement>('button, input, select')];
       },
-      onBack: () => {
-        this.registry.remove('editorLevelId');
-        this.scene.start('LobbyScene');
-      },
+      onBack: () => this.navigateBack(),
     });
   }
 
   shutdown(): void {
+    if (this.beforeUnloadHandler) {
+      window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+      this.beforeUnloadHandler = null;
+    }
     UIGamepadNavigator.getInstance().popContext('level-editor');
     this.editorContainer?.remove();
     this.editorContainer = null;

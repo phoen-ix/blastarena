@@ -334,6 +334,7 @@ export class GameOverScene extends Phaser.Scene {
   ): void {
     const colors = themeManager.getCanvasColors();
     const success = data.success;
+    let hasNextLevel = false;
     const titleColor = success ? colors.successHex : colors.dangerHex;
     const titleText = success ? 'LEVEL COMPLETE!' : 'LEVEL FAILED';
 
@@ -371,8 +372,9 @@ export class GameOverScene extends Phaser.Scene {
 
       // Next Level button
       if (data.nextLevelId) {
+        hasNextLevel = true;
         const nextBtn = this.add
-          .text(width / 2 - 120, height - 40, '[ Next Level ]', {
+          .text(width / 2, height - 40, '[ Next Level ]', {
             fontSize: '20px',
             color: colors.successHex,
             fontFamily: 'Chakra Petch, sans-serif',
@@ -403,9 +405,12 @@ export class GameOverScene extends Phaser.Scene {
     }
 
     // Play Again (on success) / Retry (on failure)
+    // When 3 buttons (next level exists): spread evenly; otherwise 2 buttons
     const retryLabel = success ? '[ Play Again ]' : '[ Retry ]';
+    const retryX = hasNextLevel ? width / 2 - 160 : width / 2 - 100;
+    const backX = hasNextLevel ? width / 2 + 160 : width / 2 + 100;
     const retryBtn = this.add
-      .text(width / 2 - 100, height - 40, retryLabel, {
+      .text(retryX, height - 40, retryLabel, {
         fontSize: '20px',
         color: colors.textHex,
         fontFamily: 'Chakra Petch, sans-serif',
@@ -425,7 +430,7 @@ export class GameOverScene extends Phaser.Scene {
 
     // Back to Campaign button
     const backBtn = this.add
-      .text(width / 2 + 100, height - 40, '[ Campaign ]', {
+      .text(backX, height - 40, '[ Campaign ]', {
         fontSize: '20px',
         color: colors.primaryHex,
         fontFamily: 'Chakra Petch, sans-serif',
