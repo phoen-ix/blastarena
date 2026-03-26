@@ -177,7 +177,7 @@ Documentation served via backend API from `docs/` directory (bind-mounted in dev
 - Self-hosted fonts (Chakra Petch + DM Sans) as woff2 in `frontend/public/fonts/`
 - SVG favicon, web app manifest (PWA-ready), robots.txt, sitemap.xml
 - Noscript fallback with branded content for JS-disabled crawlers
-- CSP header restricts all sources to `'self'` — no external domains
+- Full security header suite: CSP (with Trusted Types, script hashes, frame-ancestors), HSTS, COOP, X-Frame-Options, Permissions-Policy — all self-hosted, no external domains
 
 ## Tech Stack
 
@@ -188,7 +188,7 @@ Documentation served via backend API from `docs/` directory (bind-mounted in dev
 | Real-time | Socket.io |
 | Database | MariaDB 11 + Redis 7 |
 | Auth | JWT + bcrypt + httpOnly cookies |
-| Security | HTTP security headers, parameterized queries, rate limiting, Zod socket event validation |
+| Security | CSP + HSTS + COOP + Trusted Types, parameterized queries, rate limiting, Zod socket event validation |
 | Validation | Zod |
 | Container | Docker Compose |
 
