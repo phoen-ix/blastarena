@@ -200,7 +200,7 @@ Gzipped JSON replays with tile diffs. See [docs/replay-system.md](docs/replay-sy
 - OG image (`og-image.png`) deferred — meta tags reference it but file not yet created
 
 ## Security, Connection Resilience & Docker
-- HTTP security headers (in `docker/nginx/security-headers.conf`, included per-location to avoid Nginx `add_header` inheritance issues): CSP (with script hash for inline theme loader, `frame-ancestors 'self'`, `require-trusted-types-for 'script'`), HSTS (1yr + includeSubDomains), COOP (`same-origin`), `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (restrictive)
+- HTTP security headers (in `docker/nginx/security-headers.conf`, included per-location to avoid Nginx `add_header` inheritance issues): CSP (with script hash for inline theme loader, `frame-ancestors 'self'`), HSTS (1yr + includeSubDomains), COOP (`same-origin`), `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (restrictive)
 - Email addresses normalized to lowercase on register and email change
 - Campaign JSON fields (`enemy_placements`, `powerup_placements`, `starting_powerups`) parsed via `safeJsonParse()` with fallback to empty arrays
 - `room:create` socket event validates `MatchConfig` via Zod schema (game mode, map dimensions, player count, power-ups, etc.)
