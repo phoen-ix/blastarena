@@ -118,6 +118,7 @@ User-created maps for multiplayer rooms. Reuses the campaign `LevelEditorScene` 
 - **XP**: kills×50 + bombs×5 + powerups×10 + completion(25) + placement bonus + win bonus(100). Level N→N+1 costs N×100 XP. Admin `xp_multiplier` setting
 - **Rematch voting**: >50% threshold triggers auto-restart. `humanPlayerIds` filters to `id > 0` (excludes bots); solo with bots shows direct "Play Again" instead of vote UI
 - **Profiles**: Click usernames for public profile. `is_profile_public` toggle hides from leaderboard. `accept_friend_requests` toggle checked in `sendFriendRequest`
+- **Account deletion**: Self-service via Settings > Account > Danger Zone. `DELETE /user/account` requires password confirmation. Hard delete with FK CASCADE. Admin accounts cannot self-delete. Frontend shows confirmation modal, then calls `authManager.logout()` on success
 
 ## Social Features
 - **Friendships**: DB-backed (`friendships` table), reciprocal rows on accept. `user_blocks` table for blocking

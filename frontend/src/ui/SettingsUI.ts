@@ -200,6 +200,20 @@ export class SettingsUI {
           <div id="acct-password-status" class="settings-status"></div>
           <button class="btn btn-primary" id="acct-change-password">Change Password</button>
         </div>
+
+        ${
+          !isAdmin
+            ? `
+        <hr class="settings-separator">
+
+        <div class="content-section">
+          <h3 class="settings-section-title" style="color:var(--danger);">Danger Zone</h3>
+          <p class="settings-hint" style="margin-bottom:var(--sp-3);">Permanently delete your account and all associated data. This action cannot be undone.</p>
+          <button class="btn btn-sm" style="color:var(--danger);border:1px solid var(--danger);" id="acct-delete-account">Delete Account</button>
+        </div>
+        `
+            : ''
+        }
       </div>
     `;
 
@@ -315,6 +329,73 @@ export class SettingsUI {
         }
       });
     }
+
+    // Delete account
+    const deleteBtn = this.contentEl.querySelector('#acct-delete-account');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', () => this.showDeleteAccountModal());
+    }
+  }
+
+  private showDeleteAccountModal(): void {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Delete Account');
+    modal.innerHTML = `
+      <div class="modal" style="max-width:440px;">
+        <h2 style="color:var(--danger);">Delete Account</h2>
+        <p style="margin:var(--sp-3) 0;color:var(--text-dim);">This will permanently delete your account and all associated data including stats, replays, maps, messages, and friends. This cannot be undone.</p>
+        <div class="form-group">
+          <label for="delete-password">Enter your password to confirm</label>
+          <input type="password" class="input" id="delete-password" placeholder="Password" autocomplete="current-password">
+        </div>
+        <div id="delete-status" class="settings-status" style="margin-bottom:var(--sp-2);"></div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="delete-cancel">Cancel</button>
+          <button class="btn" style="background:var(--danger);color:#fff;" id="delete-confirm">Delete My Account</button>
+        </div>
+      </div>
+    `;
+
+    const closeModal = () => modal.remove();
+    modal.querySelector('#delete-cancel')!.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+    const escHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeModal();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    modal.querySelector('#delete-confirm')!.addEventListener('click', async () => {
+      const password = (modal.querySelector('#delete-password') as HTMLInputElement).value;
+      const statusEl = modal.querySelector('#delete-status')!;
+      if (!password) {
+        statusEl.innerHTML = '<span class="text-danger">Please enter your password.</span>';
+        return;
+      }
+      const btn = modal.querySelector('#delete-confirm') as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+      try {
+        await ApiClient.delete('/user/account', { password });
+        closeModal();
+        document.removeEventListener('keydown', escHandler);
+        this.authManager.logout();
+      } catch (err: unknown) {
+        btn.disabled = false;
+        btn.textContent = 'Delete My Account';
+        statusEl.innerHTML = `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`;
+      }
+    });
+
+    document.getElementById('ui-overlay')!.appendChild(modal);
+    (modal.querySelector('#delete-password') as HTMLInputElement).focus();
   }
 
   private renderPreferencesTab(): void {

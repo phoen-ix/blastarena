@@ -164,6 +164,26 @@ router.put(
   },
 );
 
+const deleteAccountSchema = z.object({
+  password: z.string().min(1),
+});
+
+router.delete(
+  '/user/account',
+  authMiddleware,
+  validate(deleteAccountSchema),
+  async (req, res, next) => {
+    try {
+      await userService.deleteAccount(req.user!.userId, req.body.password);
+      // Clear refresh token cookie
+      res.clearCookie('refreshToken', { path: '/api/auth' });
+      res.json({ message: 'Account deleted successfully' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 router.get('/user/confirm-email/:token', async (req, res, next) => {
   try {
     await userService.confirmEmailChange(req.params.token);

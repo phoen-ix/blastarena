@@ -130,6 +130,7 @@ All actions audit-logged. See [docs/admin-and-systems.md](docs/admin-and-systems
 - **Rematch Voting**: After game over, players vote for rematch. >50% triggers auto-restart with same settings. 30s timeout. Solo games (1 human + bots) show direct "Play Again" button instead of voting.
 - **Admin Chat Controls**: All chat features (party chat, lobby chat, DMs, emotes, spectator chat) individually configurable: everyone (default), staff only, admin only, or fully disabled.
 - **Imprint & GitHub**: Admin-toggled links displayed on the login page footer and as right-aligned items in the Help tab bar. Imprint text editable in Dashboard; shown as modal on login, inline tab in Help. GitHub link opens repo in new tab.
+- **Account Deletion**: Self-service account deletion in Settings > Account. Password confirmation required. Permanently removes all user data (stats, replays, maps, messages, friends). Admin accounts are protected from self-deletion.
 
 ## Game Replays
 

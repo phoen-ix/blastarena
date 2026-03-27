@@ -208,3 +208,25 @@ export async function updatePrivacySettings(
   params.push(userId);
   await execute(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, params);
 }
+
+export async function deleteAccount(userId: number, password: string): Promise<void> {
+  const rows = await query<UserRow[]>('SELECT password_hash, role FROM users WHERE id = ?', [
+    userId,
+  ]);
+  if (rows.length === 0) {
+    throw new AppError('User not found', 404, 'NOT_FOUND');
+  }
+
+  if (rows[0].role === 'admin') {
+    throw new AppError('Admin accounts cannot be self-deleted', 403, 'FORBIDDEN');
+  }
+
+  const valid = await comparePassword(password, rows[0].password_hash);
+  if (!valid) {
+    throw new AppError('Password is incorrect', 401, 'INVALID_PASSWORD');
+  }
+
+  // Hard delete — FK cascades handle all related data
+  await execute('DELETE FROM users WHERE id = ?', [userId]);
+  logger.info(`User ${userId} deleted their own account`);
+}
