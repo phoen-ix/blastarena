@@ -191,7 +191,7 @@ Full i18n support via [i18next](https://www.i18next.com/). All UI strings are ex
 | English  | `en` | Complete |
 | German   | `de` | Complete |
 
-- **Language selection**: Settings > Preferences > Language dropdown. Auto-detects browser language on first visit
+- **Language selection**: Flag dropdown on login screen + Settings > Preferences dropdown. Auto-detects browser language on first visit
 - **11 namespaces** organize translations: `ui`, `admin`, `auth`, `campaign`, `editor`, `help`, `game`, `common`, `errors`, `hud`, `server`
 - **Adding a new language**: Create translated JSON files in `frontend/src/i18n/locales/{code}/`, `shared/src/i18n/locales/{code}/`, and `backend/src/i18n/locales/{code}/`, then register the language code in the i18n config files
 - **RTL ready**: Document direction attribute set dynamically for RTL languages

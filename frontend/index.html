@@ -464,6 +464,7 @@
     }
 
     .auth-form {
+      position: relative;
       background: var(--bg-surface);
       border: 1px solid var(--border-bright);
       border-radius: var(--radius-xl);
@@ -593,6 +594,61 @@
       margin: 0 8px;
       color: var(--text-muted);
       opacity: 0.5;
+    }
+
+    .auth-lang-picker {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+    }
+    .auth-lang-toggle {
+      background: var(--bg-hover);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 1;
+      padding: 4px 8px;
+      transition: border-color var(--transition);
+    }
+    .auth-lang-toggle:hover {
+      border-color: var(--primary);
+    }
+    .auth-lang-dropdown {
+      display: none;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 4px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-bright);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      overflow: hidden;
+      z-index: 10;
+      min-width: 140px;
+    }
+    .auth-lang-dropdown.open {
+      display: flex;
+      flex-direction: column;
+    }
+    .auth-lang-option {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px 14px;
+      font-size: 14px;
+      color: var(--text);
+      text-align: left;
+      white-space: nowrap;
+      transition: background var(--transition);
+    }
+    .auth-lang-option:hover {
+      background: var(--bg-hover);
+    }
+    .auth-lang-option.active {
+      color: var(--primary);
+      font-weight: 600;
     }
 
     /* ============ BUTTONS ============ */

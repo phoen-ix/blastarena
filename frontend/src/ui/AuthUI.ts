@@ -3,7 +3,7 @@ import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { getErrorMessage } from '@blast-arena/shared';
-import { t } from '../i18n';
+import { i18n, t } from '../i18n';
 
 export class AuthUI {
   private overlay: HTMLElement;
@@ -64,7 +64,9 @@ export class AuthUI {
     gpNav.pushContext({
       id: 'auth',
       elements: () => [
-        ...this.overlay.querySelectorAll<HTMLElement>('input, .btn-primary, .auth-switch a'),
+        ...this.overlay.querySelectorAll<HTMLElement>(
+          'input, .btn-primary, .auth-switch a, .auth-lang-toggle',
+        ),
       ],
       onBack: () => {
         if (this.mode !== 'login') {
@@ -97,6 +99,7 @@ export class AuthUI {
   private renderLogin(): void {
     this.overlay.innerHTML = `
       <div class="auth-form">
+        ${this.renderLanguagePicker()}
         <h2><span>${t('auth:login.title')}</span>${t('auth:login.titleAccent')}</h2>
         <div class="form-group">
           <label for="login-username">${t('auth:login.username')}</label>
@@ -138,6 +141,7 @@ export class AuthUI {
       e.preventDefault();
       this.showImprint();
     });
+    this.bindLanguagePicker();
 
     this.pushGamepadContext();
   }
@@ -185,6 +189,7 @@ export class AuthUI {
   private renderRegister(): void {
     this.overlay.innerHTML = `
       <div class="auth-form">
+        ${this.renderLanguagePicker()}
         <h2>${t('auth:register.title')} <span>${t('auth:register.titleAccent')}</span></h2>
         <div class="form-group">
           <label for="reg-username">${t('auth:register.username')}</label>
@@ -214,6 +219,7 @@ export class AuthUI {
       this.mode = 'login';
       this.render();
     });
+    this.bindLanguagePicker();
 
     this.pushGamepadContext();
   }
@@ -221,6 +227,7 @@ export class AuthUI {
   private renderForgotPassword(): void {
     this.overlay.innerHTML = `
       <div class="auth-form">
+        ${this.renderLanguagePicker()}
         <h2>${t('auth:forgotPassword.title')} <span>${t('auth:forgotPassword.titleAccent')}</span></h2>
         <div class="form-group">
           <label for="forgot-email">${t('auth:forgotPassword.email')}</label>
@@ -241,8 +248,58 @@ export class AuthUI {
       this.mode = 'login';
       this.render();
     });
+    this.bindLanguagePicker();
 
     this.pushGamepadContext();
+  }
+
+  private renderLanguagePicker(): string {
+    const languages = [
+      { code: 'en', flag: '🇬🇧', label: 'English' },
+      { code: 'de', flag: '🇩🇪', label: 'Deutsch' },
+    ];
+    const current = i18n.language?.split('-')[0] || 'en';
+    const currentLang = languages.find((l) => l.code === current) || languages[0];
+    return `<div class="auth-lang-picker">
+      <button class="auth-lang-toggle" id="auth-lang-toggle" aria-label="${t('auth:language')}" aria-expanded="false">${currentLang.flag}</button>
+      <div class="auth-lang-dropdown" id="auth-lang-dropdown">
+        ${languages
+          .map(
+            (lang) =>
+              `<button class="auth-lang-option ${current === lang.code ? 'active' : ''}" data-lang="${lang.code}">${lang.flag} ${lang.label}</button>`,
+          )
+          .join('')}
+      </div>
+    </div>`;
+  }
+
+  private bindLanguagePicker(): void {
+    const toggle = this.overlay.querySelector('#auth-lang-toggle') as HTMLButtonElement;
+    const dropdown = this.overlay.querySelector('#auth-lang-dropdown') as HTMLElement;
+    if (!toggle || !dropdown) return;
+
+    toggle.addEventListener('click', () => {
+      const open = dropdown.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', String(open));
+    });
+
+    dropdown.querySelectorAll<HTMLButtonElement>('.auth-lang-option').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const lang = btn.dataset.lang!;
+        if (lang !== i18n.language?.split('-')[0]) {
+          i18n.changeLanguage(lang);
+          this.render();
+        }
+      });
+    });
+
+    // Close dropdown on outside click
+    this.overlay.addEventListener('click', (e) => {
+      if (!toggle.contains(e.target as Node) && !dropdown.contains(e.target as Node)) {
+        dropdown.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+      }
+    });
   }
 
   private renderFooterLinks(): string {

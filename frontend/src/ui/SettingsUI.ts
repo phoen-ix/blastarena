@@ -31,6 +31,7 @@ export class SettingsUI {
   private onClose: () => void;
   private activeTabId: string;
   private contentEl: HTMLElement | null = null;
+  private onLanguageChanged: () => void;
   private get tabs(): Tab[] {
     return [
       { id: 'account', label: t('settings.tabs.account') },
@@ -53,6 +54,7 @@ export class SettingsUI {
     this.container.className = 'admin-container';
     this.activeTabId =
       initialTab && this.tabs.some((t) => t.id === initialTab) ? initialTab : 'account';
+    this.onLanguageChanged = () => this.render();
   }
 
   async show(): Promise<void> {
@@ -60,11 +62,13 @@ export class SettingsUI {
     if (uiOverlay && !uiOverlay.contains(this.container)) {
       uiOverlay.appendChild(this.container);
     }
+    window.addEventListener('language-changed', this.onLanguageChanged);
     await this.render();
     this.pushGamepadContext();
   }
 
   hide(): void {
+    window.removeEventListener('language-changed', this.onLanguageChanged);
     UIGamepadNavigator.getInstance().popContext('settings-ui');
     this.container.remove();
   }
