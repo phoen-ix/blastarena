@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { themeManager } from '../themes/ThemeManager';
 import { POWERUP_ICON_DRAWERS } from '../utils/powerUpIcons';
+import { generateHazardTileTextures } from '../utils/campaignThemes';
 
 export const PLAYER_COLORS = [
   0xe94560, 0x44aaff, 0x44ff44, 0xff8800, 0xcc44ff, 0xffff44, 0xff44ff, 0x44ffff,
@@ -536,6 +537,9 @@ export class BootScene extends Phaser.Scene {
     pitGfx.fillCircle(44, 24, 1);
     pitGfx.generateTexture('pit', 48, 48);
     pitGfx.destroy();
+
+    // Hazard tile textures (vine, quicksand, ice, lava, mud, spikes, dark_rift)
+    generateHazardTileTextures(this);
   }
 
   private generateBombTexture(): void {
