@@ -1166,12 +1166,46 @@
       width: 22px;
       height: 22px;
       border-radius: 3px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
       margin-right: 4px;
       vertical-align: middle;
-      text-align: center;
-      font-size: 8px;
       flex-shrink: 0;
+    }
+
+    .help-subheading {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--primary);
+      margin-top: 14px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .help-theme-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .help-theme-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 4px;
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .help-theme-cell canvas {
+      border-radius: 3px;
+    }
+
+    .help-theme-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-align: center;
     }
 
     /* Help: Power-up rows */
@@ -1393,21 +1427,6 @@
       color: var(--danger);
       padding: 20px;
       text-align: center;
-    }
-
-    .help-tile-teleporter-a {
-      background: radial-gradient(circle, rgba(68,170,255,0.5) 30%, rgba(68,170,255,0.15) 70%, #2a2a3e 100%);
-    }
-
-    .help-tile-teleporter-b {
-      background: radial-gradient(circle, rgba(255,136,68,0.5) 30%, rgba(255,136,68,0.15) 70%, #2a2a3e 100%);
-    }
-
-    .help-tile-conveyor {
-      background: #3a3a4e;
-      color: #88aacc;
-      font-size: 14px;
-      line-height: 22px;
     }
 
     /* ============ ADMIN BANNER ============ */

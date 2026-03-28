@@ -145,9 +145,9 @@ Full-page Help view accessible from the lobby sidebar. Seven tabs with role-base
 | Getting Started | All | Keyboard + gamepad controls, basic mechanics, spectator mode |
 | Power-Ups | All | All 9 power-ups with Canvas2D inline sprites matching in-game textures |
 | Game Modes | All | 6 modes with player counts, rules, win conditions |
-| Map Features | All | Reinforced walls, dynamic events, hazard tiles with visual previews |
+| Map Features | All | Reinforced walls, dynamic events, hazard tiles with Canvas2D tile previews, theme variant showcase (all 9 campaign themes) |
 | Guides | All | Rendered markdown docs: Campaign, Replays, Bot AI (collapsible sections) |
-| Level Editor | Staff | Campaign level editor documentation |
+| Level Editor | Staff | Visual tile reference (27 tile types with Canvas2D icons) + campaign system docs |
 | Admin Docs | Staff | Admin systems, infrastructure, testing, performance, API reference |
 
 Documentation served via backend API from `docs/` directory (bind-mounted in dev, baked into image for prod). Markdown rendered client-side with `marked`.

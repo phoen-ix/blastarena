@@ -2,8 +2,16 @@ import { AuthManager } from '../network/AuthManager';
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
-import { POWERUP_DEFINITIONS, GAME_MODES, UserRole } from '@blast-arena/shared';
+import {
+  POWERUP_DEFINITIONS,
+  GAME_MODES,
+  UserRole,
+  CAMPAIGN_THEME_PALETTES,
+  CAMPAIGN_THEME_NAMES,
+} from '@blast-arena/shared';
+import type { CampaignWorldTheme } from '@blast-arena/shared';
 import { renderPowerUpCanvas } from '../utils/powerUpCanvas';
+import { renderTileCanvas } from '../utils/tileCanvas';
 import { marked } from 'marked';
 import { t } from '../i18n';
 
@@ -326,47 +334,126 @@ export class HelpUI {
   }
 
   private renderMapFeaturesTab(): void {
-    this.contentEl!.innerHTML = `
-      <div class="help-section">
-        <div class="help-heading">${t('help:mapFeatures.reinforcedWalls.heading')}</div>
-        <div class="help-tip">${t('help:mapFeatures.reinforcedWalls.tip')}</div>
-        <div class="help-row">${t('help:mapFeatures.reinforcedWalls.desc')}</div>
-      </div>
+    if (!this.contentEl) return;
 
-      <div class="help-section">
-        <div class="help-heading">${t('help:mapFeatures.dynamicEvents.heading')}</div>
-        <div class="help-tip">${t('help:mapFeatures.dynamicEvents.tip')}</div>
-        <div class="help-row help-row-spaced">
-          <b class="text-danger">${t('help:mapFeatures.dynamicEvents.meteorStrikes')}</b> — ${t('help:mapFeatures.dynamicEvents.meteorStrikesDesc')}
-        </div>
-        <div class="help-row help-row-spaced">
-          <b class="text-success">${t('help:mapFeatures.dynamicEvents.powerUpRain')}</b> — ${t('help:mapFeatures.dynamicEvents.powerUpRainDesc')}
-        </div>
-        <div class="help-row help-row-spaced">
-          <b class="text-warning">${t('help:mapFeatures.dynamicEvents.wallCollapse')}</b> — ${t('help:mapFeatures.dynamicEvents.wallCollapseDesc')}
-        </div>
-        <div class="help-row help-row-spaced">
-          <b style="color:var(--info)">${t('help:mapFeatures.dynamicEvents.freezeWave')}</b> — ${t('help:mapFeatures.dynamicEvents.freezeWaveDesc')}
-        </div>
-        <div class="help-row">
-          <b class="text-danger">${t('help:mapFeatures.dynamicEvents.bombSurge')}</b> — ${t('help:mapFeatures.dynamicEvents.bombSurgeDesc')}
-        </div>
-      </div>
+    const wrapper = document.createElement('div');
 
-      <div class="help-section">
-        <div class="help-heading">${t('help:mapFeatures.hazardTiles.heading')}</div>
-        <div class="help-tip">${t('help:mapFeatures.hazardTiles.tip')}</div>
-        <div class="help-row help-row-spaced">
-          <span class="help-tile help-tile-teleporter-a"></span>
-          <span class="help-tile help-tile-teleporter-b"></span>
-          <b>${t('help:mapFeatures.hazardTiles.teleporters')}</b> — ${t('help:mapFeatures.hazardTiles.teleportersDesc')}
-        </div>
-        <div class="help-row">
-          <span class="help-tile help-tile-conveyor">▸▸▸</span>
-          <b>${t('help:mapFeatures.hazardTiles.conveyorBelts')}</b> — ${t('help:mapFeatures.hazardTiles.conveyorBeltsDesc')}
-        </div>
+    // Reinforced Walls section — with tile previews
+    const wallSection = document.createElement('div');
+    wallSection.className = 'help-section';
+    wallSection.innerHTML = `
+      <div class="help-heading">${t('help:mapFeatures.reinforcedWalls.heading')}</div>
+      <div class="help-tip">${t('help:mapFeatures.reinforcedWalls.tip')}</div>
+      <div class="help-row" id="help-reinforced-row"></div>
+    `;
+    wrapper.appendChild(wallSection);
+
+    const reinforcedRow = wallSection.querySelector('#help-reinforced-row')!;
+    const wallCanvas = renderTileCanvas('wall', 22);
+    wallCanvas.className = 'help-tile';
+    reinforcedRow.appendChild(wallCanvas);
+    const destCanvas = renderTileCanvas('destructible', 22);
+    destCanvas.className = 'help-tile';
+    reinforcedRow.appendChild(destCanvas);
+    const crackedCanvas = renderTileCanvas('destructible_cracked', 22);
+    crackedCanvas.className = 'help-tile';
+    reinforcedRow.appendChild(crackedCanvas);
+    reinforcedRow.insertAdjacentHTML('beforeend', ` ${t('help:mapFeatures.reinforcedWalls.desc')}`);
+
+    // Dynamic Events section
+    const eventsSection = document.createElement('div');
+    eventsSection.className = 'help-section';
+    eventsSection.innerHTML = `
+      <div class="help-heading">${t('help:mapFeatures.dynamicEvents.heading')}</div>
+      <div class="help-tip">${t('help:mapFeatures.dynamicEvents.tip')}</div>
+      <div class="help-row help-row-spaced">
+        <b class="text-danger">${t('help:mapFeatures.dynamicEvents.meteorStrikes')}</b> — ${t('help:mapFeatures.dynamicEvents.meteorStrikesDesc')}
+      </div>
+      <div class="help-row help-row-spaced">
+        <b class="text-success">${t('help:mapFeatures.dynamicEvents.powerUpRain')}</b> — ${t('help:mapFeatures.dynamicEvents.powerUpRainDesc')}
+      </div>
+      <div class="help-row help-row-spaced">
+        <b class="text-warning">${t('help:mapFeatures.dynamicEvents.wallCollapse')}</b> — ${t('help:mapFeatures.dynamicEvents.wallCollapseDesc')}
+      </div>
+      <div class="help-row help-row-spaced">
+        <b style="color:var(--info)">${t('help:mapFeatures.dynamicEvents.freezeWave')}</b> — ${t('help:mapFeatures.dynamicEvents.freezeWaveDesc')}
+      </div>
+      <div class="help-row">
+        <b class="text-danger">${t('help:mapFeatures.dynamicEvents.bombSurge')}</b> — ${t('help:mapFeatures.dynamicEvents.bombSurgeDesc')}
       </div>
     `;
+    wrapper.appendChild(eventsSection);
+
+    // Hazard Tiles section — with canvas tile previews
+    const hazardSection = document.createElement('div');
+    hazardSection.className = 'help-section';
+    hazardSection.innerHTML = `
+      <div class="help-heading">${t('help:mapFeatures.hazardTiles.heading')}</div>
+      <div class="help-tip">${t('help:mapFeatures.hazardTiles.tip')}</div>
+      <div class="help-row help-row-spaced" id="help-teleporter-row"></div>
+      <div class="help-row" id="help-conveyor-row"></div>
+    `;
+    wrapper.appendChild(hazardSection);
+
+    const teleRow = hazardSection.querySelector('#help-teleporter-row')!;
+    const teleA = renderTileCanvas('teleporter_a', 22);
+    teleA.className = 'help-tile';
+    teleRow.appendChild(teleA);
+    const teleB = renderTileCanvas('teleporter_b', 22);
+    teleB.className = 'help-tile';
+    teleRow.appendChild(teleB);
+    teleRow.insertAdjacentHTML(
+      'beforeend',
+      ` <b>${t('help:mapFeatures.hazardTiles.teleporters')}</b> — ${t('help:mapFeatures.hazardTiles.teleportersDesc')}`,
+    );
+
+    const convRow = hazardSection.querySelector('#help-conveyor-row')!;
+    const convCanvas = renderTileCanvas('conveyor_right', 22);
+    convCanvas.className = 'help-tile';
+    convRow.appendChild(convCanvas);
+    convRow.insertAdjacentHTML(
+      'beforeend',
+      ` <b>${t('help:mapFeatures.hazardTiles.conveyorBelts')}</b> — ${t('help:mapFeatures.hazardTiles.conveyorBeltsDesc')}`,
+    );
+
+    // Theme Variants section — showcase wall/destructible across all themes
+    const themeSection = document.createElement('div');
+    themeSection.className = 'help-section';
+    themeSection.innerHTML = `
+      <div class="help-heading">${t('help:mapFeatures.themeVariants.heading')}</div>
+      <div class="help-tip">${t('help:mapFeatures.themeVariants.tip')}</div>
+    `;
+    const themeGrid = document.createElement('div');
+    themeGrid.className = 'help-theme-grid';
+    const themes: CampaignWorldTheme[] = [
+      'classic',
+      'forest',
+      'desert',
+      'ice',
+      'volcano',
+      'void',
+      'castle',
+      'swamp',
+      'sky',
+    ];
+    for (const theme of themes) {
+      const palette = CAMPAIGN_THEME_PALETTES[theme];
+      const cell = document.createElement('div');
+      cell.className = 'help-theme-cell';
+      const wallC = renderTileCanvas('wall', 28, palette);
+      const destC = renderTileCanvas('destructible', 28, palette);
+      cell.appendChild(wallC);
+      cell.appendChild(destC);
+      cell.insertAdjacentHTML(
+        'beforeend',
+        `<div class="help-theme-label">${CAMPAIGN_THEME_NAMES[theme]}</div>`,
+      );
+      themeGrid.appendChild(cell);
+    }
+    themeSection.appendChild(themeGrid);
+    wrapper.appendChild(themeSection);
+
+    this.contentEl.appendChild(wrapper);
   }
 
   private async renderGuidesTab(): Promise<void> {
@@ -414,13 +501,116 @@ export class HelpUI {
   private async renderLevelEditorTab(): Promise<void> {
     if (!this.contentEl) return;
 
-    this.contentEl.innerHTML = `<div class="help-status">${t('help:loading')}</div>`;
+    const wrapper = document.createElement('div');
 
+    // Tile Reference section
+    const refSection = document.createElement('div');
+    refSection.className = 'help-section';
+    refSection.innerHTML = `
+      <div class="help-heading">${t('help:levelEditor.tileReference')}</div>
+      <div class="help-tip">${t('help:levelEditor.tileRefTip')}</div>
+    `;
+    wrapper.appendChild(refSection);
+
+    // Helper to create a tile row with canvas + description
+    const tileRow = (
+      tiles: Parameters<typeof renderTileCanvas>[0][],
+      text: string,
+      spaced = true,
+    ): HTMLDivElement => {
+      const row = document.createElement('div');
+      row.className = spaced ? 'help-row help-row-spaced' : 'help-row';
+      for (const tile of tiles) {
+        const c = renderTileCanvas(tile, 22);
+        c.className = 'help-tile';
+        row.appendChild(c);
+      }
+      row.insertAdjacentHTML('beforeend', ` ${text}`);
+      return row;
+    };
+
+    // Basic Tiles
+    const basicHeading = document.createElement('div');
+    basicHeading.className = 'help-subheading';
+    basicHeading.textContent = t('help:levelEditor.basicTiles');
+    refSection.appendChild(basicHeading);
+    refSection.appendChild(tileRow(['wall'], t('help:levelEditor.wall')));
+    refSection.appendChild(tileRow(['destructible'], t('help:levelEditor.destructible')));
+    refSection.appendChild(
+      tileRow(['destructible_cracked'], t('help:levelEditor.destructibleCracked')),
+    );
+
+    // Mechanics
+    const mechHeading = document.createElement('div');
+    mechHeading.className = 'help-subheading';
+    mechHeading.textContent = t('help:levelEditor.mechanics');
+    refSection.appendChild(mechHeading);
+    refSection.appendChild(
+      tileRow(['teleporter_a', 'teleporter_b'], t('help:levelEditor.teleporter')),
+    );
+    refSection.appendChild(
+      tileRow(
+        ['conveyor_right', 'conveyor_up', 'conveyor_down', 'conveyor_left'],
+        t('help:levelEditor.conveyor'),
+      ),
+    );
+
+    // Campaign-Only Tiles
+    const campHeading = document.createElement('div');
+    campHeading.className = 'help-subheading';
+    campHeading.textContent = t('help:levelEditor.campaignTiles');
+    refSection.appendChild(campHeading);
+    refSection.appendChild(tileRow(['exit'], t('help:levelEditor.exit')));
+    refSection.appendChild(tileRow(['goal'], t('help:levelEditor.goal')));
+
+    // Puzzle Tiles
+    const puzzleHeading = document.createElement('div');
+    puzzleHeading.className = 'help-subheading';
+    puzzleHeading.textContent = t('help:levelEditor.puzzleTiles');
+    refSection.appendChild(puzzleHeading);
+    refSection.appendChild(
+      tileRow(
+        ['switch_red', 'switch_blue', 'switch_green', 'switch_yellow'],
+        t('help:levelEditor.switch'),
+      ),
+    );
+    refSection.appendChild(
+      tileRow(['gate_red', 'gate_blue', 'gate_green', 'gate_yellow'], t('help:levelEditor.gate')),
+    );
+    refSection.appendChild(tileRow(['crumbling'], t('help:levelEditor.crumbling')));
+
+    // Hazard Tiles
+    const hazHeading = document.createElement('div');
+    hazHeading.className = 'help-subheading';
+    hazHeading.textContent = t('help:levelEditor.hazardTiles');
+    refSection.appendChild(hazHeading);
+    refSection.appendChild(tileRow(['vine'], t('help:levelEditor.vine')));
+    refSection.appendChild(tileRow(['quicksand'], t('help:levelEditor.quicksand')));
+    refSection.appendChild(tileRow(['ice'], t('help:levelEditor.ice')));
+    refSection.appendChild(tileRow(['lava'], t('help:levelEditor.lava')));
+    refSection.appendChild(tileRow(['mud'], t('help:levelEditor.mud')));
+    refSection.appendChild(tileRow(['spikes'], t('help:levelEditor.spikes')));
+    refSection.appendChild(tileRow(['dark_rift'], t('help:levelEditor.darkRift'), false));
+
+    // Full docs section (loaded async)
+    const docsSection = document.createElement('div');
+    docsSection.className = 'help-section';
+    docsSection.innerHTML = `
+      <div class="help-heading">${t('help:levelEditor.fullDocs')}</div>
+      <div class="help-tip">${t('help:levelEditor.fullDocsDesc')}</div>
+      <div class="help-markdown"><div class="help-status">${t('help:loading')}</div></div>
+    `;
+    wrapper.appendChild(docsSection);
+
+    this.contentEl.appendChild(wrapper);
+
+    // Load markdown docs
+    const markdownEl = docsSection.querySelector('.help-markdown')!;
     try {
       const html = await this.fetchAndParseDoc('/api/docs/campaign.md');
-      this.contentEl.innerHTML = `<div class="help-markdown">${html}</div>`;
+      markdownEl.innerHTML = html;
     } catch {
-      this.contentEl.innerHTML = `<div class="help-status-error">${t('help:failedToLoadLevelEditor')}</div>`;
+      markdownEl.innerHTML = `<div class="help-status-error">${t('help:failedToLoadLevelEditor')}</div>`;
     }
   }
 

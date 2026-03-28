@@ -138,7 +138,40 @@
       "teleportersDesc": "Glowing pads in blue/orange pairs. Step on one to instantly warp to the other. Use them for surprise attacks or quick escapes.",
       "conveyorBelts": "Conveyor Belts",
       "conveyorBeltsDesc": "Dark tiles with directional arrows. Automatically push you in the arrow direction when you step on them. Can be used strategically or can trap you in danger."
+    },
+    "themeVariants": {
+      "heading": "Theme Variants",
+      "tip": "In campaign mode, each world has its own visual theme. Walls and destructible blocks change appearance to match."
     }
+  },
+
+  "levelEditor": {
+    "tileReference": "Tile Reference",
+    "tileRefTip": "These are the tiles available in the level editor. Campaign mode tiles include additional special types.",
+    "basicTiles": "Basic Tiles",
+    "wall": "Wall \u2014 indestructible, blocks movement and explosions",
+    "destructible": "Destructible \u2014 breakable wall, may drop power-ups when destroyed",
+    "destructibleCracked": "Cracked \u2014 damaged destructible wall, one more hit to destroy (reinforced mode)",
+    "mechanics": "Mechanics",
+    "teleporter": "Teleporters \u2014 blue/orange pairs, step on one to warp to the other",
+    "conveyor": "Conveyors \u2014 push players, bombs, and enemies in the arrow direction",
+    "campaignTiles": "Campaign-Only Tiles",
+    "exit": "Exit \u2014 trapdoor texture, conditionally walkable (unlocks after prerequisite kills)",
+    "goal": "Goal \u2014 star marker, walk onto it to complete the level objective",
+    "puzzleTiles": "Puzzle Tiles",
+    "switch": "Switch \u2014 pressure plate that toggles linked gates (4 colors: red, blue, green, yellow)",
+    "gate": "Gate \u2014 portcullis bars blocking passage, linked to switches by color",
+    "crumbling": "Crumbling Floor \u2014 breaks into a pit 10 ticks after a player or enemy steps off",
+    "hazardTiles": "Hazard Tiles (Theme-Specific)",
+    "vine": "Vine \u2014 slows movement (Forest theme)",
+    "quicksand": "Quicksand \u2014 slows movement, kills after 2 seconds (Desert theme)",
+    "ice": "Ice \u2014 causes sliding momentum (Ice theme)",
+    "lava": "Lava \u2014 instant kill on contact (Volcano theme)",
+    "mud": "Mud \u2014 slows movement (Swamp theme)",
+    "spikes": "Spikes \u2014 cycling safe/lethal phases, 2s safe then 1s lethal (Castle theme)",
+    "darkRift": "Dark Rift \u2014 teleports to a random empty tile (Void theme)",
+    "fullDocs": "Full Documentation",
+    "fullDocsDesc": "See the complete campaign system documentation below for details on enemies, bosses, win conditions, and more."
   },
 
   "guides": {

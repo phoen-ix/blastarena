@@ -138,7 +138,40 @@
       "teleportersDesc": "Leuchtende Plattformen in blauen/orangen Paaren. Betritt eine, um dich sofort zur anderen zu teleportieren. Nutze sie f\u00fcr \u00dcberraschungsangriffe oder schnelle Fl\u00fcchten.",
       "conveyorBelts": "Flie\u00dfb\u00e4nder",
       "conveyorBeltsDesc": "Dunkle Felder mit Richtungspfeilen. Schieben dich automatisch in Pfeilrichtung, wenn du darauf trittst. K\u00f6nnen strategisch genutzt werden oder dich in Gefahr bringen."
+    },
+    "themeVariants": {
+      "heading": "Themen-Varianten",
+      "tip": "Im Kampagnenmodus hat jede Welt ihr eigenes visuelles Thema. W\u00e4nde und zerst\u00f6rbare Bl\u00f6cke \u00e4ndern ihr Aussehen passend zum Thema."
     }
+  },
+
+  "levelEditor": {
+    "tileReference": "Feld-Referenz",
+    "tileRefTip": "Dies sind die verf\u00fcgbaren Felder im Level-Editor. Der Kampagnenmodus enth\u00e4lt zus\u00e4tzliche Spezialtypen.",
+    "basicTiles": "Grundfelder",
+    "wall": "Wand \u2014 unzerst\u00f6rbar, blockiert Bewegung und Explosionen",
+    "destructible": "Zerst\u00f6rbar \u2014 zerbrechliche Wand, kann beim Zerst\u00f6ren Power-Ups fallen lassen",
+    "destructibleCracked": "Rissig \u2014 besch\u00e4digte zerst\u00f6rbare Wand, noch ein Treffer zur Zerst\u00f6rung (Verst\u00e4rkt-Modus)",
+    "mechanics": "Mechaniken",
+    "teleporter": "Teleporter \u2014 blaue/orange Paare, betritt einen um zum anderen zu teleportieren",
+    "conveyor": "Flie\u00dfb\u00e4nder \u2014 schieben Spieler, Bomben und Gegner in Pfeilrichtung",
+    "campaignTiles": "Kampagnen-exklusive Felder",
+    "exit": "Ausgang \u2014 Fallt\u00fcr-Textur, bedingt begehbar (wird nach erforderlichen Kills freigeschaltet)",
+    "goal": "Ziel \u2014 Stern-Markierung, betritt es um das Level-Ziel abzuschlie\u00dfen",
+    "puzzleTiles": "R\u00e4tsel-Felder",
+    "switch": "Schalter \u2014 Druckplatte die verbundene Tore umschaltet (4 Farben: Rot, Blau, Gr\u00fcn, Gelb)",
+    "gate": "Tor \u2014 Fallgitter das den Durchgang blockiert, farblich mit Schaltern verbunden",
+    "crumbling": "Br\u00f6ckelnder Boden \u2014 bricht 10 Ticks nachdem ein Spieler oder Gegner ihn verl\u00e4sst in eine Grube",
+    "hazardTiles": "Gefahrenfelder (Themenspezifisch)",
+    "vine": "Ranke \u2014 verlangsamt Bewegung (Wald-Thema)",
+    "quicksand": "Treibsand \u2014 verlangsamt Bewegung, t\u00f6tet nach 2 Sekunden (W\u00fcsten-Thema)",
+    "ice": "Eis \u2014 verursacht Rutsch-Schwung (Eis-Thema)",
+    "lava": "Lava \u2014 sofortiger Tod bei Kontakt (Vulkan-Thema)",
+    "mud": "Schlamm \u2014 verlangsamt Bewegung (Sumpf-Thema)",
+    "spikes": "Stacheln \u2014 wechselnde sichere/t\u00f6dliche Phasen, 2s sicher dann 1s t\u00f6dlich (Schloss-Thema)",
+    "darkRift": "Dunkler Riss \u2014 teleportiert zu einem zuf\u00e4lligen leeren Feld (Leere-Thema)",
+    "fullDocs": "Vollst\u00e4ndige Dokumentation",
+    "fullDocsDesc": "Siehe die vollst\u00e4ndige Kampagnensystem-Dokumentation unten f\u00fcr Details zu Gegnern, Bossen, Siegbedingungen und mehr."
   },
 
   "guides": {
