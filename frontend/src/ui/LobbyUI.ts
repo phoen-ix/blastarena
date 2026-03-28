@@ -364,6 +364,9 @@ export class LobbyUI {
       .querySelector('#nav-campaign')!
       .addEventListener('click', () => this.navigateTo('campaign'));
     this.container
+      .querySelector('#nav-maps')!
+      .addEventListener('click', () => this.navigateTo('maps'));
+    this.container
       .querySelector('#nav-friends')!
       .addEventListener('click', () => this.navigateTo('friends'));
     this.container
