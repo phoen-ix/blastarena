@@ -208,6 +208,10 @@ export class LevelEditorScene extends Phaser.Scene {
           // Use defaults for new map
         }
       }
+      generateHazardTileTextures(this);
+      if (this.tiles.length === 0) {
+        this.initEmptyMap();
+      }
       return;
     }
 
