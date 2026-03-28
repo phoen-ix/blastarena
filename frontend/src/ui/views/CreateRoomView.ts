@@ -213,6 +213,37 @@ export class CreateRoomView implements ILobbyView {
                 <input type="checkbox" id="cr-hazard-tiles" style="accent-color:var(--info);">
                 <span style="color:var(--info);">${t('ui:createRoom.hazardTiles')}</span>
               </label>
+            </div>
+            <div id="cr-event-types" class="create-room-options" style="display:none; margin-left:1rem; margin-top:0.25rem; padding-left:0.5rem; border-left:2px solid var(--warning);">
+              ${[
+                'meteor',
+                'powerup_rain',
+                'wall_collapse',
+                'freeze_wave',
+                'bomb_surge',
+                'ufo_abduction',
+              ]
+                .map(
+                  (evt) => `
+              <label class="option-chip">
+                <input type="checkbox" class="cr-event-type" value="${evt}" checked style="accent-color:var(--warning);">
+                <span style="color:var(--warning);">${t(`ui:createRoom.eventTypes.${evt}`)}</span>
+              </label>`,
+                )
+                .join('')}
+            </div>
+            <div id="cr-hazard-types" class="create-room-options" style="display:none; margin-left:1rem; margin-top:0.25rem; padding-left:0.5rem; border-left:2px solid var(--info);">
+              ${['vine', 'quicksand', 'ice', 'lava', 'mud', 'spikes', 'dark_rift']
+                .map(
+                  (hz) => `
+              <label class="option-chip">
+                <input type="checkbox" class="cr-hazard-type" value="${hz}" checked style="accent-color:var(--info);">
+                <span style="color:var(--info);">${t(`ui:createRoom.hazardTypes.${hz}`)}</span>
+              </label>`,
+                )
+                .join('')}
+            </div>
+            <div class="create-room-options" style="margin-top:0;">
               ${
                 this.recordingsEnabled
                   ? `
@@ -309,6 +340,23 @@ export class CreateRoomView implements ILobbyView {
     };
     modeSelect.addEventListener('change', updateFF);
     updateFF();
+
+    // Map events / hazard tiles sub-panel toggles
+    const mapEventsCheck = this.container.querySelector('#cr-map-events') as HTMLInputElement;
+    const eventTypesPanel = this.container.querySelector('#cr-event-types') as HTMLElement;
+    const hazardCheck = this.container.querySelector('#cr-hazard-tiles') as HTMLInputElement;
+    const hazardTypesPanel = this.container.querySelector('#cr-hazard-types') as HTMLElement;
+
+    const updateEventPanel = () => {
+      eventTypesPanel.style.display = mapEventsCheck.checked ? 'flex' : 'none';
+    };
+    const updateHazardPanel = () => {
+      hazardTypesPanel.style.display = hazardCheck.checked ? 'flex' : 'none';
+    };
+    mapEventsCheck.addEventListener('change', updateEventPanel);
+    hazardCheck.addEventListener('change', updateHazardPanel);
+    updateEventPanel();
+    updateHazardPanel();
 
     // Bot difficulty/AI enable
     const botsSelect = this.container.querySelector('#cr-bots') as HTMLSelectElement;
@@ -472,8 +520,18 @@ export class CreateRoomView implements ILobbyView {
     ).checked;
     const enableMapEvents = (this.container.querySelector('#cr-map-events') as HTMLInputElement)
       .checked;
+    const selectedMapEvents = enableMapEvents
+      ? Array.from(this.container.querySelectorAll('.cr-event-type:checked')).map(
+          (cb) => (cb as HTMLInputElement).value,
+        )
+      : undefined;
     const hazardTiles = (this.container.querySelector('#cr-hazard-tiles') as HTMLInputElement)
       .checked;
+    const selectedHazardTiles = hazardTiles
+      ? Array.from(this.container.querySelectorAll('.cr-hazard-type:checked')).map(
+          (cb) => (cb as HTMLInputElement).value,
+        )
+      : undefined;
     const recordGame = this.recordingsEnabled
       ? ((this.container.querySelector('#cr-record-game') as HTMLInputElement)?.checked ?? true)
       : false;
@@ -496,7 +554,9 @@ export class CreateRoomView implements ILobbyView {
           friendlyFire,
           reinforcedWalls,
           enableMapEvents,
+          selectedMapEvents,
           hazardTiles,
+          selectedHazardTiles,
           recordGame,
           botAiId: effectiveBots > 0 && botAiSelect ? botAiSelect.value : undefined,
           customMapId,

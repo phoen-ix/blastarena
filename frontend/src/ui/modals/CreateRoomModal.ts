@@ -163,6 +163,30 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
           <input type="checkbox" id="room-hazard-tiles" style="accent-color:var(--info);">
           <span style="color:var(--info);">${t('ui:createRoom.hazardTiles')}</span>
         </label>
+      </div>
+      <div id="room-event-types" class="option-chips" style="display:none; margin-top:0.25rem; margin-left:1rem; padding-left:0.5rem; border-left:2px solid var(--warning);">
+        ${['meteor', 'powerup_rain', 'wall_collapse', 'freeze_wave', 'bomb_surge', 'ufo_abduction']
+          .map(
+            (evt) => `
+        <label class="option-chip">
+          <input type="checkbox" class="room-event-type" value="${evt}" checked style="accent-color:var(--warning);">
+          <span style="color:var(--warning);">${t(`ui:createRoom.eventTypes.${evt}`)}</span>
+        </label>`,
+          )
+          .join('')}
+      </div>
+      <div id="room-hazard-types" class="option-chips" style="display:none; margin-top:0.25rem; margin-left:1rem; padding-left:0.5rem; border-left:2px solid var(--info);">
+        ${['vine', 'quicksand', 'ice', 'lava', 'mud', 'spikes', 'dark_rift']
+          .map(
+            (hz) => `
+        <label class="option-chip">
+          <input type="checkbox" class="room-hazard-type" value="${hz}" checked style="accent-color:var(--info);">
+          <span style="color:var(--info);">${t(`ui:createRoom.hazardTypes.${hz}`)}</span>
+        </label>`,
+          )
+          .join('')}
+      </div>
+      <div class="option-chips" style="margin-top:0;">
         ${
           deps.recordingsEnabled
             ? `<label class="option-chip">
@@ -216,6 +240,23 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
   };
   modeSelect.addEventListener('change', updateFFVisibility);
   updateFFVisibility();
+
+  // Map events / hazard tiles sub-panel toggles
+  const mapEventsCheck = modal.querySelector('#room-map-events') as HTMLInputElement;
+  const eventTypesPanel = modal.querySelector('#room-event-types') as HTMLElement;
+  const hazardCheck = modal.querySelector('#room-hazard-tiles') as HTMLInputElement;
+  const hazardTypesPanel = modal.querySelector('#room-hazard-types') as HTMLElement;
+
+  const updateEventPanel = () => {
+    eventTypesPanel.style.display = mapEventsCheck.checked ? 'flex' : 'none';
+  };
+  const updateHazardPanel = () => {
+    hazardTypesPanel.style.display = hazardCheck.checked ? 'flex' : 'none';
+  };
+  mapEventsCheck.addEventListener('change', updateEventPanel);
+  hazardCheck.addEventListener('change', updateHazardPanel);
+  updateEventPanel();
+  updateHazardPanel();
 
   // Enable bot difficulty only when bots > 0
   const botsSelect = modal.querySelector('#room-bots') as HTMLSelectElement;
@@ -335,7 +376,17 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
     const reinforcedWalls = (modal.querySelector('#room-reinforced-walls') as HTMLInputElement)
       .checked;
     const enableMapEvents = (modal.querySelector('#room-map-events') as HTMLInputElement).checked;
+    const selectedMapEvents = enableMapEvents
+      ? Array.from(modal.querySelectorAll('.room-event-type:checked')).map(
+          (cb) => (cb as HTMLInputElement).value,
+        )
+      : undefined;
     const hazardTiles = (modal.querySelector('#room-hazard-tiles') as HTMLInputElement).checked;
+    const selectedHazardTiles = hazardTiles
+      ? Array.from(modal.querySelectorAll('.room-hazard-type:checked')).map(
+          (cb) => (cb as HTMLInputElement).value,
+        )
+      : undefined;
     const recordGame = deps.recordingsEnabled
       ? ((modal.querySelector('#room-record-game') as HTMLInputElement)?.checked ?? true)
       : false;
@@ -358,7 +409,9 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
           friendlyFire,
           reinforcedWalls,
           enableMapEvents,
+          selectedMapEvents,
           hazardTiles,
+          selectedHazardTiles,
           recordGame,
           botAiId: effectiveBots > 0 && botAiSelect ? botAiSelect.value : undefined,
           customMapId,

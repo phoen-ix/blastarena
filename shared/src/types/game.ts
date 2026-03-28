@@ -45,6 +45,35 @@ export type TileType =
   | 'spikes_active'
   | 'dark_rift';
 
+export type HazardTileType = 'vine' | 'quicksand' | 'ice' | 'lava' | 'mud' | 'spikes' | 'dark_rift';
+
+export const HAZARD_TILE_TYPES: HazardTileType[] = [
+  'vine',
+  'quicksand',
+  'ice',
+  'lava',
+  'mud',
+  'spikes',
+  'dark_rift',
+];
+
+export type MapEventType =
+  | 'meteor'
+  | 'powerup_rain'
+  | 'wall_collapse'
+  | 'freeze_wave'
+  | 'bomb_surge'
+  | 'ufo_abduction';
+
+export const MAP_EVENT_TYPES: MapEventType[] = [
+  'meteor',
+  'powerup_rain',
+  'wall_collapse',
+  'freeze_wave',
+  'bomb_surge',
+  'ufo_abduction',
+];
+
 export interface Tile {
   x: number;
   y: number;
@@ -141,12 +170,20 @@ export interface HillZone {
 }
 
 export interface MapEvent {
-  type: 'meteor' | 'powerup_rain' | 'wall_collapse' | 'freeze_wave' | 'bomb_surge' | 'hill_move';
+  type:
+    | 'meteor'
+    | 'powerup_rain'
+    | 'wall_collapse'
+    | 'freeze_wave'
+    | 'bomb_surge'
+    | 'hill_move'
+    | 'ufo_abduction';
   position?: Position;
   tick: number;
   warningTick?: number;
   direction?: 'row' | 'column';
   index?: number;
+  targetPlayerId?: number;
 }
 
 export interface GameState {

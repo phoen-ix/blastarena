@@ -18,7 +18,9 @@ export interface MatchConfig {
   botTeams?: (number | null)[];
   friendlyFire?: boolean;
   hazardTiles?: boolean;
+  selectedHazardTiles?: string[];
   enableMapEvents?: boolean;
+  selectedMapEvents?: string[];
   reinforcedWalls?: boolean;
   recordGame?: boolean;
   botAiId?: string;

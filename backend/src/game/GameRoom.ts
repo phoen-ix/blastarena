@@ -7,6 +7,8 @@ import {
   ServerToClientEvents,
   InterServerEvents,
   SocketData,
+  HAZARD_TILE_TYPES,
+  MAP_EVENT_TYPES,
 } from '@blast-arena/shared';
 import {
   GAME_MODES,
@@ -69,6 +71,16 @@ export class GameRoom {
       botDifficulty: room.config.botDifficulty ?? 'normal',
       reinforcedWalls: room.config.reinforcedWalls ?? false,
       enableMapEvents: room.config.enableMapEvents ?? false,
+      enabledMapEvents: room.config.enableMapEvents
+        ? room.config.selectedMapEvents?.length
+          ? room.config.selectedMapEvents
+          : [...MAP_EVENT_TYPES]
+        : [],
+      hazardTiles: room.config.hazardTiles
+        ? room.config.selectedHazardTiles?.length
+          ? room.config.selectedHazardTiles
+          : [...HAZARD_TILE_TYPES]
+        : [],
       botAiId: room.config.botAiId,
       customMap,
     });

@@ -14,6 +14,8 @@ import {
   TICK_RATE,
   MOVE_COOLDOWN_BASE,
 } from '@blast-arena/shared';
+import { QUICKSAND_KILL_TICKS, SPIKE_SAFE_TICKS, SPIKE_CYCLE_TICKS } from '@blast-arena/shared';
+import { isSlowingTile } from '@blast-arena/shared';
 import {
   DEATHMATCH_RESPAWN_TICKS,
   DEATHMATCH_KILL_TARGET,
@@ -68,6 +70,10 @@ export interface GameConfig {
   botDifficulty?: 'easy' | 'normal' | 'hard';
   reinforcedWalls?: boolean;
   enableMapEvents?: boolean;
+  /** Array of enabled map event types (overrides enableMapEvents boolean when set) */
+  enabledMapEvents?: string[];
+  /** Array of hazard tile types to place on the map */
+  hazardTiles?: string[];
   botAiId?: string;
   /** If provided, use this pre-built map instead of generating one */
   customMap?: ReturnType<typeof generateMap>;
@@ -136,6 +142,7 @@ export class GameStateManager {
     warningTick?: number;
     direction?: 'row' | 'column';
     index?: number;
+    targetPlayerId?: number;
   }[] = [];
   private _mapEventsCache:
     | {
@@ -145,12 +152,14 @@ export class GameStateManager {
           | 'wall_collapse'
           | 'freeze_wave'
           | 'bomb_surge'
-          | 'hill_move';
+          | 'hill_move'
+          | 'ufo_abduction';
         position?: Position;
         tick: number;
         warningTick?: number;
         direction?: 'row' | 'column';
         index?: number;
+        targetPlayerId?: number;
       }[]
     | undefined;
   private _mapEventsDirty = true;
@@ -159,9 +168,20 @@ export class GameStateManager {
   private nextWallCollapseTick: number = 0;
   private nextFreezeWaveTick: number = 0;
   private nextBombSurgeTick: number = 0;
+  private nextUfoTick: number = 0;
   // Freeze wave state: stores original tiles to revert after duration
   private frozenTiles: Map<string, TileType> = new Map();
   private frozenTilesRevertTick: number = 0;
+  // Enabled map event types (granular control)
+  private enabledMapEventTypes: Set<string> = new Set();
+
+  // Hazard tile state
+  private hazardTileTypes: string[] = [];
+  private quicksandTimers: Map<number, number> = new Map();
+  private iceSliding: Map<number, Direction> = new Map();
+  private prevPlayerPositions: Map<number, string> = new Map();
+  private spikePositions: Position[] = [];
+  private spikePhase: number = 0;
 
   // Tile diff tracking for delta state broadcasts
   private _dirtyTiles: Map<string, TileDiff> = new Map();
@@ -184,11 +204,14 @@ export class GameStateManager {
       botDifficulty = 'normal',
       reinforcedWalls = false,
       enableMapEvents = false,
+      enabledMapEvents = [],
+      hazardTiles = [],
       botAiId = 'builtin',
     } = config;
     this.botAiId = botAiId;
 
-    this.map = config.customMap ?? generateMap(mapWidth, mapHeight, mapSeed, wallDensity);
+    this.map =
+      config.customMap ?? generateMap(mapWidth, mapHeight, mapSeed, wallDensity, hazardTiles);
     this.collisionSystem = new CollisionSystem(
       this.map.tiles,
       this.map.width,
@@ -203,12 +226,42 @@ export class GameStateManager {
     this.friendlyFire = friendlyFire;
     this.botDifficulty = botDifficulty;
     this.reinforcedWalls = reinforcedWalls;
-    this.enableMapEvents = enableMapEvents;
-    if (enableMapEvents) {
-      // Stagger initial event timers so they don't all fire at once
-      this.nextWallCollapseTick = Math.floor((45 + this.rng.next() * 15) * TICK_RATE);
-      this.nextFreezeWaveTick = Math.floor((55 + this.rng.next() * 15) * TICK_RATE);
-      this.nextBombSurgeTick = Math.floor((40 + this.rng.next() * 15) * TICK_RATE);
+    this.hazardTileTypes = hazardTiles;
+
+    // Map events: enabledMapEvents array takes precedence, fall back to boolean toggle
+    this.enabledMapEventTypes = new Set(enabledMapEvents.length > 0 ? enabledMapEvents : []);
+    this.enableMapEvents = this.enabledMapEventTypes.size > 0 || enableMapEvents;
+    if (this.enableMapEvents) {
+      // If boolean was used without specific types, enable all classic events
+      if (this.enabledMapEventTypes.size === 0) {
+        for (const t of ['meteor', 'powerup_rain', 'wall_collapse', 'freeze_wave', 'bomb_surge']) {
+          this.enabledMapEventTypes.add(t);
+        }
+      }
+      // Stagger initial event timers only for enabled events
+      if (this.enabledMapEventTypes.has('wall_collapse')) {
+        this.nextWallCollapseTick = Math.floor((45 + this.rng.next() * 15) * TICK_RATE);
+      }
+      if (this.enabledMapEventTypes.has('freeze_wave')) {
+        this.nextFreezeWaveTick = Math.floor((55 + this.rng.next() * 15) * TICK_RATE);
+      }
+      if (this.enabledMapEventTypes.has('bomb_surge')) {
+        this.nextBombSurgeTick = Math.floor((40 + this.rng.next() * 15) * TICK_RATE);
+      }
+      if (this.enabledMapEventTypes.has('ufo_abduction')) {
+        this.nextUfoTick = Math.floor((35 + this.rng.next() * 15) * TICK_RATE);
+      }
+    }
+
+    // Scan for spike positions if spikes are enabled
+    if (hazardTiles.includes('spikes')) {
+      for (let y = 0; y < this.map.height; y++) {
+        for (let x = 0; x < this.map.width; x++) {
+          if (this.map.tiles[y][x] === 'spikes' || this.map.tiles[y][x] === 'spikes_active') {
+            this.spikePositions.push({ x, y });
+          }
+        }
+      }
     }
 
     // Shuffle spawn point indices using Fisher-Yates for fair spawn assignment (deterministic per seed)
@@ -397,6 +450,17 @@ export class GameStateManager {
 
       // 1b. Process conveyor belt forced movement
       this.processConveyors(sharedBombPositions, sharedPlayerPositions);
+
+      // 1c. Hazard tile movement slowdown (vine, quicksand, mud)
+      if (this.hazardTileTypes.length > 0) {
+        for (const player of this.players.values()) {
+          if (!player.alive || !player.movedThisTick) continue;
+          const tile = this.collisionSystem.getTileAt(player.position.x, player.position.y);
+          if (isSlowingTile(tile)) {
+            player.moveCooldown += MOVE_COOLDOWN_BASE;
+          }
+        }
+      }
     }
 
     // 2. Update bomb timers and slide kicked bombs
@@ -563,6 +627,11 @@ export class GameStateManager {
       }
     }
 
+    // 6.3 Hazard tile processing
+    if (this.hazardTileTypes.length > 0 && this.finishTick === null) {
+      this.processHazardTiles();
+    }
+
     // 6.5 King of the Hill scoring
     this._hillControllingPlayerId = null;
     if (this.hillZone && this.finishTick === null) {
@@ -613,7 +682,7 @@ export class GameStateManager {
     // 6.7 Dynamic map events
     if (this.enableMapEvents && this.finishTick === null) {
       // Meteor strike every 30-45 seconds
-      if (this.tick >= this.nextMeteorTick) {
+      if (this.enabledMapEventTypes.has('meteor') && this.tick >= this.nextMeteorTick) {
         // Find random empty tile
         const emptyTiles: Position[] = [];
         for (let y = 1; y < this.map.height - 1; y++) {
@@ -634,7 +703,7 @@ export class GameStateManager {
       }
 
       // Power-up rain every 60 seconds
-      if (this.tick >= this.nextPowerupRainTick) {
+      if (this.enabledMapEventTypes.has('powerup_rain') && this.tick >= this.nextPowerupRainTick) {
         const emptyTiles: Position[] = [];
         for (let y = 1; y < this.map.height - 1; y++) {
           for (let x = 1; x < this.map.width - 1; x++) {
@@ -658,7 +727,10 @@ export class GameStateManager {
       }
 
       // Wall collapse every 45-60 seconds
-      if (this.tick >= this.nextWallCollapseTick) {
+      if (
+        this.enabledMapEventTypes.has('wall_collapse') &&
+        this.tick >= this.nextWallCollapseTick
+      ) {
         // Find 3x3 areas with at least 1 destructible wall
         const candidates: Position[] = [];
         for (let y = 1; y < this.map.height - 4; y++) {
@@ -690,7 +762,7 @@ export class GameStateManager {
       }
 
       // Freeze wave every 50-70 seconds
-      if (this.tick >= this.nextFreezeWaveTick) {
+      if (this.enabledMapEventTypes.has('freeze_wave') && this.tick >= this.nextFreezeWaveTick) {
         const isRow = this.rng.next() > 0.5;
         const maxIdx = isRow ? this.map.height - 2 : this.map.width - 2;
         const idx = 1 + Math.floor(this.rng.next() * maxIdx);
@@ -708,7 +780,7 @@ export class GameStateManager {
       }
 
       // Bomb surge every 40-55 seconds
-      if (this.tick >= this.nextBombSurgeTick) {
+      if (this.enabledMapEventTypes.has('bomb_surge') && this.tick >= this.nextBombSurgeTick) {
         let bombCount = 0;
         for (const bomb of this.bombs.values()) {
           bomb.ticksRemaining = Math.max(1, bomb.ticksRemaining - 20);
@@ -719,6 +791,24 @@ export class GameStateManager {
           this._mapEventsDirty = true;
         }
         this.nextBombSurgeTick = this.tick + Math.floor((40 + this.rng.next() * 15) * TICK_RATE);
+      }
+
+      // UFO abduction every 35-50 seconds
+      if (this.enabledMapEventTypes.has('ufo_abduction') && this.tick >= this.nextUfoTick) {
+        const alivePlayers = this.getAlivePlayers().filter((p) => p.invulnerableTicks <= 0);
+        if (alivePlayers.length > 0) {
+          const target = alivePlayers[Math.floor(this.rng.next() * alivePlayers.length)];
+          const impactTick = this.tick + 40; // 2 second warning
+          this.mapEvents.push({
+            type: 'ufo_abduction',
+            position: { x: target.position.x, y: target.position.y },
+            targetPlayerId: target.id,
+            tick: impactTick,
+            warningTick: this.tick,
+          });
+          this._mapEventsDirty = true;
+        }
+        this.nextUfoTick = this.tick + Math.floor((35 + this.rng.next() * 15) * TICK_RATE);
       }
 
       // Revert freeze wave tiles when duration expires
@@ -784,6 +874,36 @@ export class GameStateManager {
             }
           }
           this.frozenTilesRevertTick = this.tick + 120; // 6 seconds
+          this.mapEvents.splice(i, 1);
+          this._mapEventsDirty = true;
+        }
+
+        // Process UFO abduction impacts
+        if (event.type === 'ufo_abduction' && this.tick >= event.tick) {
+          if (event.targetPlayerId != null) {
+            const player = this.players.get(event.targetPlayerId);
+            if (player && player.alive) {
+              // Teleport to random walkable tile
+              const walkableTiles: Position[] = [];
+              for (let y = 1; y < this.map.height - 1; y++) {
+                for (let x = 1; x < this.map.width - 1; x++) {
+                  const tile = this.map.tiles[y][x];
+                  if (
+                    (tile === 'empty' || tile === 'spawn') &&
+                    !(x === player.position.x && y === player.position.y)
+                  ) {
+                    walkableTiles.push({ x, y });
+                  }
+                }
+              }
+              if (walkableTiles.length > 0) {
+                const dest = walkableTiles[Math.floor(this.rng.next() * walkableTiles.length)];
+                player.position = { x: dest.x, y: dest.y };
+                player.applyMoveCooldown();
+                player.invulnerableTicks = 10; // Brief invulnerability after teleport
+              }
+            }
+          }
           this.mapEvents.splice(i, 1);
           this._mapEventsDirty = true;
         }
@@ -853,7 +973,213 @@ export class GameStateManager {
       this.checkWinCondition();
     }
 
+    // Track previous player positions for hazard entry detection (ice, dark_rift)
+    if (this.hazardTileTypes.length > 0) {
+      for (const player of this.players.values()) {
+        this.prevPlayerPositions.set(player.id, `${player.position.x},${player.position.y}`);
+      }
+    }
+
     this._processingTick = false;
+  }
+
+  // --- Hazard tile processing (multiplayer) ---
+
+  private processHazardTiles(): void {
+    if (this.hazardTileTypes.includes('quicksand')) this.processQuicksandTiles();
+    if (this.hazardTileTypes.includes('ice')) this.processIceSliding();
+    if (this.hazardTileTypes.includes('lava')) this.processLavaDetonation();
+    if (this.hazardTileTypes.includes('spikes')) this.processSpikeTiles();
+    if (this.hazardTileTypes.includes('dark_rift')) this.processDarkRiftTiles();
+  }
+
+  private processQuicksandTiles(): void {
+    for (const player of this.players.values()) {
+      if (!player.alive) continue;
+      const tile = this.collisionSystem.getTileAt(player.position.x, player.position.y);
+      if (tile === 'quicksand') {
+        const timer = (this.quicksandTimers.get(player.id) ?? 0) + 1;
+        this.quicksandTimers.set(player.id, timer);
+        if (timer >= QUICKSAND_KILL_TICKS) {
+          if (player.hasShield) {
+            player.hasShield = false;
+            player.invulnerableTicks = 10;
+            this.quicksandTimers.set(player.id, 0);
+          } else if (player.invulnerableTicks <= 0) {
+            player.die();
+            this.invalidateAliveCache();
+            this.placementCounter--;
+            player.placement = this.getAlivePlayers().length + 1;
+            this.tickEvents.playerDied.push({ playerId: player.id, killerId: null });
+            this.dropPowerUpOnDeath(player);
+            this.quicksandTimers.delete(player.id);
+          }
+        }
+      } else {
+        this.quicksandTimers.delete(player.id);
+      }
+    }
+  }
+
+  private processIceSliding(): void {
+    const bombPositions = Array.from(this.bombs.values()).map((b) => b.position);
+
+    // Detect players who just moved onto ice
+    for (const player of this.players.values()) {
+      if (!player.alive || player.frozen) continue;
+      if (this.iceSliding.has(player.id)) continue;
+      const tile = this.collisionSystem.getTileAt(player.position.x, player.position.y);
+      if (tile !== 'ice') continue;
+      const prevKey = this.prevPlayerPositions.get(player.id);
+      const curKey = `${player.position.x},${player.position.y}`;
+      if (prevKey !== curKey) {
+        this.iceSliding.set(player.id, player.direction);
+      }
+    }
+
+    // Process player ice sliding
+    for (const [playerId, direction] of this.iceSliding) {
+      const player = this.players.get(playerId);
+      if (!player || !player.alive) {
+        this.iceSliding.delete(playerId);
+        continue;
+      }
+
+      const playerPositions = Array.from(this.players.values())
+        .filter((p) => p.alive && p.id !== playerId)
+        .map((p) => p.position);
+
+      const newPos = this.collisionSystem.canMoveTo(
+        player.position.x,
+        player.position.y,
+        direction,
+        bombPositions,
+        playerPositions,
+      );
+
+      if (newPos) {
+        player.position = newPos;
+        player.applyMoveCooldown();
+        const newTile = this.collisionSystem.getTileAt(newPos.x, newPos.y);
+        if (newTile !== 'ice') {
+          this.iceSliding.delete(playerId);
+        }
+        this.applyTeleporter(player);
+      } else {
+        this.iceSliding.delete(playerId);
+      }
+    }
+
+    // Ice affects kicked bombs: sliding bombs on ice move an extra tile
+    for (const bomb of this.bombs.values()) {
+      if (!bomb.sliding) continue;
+      const tile = this.collisionSystem.getTileAt(bomb.position.x, bomb.position.y);
+      if (tile !== 'ice') continue;
+
+      const dx = bomb.sliding === 'left' ? -1 : bomb.sliding === 'right' ? 1 : 0;
+      const dy = bomb.sliding === 'up' ? -1 : bomb.sliding === 'down' ? 1 : 0;
+      const nextX = bomb.position.x + dx;
+      const nextY = bomb.position.y + dy;
+      if (this.collisionSystem.isWalkable(nextX, nextY)) {
+        let blocked = false;
+        for (const other of this.bombs.values()) {
+          if (other.id !== bomb.id && other.position.x === nextX && other.position.y === nextY) {
+            blocked = true;
+            break;
+          }
+        }
+        if (!blocked) {
+          bomb.position = { x: nextX, y: nextY };
+        }
+      }
+    }
+  }
+
+  private processLavaDetonation(): void {
+    for (const bomb of this.bombs.values()) {
+      const { x, y } = bomb.position;
+      const adjacent: TileType[] = [
+        this.collisionSystem.getTileAt(x - 1, y),
+        this.collisionSystem.getTileAt(x + 1, y),
+        this.collisionSystem.getTileAt(x, y - 1),
+        this.collisionSystem.getTileAt(x, y + 1),
+      ];
+      if (adjacent.some((t) => t === 'lava')) {
+        bomb.ticksRemaining = Math.min(bomb.ticksRemaining, 1);
+      }
+    }
+  }
+
+  private processSpikeTiles(): void {
+    if (this.spikePositions.length === 0) return;
+
+    const prevPhase = this.spikePhase;
+    this.spikePhase = (this.spikePhase + 1) % SPIKE_CYCLE_TICKS;
+
+    // Transition from safe to lethal
+    if (prevPhase < SPIKE_SAFE_TICKS && this.spikePhase >= SPIKE_SAFE_TICKS) {
+      for (const pos of this.spikePositions) {
+        this.setTileTracked(pos.x, pos.y, 'spikes_active');
+      }
+    }
+
+    // Transition from lethal to safe
+    if (prevPhase >= SPIKE_SAFE_TICKS && this.spikePhase < SPIKE_SAFE_TICKS) {
+      for (const pos of this.spikePositions) {
+        this.setTileTracked(pos.x, pos.y, 'spikes');
+      }
+    }
+
+    // Kill players on active spikes
+    if (this.spikePhase >= SPIKE_SAFE_TICKS) {
+      for (const player of this.players.values()) {
+        if (!player.alive || player.invulnerableTicks > 0 || player.frozen) continue;
+        const tile = this.collisionSystem.getTileAt(player.position.x, player.position.y);
+        if (tile === 'spikes_active') {
+          if (player.hasShield) {
+            player.hasShield = false;
+            player.invulnerableTicks = 10;
+          } else {
+            player.die();
+            this.invalidateAliveCache();
+            this.placementCounter--;
+            player.placement = this.getAlivePlayers().length + 1;
+            this.tickEvents.playerDied.push({ playerId: player.id, killerId: null });
+            this.dropPowerUpOnDeath(player);
+          }
+        }
+      }
+    }
+  }
+
+  private processDarkRiftTiles(): void {
+    for (const player of this.players.values()) {
+      if (!player.alive || player.frozen) continue;
+      const tile = this.collisionSystem.getTileAt(player.position.x, player.position.y);
+      if (tile !== 'dark_rift') continue;
+
+      const prevKey = this.prevPlayerPositions.get(player.id);
+      const curKey = `${player.position.x},${player.position.y}`;
+      if (prevKey === curKey) continue;
+
+      const emptyTiles: Position[] = [];
+      for (let y = 0; y < this.map.height; y++) {
+        for (let x = 0; x < this.map.width; x++) {
+          const t = this.collisionSystem.getTileAt(x, y);
+          if (
+            (t === 'empty' || t === 'spawn') &&
+            !(x === player.position.x && y === player.position.y)
+          ) {
+            emptyTiles.push({ x, y });
+          }
+        }
+      }
+      if (emptyTiles.length > 0) {
+        const dest = emptyTiles[Math.floor(this.rng.next() * emptyTiles.length)];
+        player.position = { x: dest.x, y: dest.y };
+        player.applyMoveCooldown();
+      }
+    }
   }
 
   /** Cached serialization of mapEvents — rebuilt only when events change */
@@ -868,12 +1194,14 @@ export class GameStateManager {
                 | 'wall_collapse'
                 | 'freeze_wave'
                 | 'bomb_surge'
-                | 'hill_move',
+                | 'hill_move'
+                | 'ufo_abduction',
               position: e.position,
               tick: e.tick,
               warningTick: e.warningTick,
               direction: e.direction,
               index: e.index,
+              targetPlayerId: e.targetPlayerId,
             }))
           : undefined;
       this._mapEventsDirty = false;

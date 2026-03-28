@@ -32,10 +32,23 @@ interface TrackedMeteor {
   impacted: boolean;
 }
 
+interface TrackedUfo {
+  tileX: number;
+  tileY: number;
+  targetPlayerId: number;
+  impactTick: number;
+  warningTick: number;
+  ufoGraphics: Phaser.GameObjects.Graphics;
+  beamGraphics: Phaser.GameObjects.Graphics;
+  warningText: Phaser.GameObjects.Text;
+  impacted: boolean;
+}
+
 export class MapEventRenderer {
   private scene: Phaser.Scene;
   private tracked: Map<string, TrackedMeteor> = new Map();
   private trackedWarnings: Map<string, TrackedWarning> = new Map();
+  private trackedUfos: Map<string, TrackedUfo> = new Map();
   /** Reusable set to detect removed events */
   private activeKeys = new Set<string>();
   private lastBombSurgeTick: number = -1;
@@ -94,6 +107,20 @@ export class MapEventRenderer {
         this.lastBombSurgeTick = event.tick;
         this.triggerBombSurge();
       }
+
+      // UFO abduction warnings
+      if (event.type === 'ufo_abduction' && event.position && event.warningTick != null) {
+        const key = `ufo_${event.targetPlayerId}_${event.tick}`;
+        this.activeKeys.add(key);
+
+        if (!this.trackedUfos.has(key)) {
+          this.createUfoWarning(key, event);
+        }
+        const ufo = this.trackedUfos.get(key);
+        if (ufo && !ufo.impacted) {
+          this.updateUfoWarning(ufo, currentTick);
+        }
+      }
     }
 
     // Clean up meteors that are no longer in mapEvents (they've impacted)
@@ -128,6 +155,20 @@ export class MapEventRenderer {
             tw.warningText.destroy();
           }
           this.trackedWarnings.delete(key);
+        });
+      }
+    }
+
+    // Clean up UFO abductions that have resolved
+    for (const [key, ufo] of this.trackedUfos) {
+      if (!this.activeKeys.has(key)) {
+        if (!ufo.impacted) {
+          ufo.impacted = true;
+          this.triggerUfoImpact(ufo);
+        }
+        this.scene.time.delayedCall(800, () => {
+          this.destroyUfo(ufo);
+          this.trackedUfos.delete(key);
         });
       }
     }
@@ -466,6 +507,137 @@ export class MapEventRenderer {
     }
   }
 
+  private createUfoWarning(key: string, event: MapEvent): void {
+    const pos = event.position!;
+    const px = pos.x * TILE_SIZE + TILE_SIZE / 2;
+    const py = pos.y * TILE_SIZE + TILE_SIZE / 2;
+
+    // UFO saucer above target
+    const ufoGraphics = this.scene.add.graphics();
+    ufoGraphics.setDepth(19);
+
+    // Tractor beam
+    const beamGraphics = this.scene.add.graphics();
+    beamGraphics.setDepth(8);
+
+    // Warning text
+    const warningText = this.scene.add.text(px, py - TILE_SIZE * 1.8, '?!', {
+      fontSize: '24px',
+      fontFamily: 'Chakra Petch, sans-serif',
+      color: '#44ff88',
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 4,
+    });
+    warningText.setOrigin(0.5);
+    warningText.setDepth(20);
+
+    const settings = getSettings();
+    if (settings.animations) {
+      this.scene.tweens.add({
+        targets: warningText,
+        scale: { from: 0.8, to: 1.2 },
+        alpha: { from: 0.7, to: 1 },
+        duration: 350,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.InOut',
+      });
+    }
+
+    this.trackedUfos.set(key, {
+      tileX: pos.x,
+      tileY: pos.y,
+      targetPlayerId: event.targetPlayerId ?? 0,
+      impactTick: event.tick,
+      warningTick: event.warningTick!,
+      ufoGraphics,
+      beamGraphics,
+      warningText,
+      impacted: false,
+    });
+  }
+
+  private updateUfoWarning(ufo: TrackedUfo, currentTick: number): void {
+    const totalWarning = ufo.impactTick - ufo.warningTick;
+    const remaining = Math.max(0, ufo.impactTick - currentTick);
+    const progress = 1 - remaining / totalWarning;
+
+    const px = ufo.tileX * TILE_SIZE + TILE_SIZE / 2;
+    const py = ufo.tileY * TILE_SIZE + TILE_SIZE / 2;
+    const ufoY = py - TILE_SIZE * 2.5;
+
+    // Draw UFO saucer
+    const gfx = ufo.ufoGraphics;
+    gfx.clear();
+
+    const bob = Math.sin(currentTick * 0.3) * 3;
+
+    // Saucer body (ellipse)
+    gfx.fillStyle(0x888899, 0.9);
+    gfx.fillEllipse(px, ufoY + bob, TILE_SIZE * 1.2, TILE_SIZE * 0.4);
+    // Dome on top
+    gfx.fillStyle(0x66ddaa, 0.7);
+    gfx.fillEllipse(px, ufoY - TILE_SIZE * 0.15 + bob, TILE_SIZE * 0.5, TILE_SIZE * 0.35);
+    // Light strip
+    gfx.fillStyle(0x44ff88, 0.6 + Math.sin(currentTick * 0.5) * 0.3);
+    gfx.fillEllipse(px, ufoY + bob, TILE_SIZE * 1.0, TILE_SIZE * 0.12);
+
+    // Draw tractor beam (triangle from UFO to ground)
+    const beam = ufo.beamGraphics;
+    beam.clear();
+
+    const beamAlpha = 0.1 + progress * 0.25 + Math.sin(currentTick * 0.4) * 0.08;
+    const beamWidth = TILE_SIZE * (0.3 + progress * 0.5);
+
+    beam.fillStyle(0x44ff88, beamAlpha);
+    beam.beginPath();
+    beam.moveTo(px - TILE_SIZE * 0.2, ufoY + TILE_SIZE * 0.2 + bob);
+    beam.lineTo(px + TILE_SIZE * 0.2, ufoY + TILE_SIZE * 0.2 + bob);
+    beam.lineTo(px + beamWidth, py + TILE_SIZE * 0.5);
+    beam.lineTo(px - beamWidth, py + TILE_SIZE * 0.5);
+    beam.closePath();
+    beam.fill();
+
+    // Ground circle glow
+    beam.fillStyle(0x44ff88, beamAlpha * 0.6);
+    beam.fillCircle(px, py, TILE_SIZE * 0.5 * (0.5 + progress * 0.5));
+  }
+
+  private triggerUfoImpact(ufo: TrackedUfo): void {
+    const px = ufo.tileX * TILE_SIZE + TILE_SIZE / 2;
+    const py = ufo.tileY * TILE_SIZE + TILE_SIZE / 2;
+
+    // Hide warning elements
+    ufo.ufoGraphics.setVisible(false);
+    ufo.beamGraphics.setVisible(false);
+    ufo.warningText.setVisible(false);
+
+    const settings = getSettings();
+    if (settings.animations) {
+      // Flash at abduction point
+      const flash = this.scene.add.graphics();
+      flash.setDepth(18);
+      flash.fillStyle(0x44ff88, 0.5);
+      flash.fillCircle(px, py, TILE_SIZE * 1.5);
+
+      this.scene.tweens.add({
+        targets: flash,
+        alpha: 0,
+        duration: 500,
+        ease: 'Power2',
+        onComplete: () => flash.destroy(),
+      });
+    }
+  }
+
+  private destroyUfo(ufo: TrackedUfo): void {
+    this.scene.tweens.killTweensOf(ufo.warningText);
+    if (ufo.ufoGraphics?.active) ufo.ufoGraphics.destroy();
+    if (ufo.beamGraphics?.active) ufo.beamGraphics.destroy();
+    if (ufo.warningText?.active) ufo.warningText.destroy();
+  }
+
   private destroyTracked(tracked: TrackedMeteor): void {
     this.scene.tweens.killTweensOf(tracked.warningText);
     if (tracked.targetGraphics?.active) tracked.targetGraphics.destroy();
@@ -486,5 +658,9 @@ export class MapEventRenderer {
       }
     }
     this.trackedWarnings.clear();
+    for (const ufo of this.trackedUfos.values()) {
+      this.destroyUfo(ufo);
+    }
+    this.trackedUfos.clear();
   }
 }

@@ -398,6 +398,23 @@
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} spawns)",
     "loadingPreview": "Loading preview...",
     "recordGame": "Record Game",
+    "hazardTypes": {
+      "vine": "Vine",
+      "quicksand": "Quicksand",
+      "ice": "Ice",
+      "lava": "Lava",
+      "mud": "Mud",
+      "spikes": "Spikes",
+      "dark_rift": "Dark Rift"
+    },
+    "eventTypes": {
+      "meteor": "Meteor Strike",
+      "powerup_rain": "Power-Up Rain",
+      "wall_collapse": "Wall Collapse",
+      "freeze_wave": "Freeze Wave",
+      "bomb_surge": "Bomb Surge",
+      "ufo_abduction": "UFO Abduction"
+    },
     "mapSizes": {
       "21": "21×21 (Small)",
       "31": "31×31 (Normal)",

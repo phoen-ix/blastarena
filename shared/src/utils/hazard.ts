@@ -12,7 +12,7 @@ const HAZARD_TILES: TileType[] = [
   'dark_rift',
 ];
 
-const SLOWING_TILES: TileType[] = ['vine', 'quicksand', 'mud'];
+export const SLOWING_TILES: TileType[] = ['vine', 'quicksand', 'mud'];
 
 const HAZARD_THEME_MAP: Record<string, CampaignWorldTheme> = {
   vine: 'forest',
