@@ -157,7 +157,7 @@ export class LobbyChatPanel {
       input.placeholder = t('ui:party.chatPlaceholder');
       input.maxLength = LOBBY_CHAT_MAX_LENGTH;
       input.className = 'lobby-chat-input';
-      input.setAttribute('aria-label', 'Lobby chat message');
+      input.setAttribute('aria-label', t('ui:lobbyChat.ariaLabel'));
       this.inputEl = input;
 
       const sendBtn = document.createElement('button');
@@ -189,7 +189,7 @@ export class LobbyChatPanel {
     if (!this.messagesEl) return;
 
     if (this.messages.length === 0) {
-      this.messagesEl.innerHTML = `<div class="lobby-chat-empty">No messages yet</div>`;
+      this.messagesEl.innerHTML = `<div class="lobby-chat-empty">${t('ui:lobbyChat.empty')}</div>`;
       return;
     }
 

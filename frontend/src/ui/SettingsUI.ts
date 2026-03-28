@@ -53,7 +53,7 @@ export class SettingsUI {
     this.container = document.createElement('div');
     this.container.className = 'admin-container';
     this.activeTabId =
-      initialTab && this.tabs.some((t) => t.id === initialTab) ? initialTab : 'account';
+      initialTab && this.tabs.some((tab) => tab.id === initialTab) ? initialTab : 'account';
     this.onLanguageChanged = () => this.render();
   }
 
@@ -82,8 +82,8 @@ export class SettingsUI {
       <div class="admin-tabs" id="settings-tab-bar">
         ${this.tabs
           .map(
-            (t) => `
-          <button class="admin-tab ${t.id === this.activeTabId ? 'active' : ''}" data-tab="${t.id}">${t.label}</button>
+            (tab) => `
+          <button class="admin-tab ${tab.id === this.activeTabId ? 'active' : ''}" data-tab="${tab.id}">${tab.label}</button>
         `,
           )
           .join('')}
@@ -792,8 +792,8 @@ export class SettingsUI {
         <div class="admin-tabs" id="settings-tab-bar">
           ${this.tabs
             .map(
-              (t) => `
-            <button class="admin-tab ${t.id === this.activeTabId ? 'active' : ''}" data-tab="${t.id}">${t.label}</button>
+              (tab) => `
+            <button class="admin-tab ${tab.id === this.activeTabId ? 'active' : ''}" data-tab="${tab.id}">${tab.label}</button>
           `,
             )
             .join('')}

@@ -258,7 +258,7 @@ export class MessagesView implements ILobbyView {
               this.canSend()
                 ? `
               <div class="messages-input-row">
-                <input type="text" class="input messages-input" placeholder="${t('ui:messages.placeholder')}" maxlength="${DM_MAX_LENGTH}" data-msg-input aria-label="Direct message">
+                <input type="text" class="input messages-input" placeholder="${t('ui:messages.placeholder')}" maxlength="${DM_MAX_LENGTH}" data-msg-input aria-label="${t('ui:messages.dmAriaLabel')}">
                 <button class="btn btn-primary" data-msg-send>${t('ui:messages.send')}</button>
               </div>
             `

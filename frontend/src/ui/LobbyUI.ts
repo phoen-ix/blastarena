@@ -20,6 +20,7 @@ export class LobbyUI {
   private onJoinRoom: (room: Room) => void;
   private roomListHandler: ((rooms: RoomListItem[]) => void) | null = null;
   private lobbyChatToggleHandler: (() => void) | null = null;
+  private languageChangedHandler: (() => void) | null = null;
   private partyBar: PartyBar;
   private lobbyChatPanel: LobbyChatPanel;
   private sidebarCollapsed = false;
@@ -79,6 +80,13 @@ export class LobbyUI {
     this.lobbyChatToggleHandler = () => this.lobbyChatPanel.refreshVisibility();
     window.addEventListener('lobbychat-toggle', this.lobbyChatToggleHandler);
 
+    // Re-render on language change
+    this.languageChangedHandler = () => {
+      this.render();
+      this.navigateTo(this.activeViewId);
+    };
+    window.addEventListener('language-changed', this.languageChangedHandler);
+
     // Navigate to initial view
     this.navigateTo(this.initialView || 'rooms', this.initialViewOptions || undefined);
 
@@ -101,6 +109,10 @@ export class LobbyUI {
     if (this.lobbyChatToggleHandler) {
       window.removeEventListener('lobbychat-toggle', this.lobbyChatToggleHandler);
       this.lobbyChatToggleHandler = null;
+    }
+    if (this.languageChangedHandler) {
+      window.removeEventListener('language-changed', this.languageChangedHandler);
+      this.languageChangedHandler = null;
     }
     UIGamepadNavigator.getInstance().popContext('lobby');
     this.lobbyChatPanel.unmount();
@@ -411,18 +423,18 @@ export class LobbyUI {
       const ear = this.container.querySelector('#sidebar-toggle') as HTMLElement;
       const icon = ear.querySelector('.sidebar-ear-icon')!;
       icon.innerHTML = this.sidebarCollapsed ? '&#9654;' : '&#9664;';
-      ear.title = this.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
+      ear.title = this.sidebarCollapsed ? t('ui:sidebar.expand') : t('ui:sidebar.collapse');
     });
   }
 
   private async joinRoom(code: string): Promise<void> {
     this.socketClient.emit('room:join', { code }, (response: any) => {
       if (response.success && response.room) {
-        this.notifications.success(`Joined room: ${response.room.name}`);
+        this.notifications.success(t('ui:rooms.joined', { name: response.room.name }));
         this.hide();
         this.onJoinRoom(response.room);
       } else {
-        this.notifications.error(response.error || 'Failed to join room');
+        this.notifications.error(response.error || t('ui:rooms.joinFailed'));
       }
     });
   }

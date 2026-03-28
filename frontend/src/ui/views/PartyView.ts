@@ -196,7 +196,7 @@ export class PartyView implements ILobbyView {
             <div class="party-page-chat-header">${t('ui:party.chatHeader')}</div>
             <div class="party-page-chat-messages" data-chat-messages></div>
             <div class="party-page-chat-input">
-              <input type="text" class="input" placeholder="${t('ui:party.chatPlaceholder')}" maxlength="200" data-chat-input aria-label="Party chat message">
+              <input type="text" class="input" placeholder="${t('ui:party.chatPlaceholder')}" maxlength="200" data-chat-input aria-label="${t('ui:party.chatAriaLabel')}">
               <button class="btn btn-primary" data-chat-send>${t('ui:party.chatSend')}</button>
             </div>
           </div>

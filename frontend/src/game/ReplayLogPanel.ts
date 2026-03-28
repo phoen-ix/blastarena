@@ -1,5 +1,6 @@
 import { ReplayLogEntry, ReplayLogEventType, TICK_RATE } from '@blast-arena/shared';
 import { escapeHtml } from '../utils/html';
+import { t } from '../i18n';
 
 interface FilterState {
   kill: boolean;
@@ -12,10 +13,7 @@ interface FilterState {
   game_over: boolean;
 }
 
-const EVENT_CONFIG: Record<
-  ReplayLogEventType,
-  { icon: string; color: string; label: string }
-> = {
+const EVENT_CONFIG: Record<ReplayLogEventType, { icon: string; color: string; label: string }> = {
   kill: { icon: '\u2620\uFE0F', color: 'var(--danger)', label: 'Kills' },
   bomb_place: { icon: '\uD83D\uDCA3', color: 'var(--primary)', label: 'Bombs' },
   bomb_detonate: { icon: '\uD83D\uDCA5', color: 'var(--warning)', label: 'Bombs' },
@@ -31,7 +29,12 @@ const EVENT_CONFIG: Record<
 };
 
 // Filter groups (some event types share a filter)
-const FILTER_GROUPS: { key: string; label: string; types: ReplayLogEventType[]; defaultOn: boolean }[] = [
+const FILTER_GROUPS: {
+  key: string;
+  label: string;
+  types: ReplayLogEventType[];
+  defaultOn: boolean;
+}[] = [
   { key: 'kills', label: '\u2620\uFE0F Kills', types: ['kill'], defaultOn: true },
   {
     key: 'bombs',
@@ -133,7 +136,7 @@ export class ReplayLogPanel {
       display: flex; align-items: center; justify-content: center;
     `;
     toggle.textContent = '\u25B6';
-    toggle.title = 'Toggle log panel';
+    toggle.title = t('ui:replay.toggleLog');
     toggle.addEventListener('click', () => this.togglePanel());
     this.container.appendChild(toggle);
 
@@ -141,7 +144,7 @@ export class ReplayLogPanel {
     const header = document.createElement('div');
     header.style.cssText =
       'padding:8px 12px; border-bottom:1px solid var(--border); font-weight:600; font-size:13px; color:var(--accent);';
-    header.textContent = 'Game Log';
+    header.textContent = t('ui:replay.gameLog');
     this.container.appendChild(header);
 
     // Filters
@@ -198,12 +201,8 @@ export class ReplayLogPanel {
   private togglePanel(): void {
     this.isOpen = !this.isOpen;
     if (this.container) {
-      this.container.style.transform = this.isOpen
-        ? 'translateX(0)'
-        : 'translateX(100%)';
-      const toggle = this.container.querySelector(
-        '#replay-log-toggle',
-      ) as HTMLElement;
+      this.container.style.transform = this.isOpen ? 'translateX(0)' : 'translateX(100%)';
+      const toggle = this.container.querySelector('#replay-log-toggle') as HTMLElement;
       if (toggle) {
         toggle.textContent = this.isOpen ? '\u25C0' : '\u25B6';
       }
@@ -257,13 +256,12 @@ export class ReplayLogPanel {
 
     // Timestamp
     const time = document.createElement('span');
-    time.style.cssText =
-      'color:var(--text-dim); min-width:36px; flex-shrink:0; cursor:pointer;';
+    time.style.cssText = 'color:var(--text-dim); min-width:36px; flex-shrink:0; cursor:pointer;';
     const seconds = entry.tick / TICK_RATE;
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     time.textContent = `${m}:${s.toString().padStart(2, '0')}`;
-    time.title = 'Click to seek';
+    time.title = t('ui:replay.clickToSeek');
     el.appendChild(time);
 
     // Icon

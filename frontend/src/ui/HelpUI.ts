@@ -81,6 +81,7 @@ export class HelpUI {
   private markdownCache: Map<string, string> = new Map();
   private displayGithub = false;
   private displayImprint = false;
+  private onLanguageChanged = () => this.render();
 
   constructor(
     authManager: AuthManager,
@@ -97,9 +98,9 @@ export class HelpUI {
     const role = (authManager.getUser()?.role || 'user') as UserRole;
     const isStaff = role === 'admin' || role === 'moderator';
     const allTabs = getAllTabs();
-    this.tabs = isStaff ? [...allTabs] : allTabs.filter((t) => !t.staffOnly);
+    this.tabs = isStaff ? [...allTabs] : allTabs.filter((tab) => !tab.staffOnly);
     this.activeTabId =
-      initialTab && this.tabs.some((t) => t.id === initialTab) ? initialTab : 'getting-started';
+      initialTab && this.tabs.some((tab) => tab.id === initialTab) ? initialTab : 'getting-started';
   }
 
   async show(): Promise<void> {
@@ -107,16 +108,25 @@ export class HelpUI {
     if (uiOverlay && !uiOverlay.contains(this.container)) {
       uiOverlay.appendChild(this.container);
     }
+    window.addEventListener('language-changed', this.onLanguageChanged);
     await this.render();
     this.pushGamepadContext();
   }
 
   hide(): void {
+    window.removeEventListener('language-changed', this.onLanguageChanged);
     UIGamepadNavigator.getInstance().popContext('help-ui');
     this.container.remove();
   }
 
   private async render(): Promise<void> {
+    // Refresh tab labels for current language
+    const freshTabs = getAllTabs();
+    for (const tab of this.tabs) {
+      const fresh = freshTabs.find((ft) => ft.id === tab.id);
+      if (fresh) tab.label = fresh.label;
+    }
+
     await this.loadFooterSettings();
 
     const rightLinks: string[] = [];

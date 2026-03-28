@@ -6,6 +6,7 @@ import { LobbyUI } from '../ui/LobbyUI';
 import { RoomUI } from '../ui/RoomUI';
 import { GameState, Room, CoopStartData } from '@blast-arena/shared';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
+import { t } from '../i18n';
 
 export class LobbyScene extends Phaser.Scene {
   private authManager!: AuthManager;
@@ -127,7 +128,7 @@ export class LobbyScene extends Phaser.Scene {
     this.socketClient.on('admin:banner', this.adminBannerHandler);
 
     this.adminKickedHandler = (data) => {
-      this.notifications.error(data.reason || 'You have been kicked');
+      this.notifications.error(data.reason || t('ui:rooms.kicked'));
       this.roomUI?.hide();
       this.roomUI = null;
       this.showLobby();
@@ -139,7 +140,7 @@ export class LobbyScene extends Phaser.Scene {
       if (data.roomCode) {
         this.socketClient.emit('room:join', { code: data.roomCode }, (response) => {
           if (response.success && response.room) {
-            this.notifications.info('Following party leader into room');
+            this.notifications.info(t('ui:party.followingLeader'));
             this.onJoinRoom(response.room);
           }
         });

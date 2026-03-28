@@ -27,7 +27,8 @@
     "host": "Host: {{name}}",
     "joined": "Raum beigetreten: {{name}}",
     "joinFailed": "Beitritt fehlgeschlagen",
-    "loadFailed": "Räume konnten nicht geladen werden: {{error}}"
+    "loadFailed": "Räume konnten nicht geladen werden: {{error}}",
+    "kicked": "Du wurdest gekickt"
   },
   "maps": {
     "title": "Meine Karten",
@@ -281,7 +282,8 @@
     "accept": "Annehmen",
     "decline": "Ablehnen",
     "joinedParty": "Gruppe beigetreten",
-    "joinFailed": "Beitritt zur Gruppe fehlgeschlagen"
+    "joinFailed": "Beitritt zur Gruppe fehlgeschlagen",
+    "followingLeader": "Folge dem Gruppenleiter in den Raum"
   },
   "messages": {
     "title": "Nachrichten",
@@ -299,7 +301,8 @@
     "timeNow": "jetzt",
     "timeMinutes": "{{count}}m",
     "timeHours": "{{count}}h",
-    "timeDays": "{{count}}t"
+    "timeDays": "{{count}}t",
+    "dmAriaLabel": "Direktnachricht"
   },
   "leaderboard": {
     "title": "Rangliste",
@@ -505,5 +508,26 @@
     "teamRed": "Rot",
     "teamBlue": "Blau",
     "levelUp": "LEVEL UP! → Level {{level}}"
+  },
+  "coop": {
+    "partnerDisconnected": "Partner getrennt",
+    "partnerLeft": "Partner hat verlassen"
+  },
+  "lobbyChat": {
+    "empty": "Noch keine Nachrichten",
+    "ariaLabel": "Lobby-Chatnachricht"
+  },
+  "replay": {
+    "back": "Zurück",
+    "skipToStart": "Zum Anfang springen",
+    "rewind": "5s zurück",
+    "playPause": "Abspielen/Pause",
+    "forward": "5s vor",
+    "skipToEnd": "Zum Ende springen",
+    "cycleSpeed": "Geschwindigkeit wechseln",
+    "matchInfo": "Match #{{id}} — {{mode}} — {{count}} Spieler",
+    "toggleLog": "Protokoll umschalten",
+    "gameLog": "Spielprotokoll",
+    "clickToSeek": "Klicken zum Spulen"
   }
 }

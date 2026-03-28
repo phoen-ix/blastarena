@@ -27,7 +27,8 @@
     "host": "Host: {{name}}",
     "joined": "Joined room: {{name}}",
     "joinFailed": "Failed to join room",
-    "loadFailed": "Failed to load rooms: {{error}}"
+    "loadFailed": "Failed to load rooms: {{error}}",
+    "kicked": "You have been kicked"
   },
   "maps": {
     "title": "My Maps",
@@ -281,7 +282,8 @@
     "accept": "Accept",
     "decline": "Decline",
     "joinedParty": "Joined party",
-    "joinFailed": "Failed to join party"
+    "joinFailed": "Failed to join party",
+    "followingLeader": "Following party leader into room"
   },
   "messages": {
     "title": "Messages",
@@ -299,7 +301,8 @@
     "timeNow": "now",
     "timeMinutes": "{{count}}m",
     "timeHours": "{{count}}h",
-    "timeDays": "{{count}}d"
+    "timeDays": "{{count}}d",
+    "dmAriaLabel": "Direct message"
   },
   "leaderboard": {
     "title": "Leaderboard",
@@ -505,5 +508,26 @@
     "teamRed": "Red",
     "teamBlue": "Blue",
     "levelUp": "LEVEL UP! → Level {{level}}"
+  },
+  "coop": {
+    "partnerDisconnected": "Partner disconnected",
+    "partnerLeft": "Partner left"
+  },
+  "lobbyChat": {
+    "empty": "No messages yet",
+    "ariaLabel": "Lobby chat message"
+  },
+  "replay": {
+    "back": "Back",
+    "skipToStart": "Skip to start",
+    "rewind": "Rewind 5s",
+    "playPause": "Play/Pause",
+    "forward": "Forward 5s",
+    "skipToEnd": "Skip to end",
+    "cycleSpeed": "Cycle speed",
+    "matchInfo": "Match #{{id}} — {{mode}} — {{count}} players",
+    "toggleLog": "Toggle log panel",
+    "gameLog": "Game Log",
+    "clickToSeek": "Click to seek"
   }
 }

@@ -12,6 +12,7 @@ import {
   TILE_SIZE,
   TICK_MS,
 } from '@blast-arena/shared';
+import { t } from '../i18n';
 import { TileMapRenderer } from '../game/TileMap';
 import { PlayerSpriteRenderer } from '../game/PlayerSprite';
 import { BombSpriteRenderer } from '../game/BombSprite';
@@ -492,7 +493,10 @@ export class GameScene extends Phaser.Scene {
         this.socketClient.on('campaign:partnerLeft', (data) => {
           const notifications = this.registry.get('notifications');
           if (notifications) {
-            const reason = data.reason === 'disconnected' ? 'Partner disconnected' : 'Partner left';
+            const reason =
+              data.reason === 'disconnected'
+                ? t('ui:coop.partnerDisconnected')
+                : t('ui:coop.partnerLeft');
             notifications.info(reason);
           }
         });

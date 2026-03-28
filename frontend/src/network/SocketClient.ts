@@ -44,6 +44,14 @@ export class SocketClient {
       this.checkBuild();
     });
 
+    // Keep socket auth locale in sync with language changes
+    const updateLocale = () => {
+      if (this.socket) {
+        (this.socket.auth as Record<string, string>).locale = i18n.language;
+      }
+    };
+    window.addEventListener('language-changed', updateLocale);
+
     this.socket.on('disconnect', (reason) => {
       console.log('Socket disconnected:', reason);
       // Don't show overlay for intentional disconnects

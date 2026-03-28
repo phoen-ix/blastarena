@@ -32,6 +32,7 @@ export class AdminUI {
   private tabs: Tab[];
   private activeTabId: string;
   private contentEl: HTMLElement | null = null;
+  private onLanguageChanged = () => this.render();
 
   constructor(
     socketClient: SocketClient,
@@ -135,11 +136,13 @@ export class AdminUI {
     if (uiOverlay && !uiOverlay.contains(this.container)) {
       uiOverlay.appendChild(this.container);
     }
+    window.addEventListener('language-changed', this.onLanguageChanged);
     await this.render();
     this.pushGamepadContext();
   }
 
   hide(): void {
+    window.removeEventListener('language-changed', this.onLanguageChanged);
     UIGamepadNavigator.getInstance().popContext('admin');
     // Destroy active tab
     const activeTab = this.tabs.find((tab) => tab.id === this.activeTabId);
@@ -148,6 +151,11 @@ export class AdminUI {
   }
 
   private async render(): Promise<void> {
+    // Refresh tab labels for current language
+    for (const tab of this.tabs) {
+      tab.label = t(`admin:tabs.${tab.id}`);
+    }
+
     this.container.innerHTML = `
       <div class="admin-header">
         <h1 style="color:var(--primary);margin:0;">${t('admin:title')}</h1>
