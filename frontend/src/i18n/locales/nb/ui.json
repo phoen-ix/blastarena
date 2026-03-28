@@ -396,6 +396,7 @@
     "mapSpawnHint": "Dette kartet har {{count}} startpunkter (maks {{count}} spillere)",
     "mapDimensions": "{{width}}x{{height}} kart",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} startpunkter)",
+    "loadingPreview": "Laster forh\u00e5ndsvisning...",
     "recordGame": "Ta opp spill",
     "mapSizes": {
       "21": "21\u00d721 (Liten)",

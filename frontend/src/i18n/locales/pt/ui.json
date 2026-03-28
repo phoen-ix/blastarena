@@ -396,6 +396,7 @@
     "mapSpawnHint": "Este mapa tem {{count}} pontos de in\u00edcio (m\u00e1ximo {{count}} jogadores)",
     "mapDimensions": "Mapa {{width}}x{{height}}",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} pontos de in\u00edcio)",
+    "loadingPreview": "Carregando pr\u00e9-visualiza\u00e7\u00e3o...",
     "recordGame": "Gravar Jogo",
     "mapSizes": {
       "21": "21\u00d721 (Pequeno)",

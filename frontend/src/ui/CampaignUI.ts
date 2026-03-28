@@ -5,10 +5,18 @@ import { NotificationUI } from './NotificationUI';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { PartyBar } from './PartyBar';
 import { escapeHtml } from '../utils/html';
-import { getErrorMessage, CampaignGameState, CampaignLevelSummary } from '@blast-arena/shared';
+import {
+  getErrorMessage,
+  CampaignGameState,
+  CampaignLevelSummary,
+  CAMPAIGN_THEME_PALETTES,
+} from '@blast-arena/shared';
+import type { CampaignWorldTheme } from '@blast-arena/shared';
 import { showLocalCoopModal } from './modals/LocalCoopModal';
 import { showBuddyModal, BuddyLaunchConfig } from './modals/BuddyModal';
 import { LocalCoopP2Identity } from '../game/LocalCoopInput';
+import { renderMapPreview } from '../utils/mapPreview';
+import { getCampaignLevelTiles } from '../utils/mapPreviewCache';
 import { t } from '../i18n';
 import game from '../main';
 
@@ -369,7 +377,7 @@ export class CampaignUI {
     `;
 
     for (const level of world.levels) {
-      levelContainer.appendChild(this.createLevelCard(level));
+      levelContainer.appendChild(this.createLevelCard(level, world.theme));
     }
 
     card.appendChild(levelContainer);
@@ -402,7 +410,7 @@ export class CampaignUI {
     return card;
   }
 
-  private createLevelCard(level: CampaignLevel): HTMLElement {
+  private createLevelCard(level: CampaignLevel, worldTheme: string): HTMLElement {
     const isSelected = this.selectedLevelId === level.id;
     const isAvailable = !level.locked && !level.completed;
 
@@ -410,8 +418,7 @@ export class CampaignUI {
     card.style.cssText = `
       padding: 14px 24px;
       display: flex;
-      justify-content: space-between;
-      align-items: center;
+      flex-direction: column;
       border-bottom: 1px solid var(--border);
       cursor: ${level.locked ? 'default' : 'pointer'};
       opacity: ${level.locked ? '0.4' : '1'};
@@ -609,8 +616,38 @@ export class CampaignUI {
       rightSide.appendChild(btnArea);
     }
 
-    card.appendChild(leftSide);
-    card.appendChild(rightSide);
+    const infoRow = document.createElement('div');
+    infoRow.style.cssText =
+      'display:flex;justify-content:space-between;align-items:center;width:100%;';
+    infoRow.appendChild(leftSide);
+    infoRow.appendChild(rightSide);
+    card.appendChild(infoRow);
+
+    // Map preview (shown when selected and not locked)
+    if (isSelected && !level.locked) {
+      const previewRow = document.createElement('div');
+      previewRow.style.cssText =
+        'display:flex;justify-content:center;padding:12px 0 4px;width:100%;';
+      const loadingText = document.createElement('span');
+      loadingText.style.cssText = 'font-size:11px;color:var(--text-muted);';
+      loadingText.textContent = t('campaign:mapPreview.loading');
+      previewRow.appendChild(loadingText);
+      card.appendChild(previewRow);
+
+      const palette = CAMPAIGN_THEME_PALETTES[worldTheme as CampaignWorldTheme];
+      getCampaignLevelTiles(level.id)
+        .then((data) => {
+          if (this.selectedLevelId !== level.id || !card.isConnected) return;
+          const canvas = renderMapPreview(data.tiles, { palette, maxCanvasSize: 280 });
+          canvas.style.cssText = 'border:1px solid var(--border);border-radius:4px;';
+          previewRow.innerHTML = '';
+          previewRow.appendChild(canvas);
+        })
+        .catch(() => {
+          if (this.selectedLevelId !== level.id || !card.isConnected) return;
+          previewRow.remove();
+        });
+    }
 
     // Click to select (if not locked)
     if (!level.locked) {

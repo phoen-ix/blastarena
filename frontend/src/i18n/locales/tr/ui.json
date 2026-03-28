@@ -396,6 +396,7 @@
     "mapSpawnHint": "Bu haritada {{count}} dogma noktasi var (maks {{count}} oyuncu)",
     "mapDimensions": "{{width}}x{{height}} harita",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} dogma)",
+    "loadingPreview": "\u00d6nizleme y\u00fckleniyor...",
     "recordGame": "Oyunu Kaydet",
     "mapSizes": {
       "21": "21x21 (Kucuk)",

@@ -396,6 +396,7 @@
     "mapSpawnHint": "Ta mapa ma {{count}} punkt\u00f3w startu (maks. {{count}} graczy)",
     "mapDimensions": "Mapa {{width}}x{{height}}",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} punkt\u00f3w startu)",
+    "loadingPreview": "\u0141adowanie podgl\u0105du...",
     "recordGame": "Nagraj gr\u0119",
     "mapSizes": {
       "21": "21\u00d721 (Ma\u0142y)",

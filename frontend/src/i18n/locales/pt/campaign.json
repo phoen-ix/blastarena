@@ -2,6 +2,9 @@
   "title": "Campanha",
   "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>ANHA",
   "backToLobby": "Voltar ao Lobby",
+  "mapPreview": {
+    "loading": "Carregando pr\u00e9-visualiza\u00e7\u00e3o..."
+  },
   "empty": "Nenhum mundo de campanha dispon\u00edvel ainda.",
   "loadFailed": "Falha ao carregar campanha: {{error}}",
   "loadingLevel": "Carregando fase...",

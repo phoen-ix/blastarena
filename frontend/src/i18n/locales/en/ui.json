@@ -396,6 +396,7 @@
     "mapSpawnHint": "This map has {{count}} spawn points ({{count}} players max)",
     "mapDimensions": "{{width}}x{{height}} map",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} spawns)",
+    "loadingPreview": "Loading preview...",
     "recordGame": "Record Game",
     "mapSizes": {
       "21": "21×21 (Small)",

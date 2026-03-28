@@ -2,6 +2,9 @@
   "title": "Campagna",
   "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AGNA",
   "backToLobby": "Torna alla lobby",
+  "mapPreview": {
+    "loading": "Caricamento anteprima..."
+  },
   "empty": "Nessun mondo della campagna ancora disponibile.",
   "loadFailed": "Impossibile caricare la campagna: {{error}}",
   "loadingLevel": "Caricamento livello...",

@@ -2,6 +2,9 @@
   "title": "Campagne",
   "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AGNE",
   "backToLobby": "Terug naar lobby",
+  "mapPreview": {
+    "loading": "Voorbeeld laden..."
+  },
   "empty": "Nog geen campagnewerelden beschikbaar.",
   "loadFailed": "Campagne laden mislukt: {{error}}",
   "loadingLevel": "Level laden...",

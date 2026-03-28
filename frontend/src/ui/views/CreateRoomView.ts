@@ -9,6 +9,8 @@ import {
   CustomMapSummary,
 } from '@blast-arena/shared';
 import game from '../../main';
+import { renderMapPreview } from '../../utils/mapPreview';
+import { getCustomMapTiles } from '../../utils/mapPreviewCache';
 import { t } from '../../i18n';
 
 export class CreateRoomView implements ILobbyView {
@@ -123,6 +125,7 @@ export class CreateRoomView implements ILobbyView {
                   ${this.buildMapOptions()}
                 </select>
                 <div id="cr-map-hint" style="font-size:10px;color:var(--text-dim);margin-top:2px;display:none;"></div>
+                <div id="cr-map-preview" style="margin-top:8px;display:none;"></div>
               </div>
               <div class="form-group">
                 <label>${t('ui:createRoom.mapSize')}</label>
@@ -368,6 +371,31 @@ export class CreateRoomView implements ILobbyView {
         }
       } else {
         mapHint.style.display = 'none';
+      }
+
+      // Map preview
+      const previewEl = this.container?.querySelector('#cr-map-preview') as HTMLElement | null;
+      if (previewEl) {
+        if (isCustom) {
+          previewEl.style.display = 'block';
+          previewEl.innerHTML = `<span style="font-size:11px;color:var(--text-muted);">${t('ui:createRoom.loadingPreview')}</span>`;
+          const selectedVal = val;
+          getCustomMapTiles(parseInt(selectedVal))
+            .then((data) => {
+              if (customMapSelect.value !== selectedVal) return;
+              const canvas = renderMapPreview(data.tiles, { maxCanvasSize: 200 });
+              canvas.style.cssText = 'border:1px solid var(--border);border-radius:4px;';
+              previewEl.innerHTML = '';
+              previewEl.appendChild(canvas);
+            })
+            .catch(() => {
+              if (customMapSelect.value !== selectedVal) return;
+              previewEl.style.display = 'none';
+            });
+        } else {
+          previewEl.style.display = 'none';
+          previewEl.innerHTML = '';
+        }
       }
     };
     customMapSelect.addEventListener('change', updateMapSelection);

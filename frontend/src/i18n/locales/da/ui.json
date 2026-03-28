@@ -396,6 +396,7 @@
     "mapSpawnHint": "Dette kort har {{count}} startpunkter ({{count}} spillere maks)",
     "mapDimensions": "{{width}}x{{height}} kort",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} startpunkter)",
+    "loadingPreview": "Indl\u00e6ser forh\u00e5ndsvisning...",
     "recordGame": "Optag spil",
     "mapSizes": {
       "21": "21\u00d721 (Lille)",

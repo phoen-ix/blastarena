@@ -2,6 +2,9 @@
   "title": "Kampagne",
   "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AIGN",
   "backToLobby": "Tilbage til lobby",
+  "mapPreview": {
+    "loading": "Indl\u00e6ser forh\u00e5ndsvisning..."
+  },
   "empty": "Ingen kampagne-verdener tilg\u00e6ngelige endnu.",
   "loadFailed": "Kunne ikke indl\u00e6se kampagne: {{error}}",
   "loadingLevel": "Indl\u00e6ser bane...",

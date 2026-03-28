@@ -9,6 +9,8 @@ import {
   CustomMapSummary,
 } from '@blast-arena/shared';
 import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
+import { renderMapPreview } from '../../utils/mapPreview';
+import { getCustomMapTiles } from '../../utils/mapPreviewCache';
 import { t } from '../../i18n';
 
 export interface CreateRoomModalDeps {
@@ -79,6 +81,7 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
             <option value="">${t('ui:createRoom.randomGenerated')}</option>
             ${deps.customMaps.map((m) => `<option value="${m.id}">${t('ui:createRoom.mapOptionLabel', { name: m.name, width: m.mapWidth, height: m.mapHeight, spawns: m.spawnCount })}</option>`).join('')}
           </select>
+          <div id="room-map-preview" style="margin-top:6px;display:none;"></div>
         </div>`
             : ''
         }
@@ -254,6 +257,30 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
       mapSizeSelect.style.opacity = isCustom ? '0.4' : '1';
       wallDensitySelectEl.disabled = isCustom;
       wallDensitySelectEl.style.opacity = isCustom ? '0.4' : '1';
+
+      const previewEl = modal.querySelector('#room-map-preview') as HTMLElement | null;
+      if (previewEl) {
+        if (isCustom) {
+          previewEl.style.display = 'block';
+          previewEl.innerHTML = `<span style="font-size:11px;color:var(--text-muted);">${t('ui:createRoom.loadingPreview')}</span>`;
+          const selectedVal = customMapSelect.value;
+          getCustomMapTiles(parseInt(selectedVal))
+            .then((data) => {
+              if (customMapSelect.value !== selectedVal) return;
+              const canvas = renderMapPreview(data.tiles, { maxCanvasSize: 180 });
+              canvas.style.cssText = 'border:1px solid var(--border);border-radius:4px;';
+              previewEl.innerHTML = '';
+              previewEl.appendChild(canvas);
+            })
+            .catch(() => {
+              if (customMapSelect.value !== selectedVal) return;
+              previewEl.style.display = 'none';
+            });
+        } else {
+          previewEl.style.display = 'none';
+          previewEl.innerHTML = '';
+        }
+      }
     });
   }
 

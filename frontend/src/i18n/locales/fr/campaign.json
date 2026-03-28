@@ -2,6 +2,9 @@
   "title": "Campagne",
   "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AGNE",
   "backToLobby": "Retour au lobby",
+  "mapPreview": {
+    "loading": "Chargement de l'aper\u00e7u..."
+  },
   "empty": "Aucun monde de campagne disponible pour le moment.",
   "loadFailed": "\u00c9chec du chargement de la campagne : {{error}}",
   "loadingLevel": "Chargement du niveau...",

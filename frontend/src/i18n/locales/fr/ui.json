@@ -396,6 +396,7 @@
     "mapSpawnHint": "Cette carte a {{count}} points d'apparition ({{count}} joueurs max)",
     "mapDimensions": "Carte {{width}}x{{height}}",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} apparitions)",
+    "loadingPreview": "Chargement de l'aper\u00e7u...",
     "recordGame": "Enregistrer la partie",
     "mapSizes": {
       "21": "21\u00d721 (Petite)",

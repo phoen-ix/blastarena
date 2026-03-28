@@ -396,6 +396,7 @@
     "mapSpawnHint": "Deze kaart heeft {{count}} spawnpunten (max. {{count}} spelers)",
     "mapDimensions": "{{width}}x{{height}} kaart",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} spawns)",
+    "loadingPreview": "Voorbeeld laden...",
     "recordGame": "Spel opnemen",
     "mapSizes": {
       "21": "21\u00d721 (Klein)",

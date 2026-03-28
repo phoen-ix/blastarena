@@ -396,6 +396,7 @@
     "mapSpawnHint": "Questa mappa ha {{count}} punti di nascita (massimo {{count}} giocatori)",
     "mapDimensions": "Mappa {{width}}x{{height}}",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} nascite)",
+    "loadingPreview": "Caricamento anteprima...",
     "recordGame": "Registra partita",
     "mapSizes": {
       "21": "21\u00d721 (Piccola)",

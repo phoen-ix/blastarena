@@ -396,6 +396,7 @@
     "mapSpawnHint": "Denna karta har {{count}} startplatser ({{count}} spelare max)",
     "mapDimensions": "{{width}}x{{height}} karta",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} startplatser)",
+    "loadingPreview": "Laddar förhandsvisning...",
     "recordGame": "Spela in spel",
     "mapSizes": {
       "21": "21\u00d721 (Liten)",

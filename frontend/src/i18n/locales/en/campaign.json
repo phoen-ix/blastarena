@@ -2,6 +2,9 @@
   "title": "Campaign",
   "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AIGN",
   "backToLobby": "Back to Lobby",
+  "mapPreview": {
+    "loading": "Loading preview..."
+  },
   "empty": "No campaign worlds available yet.",
   "loadFailed": "Failed to load campaign: {{error}}",
   "loadingLevel": "Loading level...",

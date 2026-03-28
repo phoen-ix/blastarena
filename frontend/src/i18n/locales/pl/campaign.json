@@ -2,6 +2,9 @@
   "title": "Kampania",
   "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AIGN",
   "backToLobby": "Powr\u00f3t do lobby",
+  "mapPreview": {
+    "loading": "\u0141adowanie podgl\u0105du..."
+  },
   "empty": "Brak dost\u0119pnych \u015bwiat\u00f3w kampanii.",
   "loadFailed": "Nie uda\u0142o si\u0119 za\u0142adowa\u0107 kampanii: {{error}}",
   "loadingLevel": "\u0141adowanie poziomu...",

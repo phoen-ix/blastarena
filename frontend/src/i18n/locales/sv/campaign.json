@@ -2,6 +2,9 @@
   "title": "Kampanj",
   "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AIGN",
   "backToLobby": "Tillbaka till lobbyn",
+  "mapPreview": {
+    "loading": "Laddar förhandsvisning..."
+  },
   "empty": "Inga kampanjvärldar tillgängliga ännu.",
   "loadFailed": "Kunde inte ladda kampanjen: {{error}}",
   "loadingLevel": "Laddar bana...",

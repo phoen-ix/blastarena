@@ -396,6 +396,7 @@
     "mapSpawnHint": "Este mapa tiene {{count}} puntos de aparición (máximo {{count}} jugadores)",
     "mapDimensions": "Mapa de {{width}}x{{height}}",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} apariciones)",
+    "loadingPreview": "Cargando vista previa...",
     "recordGame": "Grabar Partida",
     "mapSizes": {
       "21": "21\u00d721 (Pequeño)",

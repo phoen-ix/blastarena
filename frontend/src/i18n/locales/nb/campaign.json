@@ -2,6 +2,9 @@
   "title": "Kampanje",
   "titleBrand": "<span style=\"color:var(--text);\">KAMP</span>ANJE",
   "backToLobby": "Tilbake til lobbyen",
+  "mapPreview": {
+    "loading": "Laster forh\u00e5ndsvisning..."
+  },
   "empty": "Ingen kampanjeverdener tilgjengelig enn\u00e5.",
   "loadFailed": "Kunne ikke laste kampanje: {{error}}",
   "loadingLevel": "Laster niv\u00e5...",
