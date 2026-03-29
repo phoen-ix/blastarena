@@ -9,7 +9,7 @@ import {
   generateEmailHint,
 } from '../utils/crypto';
 import { getConfig } from '../config';
-import { sendEmailChangeEmail } from './email';
+import { sendEmailChangeEmail, sendEmailTakenChangeWarning } from './email';
 import { logger } from '../utils/logger';
 import { UserRow, UserProfileRow, UserEmailChangeRow, IdRow } from '../db/types';
 
@@ -100,22 +100,28 @@ export async function requestEmailChange(userId: number, newEmail: string): Prom
   const emailHash = hashEmail(normalizedEmail, config.EMAIL_PEPPER);
   const emailHint = generateEmailHint(normalizedEmail);
 
-  // Check if the new email is already used by another user
+  // Check if the new email is already used by another user — never reveal existence
   const existing = await query<IdRow[]>('SELECT id FROM users WHERE email_hash = ? AND id != ?', [
     emailHash,
     userId,
   ]);
   if (existing.length > 0) {
-    throw new AppError('Email is already in use', 409, 'CONFLICT');
+    sendEmailTakenChangeWarning(normalizedEmail).catch((err) => {
+      logger.error({ err }, 'Failed to send email-taken change warning');
+    });
+    return; // Silently succeed — don't update pending fields, don't reveal conflict
   }
 
-  // Also check if another user has this as a pending email (optional but prevents race)
+  // Also check if another user has this as a pending email
   const pendingExisting = await query<IdRow[]>(
     'SELECT id FROM users WHERE pending_email_hash = ? AND id != ?',
     [emailHash, userId],
   );
   if (pendingExisting.length > 0) {
-    throw new AppError('Email is already in use', 409, 'CONFLICT');
+    sendEmailTakenChangeWarning(normalizedEmail).catch((err) => {
+      logger.error({ err }, 'Failed to send email-taken change warning');
+    });
+    return; // Silently succeed
   }
 
   const token = generateToken();

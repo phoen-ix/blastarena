@@ -168,6 +168,7 @@ Gzipped JSON replays with tile diffs. See [docs/replay-system.md](docs/replay-sy
 ## Security, Connection Resilience & Docker
 - HTTP security headers in `docker/nginx/security-headers.conf` (included per-location to avoid Nginx inheritance issues): CSP, HSTS, COOP, X-Frame-Options, X-Content-Type-Options
 - **Email hashing**: Emails never stored in plaintext. HMAC-SHA256 with `EMAIL_PEPPER` (env var, min 32 chars). DB stores `email_hash` (for lookups) + `email_hint` (masked display like `j***@g***.com`). Same pattern for `pending_email_hash`/`pending_email_hint`. Password reset and email change flows receive plaintext from user request, hash for DB lookup, send to provided address, then discard. `backfill-emails.ts` runs on startup to migrate any legacy plaintext rows. Admin email search: exact match only (hashed) when query contains `@`
+- **Email enumeration prevention**: Registration with an existing email returns generic 400 (not 409) and sends a warning email to the existing account owner. Email change with a taken address silently succeeds (no DB update) and sends a warning. Username conflicts remain explicit (usernames are public). Warning emails: `sendEmailTakenRegistrationWarning`, `sendEmailTakenChangeWarning`
 - `room:create` validates `MatchConfig` via Zod schema
 - Health poll checks for `game-container` in body before triggering reload — prevents landing on 502.html during partial restarts
 - Game loop circuit breaker: stops after 10 consecutive tick failures

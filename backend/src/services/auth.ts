@@ -9,7 +9,11 @@ import {
   hashEmail,
   generateEmailHint,
 } from '../utils/crypto';
-import { sendVerificationEmail, sendPasswordResetEmail } from './email';
+import {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+  sendEmailTakenRegistrationWarning,
+} from './email';
 import { AppError } from '../middleware/errorHandler';
 import { AuthPayload, PublicUser, AuthResponse, UserRole } from '@blast-arena/shared';
 import { logger } from '../utils/logger';
@@ -88,13 +92,23 @@ export async function register(
   const emailHash = hashEmail(normalizedEmail, config.EMAIL_PEPPER);
   const emailHint = generateEmailHint(normalizedEmail);
 
-  // Check existing user
-  const existing = await query<IdRow[]>(
-    'SELECT id FROM users WHERE username = ? OR email_hash = ?',
-    [username, emailHash],
-  );
-  if (existing.length > 0) {
-    throw new AppError('Username or email already taken', 409, 'CONFLICT');
+  // Check username (public info — safe to reveal)
+  const usernameExists = await query<IdRow[]>('SELECT id FROM users WHERE username = ?', [
+    username,
+  ]);
+  if (usernameExists.length > 0) {
+    throw new AppError('Username already taken', 409, 'CONFLICT');
+  }
+
+  // Check email — never reveal existence
+  const emailExists = await query<IdRow[]>('SELECT id FROM users WHERE email_hash = ?', [
+    emailHash,
+  ]);
+  if (emailExists.length > 0) {
+    sendEmailTakenRegistrationWarning(normalizedEmail).catch((err) => {
+      logger.error({ err }, 'Failed to send email-taken registration warning');
+    });
+    throw new AppError('Registration could not be completed', 400, 'REGISTRATION_FAILED');
   }
 
   const passwordHash = await hashPassword(password);

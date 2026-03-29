@@ -34,8 +34,10 @@ jest.mock('../../../backend/src/config', () => ({
 }));
 
 const mockSendEmailChangeEmail = jest.fn<AnyFn>();
+const mockSendEmailTakenChangeWarning = jest.fn<AnyFn>();
 jest.mock('../../../backend/src/services/email', () => ({
   sendEmailChangeEmail: mockSendEmailChangeEmail,
+  sendEmailTakenChangeWarning: mockSendEmailTakenChangeWarning,
 }));
 
 jest.mock('../../../backend/src/utils/logger', () => ({
@@ -62,6 +64,7 @@ describe('user service', () => {
     jest.clearAllMocks();
     mockHashEmail.mockReturnValue('hashed-email');
     mockGenerateEmailHint.mockReturnValue('n***@e***.com');
+    mockSendEmailTakenChangeWarning.mockResolvedValue(undefined);
   });
 
   // ── getUserProfile ──────────────────────────────────────────────────
@@ -235,27 +238,23 @@ describe('user service', () => {
       );
     });
 
-    it('throws 409 when email is already used by another user', async () => {
+    it('silently succeeds and sends warning when email is already used', async () => {
       mockQuery.mockResolvedValueOnce([{ id: 2 }]); // email in use
 
-      const promise = requestEmailChange(1, 'taken@example.com');
-      await expect(promise).rejects.toThrow(AppError);
-      await expect(promise).rejects.toMatchObject({
-        statusCode: 409,
-        code: 'CONFLICT',
-      });
+      await requestEmailChange(1, 'taken@example.com');
+
+      expect(mockSendEmailTakenChangeWarning).toHaveBeenCalledWith('taken@example.com');
+      expect(mockExecute).not.toHaveBeenCalled();
     });
 
-    it('throws 409 when email is pending for another user', async () => {
+    it('silently succeeds and sends warning when email is pending for another user', async () => {
       mockQuery.mockResolvedValueOnce([]); // email column clear
       mockQuery.mockResolvedValueOnce([{ id: 3 }]); // pending_email in use
 
-      const promise = requestEmailChange(1, 'pending@example.com');
-      await expect(promise).rejects.toThrow(AppError);
-      await expect(promise).rejects.toMatchObject({
-        statusCode: 409,
-        code: 'CONFLICT',
-      });
+      await requestEmailChange(1, 'pending@example.com');
+
+      expect(mockSendEmailTakenChangeWarning).toHaveBeenCalledWith('pending@example.com');
+      expect(mockExecute).not.toHaveBeenCalled();
     });
   });
 

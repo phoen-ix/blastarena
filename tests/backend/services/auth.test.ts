@@ -25,9 +25,11 @@ jest.mock('../../../backend/src/utils/crypto', () => ({
 
 const mockSendVerificationEmail = jest.fn<(...args: any[]) => Promise<void>>();
 const mockSendPasswordResetEmail = jest.fn<(...args: any[]) => Promise<void>>();
+const mockSendEmailTakenRegistrationWarning = jest.fn<(...args: any[]) => Promise<void>>();
 jest.mock('../../../backend/src/services/email', () => ({
   sendVerificationEmail: mockSendVerificationEmail,
   sendPasswordResetEmail: mockSendPasswordResetEmail,
+  sendEmailTakenRegistrationWarning: mockSendEmailTakenRegistrationWarning,
 }));
 
 jest.mock('../../../backend/src/config', () => ({
@@ -63,11 +65,13 @@ describe('Auth Service', () => {
     mockGenerateEmailHint.mockReturnValue('n***@t***.com');
     mockSendVerificationEmail.mockResolvedValue(undefined);
     mockSendPasswordResetEmail.mockResolvedValue(undefined);
+    mockSendEmailTakenRegistrationWarning.mockResolvedValue(undefined);
   });
 
   describe('register', () => {
     it('should return user object and accessToken on success', async () => {
-      mockQuery.mockResolvedValue([]);
+      mockQuery.mockResolvedValueOnce([]); // username check
+      mockQuery.mockResolvedValueOnce([]); // email check
       mockExecute.mockResolvedValue({ insertId: 42, affectedRows: 1 });
 
       const result = await authService.register('newuser', 'new@test.com', 'password123');
@@ -77,20 +81,38 @@ describe('Auth Service', () => {
       expect(typeof result.accessToken).toBe('string');
     });
 
-    it('should throw 409 on duplicate username or email', async () => {
-      mockQuery.mockResolvedValue([{ id: 1 }]);
+    it('should throw 409 on duplicate username', async () => {
+      mockQuery.mockResolvedValueOnce([{ id: 1 }]); // username taken
 
       try {
-        await authService.register('taken', 'taken@test.com', 'pass');
-        expect(true).toBe(false); // Should not reach
+        await authService.register('taken', 'new@test.com', 'pass');
+        expect(true).toBe(false);
       } catch (err) {
         expect(err).toBeInstanceOf(AppError);
         expect((err as InstanceType<typeof AppError>).statusCode).toBe(409);
       }
     });
 
+    it('should throw generic 400 on duplicate email without revealing existence', async () => {
+      mockQuery.mockResolvedValueOnce([]); // username free
+      mockQuery.mockResolvedValueOnce([{ id: 1 }]); // email taken
+
+      try {
+        await authService.register('newuser', 'taken@test.com', 'pass');
+        expect(true).toBe(false);
+      } catch (err) {
+        expect(err).toBeInstanceOf(AppError);
+        expect((err as InstanceType<typeof AppError>).statusCode).toBe(400);
+        expect((err as InstanceType<typeof AppError>).message).toBe(
+          'Registration could not be completed',
+        );
+      }
+      expect(mockSendEmailTakenRegistrationWarning).toHaveBeenCalledWith('taken@test.com');
+    });
+
     it('should call hashPassword with the provided password', async () => {
-      mockQuery.mockResolvedValue([]);
+      mockQuery.mockResolvedValueOnce([]); // username check
+      mockQuery.mockResolvedValueOnce([]); // email check
       mockExecute.mockResolvedValue({ insertId: 1, affectedRows: 1 });
 
       await authService.register('user1', 'user1@test.com', 'mypassword');

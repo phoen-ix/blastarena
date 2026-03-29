@@ -223,7 +223,7 @@ Full i18n support via [i18next](https://www.i18next.com/). All UI strings are ex
 | Backend | Node.js + Express + TypeScript |
 | Real-time | Socket.io |
 | Database | MariaDB 11 + Redis 7 |
-| Auth | JWT + bcrypt + httpOnly cookies, HMAC-SHA256 email hashing |
+| Auth | JWT + bcrypt + httpOnly cookies, HMAC-SHA256 email hashing, email enumeration prevention |
 | Security | CSP + HSTS + COOP + Trusted Types, parameterized queries, rate limiting, Zod socket event validation |
 | Validation | Zod |
 | Container | Docker Compose |
