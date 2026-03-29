@@ -38,6 +38,28 @@ jest.mock('../../../backend/src/services/settings', () => ({
   getEmailSettings: mockGetEmailSettings,
 }));
 
+// ── Mock: i18n ─────────────────────────────────────────────────────────────
+
+// Load English translations so email content assertions still pass
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const emailTranslations = require('../../../backend/src/i18n/locales/en/email.json');
+
+function resolveKey(key: string): string {
+  // key format: "email:section.field"
+  const withoutNs = key.replace(/^email:/, '');
+  const parts = withoutNs.split('.');
+  let val: Record<string, unknown> = emailTranslations;
+  for (const p of parts) {
+    val = val[p] as Record<string, unknown>;
+    if (val === undefined) return key;
+  }
+  return val as unknown as string;
+}
+
+jest.mock('../../../backend/src/i18n', () => ({
+  getFixedT: () => resolveKey,
+}));
+
 // ── Import SUT (after mocks) ───────────────────────────────────────────────
 
 import {
@@ -254,7 +276,9 @@ describe('email service', () => {
     it('logs a warning about SMTP not being configured', async () => {
       await sendTestEmail('test@example.com');
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('SMTP not configured, emails will be logged only');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'SMTP not configured, emails will be logged only',
+      );
     });
 
     it('does not create a transporter', async () => {
@@ -360,9 +384,7 @@ describe('email service', () => {
       await sendVerificationEmail('user@example.com', 'mytoken');
 
       const callArgs = mockSendMail.mock.calls[0][0];
-      expect(callArgs.html).toContain(
-        'https://blast.example.com/api/auth/verify-email/mytoken',
-      );
+      expect(callArgs.html).toContain('https://blast.example.com/api/auth/verify-email/mytoken');
     });
 
     it('constructs verification URL using APP_URL from config', async () => {
@@ -536,9 +558,7 @@ describe('email service', () => {
       await sendPasswordResetEmail('user@example.com', 'reset-tok');
 
       const callArgs = mockSendMail.mock.calls[0][0];
-      expect(callArgs.html).toContain(
-        'https://blast.example.com/reset-password?token=reset-tok',
-      );
+      expect(callArgs.html).toContain('https://blast.example.com/reset-password?token=reset-tok');
     });
 
     it('constructs reset URL using APP_URL from config', async () => {
@@ -747,10 +767,7 @@ describe('email service', () => {
         // expected
       }
 
-      expect(mockLogger.info).not.toHaveBeenCalledWith(
-        expect.anything(),
-        'Email sent',
-      );
+      expect(mockLogger.info).not.toHaveBeenCalledWith(expect.anything(), 'Email sent');
     });
   });
 

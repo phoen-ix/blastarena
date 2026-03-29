@@ -398,6 +398,23 @@
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} apparitions)",
     "loadingPreview": "Chargement de l'aper\u00e7u...",
     "recordGame": "Enregistrer la partie",
+    "hazardTypes": {
+      "vine": "Liane",
+      "quicksand": "Sables mouvants",
+      "ice": "Glace",
+      "lava": "Lave",
+      "mud": "Boue",
+      "spikes": "Piques",
+      "dark_rift": "Faille sombre"
+    },
+    "eventTypes": {
+      "meteor": "Chute de météore",
+      "powerup_rain": "Pluie de bonus",
+      "wall_collapse": "Effondrement de murs",
+      "freeze_wave": "Vague de gel",
+      "bomb_surge": "Vague de bombes",
+      "ufo_abduction": "Enlèvement OVNI"
+    },
     "mapSizes": {
       "21": "21\u00d721 (Petite)",
       "31": "31\u00d731 (Normale)",
@@ -485,6 +502,12 @@
       "dynamite": "Dynamite",
       "sparky": "Sparky"
     }
+  },
+  "game": {
+    "leaveTitle": "QUITTER LA PARTIE",
+    "leaveWarning": "Vous mourrez et perdrez toute progression.",
+    "leaveConfirm": "Quitter la partie",
+    "leaveCancel": "Annuler"
   },
   "gameOver": {
     "gameWord": "FIN",

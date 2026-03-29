@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import { getConfig } from '../config';
 import { logger } from '../utils/logger';
 import { getEmailSettings } from './settings';
+import { getFixedT } from '../i18n';
 
 let transporter: nodemailer.Transporter | null = null;
 
@@ -81,89 +82,110 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
   }
 }
 
-export async function sendVerificationEmail(email: string, token: string): Promise<void> {
+export async function sendVerificationEmail(
+  email: string,
+  token: string,
+  language = 'en',
+): Promise<void> {
+  const t = getFixedT(language);
   const config = getConfig();
   const url = `${config.APP_URL}/api/auth/verify-email/${token}`;
   await sendEmail(
     email,
-    'Verify your BlastArena account',
+    t('email:verification.subject'),
     `
-    <h1>Welcome to BlastArena!</h1>
-    <p>Click the link below to verify your email address:</p>
+    <h1>${t('email:verification.heading')}</h1>
+    <p>${t('email:verification.body')}</p>
     <p><a href="${url}">${url}</a></p>
-    <p>If you didn't create an account, you can ignore this email.</p>
+    <p>${t('email:verification.ignore')}</p>
   `,
   );
 }
 
-export async function sendEmailChangeEmail(newEmail: string, token: string): Promise<void> {
+export async function sendEmailChangeEmail(
+  newEmail: string,
+  token: string,
+  language = 'en',
+): Promise<void> {
+  const t = getFixedT(language);
   const config = getConfig();
   const url = `${config.APP_URL}/api/user/confirm-email/${token}`;
   await sendEmail(
     newEmail,
-    'Confirm your new email address — BlastArena',
+    t('email:emailChange.subject'),
     `
-    <h1>Email Change Request</h1>
-    <p>You requested to change your BlastArena email to this address.</p>
-    <p>Click the link below to confirm:</p>
+    <h1>${t('email:emailChange.heading')}</h1>
+    <p>${t('email:emailChange.body')}</p>
+    <p>${t('email:emailChange.action')}</p>
     <p><a href="${url}">${url}</a></p>
-    <p>This link expires in 24 hours.</p>
-    <p>If you didn't request this change, you can ignore this email.</p>
+    <p>${t('email:emailChange.expires')}</p>
+    <p>${t('email:emailChange.ignore')}</p>
   `,
   );
 }
 
-export async function sendPasswordResetEmail(email: string, token: string): Promise<void> {
+export async function sendPasswordResetEmail(
+  email: string,
+  token: string,
+  language = 'en',
+): Promise<void> {
+  const t = getFixedT(language);
   const config = getConfig();
   const url = `${config.APP_URL}/reset-password?token=${token}`;
   await sendEmail(
     email,
-    'Reset your BlastArena password',
+    t('email:passwordReset.subject'),
     `
-    <h1>Password Reset</h1>
-    <p>Click the link below to reset your password:</p>
+    <h1>${t('email:passwordReset.heading')}</h1>
+    <p>${t('email:passwordReset.body')}</p>
     <p><a href="${url}">${url}</a></p>
-    <p>This link expires in 1 hour.</p>
-    <p>If you didn't request a password reset, you can ignore this email.</p>
+    <p>${t('email:passwordReset.expires')}</p>
+    <p>${t('email:passwordReset.ignore')}</p>
   `,
   );
 }
 
-export async function sendEmailTakenRegistrationWarning(email: string): Promise<void> {
+export async function sendEmailTakenRegistrationWarning(
+  email: string,
+  language = 'en',
+): Promise<void> {
+  const t = getFixedT(language);
   const config = getConfig();
   const resetUrl = `${config.APP_URL}/forgot-password`;
   await sendEmail(
     email,
-    'Someone tried to create a BlastArena account with your email',
+    t('email:registrationWarning.subject'),
     `
-    <h1>Registration Attempt</h1>
-    <p>Someone tried to create a new BlastArena account using your email address.</p>
-    <p>If this was you and you've forgotten your password, you can reset it here:</p>
+    <h1>${t('email:registrationWarning.heading')}</h1>
+    <p>${t('email:registrationWarning.body')}</p>
+    <p>${t('email:registrationWarning.resetHint')}</p>
     <p><a href="${resetUrl}">${resetUrl}</a></p>
-    <p>If this wasn't you, no action is needed — your account is safe.</p>
+    <p>${t('email:registrationWarning.ignore')}</p>
   `,
   );
 }
 
-export async function sendEmailTakenChangeWarning(email: string): Promise<void> {
+export async function sendEmailTakenChangeWarning(email: string, language = 'en'): Promise<void> {
+  const t = getFixedT(language);
   await sendEmail(
     email,
-    'Someone tried to change their BlastArena email to yours',
+    t('email:emailChangeWarning.subject'),
     `
-    <h1>Email Change Attempt</h1>
-    <p>Someone tried to change their BlastArena account email to your address.</p>
-    <p>If this wasn't you, no action is needed — your account is unaffected.</p>
+    <h1>${t('email:emailChangeWarning.heading')}</h1>
+    <p>${t('email:emailChangeWarning.body')}</p>
+    <p>${t('email:emailChangeWarning.ignore')}</p>
   `,
   );
 }
 
-export async function sendTestEmail(to: string): Promise<void> {
+export async function sendTestEmail(to: string, language = 'en'): Promise<void> {
+  const t = getFixedT(language);
   await sendEmail(
     to,
-    'BlastArena — Test Email',
+    t('email:test.subject'),
     `
-    <h1>Test Email</h1>
-    <p>This is a test email from BlastArena to verify your SMTP configuration is working correctly.</p>
+    <h1>${t('email:test.heading')}</h1>
+    <p>${t('email:test.body')}</p>
   `,
   );
 }

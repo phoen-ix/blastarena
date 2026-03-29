@@ -424,6 +424,23 @@
       "180": "3 min",
       "300": "5 min",
       "600": "10 min"
+    },
+    "hazardTypes": {
+      "vine": "Klimplant",
+      "quicksand": "Drijfzand",
+      "ice": "IJs",
+      "lava": "Lava",
+      "mud": "Modder",
+      "spikes": "Stekels",
+      "dark_rift": "Duistere scheur"
+    },
+    "eventTypes": {
+      "meteor": "Meteorinslag",
+      "powerup_rain": "Power-upregen",
+      "wall_collapse": "Muurinstorting",
+      "freeze_wave": "Vriesgolf",
+      "bomb_surge": "Bomgolf",
+      "ufo_abduction": "UFO-ontvoering"
     }
   },
   "spectatorChat": {
@@ -485,6 +502,12 @@
       "dynamite": "Dynamiet",
       "sparky": "Sparky"
     }
+  },
+  "game": {
+    "leaveTitle": "SPEL VERLATEN",
+    "leaveWarning": "Je gaat dood en verliest alle voortgang.",
+    "leaveConfirm": "Spel verlaten",
+    "leaveCancel": "Annuleren"
   },
   "gameOver": {
     "gameWord": "GAME",

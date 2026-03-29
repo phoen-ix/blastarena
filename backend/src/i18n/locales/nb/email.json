@@ -1,2 +1,41 @@
 {
+  "verification": {
+    "subject": "Bekreft BlastArena-kontoen din",
+    "heading": "Velkommen til BlastArena!",
+    "body": "Klikk på lenken nedenfor for å bekrefte e-postadressen din:",
+    "ignore": "Hvis du ikke har opprettet en konto, kan du se bort fra denne e-posten."
+  },
+  "emailChange": {
+    "subject": "Bekreft din nye e-postadresse — BlastArena",
+    "heading": "Forespørsel om endring av e-postadresse",
+    "body": "Du har bedt om å endre BlastArena-e-postadressen din til denne adressen.",
+    "action": "Klikk på lenken nedenfor for å bekrefte:",
+    "expires": "Denne lenken utløper om 24 timer.",
+    "ignore": "Hvis du ikke har bedt om denne endringen, kan du se bort fra denne e-posten."
+  },
+  "passwordReset": {
+    "subject": "Tilbakestill BlastArena-passordet ditt",
+    "heading": "Tilbakestilling av passord",
+    "body": "Klikk på lenken nedenfor for å tilbakestille passordet ditt:",
+    "expires": "Denne lenken utløper om 1 time.",
+    "ignore": "Hvis du ikke har bedt om å tilbakestille passordet, kan du se bort fra denne e-posten."
+  },
+  "registrationWarning": {
+    "subject": "Noen forsøkte å opprette en BlastArena-konto med e-postadressen din",
+    "heading": "Registreringsforsøk",
+    "body": "Noen forsøkte å opprette en ny BlastArena-konto med e-postadressen din.",
+    "resetHint": "Hvis det var deg og du har glemt passordet ditt, kan du tilbakestille det her:",
+    "ignore": "Hvis det ikke var deg, trenger du ikke å gjøre noe — kontoen din er trygg."
+  },
+  "emailChangeWarning": {
+    "subject": "Noen forsøkte å endre sin BlastArena-e-post til din adresse",
+    "heading": "Forsøk på endring av e-postadresse",
+    "body": "Noen forsøkte å endre BlastArena-e-postadressen sin til din adresse.",
+    "ignore": "Hvis det ikke var deg, trenger du ikke å gjøre noe — kontoen din er ikke berørt."
+  },
+  "test": {
+    "subject": "BlastArena — Test-e-post",
+    "heading": "Test-e-post",
+    "body": "Dette er en test-e-post fra BlastArena for å bekrefte at SMTP-konfigurasjonen din fungerer som den skal."
+  }
 }

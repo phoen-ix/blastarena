@@ -10,6 +10,12 @@ export interface IdRow extends RowDataPacket {
   id: number;
 }
 
+/** Id + language row for email queries that need the recipient's language */
+export interface IdWithLanguageRow extends RowDataPacket {
+  id: number;
+  language: string;
+}
+
 /** User table row */
 export interface UserRow extends RowDataPacket {
   id: number;

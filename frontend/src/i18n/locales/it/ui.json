@@ -398,6 +398,23 @@
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} nascite)",
     "loadingPreview": "Caricamento anteprima...",
     "recordGame": "Registra partita",
+    "hazardTypes": {
+      "vine": "Rampicante",
+      "quicksand": "Sabbie mobili",
+      "ice": "Ghiaccio",
+      "lava": "Lava",
+      "mud": "Fango",
+      "spikes": "Spuntoni",
+      "dark_rift": "Squarcio oscuro"
+    },
+    "eventTypes": {
+      "meteor": "Impatto di meteorite",
+      "powerup_rain": "Pioggia di potenziamenti",
+      "wall_collapse": "Crollo dei muri",
+      "freeze_wave": "Onda di gelo",
+      "bomb_surge": "Ondata di bombe",
+      "ufo_abduction": "Rapimento UFO"
+    },
     "mapSizes": {
       "21": "21\u00d721 (Piccola)",
       "31": "31\u00d731 (Normale)",
@@ -485,6 +502,12 @@
       "dynamite": "Dynamite",
       "sparky": "Sparky"
     }
+  },
+  "game": {
+    "leaveTitle": "ABBANDONA PARTITA",
+    "leaveWarning": "Morirai e perderai tutti i progressi.",
+    "leaveConfirm": "Abbandona partita",
+    "leaveCancel": "Annulla"
   },
   "gameOver": {
     "gameWord": "FINE",

@@ -1,2 +1,41 @@
 {
+  "verification": {
+    "subject": "Verifiera ditt BlastArena-konto",
+    "heading": "Välkommen till BlastArena!",
+    "body": "Klicka på länken nedan för att verifiera din e-postadress:",
+    "ignore": "Om du inte har skapat något konto kan du ignorera det här meddelandet."
+  },
+  "emailChange": {
+    "subject": "Bekräfta din nya e-postadress — BlastArena",
+    "heading": "Begäran om byte av e-postadress",
+    "body": "Du har begärt att ändra din BlastArena-e-postadress till den här adressen.",
+    "action": "Klicka på länken nedan för att bekräfta:",
+    "expires": "Länken är giltig i 24 timmar.",
+    "ignore": "Om du inte har begärt denna ändring kan du ignorera det här meddelandet."
+  },
+  "passwordReset": {
+    "subject": "Återställ ditt BlastArena-lösenord",
+    "heading": "Återställning av lösenord",
+    "body": "Klicka på länken nedan för att återställa ditt lösenord:",
+    "expires": "Länken är giltig i 1 timme.",
+    "ignore": "Om du inte har begärt en lösenordsåterställning kan du ignorera det här meddelandet."
+  },
+  "registrationWarning": {
+    "subject": "Någon försökte skapa ett BlastArena-konto med din e-postadress",
+    "heading": "Registreringsförsök",
+    "body": "Någon försökte skapa ett nytt BlastArena-konto med din e-postadress.",
+    "resetHint": "Om det var du och du har glömt ditt lösenord kan du återställa det här:",
+    "ignore": "Om det inte var du behöver du inte göra något — ditt konto är säkert."
+  },
+  "emailChangeWarning": {
+    "subject": "Någon försökte ändra sin BlastArena-e-post till din adress",
+    "heading": "Försök till byte av e-postadress",
+    "body": "Någon försökte ändra sin BlastArena-e-postadress till din adress.",
+    "ignore": "Om det inte var du behöver du inte göra något — ditt konto påverkas inte."
+  },
+  "test": {
+    "subject": "BlastArena — Testmeddelande",
+    "heading": "Testmeddelande",
+    "body": "Det här är ett testmeddelande från BlastArena för att kontrollera att din SMTP-konfiguration fungerar korrekt."
+  }
 }

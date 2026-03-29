@@ -95,7 +95,7 @@ describe('Auth Service', () => {
 
     it('should throw generic 400 on duplicate email without revealing existence', async () => {
       mockQuery.mockResolvedValueOnce([]); // username free
-      mockQuery.mockResolvedValueOnce([{ id: 1 }]); // email taken
+      mockQuery.mockResolvedValueOnce([{ id: 1, language: 'de' }]); // email taken
 
       try {
         await authService.register('newuser', 'taken@test.com', 'pass');
@@ -107,7 +107,7 @@ describe('Auth Service', () => {
           'Registration could not be completed',
         );
       }
-      expect(mockSendEmailTakenRegistrationWarning).toHaveBeenCalledWith('taken@test.com');
+      expect(mockSendEmailTakenRegistrationWarning).toHaveBeenCalledWith('taken@test.com', 'de');
     });
 
     it('should call hashPassword with the provided password', async () => {

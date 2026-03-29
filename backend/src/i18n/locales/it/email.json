@@ -1,2 +1,41 @@
 {
+  "verification": {
+    "subject": "Verifica il tuo account BlastArena",
+    "heading": "Benvenuto su BlastArena!",
+    "body": "Clicca sul link qui sotto per verificare il tuo indirizzo e-mail:",
+    "ignore": "Se non hai creato un account, puoi ignorare questa e-mail."
+  },
+  "emailChange": {
+    "subject": "Conferma il tuo nuovo indirizzo e-mail — BlastArena",
+    "heading": "Richiesta di cambio e-mail",
+    "body": "Hai richiesto di cambiare l'indirizzo e-mail del tuo account BlastArena con questo indirizzo.",
+    "action": "Clicca sul link qui sotto per confermare:",
+    "expires": "Questo link scade tra 24 ore.",
+    "ignore": "Se non hai richiesto questa modifica, puoi ignorare questa e-mail."
+  },
+  "passwordReset": {
+    "subject": "Reimposta la tua password di BlastArena",
+    "heading": "Reimpostazione della password",
+    "body": "Clicca sul link qui sotto per reimpostare la tua password:",
+    "expires": "Questo link scade tra 1 ora.",
+    "ignore": "Se non hai richiesto la reimpostazione della password, puoi ignorare questa e-mail."
+  },
+  "registrationWarning": {
+    "subject": "Qualcuno ha tentato di creare un account BlastArena con la tua e-mail",
+    "heading": "Tentativo di registrazione",
+    "body": "Qualcuno ha tentato di creare un nuovo account BlastArena utilizzando il tuo indirizzo e-mail.",
+    "resetHint": "Se eri tu e hai dimenticato la password, puoi reimpostarla qui:",
+    "ignore": "Se non eri tu, non è necessaria alcuna azione — il tuo account è al sicuro."
+  },
+  "emailChangeWarning": {
+    "subject": "Qualcuno ha tentato di cambiare la propria e-mail BlastArena con la tua",
+    "heading": "Tentativo di cambio e-mail",
+    "body": "Qualcuno ha tentato di cambiare l'indirizzo e-mail del proprio account BlastArena con il tuo.",
+    "ignore": "Se non eri tu, non è necessaria alcuna azione — il tuo account non è stato compromesso."
+  },
+  "test": {
+    "subject": "BlastArena — E-mail di prova",
+    "heading": "E-mail di prova",
+    "body": "Questa è un'e-mail di prova inviata da BlastArena per verificare che la configurazione SMTP funzioni correttamente."
+  }
 }

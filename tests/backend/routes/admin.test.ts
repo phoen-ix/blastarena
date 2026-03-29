@@ -870,7 +870,7 @@ describe('POST /admin/settings/email_settings/test', () => {
     const req = mockReq({ body: { to: 'test@example.com' } });
     const res = mockRes();
     await handler(req, res, jest.fn());
-    expect(mockSendTestEmail).toHaveBeenCalledWith('test@example.com');
+    expect(mockSendTestEmail).toHaveBeenCalledWith('test@example.com', 'en');
     expect(res._json).toEqual({ message: 'Test email sent successfully' });
   });
 
@@ -921,11 +921,22 @@ describe('POST /admin/users', () => {
     mockCreateUser.mockResolvedValue({ id: 1, username: 'x' });
     const req = mockReq({
       user: { userId: 10, username: 'admin', role: 'admin' },
-      body: { username: 'newmod', email: 'mod@example.com', password: 'securepass', role: 'moderator' },
+      body: {
+        username: 'newmod',
+        email: 'mod@example.com',
+        password: 'securepass',
+        role: 'moderator',
+      },
     });
     const res = mockRes();
     await handler(req, res, jest.fn());
-    expect(mockCreateUser).toHaveBeenCalledWith(10, 'newmod', 'mod@example.com', 'securepass', 'moderator');
+    expect(mockCreateUser).toHaveBeenCalledWith(
+      10,
+      'newmod',
+      'mod@example.com',
+      'securepass',
+      'moderator',
+    );
   });
 
   it('creates user without explicit role (optional)', async () => {
@@ -935,7 +946,13 @@ describe('POST /admin/users', () => {
     });
     const res = mockRes();
     await handler(req, res, jest.fn());
-    expect(mockCreateUser).toHaveBeenCalledWith(1, 'basic', 'basic@example.com', 'pass123', undefined);
+    expect(mockCreateUser).toHaveBeenCalledWith(
+      1,
+      'basic',
+      'basic@example.com',
+      'pass123',
+      undefined,
+    );
   });
 
   it('has adminOnlyMiddleware in route stack', () => {
@@ -2049,11 +2066,7 @@ describe('PUT /admin/ai/:id', () => {
     });
     const res = mockRes();
     await handler(req, res, jest.fn());
-    expect(mockUpdateAI).toHaveBeenCalledWith(
-      'ai-123',
-      { name: 'Updated AI', isActive: true },
-      1,
-    );
+    expect(mockUpdateAI).toHaveBeenCalledWith('ai-123', { name: 'Updated AI', isActive: true }, 1);
     expect(res._json).toEqual({ message: 'AI updated' });
   });
 
@@ -2095,12 +2108,7 @@ describe('PUT /admin/ai/:id/upload', () => {
     });
     const res = mockRes();
     await handler(req, res, jest.fn());
-    expect(mockReuploadAI).toHaveBeenCalledWith(
-      'ai-123',
-      Buffer.from('new code'),
-      'updated.ts',
-      1,
-    );
+    expect(mockReuploadAI).toHaveBeenCalledWith('ai-123', Buffer.from('new code'), 'updated.ts', 1);
     expect(res._json).toEqual({ message: 'AI updated' });
   });
 
@@ -2256,9 +2264,7 @@ describe('Middleware presence', () => {
     ];
 
     for (const { method, path } of publicRoutes) {
-      const routeIdx = stack.findIndex(
-        (l) => l.route?.path === path && l.route!.methods[method],
-      );
+      const routeIdx = stack.findIndex((l) => l.route?.path === path && l.route!.methods[method]);
       expect(routeIdx).toBeGreaterThan(-1);
       expect(routeIdx).toBeLessThan(authUseIdx);
     }

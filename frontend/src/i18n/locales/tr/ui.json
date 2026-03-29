@@ -424,6 +424,23 @@
       "180": "3 dk",
       "300": "5 dk",
       "600": "10 dk"
+    },
+    "hazardTypes": {
+      "vine": "Sarmaşık",
+      "quicksand": "Bataklık",
+      "ice": "Buz",
+      "lava": "Lav",
+      "mud": "Çamur",
+      "spikes": "Dikenler",
+      "dark_rift": "Karanlık Yarık"
+    },
+    "eventTypes": {
+      "meteor": "Meteor Yağmuru",
+      "powerup_rain": "Güç-up Yağmuru",
+      "wall_collapse": "Duvar Çökmesi",
+      "freeze_wave": "Donma Dalgası",
+      "bomb_surge": "Bomba Dalgası",
+      "ufo_abduction": "UFO Kaçırması"
     }
   },
   "spectatorChat": {
@@ -485,6 +502,12 @@
       "dynamite": "Dinamit",
       "sparky": "Kivilcim"
     }
+  },
+  "game": {
+    "leaveTitle": "OYUNDAN AYRIL",
+    "leaveWarning": "Öleceksiniz ve tüm ilerlemenizi kaybedeceksiniz.",
+    "leaveConfirm": "Oyundan Ayrıl",
+    "leaveCancel": "İptal"
   },
   "gameOver": {
     "gameWord": "OYUN",

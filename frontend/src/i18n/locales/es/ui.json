@@ -398,6 +398,23 @@
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} apariciones)",
     "loadingPreview": "Cargando vista previa...",
     "recordGame": "Grabar Partida",
+    "hazardTypes": {
+      "vine": "Enredadera",
+      "quicksand": "Arena movediza",
+      "ice": "Hielo",
+      "lava": "Lava",
+      "mud": "Barro",
+      "spikes": "Pinchos",
+      "dark_rift": "Grieta oscura"
+    },
+    "eventTypes": {
+      "meteor": "Impacto de Meteorito",
+      "powerup_rain": "Lluvia de Power-Ups",
+      "wall_collapse": "Derrumbe de Muros",
+      "freeze_wave": "Onda de Congelación",
+      "bomb_surge": "Oleada de Bombas",
+      "ufo_abduction": "Abducción OVNI"
+    },
     "mapSizes": {
       "21": "21\u00d721 (Pequeño)",
       "31": "31\u00d731 (Normal)",
@@ -485,6 +502,12 @@
       "dynamite": "Dinamita",
       "sparky": "Sparky"
     }
+  },
+  "game": {
+    "leaveTitle": "ABANDONAR PARTIDA",
+    "leaveWarning": "Morirás y perderás todo el progreso.",
+    "leaveConfirm": "Abandonar Partida",
+    "leaveCancel": "Cancelar"
   },
   "gameOver": {
     "gameWord": "FIN",

@@ -232,9 +232,7 @@ describe('POST /auth/register', () => {
     await handler(req, res, jest.fn());
 
     expect(res._status).toBe(400);
-    expect(res._json).toEqual(
-      expect.objectContaining({ error: expect.stringContaining('email') }),
-    );
+    expect(res._json).toEqual(expect.objectContaining({ error: expect.stringContaining('email') }));
     expect(mockRegister).not.toHaveBeenCalled();
   });
 
@@ -248,7 +246,7 @@ describe('POST /auth/register', () => {
     const res = mockRes();
     await handler(req, res, jest.fn());
 
-    expect(mockRegister).toHaveBeenCalledWith('alice', 'alice@example.com', 'securepass1');
+    expect(mockRegister).toHaveBeenCalledWith('alice', 'alice@example.com', 'securepass1', 'en');
   });
 
   it('passes error to next() on service failure', async () => {

@@ -424,6 +424,23 @@
       "180": "3 min",
       "300": "5 min",
       "600": "10 min"
+    },
+    "hazardTypes": {
+      "vine": "Pnącze",
+      "quicksand": "Ruchome piaski",
+      "ice": "Lód",
+      "lava": "Lawa",
+      "mud": "Błoto",
+      "spikes": "Kolce",
+      "dark_rift": "Mroczny rozłam"
+    },
+    "eventTypes": {
+      "meteor": "Uderzenie meteoru",
+      "powerup_rain": "Deszcz bonusów",
+      "wall_collapse": "Zawalenie ścian",
+      "freeze_wave": "Fala mrozu",
+      "bomb_surge": "Nawała bomb",
+      "ufo_abduction": "Porwanie UFO"
     }
   },
   "spectatorChat": {
@@ -485,6 +502,12 @@
       "dynamite": "Dynamit",
       "sparky": "Sparky"
     }
+  },
+  "game": {
+    "leaveTitle": "OPUŚĆ GRĘ",
+    "leaveWarning": "Zginiesz i stracisz cały postęp.",
+    "leaveConfirm": "Opuść grę",
+    "leaveCancel": "Anuluj"
   },
   "gameOver": {
     "gameWord": "KONIEC",

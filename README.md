@@ -202,7 +202,8 @@ Full i18n support via [i18next](https://www.i18next.com/). All UI strings are ex
 | Danish     | `da` | Complete |
 
 - **Language selection**: Flag dropdown on login screen + Settings > Preferences dropdown. Auto-detects browser language on first visit
-- **11 namespaces** organize translations: `ui`, `admin`, `auth`, `campaign`, `editor`, `help`, `game`, `common`, `errors`, `hud`, `server`
+- **12 namespaces** organize translations: `ui`, `admin`, `auth`, `campaign`, `editor`, `help`, `game`, `common`, `errors`, `hud`, `server`, `email`
+- **Email i18n**: All transactional emails (verification, password reset, email change, warnings, test) sent in the user's preferred language
 - **Adding a new language**: Create translated JSON files in `frontend/src/i18n/locales/{code}/`, `shared/src/i18n/locales/{code}/`, and `backend/src/i18n/locales/{code}/`, then register the language code in the i18n config files
 - **RTL ready**: Document direction attribute set dynamically for RTL languages
 

@@ -424,6 +424,23 @@
       "180": "3 min",
       "300": "5 min",
       "600": "10 min"
+    },
+    "hazardTypes": {
+      "vine": "Ranka",
+      "quicksand": "Kvicksand",
+      "ice": "Is",
+      "lava": "Lava",
+      "mud": "Lera",
+      "spikes": "Spikar",
+      "dark_rift": "Mörk spricka"
+    },
+    "eventTypes": {
+      "meteor": "Meteorregn",
+      "powerup_rain": "Power-up-regn",
+      "wall_collapse": "Väggkollaps",
+      "freeze_wave": "Frysvåg",
+      "bomb_surge": "Bombsvall",
+      "ufo_abduction": "UFO-bortförande"
     }
   },
   "spectatorChat": {
@@ -485,6 +502,12 @@
       "dynamite": "Dynamit",
       "sparky": "Sparky"
     }
+  },
+  "game": {
+    "leaveTitle": "LÄMNA SPEL",
+    "leaveWarning": "Du kommer att dö och förlora alla framsteg.",
+    "leaveConfirm": "Lämna spelet",
+    "leaveCancel": "Avbryt"
   },
   "gameOver": {
     "gameWord": "SPELET",

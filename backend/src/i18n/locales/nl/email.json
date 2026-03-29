@@ -1,2 +1,41 @@
 {
+  "verification": {
+    "subject": "Verifieer uw BlastArena-account",
+    "heading": "Welkom bij BlastArena!",
+    "body": "Klik op de onderstaande link om uw e-mailadres te verifiëren:",
+    "ignore": "Als u geen account heeft aangemaakt, kunt u deze e-mail negeren."
+  },
+  "emailChange": {
+    "subject": "Bevestig uw nieuwe e-mailadres — BlastArena",
+    "heading": "Verzoek tot Wijziging van E-mailadres",
+    "body": "U heeft verzocht om het e-mailadres van uw BlastArena-account te wijzigen naar dit adres.",
+    "action": "Klik op de onderstaande link om te bevestigen:",
+    "expires": "Deze link verloopt na 24 uur.",
+    "ignore": "Als u deze wijziging niet heeft aangevraagd, kunt u deze e-mail negeren."
+  },
+  "passwordReset": {
+    "subject": "Stel uw BlastArena-wachtwoord opnieuw in",
+    "heading": "Wachtwoord Opnieuw Instellen",
+    "body": "Klik op de onderstaande link om uw wachtwoord opnieuw in te stellen:",
+    "expires": "Deze link verloopt na 1 uur.",
+    "ignore": "Als u geen wachtwoordherstel heeft aangevraagd, kunt u deze e-mail negeren."
+  },
+  "registrationWarning": {
+    "subject": "Iemand heeft geprobeerd een BlastArena-account aan te maken met uw e-mailadres",
+    "heading": "Registratiepoging",
+    "body": "Iemand heeft geprobeerd een nieuw BlastArena-account aan te maken met uw e-mailadres.",
+    "resetHint": "Als u dit was en u bent uw wachtwoord vergeten, kunt u het hier opnieuw instellen:",
+    "ignore": "Als u dit niet was, hoeft u niets te doen — uw account is veilig."
+  },
+  "emailChangeWarning": {
+    "subject": "Iemand heeft geprobeerd hun BlastArena-e-mailadres te wijzigen naar het uwe",
+    "heading": "Poging tot Wijziging van E-mailadres",
+    "body": "Iemand heeft geprobeerd het e-mailadres van hun BlastArena-account te wijzigen naar uw adres.",
+    "ignore": "Als u dit niet was, hoeft u niets te doen — uw account is onaangetast."
+  },
+  "test": {
+    "subject": "BlastArena — Test E-mail",
+    "heading": "Test E-mail",
+    "body": "Dit is een test-e-mail van BlastArena om te controleren of uw SMTP-configuratie correct werkt."
+  }
 }

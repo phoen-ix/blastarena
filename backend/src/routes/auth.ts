@@ -62,7 +62,7 @@ router.post(
       const emailError = validateEmail(email);
       if (emailError) return res.status(400).json({ error: emailError });
 
-      const result = await authService.register(username, email, password);
+      const result = await authService.register(username, email, password, req.locale || 'en');
       res.status(201).json(result);
     } catch (err) {
       next(err);

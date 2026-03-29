@@ -222,7 +222,7 @@ describe('User routes', () => {
       const res = mockRes();
       await handler(req, res, jest.fn());
 
-      expect(mockRequestEmailChange).toHaveBeenCalledWith(42, 'new@example.com');
+      expect(mockRequestEmailChange).toHaveBeenCalledWith(42, 'new@example.com', 'en');
       expect(mockUpdateEmailDirect).not.toHaveBeenCalled();
       expect(res._json).toEqual({
         message: 'Confirmation email sent to your new address. The link expires in 24 hours.',
@@ -250,7 +250,7 @@ describe('User routes', () => {
       const res = mockRes();
       await handler(req, res, jest.fn());
 
-      expect(mockRequestEmailChange).toHaveBeenCalledWith(77, 'valid@test.com');
+      expect(mockRequestEmailChange).toHaveBeenCalledWith(77, 'valid@test.com', 'en');
     });
 
     it('passes error to next() on service failure', async () => {

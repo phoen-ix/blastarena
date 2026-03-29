@@ -424,6 +424,23 @@
       "180": "3 min",
       "300": "5 min",
       "600": "10 min"
+    },
+    "hazardTypes": {
+      "vine": "Trepadeira",
+      "quicksand": "Areia Movediça",
+      "ice": "Gelo",
+      "lava": "Lava",
+      "mud": "Lama",
+      "spikes": "Espinhos",
+      "dark_rift": "Fenda Sombria"
+    },
+    "eventTypes": {
+      "meteor": "Chuva de Meteoros",
+      "powerup_rain": "Chuva de Power-Ups",
+      "wall_collapse": "Colapso de Paredes",
+      "freeze_wave": "Onda de Gelo",
+      "bomb_surge": "Surto de Bombas",
+      "ufo_abduction": "Abdução OVNI"
     }
   },
   "spectatorChat": {
@@ -485,6 +502,12 @@
       "dynamite": "Dinamite",
       "sparky": "Sparky"
     }
+  },
+  "game": {
+    "leaveTitle": "SAIR DO JOGO",
+    "leaveWarning": "Você morrerá e perderá todo o progresso.",
+    "leaveConfirm": "Sair do Jogo",
+    "leaveCancel": "Cancelar"
   },
   "gameOver": {
     "gameWord": "FIM",

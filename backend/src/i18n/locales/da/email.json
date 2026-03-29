@@ -1,2 +1,41 @@
 {
+  "verification": {
+    "subject": "Bekræft din BlastArena-konto",
+    "heading": "Velkommen til BlastArena!",
+    "body": "Klik på linket nedenfor for at bekræfte din e-mailadresse:",
+    "ignore": "Hvis du ikke har oprettet en konto, kan du ignorere denne e-mail."
+  },
+  "emailChange": {
+    "subject": "Bekræft din nye e-mailadresse — BlastArena",
+    "heading": "Anmodning om ændring af e-mailadresse",
+    "body": "Du har anmodet om at ændre din BlastArena-e-mailadresse til denne adresse.",
+    "action": "Klik på linket nedenfor for at bekræfte:",
+    "expires": "Dette link udløber om 24 timer.",
+    "ignore": "Hvis du ikke har anmodet om denne ændring, kan du ignorere denne e-mail."
+  },
+  "passwordReset": {
+    "subject": "Nulstil din BlastArena-adgangskode",
+    "heading": "Nulstilling af adgangskode",
+    "body": "Klik på linket nedenfor for at nulstille din adgangskode:",
+    "expires": "Dette link udløber om 1 time.",
+    "ignore": "Hvis du ikke har anmodet om nulstilling af adgangskode, kan du ignorere denne e-mail."
+  },
+  "registrationWarning": {
+    "subject": "Nogen forsøgte at oprette en BlastArena-konto med din e-mailadresse",
+    "heading": "Registreringsforsøg",
+    "body": "Nogen forsøgte at oprette en ny BlastArena-konto med din e-mailadresse.",
+    "resetHint": "Hvis det var dig, og du har glemt din adgangskode, kan du nulstille den her:",
+    "ignore": "Hvis det ikke var dig, behøver du ikke at gøre noget — din konto er sikker."
+  },
+  "emailChangeWarning": {
+    "subject": "Nogen forsøgte at ændre deres BlastArena-e-mail til din adresse",
+    "heading": "Forsøg på ændring af e-mailadresse",
+    "body": "Nogen forsøgte at ændre deres BlastArena-e-mailadresse til din adresse.",
+    "ignore": "Hvis det ikke var dig, behøver du ikke at gøre noget — din konto er ikke berørt."
+  },
+  "test": {
+    "subject": "BlastArena — Test-e-mail",
+    "heading": "Test-e-mail",
+    "body": "Dette er en test-e-mail fra BlastArena for at bekræfte, at din SMTP-konfiguration fungerer korrekt."
+  }
 }

@@ -1,2 +1,41 @@
 {
+  "verification": {
+    "subject": "Verifique a sua conta BlastArena",
+    "heading": "Bem-vindo ao BlastArena!",
+    "body": "Clique no link abaixo para verificar o seu endereço de email:",
+    "ignore": "Se não criou uma conta, pode ignorar este email."
+  },
+  "emailChange": {
+    "subject": "Confirme o seu novo endereço de email — BlastArena",
+    "heading": "Pedido de Alteração de Email",
+    "body": "Solicitou a alteração do email da sua conta BlastArena para este endereço.",
+    "action": "Clique no link abaixo para confirmar:",
+    "expires": "Este link expira em 24 horas.",
+    "ignore": "Se não solicitou esta alteração, pode ignorar este email."
+  },
+  "passwordReset": {
+    "subject": "Redefinir a sua palavra-passe do BlastArena",
+    "heading": "Redefinição de Palavra-passe",
+    "body": "Clique no link abaixo para redefinir a sua palavra-passe:",
+    "expires": "Este link expira em 1 hora.",
+    "ignore": "Se não solicitou a redefinição da palavra-passe, pode ignorar este email."
+  },
+  "registrationWarning": {
+    "subject": "Alguém tentou criar uma conta BlastArena com o seu email",
+    "heading": "Tentativa de Registo",
+    "body": "Alguém tentou criar uma nova conta BlastArena utilizando o seu endereço de email.",
+    "resetHint": "Se foi você e esqueceu-se da sua palavra-passe, pode redefini-la aqui:",
+    "ignore": "Se não foi você, não é necessária qualquer ação — a sua conta está segura."
+  },
+  "emailChangeWarning": {
+    "subject": "Alguém tentou alterar o email do BlastArena para o seu",
+    "heading": "Tentativa de Alteração de Email",
+    "body": "Alguém tentou alterar o email da sua conta BlastArena para o seu endereço.",
+    "ignore": "Se não foi você, não é necessária qualquer ação — a sua conta não foi afetada."
+  },
+  "test": {
+    "subject": "BlastArena — Email de Teste",
+    "heading": "Email de Teste",
+    "body": "Este é um email de teste do BlastArena para verificar se a sua configuração SMTP está a funcionar corretamente."
+  }
 }

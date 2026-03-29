@@ -224,7 +224,7 @@ describe('user service', () => {
       mockExecute.mockResolvedValueOnce({});
       mockSendEmailChangeEmail.mockResolvedValueOnce(undefined);
 
-      await requestEmailChange(1, 'newemail@example.com');
+      await requestEmailChange(1, 'newemail@example.com', 'fr');
 
       expect(mockGenerateToken).toHaveBeenCalled();
       expect(mockHashToken).toHaveBeenCalledWith('raw-token-123');
@@ -235,25 +235,26 @@ describe('user service', () => {
       expect(mockSendEmailChangeEmail).toHaveBeenCalledWith(
         'newemail@example.com',
         'raw-token-123',
+        'fr',
       );
     });
 
     it('silently succeeds and sends warning when email is already used', async () => {
-      mockQuery.mockResolvedValueOnce([{ id: 2 }]); // email in use
+      mockQuery.mockResolvedValueOnce([{ id: 2, language: 'de' }]); // email in use
 
       await requestEmailChange(1, 'taken@example.com');
 
-      expect(mockSendEmailTakenChangeWarning).toHaveBeenCalledWith('taken@example.com');
+      expect(mockSendEmailTakenChangeWarning).toHaveBeenCalledWith('taken@example.com', 'de');
       expect(mockExecute).not.toHaveBeenCalled();
     });
 
     it('silently succeeds and sends warning when email is pending for another user', async () => {
       mockQuery.mockResolvedValueOnce([]); // email column clear
-      mockQuery.mockResolvedValueOnce([{ id: 3 }]); // pending_email in use
+      mockQuery.mockResolvedValueOnce([{ id: 3, language: 'es' }]); // pending_email in use
 
       await requestEmailChange(1, 'pending@example.com');
 
-      expect(mockSendEmailTakenChangeWarning).toHaveBeenCalledWith('pending@example.com');
+      expect(mockSendEmailTakenChangeWarning).toHaveBeenCalledWith('pending@example.com', 'es');
       expect(mockExecute).not.toHaveBeenCalled();
     });
   });

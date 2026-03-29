@@ -1,2 +1,41 @@
 {
+  "verification": {
+    "subject": "Verifica tu cuenta de BlastArena",
+    "heading": "¡Bienvenido a BlastArena!",
+    "body": "Haz clic en el siguiente enlace para verificar tu dirección de correo electrónico:",
+    "ignore": "Si no has creado una cuenta, puedes ignorar este correo."
+  },
+  "emailChange": {
+    "subject": "Confirma tu nueva dirección de correo — BlastArena",
+    "heading": "Solicitud de cambio de correo",
+    "body": "Has solicitado cambiar la dirección de correo de tu cuenta de BlastArena a esta dirección.",
+    "action": "Haz clic en el siguiente enlace para confirmar:",
+    "expires": "Este enlace caduca en 24 horas.",
+    "ignore": "Si no has solicitado este cambio, puedes ignorar este correo."
+  },
+  "passwordReset": {
+    "subject": "Restablece tu contraseña de BlastArena",
+    "heading": "Restablecimiento de contraseña",
+    "body": "Haz clic en el siguiente enlace para restablecer tu contraseña:",
+    "expires": "Este enlace caduca en 1 hora.",
+    "ignore": "Si no has solicitado un restablecimiento de contraseña, puedes ignorar este correo."
+  },
+  "registrationWarning": {
+    "subject": "Alguien intentó crear una cuenta de BlastArena con tu correo",
+    "heading": "Intento de registro",
+    "body": "Alguien intentó crear una nueva cuenta de BlastArena con tu dirección de correo electrónico.",
+    "resetHint": "Si fuiste tú y has olvidado tu contraseña, puedes restablecerla aquí:",
+    "ignore": "Si no fuiste tú, no es necesario hacer nada — tu cuenta está segura."
+  },
+  "emailChangeWarning": {
+    "subject": "Alguien intentó cambiar su correo de BlastArena al tuyo",
+    "heading": "Intento de cambio de correo",
+    "body": "Alguien intentó cambiar la dirección de correo de su cuenta de BlastArena a la tuya.",
+    "ignore": "Si no fuiste tú, no es necesario hacer nada — tu cuenta no se ha visto afectada."
+  },
+  "test": {
+    "subject": "BlastArena — Correo de prueba",
+    "heading": "Correo de prueba",
+    "body": "Este es un correo de prueba de BlastArena para verificar que tu configuración SMTP funciona correctamente."
+  }
 }

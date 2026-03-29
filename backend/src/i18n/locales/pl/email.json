@@ -1,2 +1,41 @@
 {
+  "verification": {
+    "subject": "Zweryfikuj swoje konto BlastArena",
+    "heading": "Witamy w BlastArena!",
+    "body": "Kliknij poniższy link, aby zweryfikować swój adres e-mail:",
+    "ignore": "Jeśli nie zakładałeś konta, możesz zignorować tę wiadomość."
+  },
+  "emailChange": {
+    "subject": "Potwierdź nowy adres e-mail — BlastArena",
+    "heading": "Zmiana Adresu E-mail",
+    "body": "Złożono prośbę o zmianę adresu e-mail konta BlastArena na ten adres.",
+    "action": "Kliknij poniższy link, aby potwierdzić:",
+    "expires": "Ten link wygasa za 24 godziny.",
+    "ignore": "Jeśli nie prosiłeś o tę zmianę, możesz zignorować tę wiadomość."
+  },
+  "passwordReset": {
+    "subject": "Zresetuj hasło do BlastArena",
+    "heading": "Resetowanie Hasła",
+    "body": "Kliknij poniższy link, aby zresetować swoje hasło:",
+    "expires": "Ten link wygasa za 1 godzinę.",
+    "ignore": "Jeśli nie prosiłeś o zresetowanie hasła, możesz zignorować tę wiadomość."
+  },
+  "registrationWarning": {
+    "subject": "Ktoś próbował utworzyć konto BlastArena z Twoim adresem e-mail",
+    "heading": "Próba Rejestracji",
+    "body": "Ktoś próbował utworzyć nowe konto BlastArena, używając Twojego adresu e-mail.",
+    "resetHint": "Jeśli to byłeś Ty i nie pamiętasz hasła, możesz je zresetować tutaj:",
+    "ignore": "Jeśli to nie byłeś Ty, nie musisz podejmować żadnych działań — Twoje konto jest bezpieczne."
+  },
+  "emailChangeWarning": {
+    "subject": "Ktoś próbował zmienić swój e-mail BlastArena na Twój adres",
+    "heading": "Próba Zmiany Adresu E-mail",
+    "body": "Ktoś próbował zmienić adres e-mail swojego konta BlastArena na Twój adres.",
+    "ignore": "Jeśli to nie byłeś Ty, nie musisz podejmować żadnych działań — Twoje konto pozostaje nienaruszone."
+  },
+  "test": {
+    "subject": "BlastArena — Wiadomość Testowa",
+    "heading": "Wiadomość Testowa",
+    "body": "To jest wiadomość testowa z BlastArena, służąca do sprawdzenia poprawności konfiguracji SMTP."
+  }
 }

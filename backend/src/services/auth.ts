@@ -17,7 +17,7 @@ import {
 import { AppError } from '../middleware/errorHandler';
 import { AuthPayload, PublicUser, AuthResponse, UserRole } from '@blast-arena/shared';
 import { logger } from '../utils/logger';
-import { UserRow, RefreshTokenJoinRow, IdRow } from '../db/types';
+import { UserRow, RefreshTokenJoinRow, IdRow, IdWithLanguageRow } from '../db/types';
 import * as cosmeticsService from './cosmetics';
 
 function toPublicUser(row: UserRow | RefreshTokenJoinRow): PublicUser {
@@ -86,6 +86,7 @@ export async function register(
   username: string,
   email: string,
   password: string,
+  language = 'en',
 ): Promise<AuthResponse> {
   const config = getConfig();
   const normalizedEmail = email.toLowerCase();
@@ -101,13 +102,16 @@ export async function register(
   }
 
   // Check email — never reveal existence
-  const emailExists = await query<IdRow[]>('SELECT id FROM users WHERE email_hash = ?', [
-    emailHash,
-  ]);
+  const emailExists = await query<IdWithLanguageRow[]>(
+    'SELECT id, language FROM users WHERE email_hash = ?',
+    [emailHash],
+  );
   if (emailExists.length > 0) {
-    sendEmailTakenRegistrationWarning(normalizedEmail).catch((err) => {
-      logger.error({ err }, 'Failed to send email-taken registration warning');
-    });
+    sendEmailTakenRegistrationWarning(normalizedEmail, emailExists[0].language || 'en').catch(
+      (err) => {
+        logger.error({ err }, 'Failed to send email-taken registration warning');
+      },
+    );
     throw new AppError('Registration could not be completed', 400, 'REGISTRATION_FAILED');
   }
 
@@ -115,8 +119,8 @@ export async function register(
   const verifyToken = generateToken();
 
   const result = await execute(
-    `INSERT INTO users (username, email_hash, email_hint, password_hash, email_verify_token) VALUES (?, ?, ?, ?, ?)`,
-    [username, emailHash, emailHint, passwordHash, hashToken(verifyToken)],
+    `INSERT INTO users (username, email_hash, email_hint, password_hash, email_verify_token, language) VALUES (?, ?, ?, ?, ?, ?)`,
+    [username, emailHash, emailHint, passwordHash, hashToken(verifyToken), language],
   );
 
   // Create user_stats row
@@ -128,11 +132,11 @@ export async function register(
   });
 
   // Send verification email (non-blocking)
-  sendVerificationEmail(normalizedEmail, verifyToken).catch((err) => {
+  sendVerificationEmail(normalizedEmail, verifyToken, language).catch((err) => {
     logger.error({ err }, 'Failed to send verification email');
   });
 
-  const user: PublicUser = { id: result.insertId, username, role: 'user', language: 'en' };
+  const user: PublicUser = { id: result.insertId, username, role: 'user', language };
   const accessToken = generateAccessToken({ userId: user.id, username, role: 'user' });
 
   return { user, accessToken };
@@ -273,7 +277,10 @@ export async function forgotPassword(email: string): Promise<void> {
   const config = getConfig();
   const emailHash = hashEmail(email.toLowerCase().trim(), config.EMAIL_PEPPER);
 
-  const rows = await query<IdRow[]>('SELECT id FROM users WHERE email_hash = ?', [emailHash]);
+  const rows = await query<IdWithLanguageRow[]>(
+    'SELECT id, language FROM users WHERE email_hash = ?',
+    [emailHash],
+  );
   if (rows.length === 0) {
     // Don't reveal whether email exists
     return;
@@ -287,7 +294,7 @@ export async function forgotPassword(email: string): Promise<void> {
     [hashToken(resetToken), expires, emailHash],
   );
 
-  await sendPasswordResetEmail(email, resetToken);
+  await sendPasswordResetEmail(email, resetToken, rows[0].language || 'en');
 }
 
 export async function resetPassword(token: string, newPassword: string): Promise<void> {

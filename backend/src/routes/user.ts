@@ -70,7 +70,7 @@ router.post('/user/email', authMiddleware, validate(changeEmailSchema), async (r
       await userService.updateEmailDirect(req.user!.userId, req.body.email);
       res.json({ message: 'Email address updated.' });
     } else {
-      await userService.requestEmailChange(req.user!.userId, req.body.email);
+      await userService.requestEmailChange(req.user!.userId, req.body.email, req.locale || 'en');
       res.json({
         message: 'Confirmation email sent to your new address. The link expires in 24 hours.',
       });

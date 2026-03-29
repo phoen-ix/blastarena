@@ -1,2 +1,41 @@
 {
+  "verification": {
+    "subject": "BlastArena hesabınızı doğrulayın",
+    "heading": "BlastArena'ya hoş geldiniz!",
+    "body": "E-posta adresinizi doğrulamak için aşağıdaki bağlantıya tıklayın:",
+    "ignore": "Bir hesap oluşturmadıysanız bu e-postayı görmezden gelebilirsiniz."
+  },
+  "emailChange": {
+    "subject": "Yeni e-posta adresinizi onaylayın — BlastArena",
+    "heading": "E-posta Değişikliği Talebi",
+    "body": "BlastArena hesabınızın e-posta adresini bu adresle değiştirme talebinde bulundunuz.",
+    "action": "Onaylamak için aşağıdaki bağlantıya tıklayın:",
+    "expires": "Bu bağlantının süresi 24 saat içinde dolacaktır.",
+    "ignore": "Bu değişikliği siz talep etmediyseniz bu e-postayı görmezden gelebilirsiniz."
+  },
+  "passwordReset": {
+    "subject": "BlastArena şifrenizi sıfırlayın",
+    "heading": "Şifre Sıfırlama",
+    "body": "Şifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın:",
+    "expires": "Bu bağlantının süresi 1 saat içinde dolacaktır.",
+    "ignore": "Şifre sıfırlama talebinde bulunmadıysanız bu e-postayı görmezden gelebilirsiniz."
+  },
+  "registrationWarning": {
+    "subject": "Birisi e-posta adresinizle bir BlastArena hesabı oluşturmaya çalıştı",
+    "heading": "Kayıt Denemesi",
+    "body": "Birisi e-posta adresinizi kullanarak yeni bir BlastArena hesabı oluşturmaya çalıştı.",
+    "resetHint": "Bu siz olduysanız ve şifrenizi unuttuysanız buradan sıfırlayabilirsiniz:",
+    "ignore": "Bu siz değildiyseniz herhangi bir işlem yapmanıza gerek yoktur — hesabınız güvende."
+  },
+  "emailChangeWarning": {
+    "subject": "Birisi BlastArena e-postasını sizin adresinize değiştirmeye çalıştı",
+    "heading": "E-posta Değişikliği Denemesi",
+    "body": "Birisi BlastArena hesabının e-posta adresini sizin adresinize değiştirmeye çalıştı.",
+    "ignore": "Bu siz değildiyseniz herhangi bir işlem yapmanıza gerek yoktur — hesabınız etkilenmemiştir."
+  },
+  "test": {
+    "subject": "BlastArena — Test E-postası",
+    "heading": "Test E-postası",
+    "body": "Bu, BlastArena tarafından SMTP yapılandırmanızın doğru çalışıp çalışmadığını kontrol etmek için gönderilen bir test e-postasıdır."
+  }
 }

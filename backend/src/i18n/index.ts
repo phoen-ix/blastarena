@@ -16,7 +16,7 @@ export async function initI18n(): Promise<void> {
     interpolation: {
       escapeValue: false,
     },
-    preload: ['en', 'de'],
+    preload: ['en', 'de', 'fr', 'es', 'it', 'pt', 'pl', 'nl', 'tr', 'sv', 'nb', 'da'],
   });
 }
 

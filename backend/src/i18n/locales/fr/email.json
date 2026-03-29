@@ -1,2 +1,41 @@
 {
+  "verification": {
+    "subject": "Vérifiez votre compte BlastArena",
+    "heading": "Bienvenue sur BlastArena !",
+    "body": "Cliquez sur le lien ci-dessous pour vérifier votre adresse e-mail :",
+    "ignore": "Si vous n'avez pas créé de compte, vous pouvez ignorer cet e-mail."
+  },
+  "emailChange": {
+    "subject": "Confirmez votre nouvelle adresse e-mail — BlastArena",
+    "heading": "Demande de changement d'e-mail",
+    "body": "Vous avez demandé à changer l'adresse e-mail de votre compte BlastArena pour celle-ci.",
+    "action": "Cliquez sur le lien ci-dessous pour confirmer :",
+    "expires": "Ce lien expire dans 24 heures.",
+    "ignore": "Si vous n'avez pas demandé ce changement, vous pouvez ignorer cet e-mail."
+  },
+  "passwordReset": {
+    "subject": "Réinitialisez votre mot de passe BlastArena",
+    "heading": "Réinitialisation du mot de passe",
+    "body": "Cliquez sur le lien ci-dessous pour réinitialiser votre mot de passe :",
+    "expires": "Ce lien expire dans 1 heure.",
+    "ignore": "Si vous n'avez pas demandé de réinitialisation de mot de passe, vous pouvez ignorer cet e-mail."
+  },
+  "registrationWarning": {
+    "subject": "Quelqu'un a tenté de créer un compte BlastArena avec votre e-mail",
+    "heading": "Tentative d'inscription",
+    "body": "Quelqu'un a tenté de créer un nouveau compte BlastArena avec votre adresse e-mail.",
+    "resetHint": "Si c'était vous et que vous avez oublié votre mot de passe, vous pouvez le réinitialiser ici :",
+    "ignore": "Si ce n'était pas vous, aucune action n'est nécessaire — votre compte est en sécurité."
+  },
+  "emailChangeWarning": {
+    "subject": "Quelqu'un a tenté de changer son e-mail BlastArena pour le vôtre",
+    "heading": "Tentative de changement d'e-mail",
+    "body": "Quelqu'un a tenté de changer l'adresse e-mail de son compte BlastArena pour la vôtre.",
+    "ignore": "Si ce n'était pas vous, aucune action n'est nécessaire — votre compte n'est pas affecté."
+  },
+  "test": {
+    "subject": "BlastArena — E-mail de test",
+    "heading": "E-mail de test",
+    "body": "Ceci est un e-mail de test envoyé par BlastArena pour vérifier que votre configuration SMTP fonctionne correctement."
+  }
 }

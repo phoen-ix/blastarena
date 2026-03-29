@@ -424,6 +424,23 @@
       "180": "3 min",
       "300": "5 min",
       "600": "10 min"
+    },
+    "hazardTypes": {
+      "vine": "Slyngplante",
+      "quicksand": "Kviksand",
+      "ice": "Is",
+      "lava": "Lava",
+      "mud": "Mudder",
+      "spikes": "Pigge",
+      "dark_rift": "Mork sprække"
+    },
+    "eventTypes": {
+      "meteor": "Meteornedslag",
+      "powerup_rain": "Power-up-regn",
+      "wall_collapse": "Vægkollaps",
+      "freeze_wave": "Frysebølge",
+      "bomb_surge": "Bombestorm",
+      "ufo_abduction": "UFO-bortførelse"
     }
   },
   "spectatorChat": {
@@ -485,6 +502,12 @@
       "dynamite": "Dynamit",
       "sparky": "Sparky"
     }
+  },
+  "game": {
+    "leaveTitle": "FORLAD SPIL",
+    "leaveWarning": "Du vil dø og miste al fremskridt.",
+    "leaveConfirm": "Forlad spillet",
+    "leaveCancel": "Annuller"
   },
   "gameOver": {
     "gameWord": "SPIL",

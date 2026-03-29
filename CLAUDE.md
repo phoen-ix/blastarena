@@ -192,6 +192,7 @@ Full-stack i18n via **i18next**. Frontend: `i18next-http-backend` + `i18next-bro
 - **Lazy evaluation**: Module-level constants using `t()` must be functions/getters — `t()` returns key before i18n initializes
 - **Adding a language**: Create `{lng}/` dirs in all 3 locale paths, translate all JSONs (1:1 key parity with `en/`), add to `supportedLngs` in both init files, add to `SettingsUI` + `AuthUI` selectors
 - **Frontend init**: `await initI18n()` in `main.ts` before Phaser. Detection: localStorage → navigator → `en`
+- **Email i18n**: All 6 email templates use `getFixedT(language)` for translated content. Language threaded from `req.locale` (new users) or `users.language` (existing users) through services to email functions. Warning emails to existing users query their stored language. All 12 languages preloaded at startup
 - **DB**: `users.language` column (migration 027). Synced on login via `i18n.changeLanguage(user.language)`
 
 ## Code Quality & Tooling

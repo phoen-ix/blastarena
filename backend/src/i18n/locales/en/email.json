@@ -1,2 +1,41 @@
 {
+  "verification": {
+    "subject": "Verify your BlastArena account",
+    "heading": "Welcome to BlastArena!",
+    "body": "Click the link below to verify your email address:",
+    "ignore": "If you didn't create an account, you can ignore this email."
+  },
+  "emailChange": {
+    "subject": "Confirm your new email address — BlastArena",
+    "heading": "Email Change Request",
+    "body": "You requested to change your BlastArena email to this address.",
+    "action": "Click the link below to confirm:",
+    "expires": "This link expires in 24 hours.",
+    "ignore": "If you didn't request this change, you can ignore this email."
+  },
+  "passwordReset": {
+    "subject": "Reset your BlastArena password",
+    "heading": "Password Reset",
+    "body": "Click the link below to reset your password:",
+    "expires": "This link expires in 1 hour.",
+    "ignore": "If you didn't request a password reset, you can ignore this email."
+  },
+  "registrationWarning": {
+    "subject": "Someone tried to create a BlastArena account with your email",
+    "heading": "Registration Attempt",
+    "body": "Someone tried to create a new BlastArena account using your email address.",
+    "resetHint": "If this was you and you've forgotten your password, you can reset it here:",
+    "ignore": "If this wasn't you, no action is needed — your account is safe."
+  },
+  "emailChangeWarning": {
+    "subject": "Someone tried to change their BlastArena email to yours",
+    "heading": "Email Change Attempt",
+    "body": "Someone tried to change their BlastArena account email to your address.",
+    "ignore": "If this wasn't you, no action is needed — your account is unaffected."
+  },
+  "test": {
+    "subject": "BlastArena — Test Email",
+    "heading": "Test Email",
+    "body": "This is a test email from BlastArena to verify your SMTP configuration is working correctly."
+  }
 }

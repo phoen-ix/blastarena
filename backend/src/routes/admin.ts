@@ -765,7 +765,7 @@ router.post(
   validate(testEmailSchema),
   async (req, res, _next) => {
     try {
-      await sendTestEmail(req.body.to);
+      await sendTestEmail(req.body.to, req.locale || 'en');
       res.json({ message: 'Test email sent successfully' });
     } catch (err) {
       res.status(400).json({ error: `Failed to send test email: ${getErrorMessage(err)}` });

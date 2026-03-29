@@ -398,6 +398,23 @@
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} Spawns)",
     "loadingPreview": "Vorschau wird geladen...",
     "recordGame": "Spiel aufzeichnen",
+    "hazardTypes": {
+      "vine": "Ranke",
+      "quicksand": "Treibsand",
+      "ice": "Eis",
+      "lava": "Lava",
+      "mud": "Schlamm",
+      "spikes": "Stacheln",
+      "dark_rift": "Dunkler Riss"
+    },
+    "eventTypes": {
+      "meteor": "Meteoriteneinschlag",
+      "powerup_rain": "Power-Up-Regen",
+      "wall_collapse": "Wandeinsturz",
+      "freeze_wave": "Frostwelle",
+      "bomb_surge": "Bombensturm",
+      "ufo_abduction": "UFO-Entführung"
+    },
     "mapSizes": {
       "21": "21×21 (Klein)",
       "31": "31×31 (Normal)",
@@ -485,6 +502,12 @@
       "dynamite": "Dynamite",
       "sparky": "Sparky"
     }
+  },
+  "game": {
+    "leaveTitle": "SPIEL VERLASSEN",
+    "leaveWarning": "Du wirst sterben und deinen gesamten Fortschritt verlieren.",
+    "leaveConfirm": "Spiel verlassen",
+    "leaveCancel": "Abbrechen"
   },
   "gameOver": {
     "gameWord": "SPIEL",

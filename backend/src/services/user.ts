@@ -11,7 +11,7 @@ import {
 import { getConfig } from '../config';
 import { sendEmailChangeEmail, sendEmailTakenChangeWarning } from './email';
 import { logger } from '../utils/logger';
-import { UserRow, UserProfileRow, UserEmailChangeRow, IdRow } from '../db/types';
+import { UserRow, UserProfileRow, UserEmailChangeRow, IdRow, IdWithLanguageRow } from '../db/types';
 
 export async function getUserProfile(userId: number) {
   const rows = await query<UserProfileRow[]>(
@@ -94,33 +94,39 @@ export async function updateEmailDirect(userId: number, newEmail: string): Promi
   );
 }
 
-export async function requestEmailChange(userId: number, newEmail: string): Promise<void> {
+export async function requestEmailChange(
+  userId: number,
+  newEmail: string,
+  language = 'en',
+): Promise<void> {
   const config = getConfig();
   const normalizedEmail = newEmail.toLowerCase();
   const emailHash = hashEmail(normalizedEmail, config.EMAIL_PEPPER);
   const emailHint = generateEmailHint(normalizedEmail);
 
   // Check if the new email is already used by another user — never reveal existence
-  const existing = await query<IdRow[]>('SELECT id FROM users WHERE email_hash = ? AND id != ?', [
-    emailHash,
-    userId,
-  ]);
+  const existing = await query<IdWithLanguageRow[]>(
+    'SELECT id, language FROM users WHERE email_hash = ? AND id != ?',
+    [emailHash, userId],
+  );
   if (existing.length > 0) {
-    sendEmailTakenChangeWarning(normalizedEmail).catch((err) => {
+    sendEmailTakenChangeWarning(normalizedEmail, existing[0].language || 'en').catch((err) => {
       logger.error({ err }, 'Failed to send email-taken change warning');
     });
     return; // Silently succeed — don't update pending fields, don't reveal conflict
   }
 
   // Also check if another user has this as a pending email
-  const pendingExisting = await query<IdRow[]>(
-    'SELECT id FROM users WHERE pending_email_hash = ? AND id != ?',
+  const pendingExisting = await query<IdWithLanguageRow[]>(
+    'SELECT id, language FROM users WHERE pending_email_hash = ? AND id != ?',
     [emailHash, userId],
   );
   if (pendingExisting.length > 0) {
-    sendEmailTakenChangeWarning(normalizedEmail).catch((err) => {
-      logger.error({ err }, 'Failed to send email-taken change warning');
-    });
+    sendEmailTakenChangeWarning(normalizedEmail, pendingExisting[0].language || 'en').catch(
+      (err) => {
+        logger.error({ err }, 'Failed to send email-taken change warning');
+      },
+    );
     return; // Silently succeed
   }
 
@@ -133,7 +139,7 @@ export async function requestEmailChange(userId: number, newEmail: string): Prom
   );
 
   // Send confirmation to the NEW email address
-  sendEmailChangeEmail(normalizedEmail, token).catch((err) => {
+  sendEmailChangeEmail(normalizedEmail, token, language).catch((err) => {
     logger.error({ err }, 'Failed to send email change confirmation');
   });
 }
