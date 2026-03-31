@@ -13,6 +13,7 @@ import type { CampaignWorldTheme } from '@blast-arena/shared';
 import { renderPowerUpCanvas } from '../utils/powerUpCanvas';
 import { renderTileCanvas } from '../utils/tileCanvas';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { t } from '../i18n';
 
 interface HelpTab {
@@ -639,7 +640,7 @@ export class HelpUI {
           if (isYaml) {
             el.innerHTML = `<pre><code>${this.escapeForPre(content)}</code></pre>`;
           } else {
-            el.innerHTML = await marked.parse(content);
+            el.innerHTML = DOMPurify.sanitize(await marked.parse(content));
           }
         }
       } catch {
@@ -658,7 +659,7 @@ export class HelpUI {
       return this.markdownCache.get(url)!;
     }
     const raw = await this.fetchRawDoc(url);
-    const html = await marked.parse(raw);
+    const html = DOMPurify.sanitize(await marked.parse(raw));
     this.markdownCache.set(url, html);
     return html;
   }

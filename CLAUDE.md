@@ -33,7 +33,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - Friendly fire config: when OFF, same-team explosions don't damage teammates (self-damage still applies)
 - Map dimensions should be odd numbers for proper indestructible wall grid pattern
 - Branding: "BLAST" in white, "ARENA" in primary (`--primary`). In sidebar: `<span>BLAST</span>ARENA` where parent is primary and span is text color. In Phaser: two separate text objects via `themeManager.getCanvasColors()`
-- Modal overlay uses `position: fixed` to prevent backdrop-filter repaint flashes from sibling DOM mutations
+- Modal overlay uses `position: fixed` to prevent backdrop-filter repaint flashes from sibling DOM mutations. All modals use `trapFocus()` from `utils/html.ts` — returns a cleanup function called in `closeModal()`
 
 ## Frontend Architecture
 - **Themes**: 11 palettes in `frontend/src/themes/definitions.ts`. `ThemeManager` reads localStorage → admin default → 'inferno'. `[data-theme]` on `<html>`. Inline `<script>` in `<head>` prevents flash. Phaser uses `themeManager.getCanvasColors()`
@@ -169,6 +169,9 @@ Gzipped JSON replays with tile diffs. See [docs/replay-system.md](docs/replay-sy
 - HTTP security headers in `docker/nginx/security-headers.conf` (included per-location to avoid Nginx inheritance issues): CSP, HSTS, COOP, X-Frame-Options, X-Content-Type-Options
 - **Email hashing**: Emails never stored in plaintext. HMAC-SHA256 with `EMAIL_PEPPER` (env var, min 32 chars). DB stores `email_hash` (for lookups) + `email_hint` (masked display like `j***@g***.com`). Same pattern for `pending_email_hash`/`pending_email_hint`. Password reset and email change flows receive plaintext from user request, hash for DB lookup, send to provided address, then discard. `backfill-emails.ts` runs on startup to migrate any legacy plaintext rows. Admin email search: exact match only (hashed) when query contains `@`
 - **Email enumeration prevention**: Registration with an existing email returns generic 400 (not 409) and sends a warning email to the existing account owner. Email change with a taken address silently succeeds (no DB update) and sends a warning. Username conflicts remain explicit (usernames are public). Warning emails: `sendEmailTakenRegistrationWarning`, `sendEmailTakenChangeWarning`
+- **Nginx rate limiting**: `limit_req_zone` for API (30r/s), Socket.io (10r/s), auth (5r/s) — defense-in-depth alongside Express middleware
+- **Refresh token rotation**: Atomic compare-and-swap (`UPDATE ... WHERE revoked = FALSE` + `affectedRows` check) prevents concurrent refresh race
+- **Markdown sanitization**: `DOMPurify.sanitize()` wraps all `marked.parse()` output in HelpUI
 - `room:create` validates `MatchConfig` via Zod schema
 - Health poll checks for `game-container` in body before triggering reload — prevents landing on 502.html during partial restarts
 - Game loop circuit breaker: stops after 10 consecutive tick failures
@@ -190,7 +193,7 @@ Full-stack i18n via **i18next**. Frontend: `i18next-http-backend` + `i18next-bro
 - **Key conventions**: Dots are key separators — never use decimal numbers as JSON keys (use `"low30"` not `"0.3"`). View titles use getter: `get title() { return t('ui:...'); }` (not static)
 - **Variable shadowing**: When importing `{ t }` from i18n, lambda parameters named `t` must be renamed (e.g., `(tab) =>`)
 - **Lazy evaluation**: Module-level constants using `t()` must be functions/getters — `t()` returns key before i18n initializes
-- **Adding a language**: Create `{lng}/` dirs in all 3 locale paths, translate all JSONs (1:1 key parity with `en/`), add to `supportedLngs` in both init files, add to `SettingsUI` + `AuthUI` selectors
+- **Adding a language**: Create `{lng}/` dirs in all 3 locale paths, translate all JSONs (1:1 key parity with `en/`), add to `supportedLngs` in both init files, add to `SUPPORTED_LANGUAGES` in `routes/user.ts`, add to `SettingsUI` + `AuthUI` selectors
 - **Frontend init**: `await initI18n()` in `main.ts` before Phaser. Detection: localStorage → navigator → `en`
 - **Email i18n**: All 6 email templates use `getFixedT(language)` for translated content. Language threaded from `req.locale` (new users) or `users.language` (existing users) through services to email functions. Warning emails to existing users query their stored language. All 12 languages preloaded at startup
 - **DB**: `users.language` column (migration 027). Synced on login via `i18n.changeLanguage(user.language)`

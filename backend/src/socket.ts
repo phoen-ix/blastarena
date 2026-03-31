@@ -808,6 +808,10 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     // Admin: send message to room
     socket.on('admin:roomMessage', (data) => {
       if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') return;
+      if (typeof data.roomCode !== 'string' || !data.roomCode) return;
+
+      // Verify admin has joined (is spectating) this room
+      if (!socket.rooms.has(`room:${data.roomCode}`)) return;
 
       // Validate and sanitize message
       if (typeof data.message !== 'string' || !data.message.trim()) return;
@@ -914,7 +918,12 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     });
 
     // Campaign: start level (solo, online co-op, or local co-op)
+    const campaignStartLimiter = createSocketRateLimiter(1);
+
     socket.on('campaign:start', async (data, callback) => {
+      if (!campaignStartLimiter.isAllowed(socket.id)) {
+        return callback({ success: false, error: 'Too many requests, please wait' });
+      }
       try {
         const campaignManager = getCampaignGameManager();
 

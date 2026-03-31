@@ -1,7 +1,7 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
 import { Friend, FriendRequest, ActivityStatus } from '@blast-arena/shared';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, enableKeyboardActions } from '../../utils/html';
 import { t } from '../../i18n';
 
 export class FriendsView implements ILobbyView {
@@ -46,6 +46,8 @@ export class FriendsView implements ILobbyView {
   private setupDelegatedListeners(): void {
     if (!this.container) return;
     const sc = this.deps.socketClient;
+
+    enableKeyboardActions(this.container);
 
     this.container.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;

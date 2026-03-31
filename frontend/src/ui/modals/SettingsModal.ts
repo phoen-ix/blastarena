@@ -1,5 +1,6 @@
 import { getSettings, saveSettings, VisualSettings } from '../../game/Settings';
 import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
+import { trapFocus } from '../../utils/html';
 import { t } from '../../i18n';
 
 export function showSettingsModal(): void {
@@ -39,10 +40,12 @@ export function showSettingsModal(): void {
     saveSettings(current);
   });
 
+  const releaseFocusTrap = trapFocus(modal);
   const escHandler = (e: KeyboardEvent) => {
     if (e.key === 'Escape') closeModal();
   };
   const closeModal = () => {
+    releaseFocusTrap();
     document.removeEventListener('keydown', escHandler);
     UIGamepadNavigator.getInstance().popContext('settings-modal');
     modal.remove();

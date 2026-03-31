@@ -131,8 +131,23 @@ router.put('/user/privacy', authMiddleware, validate(privacySchema), async (req,
 
 // --- Language Preference ---
 
+const SUPPORTED_LANGUAGES = [
+  'en',
+  'de',
+  'fr',
+  'es',
+  'it',
+  'pt',
+  'pl',
+  'nl',
+  'tr',
+  'sv',
+  'nb',
+  'da',
+] as const;
+
 const languageSchema = z.object({
-  language: z.string().min(2).max(10),
+  language: z.enum(SUPPORTED_LANGUAGES),
 });
 
 router.put('/user/language', authMiddleware, validate(languageSchema), async (req, res, next) => {

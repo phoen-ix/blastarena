@@ -231,8 +231,16 @@ export async function refreshAccessToken(
     throw new AppError('Account has been deactivated', 403, 'DEACTIVATED');
   }
 
-  // Revoke old token
-  await execute('UPDATE refresh_tokens SET revoked = TRUE WHERE id = ?', [row.id]);
+  // Atomically revoke old token — prevents race condition with concurrent refresh calls
+  const revokeResult = await execute(
+    'UPDATE refresh_tokens SET revoked = TRUE WHERE id = ? AND revoked = FALSE',
+    [row.id],
+  );
+  if (revokeResult.affectedRows === 0) {
+    // Another concurrent request already revoked this token — treat as reuse
+    await execute('UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = ?', [row.user_id]);
+    throw new AppError('Token reuse detected', 401, 'TOKEN_REUSE');
+  }
 
   // Issue new refresh token (rotation)
   const newRefreshToken = generateToken();

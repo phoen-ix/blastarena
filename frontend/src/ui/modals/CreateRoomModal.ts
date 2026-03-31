@@ -11,6 +11,7 @@ import {
 import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 import { renderMapPreview } from '../../utils/mapPreview';
 import { getCustomMapTiles } from '../../utils/mapPreviewCache';
+import { trapFocus } from '../../utils/html';
 import { t } from '../../i18n';
 
 export interface CreateRoomModalDeps {
@@ -325,10 +326,12 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
     });
   }
 
+  const releaseFocusTrap = trapFocus(modal);
   const escHandler = (e: KeyboardEvent) => {
     if (e.key === 'Escape') closeModal();
   };
   const closeModal = () => {
+    releaseFocusTrap();
     document.removeEventListener('keydown', escHandler);
     UIGamepadNavigator.getInstance().popContext('create-room-modal');
     modal.remove();

@@ -117,6 +117,7 @@ export class SimulationsTab {
       const resp = await ApiClient.get<{ batches: SimulationBatchStatus[]; total: number }>(
         '/admin/simulations',
       );
+      if (!this.container) return;
       const batches = resp.batches ?? [];
 
       this.container.innerHTML = `

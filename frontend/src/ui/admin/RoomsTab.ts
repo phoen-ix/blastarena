@@ -11,6 +11,7 @@ export class RoomsTab {
   private socketClient: SocketClient;
   private role: UserRole;
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
+  private abortController: AbortController | null = null;
 
   constructor(notifications: NotificationUI, socketClient: SocketClient, role: UserRole) {
     this.notifications = notifications;
@@ -19,6 +20,7 @@ export class RoomsTab {
   }
 
   async render(parent: HTMLElement): Promise<void> {
+    this.abortController = new AbortController();
     this.container = document.createElement('div');
     parent.appendChild(this.container);
     await this.loadRooms();
@@ -26,6 +28,8 @@ export class RoomsTab {
   }
 
   destroy(): void {
+    this.abortController?.abort();
+    this.abortController = null;
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
       this.refreshInterval = null;
@@ -40,6 +44,7 @@ export class RoomsTab {
 
     try {
       const rooms = await ApiClient.get<any[]>('/admin/rooms');
+      if (!this.container) return;
 
       this.container.innerHTML = `
         <table class="admin-table">

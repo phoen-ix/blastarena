@@ -814,6 +814,7 @@ router.put(
   async (req, res, next) => {
     try {
       const userId = parseInt(req.params.id);
+      if (isNaN(userId)) return res.status(400).json({ error: 'Invalid user ID' });
       await adminService.changeUserRole(req.user!.userId, userId, req.body.role);
       res.json({ message: 'Role updated' });
     } catch (err) {
@@ -829,6 +830,7 @@ router.put(
   async (req, res, next) => {
     try {
       const userId = parseInt(req.params.id);
+      if (isNaN(userId)) return res.status(400).json({ error: 'Invalid user ID' });
       await adminService.deactivateUser(req.user!.userId, userId, req.body.deactivated);
       res.json({ message: req.body.deactivated ? 'User deactivated' : 'User reactivated' });
     } catch (err) {
@@ -844,6 +846,7 @@ router.put(
   async (req, res, next) => {
     try {
       const userId = parseInt(req.params.id);
+      if (isNaN(userId)) return res.status(400).json({ error: 'Invalid user ID' });
       await adminService.resetUserPassword(req.user!.userId, userId, req.body.password);
       res.json({ message: 'Password reset' });
     } catch (err) {
@@ -855,6 +858,7 @@ router.put(
 router.delete('/admin/users/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const userId = parseInt(req.params.id);
+    if (isNaN(userId)) return res.status(400).json({ error: 'Invalid user ID' });
     await adminService.deleteUser(req.user!.userId, userId);
     res.json({ message: 'User deleted' });
   } catch (err) {
@@ -889,6 +893,7 @@ router.get('/admin/matches', async (req, res, next) => {
 router.get('/admin/matches/:id', async (req, res, next) => {
   try {
     const matchId = parseInt(req.params.id);
+    if (isNaN(matchId)) return res.status(400).json({ error: 'Invalid match ID' });
     const result = await adminService.getMatchDetail(matchId);
     res.json(result);
   } catch (err) {
@@ -899,6 +904,7 @@ router.get('/admin/matches/:id', async (req, res, next) => {
 router.delete('/admin/matches/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const matchId = parseInt(req.params.id);
+    if (isNaN(matchId)) return res.status(400).json({ error: 'Invalid match ID' });
     // Delete replay file if it exists
     replayService.deleteReplay(matchId);
     // Delete match record (cascades to match_players)

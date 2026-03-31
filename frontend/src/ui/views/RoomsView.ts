@@ -41,11 +41,20 @@ export class RoomsView implements ILobbyView {
       </div>
     `;
 
-    // Delegated click handler on room list — set up once per render()
+    // Delegated click + keyboard handler on room list — set up once per render()
     const list = container.querySelector('#room-list')!;
     list.addEventListener('click', (e) => {
       const card = (e.target as HTMLElement).closest('.room-card') as HTMLElement | null;
       if (card?.dataset.code) {
+        this.joinRoom(card.dataset.code);
+      }
+    });
+    list.addEventListener('keydown', (ev) => {
+      const e = ev as KeyboardEvent;
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const card = (e.target as HTMLElement).closest('.room-card') as HTMLElement | null;
+      if (card?.dataset.code) {
+        e.preventDefault();
         this.joinRoom(card.dataset.code);
       }
     });
@@ -95,7 +104,7 @@ export class RoomsView implements ILobbyView {
     list.innerHTML = rooms
       .map(
         (room) => `
-      <div class="room-card ${room.status === 'waiting' ? 'waiting' : 'playing'}" data-code="${escapeAttr(room.code)}">
+      <div class="room-card ${room.status === 'waiting' ? 'waiting' : 'playing'}" data-code="${escapeAttr(room.code)}" tabindex="0" role="button">
         <h3>${escapeHtml(room.name)}</h3>
         <div class="room-info">
           <span>${t('ui:rooms.players', { current: room.playerCount, max: room.maxPlayers })}</span>

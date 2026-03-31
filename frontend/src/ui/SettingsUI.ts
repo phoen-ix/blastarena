@@ -1,7 +1,7 @@
 import { AuthManager } from '../network/AuthManager';
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
-import { escapeHtml } from '../utils/html';
+import { escapeHtml, trapFocus } from '../utils/html';
 import {
   getErrorMessage,
   Cosmetic,
@@ -360,16 +360,18 @@ export class SettingsUI {
       </div>
     `;
 
-    const closeModal = () => modal.remove();
+    const releaseFocusTrap = trapFocus(modal);
+    const closeModal = () => {
+      releaseFocusTrap();
+      document.removeEventListener('keydown', escHandler);
+      modal.remove();
+    };
     modal.querySelector('#delete-cancel')!.addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeModal();
     });
     const escHandler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeModal();
-        document.removeEventListener('keydown', escHandler);
-      }
+      if (e.key === 'Escape') closeModal();
     };
     document.addEventListener('keydown', escHandler);
 
@@ -386,7 +388,6 @@ export class SettingsUI {
       try {
         await ApiClient.delete('/user/account', { password });
         closeModal();
-        document.removeEventListener('keydown', escHandler);
         this.authManager.logout();
       } catch (err: unknown) {
         btn.disabled = false;

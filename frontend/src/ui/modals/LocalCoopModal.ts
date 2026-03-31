@@ -13,6 +13,7 @@ import {
 import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 import { PLAYER_COLORS } from '../../scenes/BootScene';
 import { AuthManager } from '../../network/AuthManager';
+import { trapFocus } from '../../utils/html';
 import { PlayerCosmeticData } from '@blast-arena/shared';
 import { t } from '../../i18n';
 
@@ -70,6 +71,7 @@ export function showLocalCoopModal(
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-label', t('campaign:localCoopModal.ariaLabel'));
 
+  let releaseFocusTrap: (() => void) | null = null;
   const escHandler = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       closeModal();
@@ -77,6 +79,7 @@ export function showLocalCoopModal(
     }
   };
   function closeModal(): void {
+    releaseFocusTrap?.();
     document.removeEventListener('keydown', escHandler);
     UIGamepadNavigator.getInstance().popContext('local-coop-modal');
     overlay.remove();
@@ -547,6 +550,7 @@ export function showLocalCoopModal(
   } else {
     document.body.appendChild(overlay);
   }
+  releaseFocusTrap = trapFocus(overlay);
 }
 
 export function createControlsSection(

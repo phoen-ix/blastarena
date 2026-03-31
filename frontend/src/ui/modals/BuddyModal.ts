@@ -8,6 +8,7 @@ import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 import { PLAYER_COLORS } from '../../scenes/BootScene';
 import { ApiClient } from '../../network/ApiClient';
 import { drawPlayerSprite, playerColorToHex } from '../../utils/playerCanvas';
+import { trapFocus } from '../../utils/html';
 import type { BuddySettings } from '@blast-arena/shared';
 import { t } from '../../i18n';
 
@@ -45,6 +46,7 @@ export function showBuddyModal(
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-label', t('campaign:buddyModal.ariaLabel'));
 
+  let releaseFocusTrap: (() => void) | null = null;
   const escHandler = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       closeModal();
@@ -52,6 +54,7 @@ export function showBuddyModal(
     }
   };
   function closeModal(): void {
+    releaseFocusTrap?.();
     document.removeEventListener('keydown', escHandler);
     UIGamepadNavigator.getInstance().popContext('buddy-modal');
     overlay.remove();
@@ -431,4 +434,5 @@ export function showBuddyModal(
     document.body.appendChild(overlay);
   }
   render();
+  releaseFocusTrap = trapFocus(overlay);
 }

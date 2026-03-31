@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@blast-arena/shared": "*",
+    "dompurify": "^3.3.3",
     "i18next": "^25.10.10",
     "i18next-browser-languagedetector": "^8.2.1",
     "i18next-http-backend": "^3.0.2",

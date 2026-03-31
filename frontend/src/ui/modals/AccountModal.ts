@@ -1,7 +1,7 @@
 import { AuthManager } from '../../network/AuthManager';
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, trapFocus } from '../../utils/html';
 import { getErrorMessage } from '@blast-arena/shared';
 import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 import { t } from '../../i18n';
@@ -198,10 +198,12 @@ export async function showAccountModal(deps: AccountModalDeps): Promise<void> {
     });
   }
 
+  const releaseFocusTrap = trapFocus(modal);
   const escHandler = (e: KeyboardEvent) => {
     if (e.key === 'Escape') closeModal();
   };
   const closeModal = () => {
+    releaseFocusTrap();
     document.removeEventListener('keydown', escHandler);
     UIGamepadNavigator.getInstance().popContext('account-modal');
     modal.remove();

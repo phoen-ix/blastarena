@@ -215,6 +215,8 @@ Full i18n support via [i18next](https://www.i18next.com/). All UI strings are ex
 - SVG favicon, web app manifest (PWA-ready), robots.txt, sitemap.xml
 - Noscript fallback with branded content for JS-disabled crawlers
 - Full security header suite: CSP (with Trusted Types, script hashes, frame-ancestors), HSTS, COOP, X-Frame-Options, Permissions-Policy — all self-hosted, no external domains
+- Nginx rate limiting: API (30r/s), Socket.io (10r/s), auth (5r/s) — defense-in-depth with Express middleware
+- Modal focus trapping for WCAG 2.1 AA accessibility, keyboard-navigable interactive lists
 
 ## Tech Stack
 
@@ -225,7 +227,7 @@ Full i18n support via [i18next](https://www.i18next.com/). All UI strings are ex
 | Real-time | Socket.io |
 | Database | MariaDB 11 + Redis 7 |
 | Auth | JWT + bcrypt + httpOnly cookies, HMAC-SHA256 email hashing, email enumeration prevention |
-| Security | CSP + HSTS + COOP + Trusted Types, parameterized queries, rate limiting, Zod socket event validation |
+| Security | CSP + HSTS + COOP + Trusted Types, parameterized queries, nginx + Express rate limiting, Zod socket event validation, DOMPurify |
 | Validation | Zod |
 | Container | Docker Compose |
 
@@ -258,12 +260,12 @@ blast-arena/
 ## Testing & Linting
 
 ```bash
-npm test                    # Run all test suites (1882 tests)
+npm test                    # Run all test suites (1883 tests)
 npm run lint                # ESLint across all workspaces
 npm run format:check        # Prettier format check
 ```
 
-1882 tests across 59 suites: game logic (455), services (721), routes (486), middleware (36), simulation (69), utilities (72), frontend (42). See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
+1883 tests across 59 suites: game logic (455), services (721), routes (486), middleware (36), simulation (69), utilities (74), frontend (42). See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
 
 ## Documentation
 
