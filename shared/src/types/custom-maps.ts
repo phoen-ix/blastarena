@@ -24,4 +24,6 @@ export interface CustomMapSummary {
   createdBy: number;
   creatorUsername?: string;
   playCount: number;
+  avgRating: number | null;
+  ratingCount: number;
 }

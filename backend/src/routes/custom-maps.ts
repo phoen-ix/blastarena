@@ -139,6 +139,46 @@ router.put(
   },
 );
 
+// Rate a published map (1-5 stars)
+const ratingSchema = z.object({ rating: z.number().int().min(1).max(5) });
+
+router.post(
+  '/maps/:id/rate',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  validate(ratingSchema),
+  async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) throw new AppError('Invalid map ID', 400);
+
+      const map = await customMapsService.getMap(id);
+      if (!map || !map.isPublished) throw new AppError('Map not found', 404);
+      if (map.createdBy === req.user!.userId) {
+        throw new AppError('Cannot rate your own map', 400);
+      }
+
+      const result = await customMapsService.rateMap(id, req.user!.userId, req.body.rating);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Get user's rating for a map
+router.get('/maps/:id/rating', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) throw new AppError('Invalid map ID', 400);
+
+    const rating = await customMapsService.getUserRating(id, req.user!.userId);
+    res.json({ rating });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Delete map (owner only)
 router.delete('/maps/:id', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {

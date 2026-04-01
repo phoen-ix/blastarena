@@ -589,7 +589,10 @@ export class CreateRoomView implements ILobbyView {
       html += `<optgroup label="${t('ui:createRoom.communityMaps')}">`;
       for (const m of communityMaps) {
         const by = m.creatorUsername ? ` by ${m.creatorUsername}` : '';
-        html += `<option value="${m.id}">${m.name}${by} (${m.mapWidth}x${m.mapHeight}, ${m.spawnCount} spawns)</option>`;
+        const rating = m.avgRating
+          ? ` ${'★'.repeat(Math.round(m.avgRating))}${'☆'.repeat(5 - Math.round(m.avgRating))}`
+          : '';
+        html += `<option value="${m.id}">${m.name}${by}${rating} (${m.mapWidth}x${m.mapHeight}, ${m.spawnCount} spawns)</option>`;
       }
       html += '</optgroup>';
     }

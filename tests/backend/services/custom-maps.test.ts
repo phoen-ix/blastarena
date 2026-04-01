@@ -114,6 +114,8 @@ describe('Custom Maps Service', () => {
         createdBy: 42,
         creatorUsername: 'alice',
         playCount: 10,
+        avgRating: null,
+        ratingCount: 0,
       });
     });
 
@@ -137,12 +139,14 @@ describe('Custom Maps Service', () => {
       );
     });
 
-    it('should order by play_count DESC', async () => {
+    it('should order by rating then play_count DESC', async () => {
       mockQuery.mockResolvedValue([]);
 
       await customMapsService.listPublishedMaps();
 
-      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.play_count DESC'));
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('ORDER BY r.avg_rating DESC, m.play_count DESC'),
+      );
     });
 
     it('should return summaries for multiple published maps', async () => {
