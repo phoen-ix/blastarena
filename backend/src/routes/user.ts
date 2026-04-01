@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth';
+import { emailVerifiedMiddleware } from '../middleware/emailVerified';
 import { validate } from '../middleware/validation';
 import * as userService from '../services/user';
 import * as buddyService from '../services/buddy';
@@ -41,6 +42,7 @@ router.get('/user/profile', authMiddleware, async (req, res, next) => {
 router.put(
   '/user/profile',
   authMiddleware,
+  emailVerifiedMiddleware,
   validate(updateProfileSchema),
   async (req, res, next) => {
     try {
@@ -61,28 +63,35 @@ router.put(
   },
 );
 
-router.post('/user/email', authMiddleware, validate(changeEmailSchema), async (req, res, next) => {
-  try {
-    const emailError = validateEmailFn(req.body.email);
-    if (emailError) return res.status(400).json({ error: emailError });
+router.post(
+  '/user/email',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  validate(changeEmailSchema),
+  async (req, res, next) => {
+    try {
+      const emailError = validateEmailFn(req.body.email);
+      if (emailError) return res.status(400).json({ error: emailError });
 
-    if (req.user!.role === 'admin') {
-      await userService.updateEmailDirect(req.user!.userId, req.body.email);
-      res.json({ message: 'Email address updated.' });
-    } else {
-      await userService.requestEmailChange(req.user!.userId, req.body.email, req.locale || 'en');
-      res.json({
-        message: 'Confirmation email sent to your new address. The link expires in 24 hours.',
-      });
+      if (req.user!.role === 'admin') {
+        await userService.updateEmailDirect(req.user!.userId, req.body.email);
+        res.json({ message: 'Email address updated.' });
+      } else {
+        await userService.requestEmailChange(req.user!.userId, req.body.email, req.locale || 'en');
+        res.json({
+          message: 'Confirmation email sent to your new address. The link expires in 24 hours.',
+        });
+      }
+    } catch (err) {
+      next(err);
     }
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
 router.post(
   '/user/password',
   authMiddleware,
+  emailVerifiedMiddleware,
   validate(changePasswordSchema),
   async (req, res, next) => {
     try {
@@ -105,7 +114,7 @@ router.post(
   },
 );
 
-router.delete('/user/email', authMiddleware, async (req, res, next) => {
+router.delete('/user/email', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
     await userService.cancelEmailChange(req.user!.userId);
     res.json({ message: 'Pending email change cancelled' });
@@ -119,15 +128,21 @@ const privacySchema = z.object({
   acceptFriendRequests: z.boolean().optional(),
 });
 
-router.put('/user/privacy', authMiddleware, validate(privacySchema), async (req, res, next) => {
-  try {
-    await userService.updatePrivacySettings(req.user!.userId, req.body);
-    const profile = await userService.getUserProfile(req.user!.userId);
-    res.json(profile);
-  } catch (err) {
-    next(err);
-  }
-});
+router.put(
+  '/user/privacy',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  validate(privacySchema),
+  async (req, res, next) => {
+    try {
+      await userService.updatePrivacySettings(req.user!.userId, req.body);
+      const profile = await userService.getUserProfile(req.user!.userId);
+      res.json(profile);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // --- Language Preference ---
 
@@ -161,14 +176,19 @@ router.put('/user/language', authMiddleware, validate(languageSchema), async (re
 
 // --- Buddy Settings ---
 
-router.get('/user/buddy-settings', authMiddleware, async (req, res, next) => {
-  try {
-    const settings = await buddyService.getBuddySettings(req.user!.userId);
-    res.json(settings);
-  } catch (err) {
-    next(err);
-  }
-});
+router.get(
+  '/user/buddy-settings',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  async (req, res, next) => {
+    try {
+      const settings = await buddyService.getBuddySettings(req.user!.userId);
+      res.json(settings);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 const buddySettingsSchema = z.object({
   name: z.string().min(1).max(20).optional(),
@@ -182,6 +202,7 @@ const buddySettingsSchema = z.object({
 router.put(
   '/user/buddy-settings',
   authMiddleware,
+  emailVerifiedMiddleware,
   validate(buddySettingsSchema),
   async (req, res, next) => {
     try {
@@ -201,6 +222,7 @@ const deleteAccountSchema = z.object({
 router.delete(
   '/user/account',
   authMiddleware,
+  emailVerifiedMiddleware,
   validate(deleteAccountSchema),
   async (req, res, next) => {
     try {

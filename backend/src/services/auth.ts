@@ -64,6 +64,30 @@ export function verifyLocalCoopToken(token: string): { userId: number; username:
   }
 }
 
+export function generateLocalCoopSocketToken(userId: number, username: string): string {
+  const config = getConfig();
+  return jwt.sign({ userId, username, purpose: 'local-coop-socket' }, config.JWT_SECRET, {
+    expiresIn: '5m',
+  } as jwt.SignOptions);
+}
+
+export function verifyLocalCoopSocketToken(
+  token: string,
+): { userId: number; username: string } | null {
+  try {
+    const config = getConfig();
+    const decoded = jwt.verify(token, config.JWT_SECRET) as {
+      userId: number;
+      username: string;
+      purpose?: string;
+    };
+    if (decoded.purpose !== 'local-coop-socket') return null;
+    return { userId: decoded.userId, username: decoded.username };
+  } catch {
+    return null;
+  }
+}
+
 function parseExpiresIn(expiresIn: string): number {
   const match = expiresIn.match(/^(\d+)(s|m|h|d)$/);
   if (!match) return 7 * 24 * 60 * 60 * 1000; // default 7 days
@@ -341,21 +365,22 @@ export async function forgotPassword(email: string): Promise<void> {
 
 export async function resetPassword(token: string, newPassword: string): Promise<void> {
   const tokenHash = hashToken(token);
-  const rows = await query<IdRow[]>(
-    'SELECT id FROM users WHERE password_reset_token = ? AND password_reset_expires > NOW()',
-    [tokenHash],
+  const passwordHash = await hashPassword(newPassword);
+
+  // Atomic: verify token + update password in one step (prevents TOCTOU race)
+  // id = LAST_INSERT_ID(id) captures the matched row's id in result.insertId
+  const result = await execute(
+    `UPDATE users SET password_hash = ?, password_reset_token = NULL, password_reset_expires = NULL,
+     id = LAST_INSERT_ID(id)
+     WHERE password_reset_token = ? AND password_reset_expires > NOW()`,
+    [passwordHash, tokenHash],
   );
 
-  if (rows.length === 0) {
+  if (result.affectedRows === 0) {
     throw new AppError('Invalid or expired reset token', 400, 'INVALID_TOKEN');
   }
 
-  const userId = rows[0].id;
-  const passwordHash = await hashPassword(newPassword);
-  await execute(
-    'UPDATE users SET password_hash = ?, password_reset_token = NULL, password_reset_expires = NULL WHERE id = ?',
-    [passwordHash, userId],
-  );
+  const userId = result.insertId;
 
   // Revoke all refresh tokens for security
   await execute('UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = ?', [userId]);

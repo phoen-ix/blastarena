@@ -227,7 +227,7 @@ Full i18n support via [i18next](https://www.i18next.com/). All UI strings are ex
 | Real-time | Socket.io |
 | Database | MariaDB 11 + Redis 7 |
 | Auth | JWT + bcrypt + httpOnly cookies, HMAC-SHA256 email hashing, email verification enforcement, email enumeration prevention |
-| Security | CSP + HSTS + COOP + Trusted Types, parameterized queries, nginx + Express rate limiting, Zod socket event validation, DOMPurify |
+| Security | CSP + HSTS + COOP + Trusted Types, parameterized queries, nginx + Express rate limiting, Zod socket event validation, DOMPurify, email verification on REST + socket, atomic token operations, role-from-DB socket auth |
 | Validation | Zod |
 | Container | Docker Compose |
 

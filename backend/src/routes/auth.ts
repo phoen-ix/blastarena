@@ -286,6 +286,23 @@ router.get('/local-coop/session', async (req, res, next) => {
   }
 });
 
+router.get('/local-coop/socket-token', authMiddleware, async (req, res, next) => {
+  try {
+    const cookieToken = req.cookies?.[LOCAL_COOP_COOKIE];
+    if (!cookieToken) {
+      return res.status(401).json({ error: 'No local co-op session' });
+    }
+    const decoded = authService.verifyLocalCoopToken(cookieToken);
+    if (!decoded) {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+    const socketToken = authService.generateLocalCoopSocketToken(decoded.userId, decoded.username);
+    res.json({ token: socketToken });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/local-coop/logout', (_req, res) => {
   res.clearCookie(LOCAL_COOP_COOKIE, { path: LOCAL_COOP_COOKIE_PATH });
   res.json({ message: 'Logged out' });

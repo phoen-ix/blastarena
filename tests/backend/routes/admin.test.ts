@@ -122,7 +122,7 @@ const mockSimulationManager = {
 };
 
 const mockIOEmit = jest.fn<AnyFn>();
-const mockIO = { emit: mockIOEmit };
+const mockIO = { emit: mockIOEmit, to: jest.fn<AnyFn>().mockReturnValue({ emit: mockIOEmit }) };
 
 jest.mock('../../../backend/src/game/registry', () => ({
   getSimulationManager: () => mockSimulationManager,

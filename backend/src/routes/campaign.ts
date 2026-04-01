@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth';
+import { emailVerifiedMiddleware } from '../middleware/emailVerified';
 import { adminOnlyMiddleware } from '../middleware/admin';
 import { validate } from '../middleware/validation';
 import * as campaignService from '../services/campaign';
@@ -172,7 +173,7 @@ const levelSchema = z.object({
 // ==========================
 
 // List published worlds with levels and user progress
-router.get('/campaign/worlds', authMiddleware, async (req, res, next) => {
+router.get('/campaign/worlds', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
     const userId = req.user!.userId;
     const worlds = await campaignService.listWorldsWithProgress(userId);
@@ -192,51 +193,71 @@ router.get('/campaign/worlds', authMiddleware, async (req, res, next) => {
 });
 
 // List published levels in a world with user progress
-router.get('/campaign/worlds/:worldId/levels', authMiddleware, async (req, res, next) => {
-  try {
-    const userId = req.user!.userId;
-    const worldId = parseIntParam(req.params.worldId, 'worldId');
-    const levels = await campaignService.listLevelsWithProgress(worldId, userId);
-    res.json({ levels });
-  } catch (err) {
-    next(err);
-  }
-});
+router.get(
+  '/campaign/worlds/:worldId/levels',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  async (req, res, next) => {
+    try {
+      const userId = req.user!.userId;
+      const worldId = parseIntParam(req.params.worldId, 'worldId');
+      const levels = await campaignService.listLevelsWithProgress(worldId, userId);
+      res.json({ levels });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // Get full level data (published only)
-router.get('/campaign/levels/:levelId', authMiddleware, async (req, res, next) => {
-  try {
-    const levelId = parseIntParam(req.params.levelId, 'levelId');
-    const level = await campaignService.getLevel(levelId);
-    if (!level || !level.isPublished) {
-      return res.status(404).json({ error: 'Level not found' });
+router.get(
+  '/campaign/levels/:levelId',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  async (req, res, next) => {
+    try {
+      const levelId = parseIntParam(req.params.levelId, 'levelId');
+      const level = await campaignService.getLevel(levelId);
+      if (!level || !level.isPublished) {
+        return res.status(404).json({ error: 'Level not found' });
+      }
+      res.json({ level });
+    } catch (err) {
+      next(err);
     }
-    res.json({ level });
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
 // User's overall campaign state
-router.get('/campaign/progress', authMiddleware, async (req, res, next) => {
-  try {
-    const userId = req.user!.userId;
-    const state = await progressService.getUserState(userId);
-    res.json({ state });
-  } catch (err) {
-    next(err);
-  }
-});
+router.get(
+  '/campaign/progress',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  async (req, res, next) => {
+    try {
+      const userId = req.user!.userId;
+      const state = await progressService.getUserState(userId);
+      res.json({ state });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // List all enemy types (for texture generation on client)
-router.get('/campaign/enemy-types', authMiddleware, async (_req, res, next) => {
-  try {
-    const types = await enemyTypeService.listEnemyTypes();
-    res.json({ enemyTypes: types });
-  } catch (err) {
-    next(err);
-  }
-});
+router.get(
+  '/campaign/enemy-types',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  async (_req, res, next) => {
+    try {
+      const types = await enemyTypeService.listEnemyTypes();
+      res.json({ enemyTypes: types });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // ==========================
 // Admin endpoints

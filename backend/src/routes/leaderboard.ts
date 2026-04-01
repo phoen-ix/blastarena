@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth';
+import { emailVerifiedMiddleware } from '../middleware/emailVerified';
 import * as leaderboardService from '../services/leaderboard';
 import * as seasonService from '../services/season';
 
@@ -58,7 +59,7 @@ router.get('/user/:id/public', async (req, res, next) => {
 });
 
 // Auth: own rank info
-router.get('/user/rank', authMiddleware, async (req, res, next) => {
+router.get('/user/rank', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
     const rank = await leaderboardService.getUserRank(req.user!.userId);
     res.json(rank);

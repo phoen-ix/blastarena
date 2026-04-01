@@ -268,8 +268,8 @@ describe('Middleware presence', () => {
     const postLayer = stack.find((l) => l.route?.path === '/lobby/rooms' && l.route.methods.post);
     expect(postLayer).toBeDefined();
 
-    // GET has 2 handlers (authMiddleware + handler), POST has 3 (authMiddleware + validate + handler)
-    expect(getLayer!.route.stack.length).toBe(2);
-    expect(postLayer!.route.stack.length).toBe(3);
+    // GET has 3 handlers (auth + emailVerified + handler), POST has 4 (auth + emailVerified + validate + handler)
+    expect(getLayer!.route.stack.length).toBe(3);
+    expect(postLayer!.route.stack.length).toBe(4);
   });
 });

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth';
+import { emailVerifiedMiddleware } from '../middleware/emailVerified';
 import { validate } from '../middleware/validation';
 import * as friendsService from '../services/friends';
 
@@ -11,7 +12,7 @@ const searchSchema = z.object({
 });
 
 // List friends + pending requests (enriched with presence)
-router.get('/friends', authMiddleware, async (req, res, next) => {
+router.get('/friends', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
     const userId = req.user!.userId;
     const [friends, pending, blocked] = await Promise.all([
@@ -26,7 +27,7 @@ router.get('/friends', authMiddleware, async (req, res, next) => {
 });
 
 // List blocked users
-router.get('/friends/blocked', authMiddleware, async (req, res, next) => {
+router.get('/friends/blocked', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
     const blocked = await friendsService.getBlockedUsers(req.user!.userId);
     res.json({ blocked });
@@ -36,13 +37,19 @@ router.get('/friends/blocked', authMiddleware, async (req, res, next) => {
 });
 
 // Search users by username prefix
-router.post('/friends/search', authMiddleware, validate(searchSchema), async (req, res, next) => {
-  try {
-    const results = await friendsService.searchUsers(req.body.query, req.user!.userId);
-    res.json({ users: results });
-  } catch (err) {
-    next(err);
-  }
-});
+router.post(
+  '/friends/search',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  validate(searchSchema),
+  async (req, res, next) => {
+    try {
+      const results = await friendsService.searchUsers(req.body.query, req.user!.userId);
+      res.json({ users: results });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 export default router;

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth';
+import { emailVerifiedMiddleware } from '../middleware/emailVerified';
 import { validate } from '../middleware/validation';
 import { AppError } from '../middleware/errorHandler';
 import * as customMapsService from '../services/custom-maps';
@@ -19,7 +20,7 @@ const customMapSchema = z.object({
 });
 
 // List current user's maps
-router.get('/maps/mine', authMiddleware, async (req, res, next) => {
+router.get('/maps/mine', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
     const maps = await customMapsService.listMyMaps(req.user!.userId);
     res.json({ maps });
@@ -29,7 +30,7 @@ router.get('/maps/mine', authMiddleware, async (req, res, next) => {
 });
 
 // List all published maps
-router.get('/maps/published', authMiddleware, async (req, res, next) => {
+router.get('/maps/published', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
     const maps = await customMapsService.listPublishedMaps();
     res.json({ maps });
@@ -39,7 +40,7 @@ router.get('/maps/published', authMiddleware, async (req, res, next) => {
 });
 
 // Get full map data (own or published)
-router.get('/maps/:id', authMiddleware, async (req, res, next) => {
+router.get('/maps/:id', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) throw new AppError('Invalid map ID', 400);
@@ -59,75 +60,87 @@ router.get('/maps/:id', authMiddleware, async (req, res, next) => {
 });
 
 // Create new map
-router.post('/maps', authMiddleware, validate(customMapSchema), async (req, res, next) => {
-  try {
-    const data = req.body;
-    const tiles = data.tiles as TileType[][];
-    const spawnPoints = data.spawnPoints as Position[];
+router.post(
+  '/maps',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  validate(customMapSchema),
+  async (req, res, next) => {
+    try {
+      const data = req.body;
+      const tiles = data.tiles as TileType[][];
+      const spawnPoints = data.spawnPoints as Position[];
 
-    // Server-side validation
-    const errors = validateCustomMap(tiles, data.mapWidth, data.mapHeight);
-    if (errors.length > 0) {
-      throw new AppError(errors[0], 400);
+      // Server-side validation
+      const errors = validateCustomMap(tiles, data.mapWidth, data.mapHeight);
+      if (errors.length > 0) {
+        throw new AppError(errors[0], 400);
+      }
+
+      const id = await customMapsService.createMap(
+        {
+          name: data.name,
+          description: data.description,
+          mapWidth: data.mapWidth,
+          mapHeight: data.mapHeight,
+          tiles,
+          spawnPoints,
+          isPublished: data.isPublished,
+        },
+        req.user!.userId,
+      );
+
+      res.status(201).json({ id });
+    } catch (err) {
+      next(err);
     }
-
-    const id = await customMapsService.createMap(
-      {
-        name: data.name,
-        description: data.description,
-        mapWidth: data.mapWidth,
-        mapHeight: data.mapHeight,
-        tiles,
-        spawnPoints,
-        isPublished: data.isPublished,
-      },
-      req.user!.userId,
-    );
-
-    res.status(201).json({ id });
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
 // Update map (owner only)
-router.put('/maps/:id', authMiddleware, validate(customMapSchema), async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) throw new AppError('Invalid map ID', 400);
+router.put(
+  '/maps/:id',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  validate(customMapSchema),
+  async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) throw new AppError('Invalid map ID', 400);
 
-    const data = req.body;
-    const tiles = data.tiles as TileType[][];
-    const spawnPoints = data.spawnPoints as Position[];
+      const data = req.body;
+      const tiles = data.tiles as TileType[][];
+      const spawnPoints = data.spawnPoints as Position[];
 
-    const errors = validateCustomMap(tiles, data.mapWidth, data.mapHeight);
-    if (errors.length > 0) {
-      throw new AppError(errors[0], 400);
+      const errors = validateCustomMap(tiles, data.mapWidth, data.mapHeight);
+      if (errors.length > 0) {
+        throw new AppError(errors[0], 400);
+      }
+
+      const updated = await customMapsService.updateMap(
+        id,
+        {
+          name: data.name,
+          description: data.description,
+          mapWidth: data.mapWidth,
+          mapHeight: data.mapHeight,
+          tiles,
+          spawnPoints,
+          isPublished: data.isPublished,
+        },
+        req.user!.userId,
+      );
+
+      if (!updated) throw new AppError('Map not found or not owned by you', 404);
+      res.json({ success: true });
+    } catch (err) {
+      next(err);
     }
-
-    const updated = await customMapsService.updateMap(
-      id,
-      {
-        name: data.name,
-        description: data.description,
-        mapWidth: data.mapWidth,
-        mapHeight: data.mapHeight,
-        tiles,
-        spawnPoints,
-        isPublished: data.isPublished,
-      },
-      req.user!.userId,
-    );
-
-    if (!updated) throw new AppError('Map not found or not owned by you', 404);
-    res.json({ success: true });
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
 // Delete map (owner only)
-router.delete('/maps/:id', authMiddleware, async (req, res, next) => {
+router.delete('/maps/:id', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) throw new AppError('Invalid map ID', 400);

@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth';
+import { emailVerifiedMiddleware } from '../middleware/emailVerified';
 import * as messageService from '../services/messages';
 
 const router = Router();
 
 // GET /messages — conversation list
-router.get('/messages', authMiddleware, async (req, res, next) => {
+router.get('/messages', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
     const conversations = await messageService.getConversationList(req.user!.userId);
     res.json({ conversations });
@@ -15,7 +16,7 @@ router.get('/messages', authMiddleware, async (req, res, next) => {
 });
 
 // GET /messages/unread — unread counts per user
-router.get('/messages/unread', authMiddleware, async (req, res, next) => {
+router.get('/messages/unread', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
     const counts = await messageService.getUnreadCounts(req.user!.userId);
     res.json({ counts });
@@ -25,7 +26,7 @@ router.get('/messages/unread', authMiddleware, async (req, res, next) => {
 });
 
 // GET /messages/:userId — paginated conversation history
-router.get('/messages/:userId', authMiddleware, async (req, res, next) => {
+router.get('/messages/:userId', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
     const otherUserId = parseInt(req.params.userId);
     if (isNaN(otherUserId)) {
@@ -42,18 +43,23 @@ router.get('/messages/:userId', authMiddleware, async (req, res, next) => {
 });
 
 // PUT /messages/:userId/read — mark messages from userId as read
-router.put('/messages/:userId/read', authMiddleware, async (req, res, next) => {
-  try {
-    const senderId = parseInt(req.params.userId);
-    if (isNaN(senderId)) {
-      res.status(400).json({ error: 'Invalid user ID' });
-      return;
+router.put(
+  '/messages/:userId/read',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  async (req, res, next) => {
+    try {
+      const senderId = parseInt(req.params.userId);
+      if (isNaN(senderId)) {
+        res.status(400).json({ error: 'Invalid user ID' });
+        return;
+      }
+      await messageService.markRead(req.user!.userId, senderId);
+      res.json({ message: 'Messages marked as read' });
+    } catch (err) {
+      next(err);
     }
-    await messageService.markRead(req.user!.userId, senderId);
-    res.json({ message: 'Messages marked as read' });
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
 export default router;

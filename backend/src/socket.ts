@@ -15,6 +15,7 @@ import {
   AuthPayload,
   PublicUser,
   CampaignGameState,
+  UserRole,
   getErrorMessage,
 } from '@blast-arena/shared';
 import {
@@ -38,6 +39,7 @@ import * as customMapsService from './services/custom-maps';
 import { z } from 'zod';
 import { query } from './db/connection';
 import { UserRow } from './db/types';
+import { verifyLocalCoopSocketToken } from './services/auth';
 
 type TypedServer = Server<
   ClientToServerEvents,
@@ -149,7 +151,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
       // Check email verification status from database
       const rows = await query<UserRow[]>(
-        'SELECT email_verified, is_deactivated FROM users WHERE id = ?',
+        'SELECT email_verified, is_deactivated, role FROM users WHERE id = ?',
         [payload.userId],
       );
       if (rows.length === 0) {
@@ -164,7 +166,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
       socket.data.userId = payload.userId;
       socket.data.username = payload.username;
-      socket.data.role = payload.role;
+      socket.data.role = rows[0].role as UserRole;
       socket.data.locale = (socket.handshake.auth.locale as string) || 'en';
       next();
     } catch (err) {
@@ -225,6 +227,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     // Auto-join admin room for simulation broadcasts
     if (socket.data.role === 'admin') {
       socket.join('sim:admin');
+    }
+
+    // Join role-based room for scoped admin broadcasts
+    if (socket.data.role === 'admin' || socket.data.role === 'moderator') {
+      socket.join('role:staff');
     }
 
     // Join user-specific room for friend/party notifications
@@ -1010,9 +1017,25 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           usernames.push(partner.username);
         } else if (data.localCoopMode && data.localP2) {
           // Local co-op: P2 from same client
-          const p2Id = data.localP2.userId ?? -(1000 + (Date.now() % 10000));
+          let p2Id: number;
+          let p2Username: string;
+          if (data.localP2.userId && data.localP2.userId > 0 && data.localP2.token) {
+            // Real user — verify token to prevent userId spoofing
+            const verified = verifyLocalCoopSocketToken(data.localP2.token);
+            if (verified && verified.userId === data.localP2.userId) {
+              p2Id = verified.userId;
+              p2Username = verified.username;
+            } else {
+              // Invalid token — fall back to guest
+              p2Id = -(1000 + (Date.now() % 10000));
+              p2Username = data.localP2.username;
+            }
+          } else {
+            p2Id = -(1000 + (Date.now() % 10000));
+            p2Username = data.localP2.username;
+          }
           userIds.push(p2Id);
-          usernames.push(data.localP2.username);
+          usernames.push(p2Username);
         } else if (data.buddyMode) {
           // Buddy mode: P2 is an invulnerable support character
           const buddyId = -(2000 + (Date.now() % 10000));

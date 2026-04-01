@@ -802,7 +802,7 @@ export class CampaignUI {
         levelId: number;
         coopMode?: boolean;
         localCoopMode?: boolean;
-        localP2?: { userId?: number; username: string; guestColor?: number };
+        localP2?: { userId?: number; username: string; guestColor?: number; token?: string };
         buddyMode?: boolean;
       } = { levelId };
       if (buddyMode) {
@@ -813,9 +813,18 @@ export class CampaignUI {
         startData.localCoopMode = true;
         const p2Id = game.registry.get('localCoopP2Identity') as LocalCoopP2Identity | undefined;
         if (p2Id?.mode === 'loggedIn' && p2Id.loggedInUserId) {
+          // Fetch short-lived socket token to prove P2 identity
+          let socketToken: string | undefined;
+          try {
+            const resp = await ApiClient.get<{ token: string }>('/local-coop/socket-token');
+            socketToken = resp.token;
+          } catch {
+            // Token fetch failed — P2 will fall back to guest on server
+          }
           startData.localP2 = {
             userId: p2Id.loggedInUserId,
             username: p2Id.loggedInUsername || t('campaign:localCoopModal.defaultPlayerName'),
+            token: socketToken,
           };
         } else {
           startData.localP2 = {

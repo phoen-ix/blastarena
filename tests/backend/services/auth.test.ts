@@ -353,13 +353,12 @@ describe('Auth Service', () => {
 
   describe('resetPassword', () => {
     it('should revoke all refresh tokens after password change', async () => {
-      mockQuery.mockResolvedValue([{ id: 10 }]);
-      mockExecute.mockResolvedValue({ affectedRows: 1 });
+      mockExecute.mockResolvedValue({ affectedRows: 1, insertId: 10 });
 
       await authService.resetPassword('reset-token', 'newpassword');
 
       expect(mockHashPassword).toHaveBeenCalledWith('newpassword');
-      // Should revoke all refresh tokens for the user
+      // Should revoke all refresh tokens for the user (userId captured via LAST_INSERT_ID)
       const revokeCall = mockExecute.mock.calls.find(
         (call) =>
           typeof call[0] === 'string' &&

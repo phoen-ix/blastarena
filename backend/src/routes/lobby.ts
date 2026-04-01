@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth';
+import { emailVerifiedMiddleware } from '../middleware/emailVerified';
 import { validate } from '../middleware/validation';
 import * as lobbyService from '../services/lobby';
 
@@ -50,7 +51,7 @@ const createRoomSchema = z.object({
   }),
 });
 
-router.get('/lobby/rooms', authMiddleware, async (_req, res, next) => {
+router.get('/lobby/rooms', authMiddleware, emailVerifiedMiddleware, async (_req, res, next) => {
   try {
     const rooms = await lobbyService.listRooms();
     res.json(rooms);
@@ -59,23 +60,29 @@ router.get('/lobby/rooms', authMiddleware, async (_req, res, next) => {
   }
 });
 
-router.post('/lobby/rooms', authMiddleware, validate(createRoomSchema), async (req, res, next) => {
-  try {
-    const room = await lobbyService.createRoom(
-      {
-        id: req.user!.userId,
-        username: req.user!.username,
-        role: req.user!.role,
-        language: 'en',
-        emailVerified: true,
-      },
-      req.body.name,
-      req.body.config,
-    );
-    res.status(201).json(room);
-  } catch (err) {
-    next(err);
-  }
-});
+router.post(
+  '/lobby/rooms',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  validate(createRoomSchema),
+  async (req, res, next) => {
+    try {
+      const room = await lobbyService.createRoom(
+        {
+          id: req.user!.userId,
+          username: req.user!.username,
+          role: req.user!.role,
+          language: 'en',
+          emailVerified: true,
+        },
+        req.body.name,
+        req.body.config,
+      );
+      res.status(201).json(room);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 export default router;

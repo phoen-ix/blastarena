@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth';
 import { staffMiddleware, adminOnlyMiddleware } from '../middleware/admin';
 import { validate } from '../middleware/validation';
+import { rateLimiter } from '../middleware/rateLimiter';
 import { getConfig } from '../config';
 import * as adminService from '../services/admin';
 import * as replayService from '../services/replay';
@@ -252,7 +253,7 @@ router.put(
         ],
       );
       const io = getIO();
-      io.emit('admin:settingsChanged', {
+      io.to('role:staff').emit('admin:settingsChanged', {
         key: 'registration_enabled',
         value: req.body.enabled,
       });
@@ -282,7 +283,7 @@ router.put(
       );
       // Broadcast to all connected clients
       const io = getIO();
-      io.emit('admin:settingsChanged', {
+      io.to('role:staff').emit('admin:settingsChanged', {
         key: 'recordings_enabled',
         value: req.body.enabled,
       });
@@ -315,7 +316,7 @@ router.put(
         ],
       );
       const io = getIO();
-      io.emit('admin:settingsChanged', {
+      io.to('role:staff').emit('admin:settingsChanged', {
         key: 'party_chat_mode',
         value: req.body.mode,
       });
@@ -344,7 +345,10 @@ router.put(
         ],
       );
       const io = getIO();
-      io.emit('admin:settingsChanged', { key: 'lobby_chat_mode', value: req.body.mode });
+      io.to('role:staff').emit('admin:settingsChanged', {
+        key: 'lobby_chat_mode',
+        value: req.body.mode,
+      });
       res.json({ message: 'Setting updated' });
     } catch (err) {
       next(err);
@@ -370,7 +374,7 @@ router.put(
         ],
       );
       const io = getIO();
-      io.emit('admin:settingsChanged', { key: 'dm_mode', value: req.body.mode });
+      io.to('role:staff').emit('admin:settingsChanged', { key: 'dm_mode', value: req.body.mode });
       res.json({ message: 'Setting updated' });
     } catch (err) {
       next(err);
@@ -396,7 +400,10 @@ router.put(
         ],
       );
       const io = getIO();
-      io.emit('admin:settingsChanged', { key: 'emote_mode', value: req.body.mode });
+      io.to('role:staff').emit('admin:settingsChanged', {
+        key: 'emote_mode',
+        value: req.body.mode,
+      });
       res.json({ message: 'Setting updated' });
     } catch (err) {
       next(err);
@@ -422,7 +429,10 @@ router.put(
         ],
       );
       const io = getIO();
-      io.emit('admin:settingsChanged', { key: 'spectator_chat_mode', value: req.body.mode });
+      io.to('role:staff').emit('admin:settingsChanged', {
+        key: 'spectator_chat_mode',
+        value: req.body.mode,
+      });
       res.json({ message: 'Setting updated' });
     } catch (err) {
       next(err);
@@ -448,7 +458,7 @@ router.put('/admin/settings/xp_multiplier', adminOnlyMiddleware, async (req, res
       ],
     );
     const io = getIO();
-    io.emit('admin:settingsChanged', { key: 'xp_multiplier', value: multiplier });
+    io.to('role:staff').emit('admin:settingsChanged', { key: 'xp_multiplier', value: multiplier });
     res.json({ message: 'XP multiplier updated' });
   } catch (err) {
     next(err);
@@ -477,7 +487,10 @@ router.put(
         ],
       );
       const io = getIO();
-      io.emit('admin:settingsChanged', { key: 'default_theme', value: req.body.theme });
+      io.to('role:staff').emit('admin:settingsChanged', {
+        key: 'default_theme',
+        value: req.body.theme,
+      });
       res.json({ message: 'Default theme updated' });
     } catch (err) {
       next(err);
@@ -647,7 +660,7 @@ router.put(
         ],
       );
       const io = getIO();
-      io.emit('admin:settingsChanged', { key: 'game_defaults', value: defaults });
+      io.to('role:staff').emit('admin:settingsChanged', { key: 'game_defaults', value: defaults });
       res.json({ message: 'Game defaults updated' });
     } catch (err) {
       next(err);
@@ -674,7 +687,10 @@ router.put(
         ],
       );
       const io = getIO();
-      io.emit('admin:settingsChanged', { key: 'simulation_defaults', value: defaults });
+      io.to('role:staff').emit('admin:settingsChanged', {
+        key: 'simulation_defaults',
+        value: defaults,
+      });
       res.json({ message: 'Simulation defaults updated' });
     } catch (err) {
       next(err);
@@ -750,7 +766,7 @@ router.put(
       );
 
       const io = getIO();
-      io.emit('admin:settingsChanged', { key: 'email_settings' });
+      io.to('role:staff').emit('admin:settingsChanged', { key: 'email_settings' });
 
       res.json({ message: 'Email settings updated' });
     } catch (err) {
@@ -992,17 +1008,23 @@ router.get('/admin/actions', adminOnlyMiddleware, async (req, res, next) => {
 
 // --- Announcements ---
 
-router.post('/admin/announcements/toast', validate(toastSchema), async (req, res, next) => {
-  try {
-    await adminService.sendToast(req.user!.userId, req.body.message);
-    res.json({ message: 'Toast sent' });
-  } catch (err) {
-    next(err);
-  }
-});
+router.post(
+  '/admin/announcements/toast',
+  rateLimiter({ windowMs: 60000, maxRequests: 10 }),
+  validate(toastSchema),
+  async (req, res, next) => {
+    try {
+      await adminService.sendToast(req.user!.userId, req.body.message);
+      res.json({ message: 'Toast sent' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.post(
   '/admin/announcements/banner',
+  rateLimiter({ windowMs: 60000, maxRequests: 10 }),
   adminOnlyMiddleware,
   validate(bannerSchema),
   async (req, res, next) => {
@@ -1015,14 +1037,19 @@ router.post(
   },
 );
 
-router.delete('/admin/announcements/banner', adminOnlyMiddleware, async (req, res, next) => {
-  try {
-    await adminService.clearBanner(req.user!.userId);
-    res.json({ message: 'Banner cleared' });
-  } catch (err) {
-    next(err);
-  }
-});
+router.delete(
+  '/admin/announcements/banner',
+  rateLimiter({ windowMs: 60000, maxRequests: 10 }),
+  adminOnlyMiddleware,
+  async (req, res, next) => {
+    try {
+      await adminService.clearBanner(req.user!.userId);
+      res.json({ message: 'Banner cleared' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // --- Replays ---
 
