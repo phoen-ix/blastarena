@@ -1,10 +1,10 @@
 # Testing
 
-BlastArena has **1846 tests** across 58 test suites covering the full stack: game logic, backend services, API routes, middleware, utilities, and frontend.
+BlastArena has **1883 tests** across 59 test suites covering the full stack: game logic, backend services, API routes, middleware, utilities, and frontend.
 
 | Stack | Framework | Suites | Tests |
 |-------|-----------|--------|-------|
-| Backend | Jest + ts-jest | 55 | 1804 |
+| Backend | Jest + ts-jest | 56 | 1841 |
 | Frontend | Vitest + happy-dom | 3 | 42 |
 
 ## Running Tests
@@ -37,13 +37,13 @@ cd frontend && npx vitest                                     # Frontend watch m
 ```
 tests/
 ├── backend/
-│   ├── game/           16 files — core game logic
-│   ├── services/       21 files — business logic layer
+│   ├── game/           17 files — core game logic
+│   ├── services/       20 files — business logic layer
 │   ├── routes/          9 files — API endpoint handlers
 │   ├── middleware/      4 files — auth, validation, rate limiting, errors
 │   ├── simulation/      1 file  — batch bot simulation runner
 │   ├── utils/           2 files — crypto, socket rate limiting
-│   └── shared/          2 files — XP math, validation rules
+│   └── shared/          1 file  — XP math
 └── shared/              2 files — grid utilities, validation (run by backend Jest)
 
 frontend/tests/
@@ -54,14 +54,14 @@ frontend/tests/
 
 ## Test Inventory
 
-### Game Logic (16 files, 450 tests)
+### Game Logic (17 files, 486 tests)
 
 Core game mechanics — these test the server-authoritative game state directly without mocks.
 
 | File | Tests | Coverage |
 |------|-------|----------|
-| `game/GameState.test.ts` | 72 | Full lifecycle, movement, bombs, explosions, power-ups, all 6 game modes |
-| `game/CampaignGame.test.ts` | 64 | Map building, spawn fallback chains, enemy spawning, win/loss conditions |
+| `game/GameState.test.ts` | 75 | Full lifecycle, movement, bombs, explosions, power-ups, all 6 game modes |
+| `game/CampaignGame.test.ts` | 66 | Map building, spawn fallback chains, enemy spawning, win/loss conditions |
 | `game/Player.test.ts` | 62 | State management, movement cooldowns, power-up effects, shield, death, respawn |
 | `game/EnemyAI.test.ts` | 52 | 5 movement patterns (wander, chase, patrol, guard, flee), pathfinding, boss behaviors |
 | `game/Enemy.test.ts` | 51 | Movement, speed divisor formula, boss phases, type config parsing |
@@ -75,9 +75,10 @@ Core game mechanics — these test the server-authoritative game state directly 
 | `game/CollisionSystem.test.ts` | 7 | Collision detection, tile occupancy checks |
 | `game/Map.test.ts` | 7 | Map generation, tile types, indestructible wall grid pattern |
 | `game/Bomb.test.ts` | 3 | Bomb creation, countdown timer, detonation |
-| `game/GameLoop.test.ts` | 2 | Tick timing, game state progression |
+| `game/GameLoop.test.ts` | 4 | Tick timing, game state progression, circuit breaker |
+| `game/HazardTiles.test.ts` | 29 | All 10 hazard tile types, slowing effects, instant-kill tiles, conveyors, teleporters, ice sliding, spikes cycling, dark rift, collision walkability |
 
-### Services (21 files, 721 tests)
+### Services (20 files, 692 tests)
 
 Business logic layer — each service is tested with mocked database and Redis.
 
@@ -98,7 +99,7 @@ Business logic layer — each service is tested with mocked database and Redis.
 | `services/party.test.ts` | 24 | Create/join/leave/kick/disband, Lua script atomic join, invite CRUD |
 | `services/botai-sandbox.test.ts` | 22 | Source scan, global access blocking, vm sandbox, import blocking, eval/Function blocking |
 | `services/season.test.ts` | 21 | CRUD, activate/deactivate, end with hard/soft reset, user history |
-| `services/auth.test.ts` | 19 | Register, login, refresh, logout, verify email, forgot/reset password |
+| `services/auth.test.ts` | 20 | Register, login, refresh, logout, verify email, forgot/reset password, atomic reset |
 | `services/lobby.test.ts` | 17 | Room CRUD via Redis, join (atomic Lua), leave, ready toggle, teams |
 | `services/user.test.ts` | 16 | Profile CRUD, username/email/password changes, admin bypass |
 | `services/settings.test.ts` | 13 | Get/set/defaults, registration toggle, chat mode settings |
@@ -135,7 +136,7 @@ HTTP endpoint tests — Express route handlers tested with mocked services and p
 |------|-------|----------|
 | `simulation/SimulationManager.test.ts` | 69 | Batch lifecycle, queue management (max 10), getHistory pagination, disk scanning, batch results/deletion |
 
-### Utilities & Shared (6 files, 72 tests)
+### Utilities & Shared (5 files, 72 tests)
 
 | File | Tests | Coverage |
 |------|-------|----------|

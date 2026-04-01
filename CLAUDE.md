@@ -226,7 +226,7 @@ npm test                    # Run all workspace tests (backend + frontend)
 npx jest --config tests/backend/jest.config.ts  # Backend only (from project root)
 cd frontend && npx vitest run                   # Frontend only
 ```
-- 1882 tests: 1840 backend (Jest, 56 suites) + 42 frontend (Vitest, 3 suites)
+- 1883 tests: 1841 backend (Jest, 56 suites) + 42 frontend (Vitest, 3 suites)
 - See [docs/testing.md](docs/testing.md) for full inventory, mocking patterns, and guide for writing new tests
 
 ## Documentation
@@ -236,6 +236,7 @@ cd frontend && npx vitest run                   # Frontend only
 - [Campaign System](docs/campaign.md) — enemies, levels, editor, progress
 - [Admin Panel & Systems](docs/admin-and-systems.md) — admin tabs, bot AI management, simulations, accounts
 - [Replay System](docs/replay-system.md) — recording, playback, controls, API
+- [Socket.io Events](docs/socket-events.md) — real-time event reference (86 events, rate limits, room patterns)
 - [Performance & Internals](docs/performance-and-internals.md) — optimizations, game logging
 - [Infrastructure & Security](docs/infrastructure.md) — security, resilience, Docker, migrations
 - [Testing](docs/testing.md) — test inventory, mocking patterns, writing new tests

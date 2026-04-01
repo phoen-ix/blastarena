@@ -4,7 +4,7 @@
 
 ### CORS & CSP
 - CORS restricted to `APP_URL` origin for both Express and Socket.io (not `origin: true`)
-- Content-Security-Policy header in nginx: `default-src 'self'`, inline scripts/styles allowed, fonts from Google, WebSocket connections
+- Content-Security-Policy header in nginx: `default-src 'self'`, inline styles allowed, WebSocket connections. All fonts self-hosted (no external CDN)
 
 ### XSS Prevention
 - All user-generated content (usernames) escaped via `escapeHtml()` before innerHTML insertion (HUD kill feed, player list)
@@ -34,6 +34,39 @@
 - `staffMiddleware` and `adminOnlyMiddleware` for route protection
 - Deactivated users blocked from login and token refresh
 - Self-protection: admins cannot deactivate/delete themselves
+- Admin announcement endpoints (toast/banner) rate-limited to 10 req/min
+- `admin:settingsChanged` broadcasts scoped to `role:staff` room (not all sockets)
+
+### Email Security
+- Emails never stored in plaintext — HMAC-SHA256 with `EMAIL_PEPPER` env var (min 32 chars)
+- DB stores `email_hash` (for lookups) + `email_hint` (masked display like `j***@g***.com`)
+- Same pattern for `pending_email_hash`/`pending_email_hint` during email change
+- `backfill-emails.ts` runs on startup to migrate any legacy plaintext rows
+- Admin email search: exact match only (hashed) when query contains `@`
+
+### Email Verification Enforcement
+- Socket.io middleware queries DB for `email_verified` and rejects unverified users (`EMAIL_NOT_VERIFIED`)
+- REST endpoints protected by `emailVerifiedMiddleware` (DB check, applied after `authMiddleware`)
+- Exceptions: `GET /user/profile`, `PUT /user/language`, all auth routes
+
+### Email Enumeration Prevention
+- Registration with an existing email returns generic 400 (not 409) and sends a warning email to the existing account owner
+- Email change with a taken address silently succeeds (no DB update) and sends a warning
+- Username conflicts remain explicit (usernames are public)
+
+### Nginx Rate Limiting
+- `limit_req_zone` for API (30r/s), Socket.io (10r/s), auth (5r/s) — defense-in-depth alongside Express middleware
+
+### Socket.io Auth Hardening
+- Socket middleware reads `role` from database (not JWT) on each connection — demoted admins lose privileges immediately
+- Sockets join `role:staff` room for scoped admin broadcasts
+- Atomic password reset: single `UPDATE ... WHERE token = ? AND expires > NOW()` with `LAST_INSERT_ID(id)` — prevents TOCTOU race
+- Refresh token rotation: atomic compare-and-swap (`UPDATE ... WHERE revoked = FALSE` + `affectedRows` check)
+- Local co-op P2 validation: `campaign:start` requires short-lived socket token for positive P2 userIds
+
+### Content Sanitization
+- `DOMPurify.sanitize()` wraps all `marked.parse()` output in HelpUI
+- `escapeHtml()` and `escapeAttr()` utilities for all user-generated content in DOM
 
 ---
 
@@ -107,3 +140,22 @@ Migrations in `backend/src/db/migrations/` run automatically on server start:
 9. `009_campaign_seed.sql` — Seed data: 3 enemy types + "Training Grounds" world with 3 levels
 10. `010_campaign_par_time.sql` — Par time column for campaign levels
 11. `011_fix_campaign_tile_types.sql` — Fix seed tile types
+12. `012_campaign_indexes.sql` — Campaign foreign key indexes (progress, user_state)
+13. `013_friends_parties.sql` — Friendships, friend requests, user_blocks, party tables
+14. `014_direct_messages.sql` — Direct messages table
+15. `015_leaderboard_seasons.sql` — Seasons and season_elo tables for Elo tracking
+16. `016_achievements_cosmetics.sql` — Cosmetics, achievements, user_cosmetics, user_achievements tables
+17. `017_default_achievements.sql` — Seed data: 25 cosmetics + 47 default achievements
+18. `018_player_xp_levels.sql` — XP and level columns on user_stats, level_milestone cosmetic unlock type
+19. `019_enemy_ais.sql` — Enemy AI management table
+20. `020_buddy_settings.sql` — Buddy mode settings per user (name, color, size)
+21. `021_campaign_query_indexes.sql` — Indexes for campaign level/progress query patterns
+22. `022_friendships_user_status_index.sql` — Composite index on friendships(user_id, status)
+23. `023_covered_tiles.sql` — covered_tiles JSON column on campaign_levels
+24. `024_puzzle_tiles.sql` — puzzle_config JSON column on campaign_levels
+25. `025_campaign_replays.sql` — campaign_replays table for campaign replay storage
+26. `026_custom_maps.sql` — custom_maps table for user-created maps
+27. `027_user_language.sql` — language column on users for i18n preference
+28. `028_tutorial_levels_seed.sql` — Tutorial campaign: 8 worlds, 21 levels
+29. `029_email_hashing.sql` — email_hash, email_hint columns for HMAC-SHA256 storage
+30. `030_finalize_email_hashing.sql` — Drop plaintext email columns, enforce NOT NULL on email_hash

@@ -265,16 +265,22 @@ npm run lint                # ESLint across all workspaces
 npm run format:check        # Prettier format check
 ```
 
-1883 tests across 59 suites: game logic (455), services (721), routes (486), middleware (36), simulation (69), utilities (74), frontend (42). See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
+1883 tests across 59 suites: game logic (486), services (692), routes (486), middleware (36), simulation (69), utilities (72), frontend (42). See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
 
 ## Documentation
 
 - [Bot AI Developer Guide](docs/bot-ai-guide.md) — writing custom bot AIs
 - [Bot AI Internals](docs/bot-ai-internals.md) — built-in BotAI decision engine
+- [Enemy AI Developer Guide](docs/enemy-ai-guide.md) — writing custom campaign enemy AIs
 - [Campaign System](docs/campaign.md) — enemies, levels, editor, progress
 - [Admin Panel & Systems](docs/admin-and-systems.md) — admin tabs, simulations, accounts
 - [Replay System](docs/replay-system.md) — recording, playback, controls
+- [Socket.io Events](docs/socket-events.md) — real-time event reference (86 events)
 - [Performance & Internals](docs/performance-and-internals.md) — optimizations, game logging
 - [Infrastructure & Security](docs/infrastructure.md) — security, resilience, Docker, migrations
 - [Testing](docs/testing.md) — test inventory, mocking patterns, writing new tests
 - [API Reference](docs/openapi.yaml) — OpenAPI 3.0.3 specification for all REST endpoints
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.

@@ -42,6 +42,32 @@ tags:
     description: Bot simulation batch management
   - name: Bot AI
     description: Custom bot AI upload and management
+  - name: Local Co-Op
+    description: Local co-op player 2 session management
+  - name: Leaderboard
+    description: Public leaderboard, ranks, seasons, and player profiles
+  - name: Friends
+    description: Friend list, blocked users, and user search
+  - name: Messages
+    description: Direct message conversations
+  - name: Cosmetics
+    description: Player cosmetics and equipment
+  - name: Achievements
+    description: Achievement definitions and player progress
+  - name: Custom Maps
+    description: User-created map management
+  - name: Docs
+    description: Documentation file serving
+  - name: Campaign Replays
+    description: Campaign replay management (staff/admin)
+  - name: Enemy AI
+    description: Admin enemy AI management
+  - name: Seasons
+    description: Admin season management
+  - name: Achievements Admin
+    description: Admin achievement management and import/export
+  - name: Cosmetics Admin
+    description: Admin cosmetic management and import/export
 
 security:
   - BearerAuth: []
@@ -1788,6 +1814,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
     delete:
       tags: [Announcements]
       summary: Clear banner (admin only)
@@ -1803,6 +1831,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /admin/announcements/toast:
     post:
@@ -1832,6 +1862,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   # ===================== Replays =====================
   /admin/replays:
@@ -2314,6 +2346,2287 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  # ===================== Auth — Resend Verification =====================
+  /auth/resend-verification:
+    post:
+      tags: [Auth]
+      summary: Resend email verification link
+      operationId: resendVerification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Verification email sent (if email matches)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  # ===================== Local Co-Op =====================
+  /local-coop/login:
+    post:
+      tags: [Local Co-Op]
+      summary: Log in as local co-op player 2
+      description: Authenticates P2 and sets an isolated httpOnly cookie. Requires P1 to be authenticated.
+      operationId: localCoopLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocalCoopLoginRequest'
+      responses:
+        '200':
+          description: P2 session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocalCoopSession'
+        '400':
+          description: Invalid credentials or same user as P1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /local-coop/session:
+    get:
+      tags: [Local Co-Op]
+      summary: Get current local co-op P2 session
+      operationId: localCoopSession
+      security: []
+      responses:
+        '200':
+          description: Active P2 session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocalCoopSession'
+        '401':
+          description: No session or invalid/expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /local-coop/socket-token:
+    get:
+      tags: [Local Co-Op]
+      summary: Get a short-lived socket token for P2
+      description: Converts the P2 httpOnly cookie into a JS-readable token (5min expiry) for socket auth.
+      operationId: localCoopSocketToken
+      responses:
+        '200':
+          description: Socket token for P2
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '401':
+          description: No local co-op session or invalid/expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /local-coop/logout:
+    post:
+      tags: [Local Co-Op]
+      summary: Log out local co-op player 2
+      operationId: localCoopLogout
+      security: []
+      responses:
+        '200':
+          description: P2 session cleared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+
+  # ===================== User — Privacy =====================
+  /user/privacy:
+    put:
+      tags: [User]
+      summary: Update privacy settings
+      operationId: updatePrivacy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrivacySettings'
+      responses:
+        '200':
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================== User — Language =====================
+  /user/language:
+    put:
+      tags: [User]
+      summary: Update preferred language
+      operationId: updateLanguage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [language]
+              properties:
+                language:
+                  $ref: '#/components/schemas/SupportedLanguage'
+      responses:
+        '200':
+          description: Language updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  language:
+                    $ref: '#/components/schemas/SupportedLanguage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================== User — Buddy Settings =====================
+  /user/buddy-settings:
+    get:
+      tags: [User]
+      summary: Get buddy mode settings
+      operationId: getBuddySettings
+      responses:
+        '200':
+          description: Current buddy settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuddySettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [User]
+      summary: Update buddy mode settings
+      operationId: updateBuddySettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuddySettings'
+      responses:
+        '200':
+          description: Updated buddy settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuddySettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================== User — Delete Account =====================
+  /user/account:
+    delete:
+      tags: [User]
+      summary: Delete own account
+      description: Hard-deletes the account after password confirmation. Admin accounts cannot self-delete.
+      operationId: deleteAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Account deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Wrong password or admin account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================== Leaderboard =====================
+  /leaderboard:
+    get:
+      tags: [Leaderboard]
+      summary: Get paginated leaderboard
+      operationId: getLeaderboard
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: season_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by season ID (omit for current/global)
+      responses:
+        '200':
+          description: Leaderboard page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderboardResponse'
+
+  /leaderboard/tiers:
+    get:
+      tags: [Leaderboard]
+      summary: Get rank tier configuration
+      operationId: getRankTiers
+      security: []
+      responses:
+        '200':
+          description: Rank tier config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RankConfig'
+
+  /leaderboard/seasons:
+    get:
+      tags: [Leaderboard]
+      summary: List all seasons
+      operationId: getSeasons
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Paginated seasons list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  seasons:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Season'
+                  total:
+                    type: integer
+
+  /user/{id}/public:
+    get:
+      tags: [Leaderboard]
+      summary: Get a user's public profile
+      operationId: getPublicProfile
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Public profile data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicProfile'
+        '400':
+          description: Invalid user ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Profile not found or is private
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/rank:
+    get:
+      tags: [Leaderboard]
+      summary: Get own rank info
+      operationId: getUserRank
+      responses:
+        '200':
+          description: Current user's rank data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRankInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================== Friends =====================
+  /friends:
+    get:
+      tags: [Friends]
+      summary: List friends, pending requests, and blocked users
+      operationId: getFriends
+      responses:
+        '200':
+          description: Friends, incoming/outgoing requests, and blocked users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  friends:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FriendEntry'
+                  incoming:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FriendRequest'
+                  outgoing:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FriendRequest'
+                  blocked:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BlockedUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /friends/blocked:
+    get:
+      tags: [Friends]
+      summary: List blocked users
+      operationId: getBlockedUsers
+      responses:
+        '200':
+          description: Blocked user list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  blocked:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BlockedUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /friends/search:
+    post:
+      tags: [Friends]
+      summary: Search users by username prefix
+      operationId: searchUsers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  minLength: 2
+                  maxLength: 20
+      responses:
+        '200':
+          description: Matching users (max 10)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        username:
+                          type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================== Messages =====================
+  /messages:
+    get:
+      tags: [Messages]
+      summary: List conversation summaries
+      operationId: getConversations
+      responses:
+        '200':
+          description: Conversation list ordered by most recent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConversationListItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /messages/unread:
+    get:
+      tags: [Messages]
+      summary: Get unread message counts per sender
+      operationId: getUnreadCounts
+      responses:
+        '200':
+          description: Map of senderId to unread count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  counts:
+                    type: object
+                    additionalProperties:
+                      type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /messages/{userId}:
+    get:
+      tags: [Messages]
+      summary: Get paginated conversation with a user
+      operationId: getConversation
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Paginated messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConversationMessage'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+        '400':
+          description: Invalid user ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /messages/{userId}/read:
+    put:
+      tags: [Messages]
+      summary: Mark messages from a user as read
+      operationId: markMessagesRead
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Messages marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid user ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================== Cosmetics =====================
+  /cosmetics:
+    get:
+      tags: [Cosmetics]
+      summary: List all active cosmetics
+      operationId: getAllCosmetics
+      security: []
+      responses:
+        '200':
+          description: Active cosmetics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cosmetics:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CosmeticEntry'
+
+  /cosmetics/mine:
+    get:
+      tags: [Cosmetics]
+      summary: List user's unlocked cosmetics
+      operationId: getUserCosmetics
+      responses:
+        '200':
+          description: Unlocked cosmetics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cosmetics:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CosmeticEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /cosmetics/equipped:
+    get:
+      tags: [Cosmetics]
+      summary: Get user's equipped cosmetics
+      operationId: getEquippedCosmetics
+      responses:
+        '200':
+          description: Equipped cosmetic IDs by slot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EquippedCosmetics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /cosmetics/equip:
+    put:
+      tags: [Cosmetics]
+      summary: Equip or unequip a cosmetic
+      operationId: equipCosmetic
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slot, cosmeticId]
+              properties:
+                slot:
+                  $ref: '#/components/schemas/CosmeticType'
+                cosmeticId:
+                  type: integer
+                  nullable: true
+                  description: Cosmetic ID to equip, or null to unequip
+      responses:
+        '200':
+          description: Updated equipped cosmetics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EquippedCosmetics'
+        '400':
+          description: Do not own cosmetic or type mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================== Achievements =====================
+  /achievements:
+    get:
+      tags: [Achievements]
+      summary: List all active achievements
+      operationId: getAllAchievements
+      security: []
+      responses:
+        '200':
+          description: Active achievements
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  achievements:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AchievementEntry'
+
+  /achievements/mine:
+    get:
+      tags: [Achievements]
+      summary: Get user's unlocked achievements
+      operationId: getUserAchievements
+      responses:
+        '200':
+          description: User's achievement unlock records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  achievements:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserAchievement'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /achievements/progress:
+    get:
+      tags: [Achievements]
+      summary: Get achievement progress for current user
+      operationId: getAchievementProgress
+      responses:
+        '200':
+          description: Progress toward each active achievement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  progress:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AchievementProgress'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================== Custom Maps =====================
+  /maps/mine:
+    get:
+      tags: [Custom Maps]
+      summary: List current user's maps
+      operationId: getMyMaps
+      responses:
+        '200':
+          description: User's custom maps
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  maps:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CustomMapSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /maps/published:
+    get:
+      tags: [Custom Maps]
+      summary: List all published maps
+      operationId: getPublishedMaps
+      responses:
+        '200':
+          description: Published custom maps
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  maps:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CustomMapSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /maps/{id}:
+    get:
+      tags: [Custom Maps]
+      summary: Get full map data
+      description: Returns full map data if the user owns it or the map is published.
+      operationId: getMap
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Full custom map data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  map:
+                    $ref: '#/components/schemas/CustomMap'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Map not found or not accessible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags: [Custom Maps]
+      summary: Update a custom map (owner only)
+      operationId: updateMap
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomMapInput'
+      responses:
+        '200':
+          description: Map updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '400':
+          description: Invalid map data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Map not found or not owned by user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Custom Maps]
+      summary: Delete a custom map (owner only)
+      operationId: deleteMap
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Map deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Map not found or not owned by user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /maps:
+    post:
+      tags: [Custom Maps]
+      summary: Create a new custom map
+      operationId: createMap
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomMapInput'
+      responses:
+        '201':
+          description: Map created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+        '400':
+          description: Invalid map data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================== Docs =====================
+  /docs/{filename}:
+    get:
+      tags: [Docs]
+      summary: Get a public documentation file
+      description: |
+        Serves public docs (campaign.md, replay-system.md, bot-ai-guide.md, enemy-ai-guide.md).
+        Requires authentication but not staff role.
+      operationId: getPublicDoc
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [campaign.md, replay-system.md, bot-ai-guide.md, enemy-ai-guide.md]
+      responses:
+        '200':
+          description: Document content
+          content:
+            text/plain:
+              schema:
+                type: string
+        '400':
+          description: Invalid document name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /docs/admin/{filename}:
+    get:
+      tags: [Docs]
+      summary: Get a staff-only documentation file
+      description: |
+        Serves staff docs (admin-and-systems.md, infrastructure.md, testing.md,
+        performance-and-internals.md, bot-ai-internals.md, openapi.yaml).
+        Requires admin or moderator role.
+      operationId: getStaffDoc
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [admin-and-systems.md, infrastructure.md, testing.md, performance-and-internals.md, bot-ai-internals.md, openapi.yaml]
+      responses:
+        '200':
+          description: Document content
+          content:
+            text/plain:
+              schema:
+                type: string
+        '400':
+          description: Invalid document name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ===================== Settings (additional) =====================
+  /admin/settings/public:
+    get:
+      tags: [Settings]
+      summary: Get batched public settings
+      description: Returns registration, imprint, and github display settings in a single request.
+      security: []
+      operationId: getPublicSettings
+      responses:
+        '200':
+          description: Batched public settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  registrationEnabled:
+                    type: boolean
+                  imprint:
+                    type: boolean
+                  imprintText:
+                    type: string
+                  displayGithub:
+                    type: boolean
+
+  /admin/settings/party_chat_mode:
+    get:
+      tags: [Settings]
+      summary: Get party chat mode
+      security: []
+      operationId: getPartyChatMode
+      responses:
+        '200':
+          description: Party chat mode
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mode:
+                    $ref: '#/components/schemas/ChatMode'
+    put:
+      tags: [Settings]
+      summary: Set party chat mode (admin only)
+      operationId: setPartyChatMode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode:
+                  $ref: '#/components/schemas/ChatMode'
+      responses:
+        '200':
+          description: Setting updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/settings/lobby_chat_mode:
+    get:
+      tags: [Settings]
+      summary: Get lobby chat mode
+      security: []
+      operationId: getLobbyChatMode
+      responses:
+        '200':
+          description: Lobby chat mode
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mode:
+                    $ref: '#/components/schemas/ChatMode'
+    put:
+      tags: [Settings]
+      summary: Set lobby chat mode (admin only)
+      operationId: setLobbyChatMode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode:
+                  $ref: '#/components/schemas/ChatMode'
+      responses:
+        '200':
+          description: Setting updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/settings/dm_mode:
+    get:
+      tags: [Settings]
+      summary: Get DM mode
+      security: []
+      operationId: getDMMode
+      responses:
+        '200':
+          description: DM chat mode
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mode:
+                    $ref: '#/components/schemas/ChatMode'
+    put:
+      tags: [Settings]
+      summary: Set DM mode (admin only)
+      operationId: setDMMode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode:
+                  $ref: '#/components/schemas/ChatMode'
+      responses:
+        '200':
+          description: Setting updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/settings/emote_mode:
+    get:
+      tags: [Settings]
+      summary: Get emote mode
+      security: []
+      operationId: getEmoteMode
+      responses:
+        '200':
+          description: Emote mode
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mode:
+                    $ref: '#/components/schemas/ChatMode'
+    put:
+      tags: [Settings]
+      summary: Set emote mode (admin only)
+      operationId: setEmoteMode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode:
+                  $ref: '#/components/schemas/ChatMode'
+      responses:
+        '200':
+          description: Setting updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/settings/spectator_chat_mode:
+    get:
+      tags: [Settings]
+      summary: Get spectator chat mode
+      security: []
+      operationId: getSpectatorChatMode
+      responses:
+        '200':
+          description: Spectator chat mode
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mode:
+                    $ref: '#/components/schemas/ChatMode'
+    put:
+      tags: [Settings]
+      summary: Set spectator chat mode (admin only)
+      operationId: setSpectatorChatMode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode:
+                  $ref: '#/components/schemas/ChatMode'
+      responses:
+        '200':
+          description: Setting updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/settings/xp_multiplier:
+    get:
+      tags: [Settings]
+      summary: Get XP multiplier
+      security: []
+      operationId: getXpMultiplier
+      responses:
+        '200':
+          description: Current XP multiplier
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  multiplier:
+                    type: number
+                    example: 1
+    put:
+      tags: [Settings]
+      summary: Set XP multiplier (admin only)
+      operationId: setXpMultiplier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [multiplier]
+              properties:
+                multiplier:
+                  type: number
+                  minimum: 0
+                  maximum: 10
+      responses:
+        '200':
+          description: XP multiplier updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Multiplier out of range
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/settings/default_theme:
+    get:
+      tags: [Settings]
+      summary: Get default theme
+      security: []
+      operationId: getDefaultTheme
+      responses:
+        '200':
+          description: Default theme
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  theme:
+                    type: string
+                    example: inferno
+    put:
+      tags: [Settings]
+      summary: Set default theme (admin only)
+      operationId: setDefaultTheme
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [theme]
+              properties:
+                theme:
+                  type: string
+                  description: Must be a valid theme ID from THEME_IDS
+      responses:
+        '200':
+          description: Default theme updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/settings/imprint:
+    get:
+      tags: [Settings]
+      summary: Get imprint settings
+      security: []
+      operationId: getImprint
+      responses:
+        '200':
+          description: Imprint settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  text:
+                    type: string
+    put:
+      tags: [Settings]
+      summary: Update imprint settings (admin only)
+      operationId: setImprint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+                text:
+                  type: string
+                  maxLength: 10000
+      responses:
+        '200':
+          description: Imprint settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/settings/display_github:
+    get:
+      tags: [Settings]
+      summary: Get GitHub display setting
+      security: []
+      operationId: getDisplayGithub
+      responses:
+        '200':
+          description: GitHub display setting
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+    put:
+      tags: [Settings]
+      summary: Set GitHub display setting (admin only)
+      operationId: setDisplayGithub
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Setting updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/settings/rank_tiers:
+    get:
+      tags: [Settings]
+      summary: Get rank tier configuration (admin only)
+      operationId: adminGetRankTiers
+      responses:
+        '200':
+          description: Rank tier config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RankConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Settings]
+      summary: Update rank tier configuration (admin only)
+      operationId: adminSetRankTiers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RankConfig'
+      responses:
+        '200':
+          description: Updated rank config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RankConfig'
+        '400':
+          description: Invalid rank config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ===================== Session Revocation =====================
+  /admin/users/{id}/revoke-sessions:
+    post:
+      tags: [Users Admin]
+      summary: Revoke all sessions for a user (admin only)
+      description: Revokes refresh tokens and force-disconnects the user's sockets.
+      operationId: adminRevokeUserSessions
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Sessions revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid user ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/revoke-all-sessions:
+    post:
+      tags: [Users Admin]
+      summary: Revoke all user sessions globally (admin only)
+      description: Revokes all refresh tokens and disconnects all sockets except the admin performing the action.
+      operationId: adminRevokeAllSessions
+      responses:
+        '200':
+          description: All sessions revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ===================== Campaign Replays =====================
+  /admin/campaign-replays:
+    get:
+      tags: [Campaign Replays]
+      summary: List campaign replays (staff)
+      operationId: adminListCampaignReplays
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: userId
+          in: query
+          schema:
+            type: integer
+          description: Filter by user ID
+        - name: levelId
+          in: query
+          schema:
+            type: integer
+          description: Filter by level ID
+      responses:
+        '200':
+          description: Paginated campaign replay list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  replays:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CampaignReplayListItem'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/campaign-replays/{sessionId}:
+    get:
+      tags: [Campaign Replays]
+      summary: Get campaign replay data (staff)
+      operationId: adminGetCampaignReplay
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Full campaign replay data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReplayData'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Campaign replay not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Campaign Replays]
+      summary: Delete a campaign replay (admin only)
+      operationId: adminDeleteCampaignReplay
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Campaign replay deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ===================== Enemy AI =====================
+  /admin/enemy-ai/active:
+    get:
+      tags: [Enemy AI]
+      summary: List active enemy AIs (staff)
+      description: Available to all authenticated staff users for enemy type configuration.
+      operationId: getActiveEnemyAIs
+      responses:
+        '200':
+          description: Active enemy AI list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ais:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BotAIEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/enemy-ai:
+    get:
+      tags: [Enemy AI]
+      summary: List all enemy AIs (admin only)
+      operationId: adminListEnemyAIs
+      responses:
+        '200':
+          description: All enemy AIs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ais:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BotAIEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Enemy AI]
+      summary: Upload a new enemy AI (admin only)
+      operationId: adminUploadEnemyAI
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, name]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: TypeScript source file (.ts, max 500KB)
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                description:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          description: Enemy AI uploaded and compiled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ai:
+                    $ref: '#/components/schemas/BotAIEntry'
+        '400':
+          description: Compilation/validation failed or no file
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  errors:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/enemy-ai/{id}:
+    put:
+      tags: [Enemy AI]
+      summary: Update enemy AI metadata (admin only)
+      operationId: adminUpdateEnemyAI
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                description:
+                  type: string
+                  maxLength: 500
+                isActive:
+                  type: boolean
+      responses:
+        '200':
+          description: Enemy AI updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags: [Enemy AI]
+      summary: Delete an enemy AI (admin only)
+      operationId: adminDeleteEnemyAI
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Enemy AI deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/enemy-ai/{id}/upload:
+    put:
+      tags: [Enemy AI]
+      summary: Re-upload enemy AI source (admin only)
+      operationId: adminReuploadEnemyAI
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: TypeScript source file (.ts, max 500KB)
+      responses:
+        '200':
+          description: Enemy AI source updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Compilation/validation failed or no file
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  errors:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/enemy-ai/{id}/download:
+    get:
+      tags: [Enemy AI]
+      summary: Download enemy AI source (admin only)
+      operationId: adminDownloadEnemyAI
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TypeScript source file
+          content:
+            text/typescript:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Enemy AI source not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ===================== Seasons =====================
+  /admin/seasons:
+    get:
+      tags: [Seasons]
+      summary: List seasons (admin only)
+      operationId: adminGetSeasons
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Paginated season list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  seasons:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Season'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Seasons]
+      summary: Create a season (admin only)
+      operationId: adminCreateSeason
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, startDate, endDate]
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                startDate:
+                  type: string
+                  format: date
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
+                endDate:
+                  type: string
+                  format: date
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
+      responses:
+        '200':
+          description: Season created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Season'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/seasons/{id}:
+    put:
+      tags: [Seasons]
+      summary: Update a season (admin only)
+      operationId: adminUpdateSeason
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+                isActive:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated season
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Season'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags: [Seasons]
+      summary: Delete a season (admin only)
+      operationId: adminDeleteSeason
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Season deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/seasons/{id}/activate:
+    post:
+      tags: [Seasons]
+      summary: Activate a season (admin only)
+      operationId: adminActivateSeason
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Season activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/seasons/{id}/end:
+    post:
+      tags: [Seasons]
+      summary: End a season (admin only)
+      operationId: adminEndSeason
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resetMode]
+              properties:
+                resetMode:
+                  type: string
+                  enum: [hard, soft]
+                  description: "'hard' resets all Elo to default; 'soft' decays toward default"
+      responses:
+        '200':
+          description: Season ended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ===================== Achievements Admin =====================
+  /admin/achievements:
+    get:
+      tags: [Achievements Admin]
+      summary: List all achievements (admin only)
+      operationId: adminListAchievements
+      responses:
+        '200':
+          description: All achievements
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  achievements:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AchievementEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Achievements Admin]
+      summary: Create an achievement (admin only)
+      operationId: adminCreateAchievement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AchievementInput'
+      responses:
+        '200':
+          description: Achievement created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AchievementEntry'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/achievements/{id}:
+    put:
+      tags: [Achievements Admin]
+      summary: Update an achievement (admin only)
+      operationId: adminUpdateAchievement
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AchievementInput'
+      responses:
+        '200':
+          description: Updated achievement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AchievementEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags: [Achievements Admin]
+      summary: Delete an achievement (admin only)
+      operationId: adminDeleteAchievement
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Achievement deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/achievements/{id}/export:
+    get:
+      tags: [Achievements Admin]
+      summary: Export a single achievement as JSON (admin only)
+      operationId: adminExportAchievement
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Achievement export JSON file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AchievementExportData'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Achievement not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/achievements/export-all:
+    get:
+      tags: [Achievements Admin]
+      summary: Export all achievements as a bundle JSON (admin only)
+      operationId: adminExportAllAchievements
+      responses:
+        '200':
+          description: Achievement bundle JSON file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AchievementBundleExportData'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/achievements/import:
+    post:
+      tags: [Achievements Admin]
+      summary: Import achievements (admin only, two-phase)
+      description: |
+        Phase 1: Post without `cosmeticIdMap` to detect cosmetic conflicts.
+        Phase 2: Post with `cosmeticIdMap` to resolve conflicts and import.
+      operationId: adminImportAchievements
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [achievements]
+              properties:
+                achievements:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AchievementExportEntry'
+                  description: Achievement data to import
+                cosmetics:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/CosmeticBundleEntry'
+                  description: Referenced cosmetics from bundle export
+                cosmeticIdMap:
+                  type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: integer
+                      - type: string
+                        enum: [create, skip]
+                  description: "Mapping of original cosmetic ID to action: existing ID (number), 'create', or 'skip'"
+      responses:
+        '200':
+          description: Phase 1 response with conflicts, or import result
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      conflicts:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AchievementImportConflict'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                      created:
+                        type: integer
+        '400':
+          description: Invalid import data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ===================== Cosmetics Admin =====================
+  /admin/cosmetics:
+    get:
+      tags: [Cosmetics Admin]
+      summary: List all cosmetics (admin only)
+      operationId: adminListCosmetics
+      responses:
+        '200':
+          description: All cosmetics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cosmetics:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CosmeticEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Cosmetics Admin]
+      summary: Create a cosmetic (admin only)
+      operationId: adminCreateCosmetic
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CosmeticInput'
+      responses:
+        '200':
+          description: Cosmetic created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CosmeticEntry'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/cosmetics/{id}:
+    put:
+      tags: [Cosmetics Admin]
+      summary: Update a cosmetic (admin only)
+      operationId: adminUpdateCosmetic
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CosmeticInput'
+      responses:
+        '200':
+          description: Updated cosmetic
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CosmeticEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags: [Cosmetics Admin]
+      summary: Delete a cosmetic (admin only)
+      operationId: adminDeleteCosmetic
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Cosmetic deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/cosmetics/{id}/export:
+    get:
+      tags: [Cosmetics Admin]
+      summary: Export a cosmetic as JSON (admin only)
+      operationId: adminExportCosmetic
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Cosmetic export JSON file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CosmeticExportData'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Cosmetic not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/cosmetics/import:
+    post:
+      tags: [Cosmetics Admin]
+      summary: Import a cosmetic (admin only)
+      operationId: adminImportCosmetic
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CosmeticExportData'
+      responses:
+        '200':
+          description: Cosmetic imported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CosmeticEntry'
+        '400':
+          description: Invalid cosmetic import data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
 components:
   securitySchemes:
@@ -3688,3 +6001,810 @@ components:
         fileSize:
           type: integer
           description: File size in bytes
+
+    # ---- Enums (new) ----
+    ChatMode:
+      type: string
+      enum: [everyone, staff, admin_only, disabled]
+
+    SupportedLanguage:
+      type: string
+      enum: [en, de, fr, es, it, pt, pl, nl, tr, sv, nb, da]
+
+    CosmeticType:
+      type: string
+      enum: [color, eyes, trail, bomb_skin]
+
+    CosmeticRarity:
+      type: string
+      enum: [common, rare, epic, legendary]
+
+    CosmeticUnlockType:
+      type: string
+      enum: [achievement, campaign_stars, level_milestone, default]
+
+    AchievementConditionType:
+      type: string
+      enum: [cumulative, per_game, mode_specific, campaign]
+
+    AchievementRewardType:
+      type: string
+      enum: [cosmetic, title, none]
+
+    ActivityStatus:
+      type: string
+      enum: [offline, online, in_lobby, in_game, in_campaign]
+
+    # ---- Local Co-Op ----
+    LocalCoopLoginRequest:
+      type: object
+      required: [username, password, duration]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 20
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+        duration:
+          type: integer
+          description: Session duration in hours (0 = session-only cookie)
+          enum: [0, 1, 6, 12, 24]
+
+    LocalCoopSession:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+            username:
+              type: string
+        cosmetics:
+          type: object
+          description: Player cosmetic data for rendering
+          additionalProperties: true
+
+    # ---- User (new) ----
+    PrivacySettings:
+      type: object
+      properties:
+        isProfilePublic:
+          type: boolean
+        acceptFriendRequests:
+          type: boolean
+
+    BuddySettings:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 20
+        color:
+          type: string
+          pattern: '^#[0-9a-fA-F]{6}$'
+          description: Hex color code
+        size:
+          type: number
+          minimum: 0.4
+          maximum: 0.8
+
+    # ---- Leaderboard ----
+    LeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: integer
+        userId:
+          type: integer
+        username:
+          type: string
+        eloRating:
+          type: integer
+        peakElo:
+          type: integer
+        matchesPlayed:
+          type: integer
+        totalWins:
+          type: integer
+        totalKills:
+          type: integer
+        level:
+          type: integer
+        totalXp:
+          type: integer
+        rankTier:
+          type: string
+        rankColor:
+          type: string
+
+    LeaderboardResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderboardEntry'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        season:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/Season'
+
+    Season:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        isActive:
+          type: boolean
+
+    RankTier:
+      type: object
+      properties:
+        name:
+          type: string
+        minElo:
+          type: integer
+        maxElo:
+          type: integer
+        color:
+          type: string
+
+    RankConfig:
+      type: object
+      properties:
+        tiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/RankTier'
+        subTiersEnabled:
+          type: boolean
+
+    SeasonSummary:
+      type: object
+      properties:
+        seasonId:
+          type: integer
+        seasonName:
+          type: string
+        finalElo:
+          type: integer
+        peakElo:
+          type: integer
+        matchesPlayed:
+          type: integer
+
+    UserAchievementPublic:
+      type: object
+      properties:
+        achievement:
+          $ref: '#/components/schemas/AchievementEntry'
+        unlockedAt:
+          type: string
+          format: date-time
+
+    PublicProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        role:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        stats:
+          type: object
+          properties:
+            totalMatches:
+              type: integer
+            totalWins:
+              type: integer
+            totalKills:
+              type: integer
+            totalDeaths:
+              type: integer
+            eloRating:
+              type: integer
+            peakElo:
+              type: integer
+            winStreak:
+              type: integer
+            bestWinStreak:
+              type: integer
+            level:
+              type: integer
+            totalXp:
+              type: integer
+        rankTier:
+          type: string
+        rankColor:
+          type: string
+        seasonHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeasonSummary'
+        achievements:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserAchievementPublic'
+        equippedCosmetics:
+          $ref: '#/components/schemas/EquippedCosmetics'
+        cosmeticData:
+          type: object
+          nullable: true
+          description: Resolved cosmetic rendering data
+          additionalProperties: true
+
+    UserRankInfo:
+      type: object
+      properties:
+        eloRating:
+          type: integer
+        peakElo:
+          type: integer
+        rankTier:
+          type: string
+        rankColor:
+          type: string
+        seasonElo:
+          type: integer
+          nullable: true
+        level:
+          type: integer
+        totalXp:
+          type: integer
+
+    # ---- Friends ----
+    FriendEntry:
+      type: object
+      properties:
+        userId:
+          type: integer
+        username:
+          type: string
+        status:
+          type: string
+          enum: [pending, accepted]
+        direction:
+          type: string
+          nullable: true
+          enum: [incoming, outgoing, null]
+        activity:
+          $ref: '#/components/schemas/ActivityStatus'
+        roomCode:
+          type: string
+        gameMode:
+          type: string
+        since:
+          type: string
+          format: date-time
+
+    FriendRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        fromUserId:
+          type: integer
+        fromUsername:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    BlockedUser:
+      type: object
+      properties:
+        userId:
+          type: integer
+        username:
+          type: string
+
+    # ---- Messages ----
+    ConversationListItem:
+      type: object
+      properties:
+        userId:
+          type: integer
+        username:
+          type: string
+        lastMessage:
+          type: string
+        lastMessageAt:
+          type: string
+          format: date-time
+        unreadCount:
+          type: integer
+
+    ConversationMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        senderId:
+          type: integer
+        senderUsername:
+          type: string
+        recipientId:
+          type: integer
+        message:
+          type: string
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    # ---- Cosmetics ----
+    CosmeticEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/CosmeticType'
+        config:
+          type: object
+          additionalProperties: true
+        rarity:
+          $ref: '#/components/schemas/CosmeticRarity'
+        unlockType:
+          $ref: '#/components/schemas/CosmeticUnlockType'
+        unlockRequirement:
+          type: object
+          nullable: true
+          additionalProperties: true
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+
+    EquippedCosmetics:
+      type: object
+      properties:
+        colorId:
+          type: integer
+          nullable: true
+        eyesId:
+          type: integer
+          nullable: true
+        trailId:
+          type: integer
+          nullable: true
+        bombSkinId:
+          type: integer
+          nullable: true
+
+    # ---- Achievements ----
+    AchievementEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        category:
+          type: string
+        conditionType:
+          $ref: '#/components/schemas/AchievementConditionType'
+        conditionConfig:
+          type: object
+          additionalProperties: true
+        rewardType:
+          $ref: '#/components/schemas/AchievementRewardType'
+        rewardId:
+          type: integer
+          nullable: true
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+
+    UserAchievement:
+      type: object
+      properties:
+        achievementId:
+          type: integer
+        unlockedAt:
+          type: string
+          format: date-time
+          nullable: true
+        progress:
+          type: object
+          nullable: true
+          additionalProperties: true
+
+    AchievementProgress:
+      type: object
+      properties:
+        achievementId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        category:
+          type: string
+        conditionType:
+          $ref: '#/components/schemas/AchievementConditionType'
+        current:
+          type: integer
+          description: Current progress value
+        threshold:
+          type: integer
+          description: Target value to unlock
+        unlocked:
+          type: boolean
+        unlockedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    # ---- Custom Maps ----
+    CustomMap:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        mapWidth:
+          type: integer
+        mapHeight:
+          type: integer
+        tiles:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+        spawnPoints:
+          type: array
+          items:
+            type: object
+            properties:
+              x:
+                type: integer
+              y:
+                type: integer
+        isPublished:
+          type: boolean
+        createdBy:
+          type: integer
+        creatorUsername:
+          type: string
+        playCount:
+          type: integer
+
+    CustomMapSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        mapWidth:
+          type: integer
+        mapHeight:
+          type: integer
+        spawnCount:
+          type: integer
+        isPublished:
+          type: boolean
+        createdBy:
+          type: integer
+        creatorUsername:
+          type: string
+        playCount:
+          type: integer
+
+    CustomMapInput:
+      type: object
+      required: [name, mapWidth, mapHeight, tiles, spawnPoints]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+          default: ''
+        mapWidth:
+          type: integer
+          minimum: 9
+          maximum: 51
+          description: Must be an odd number
+        mapHeight:
+          type: integer
+          minimum: 9
+          maximum: 51
+          description: Must be an odd number
+        tiles:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+        spawnPoints:
+          type: array
+          items:
+            type: object
+            required: [x, y]
+            properties:
+              x:
+                type: integer
+              y:
+                type: integer
+          minItems: 2
+          maxItems: 8
+        isPublished:
+          type: boolean
+          default: false
+
+    # ---- Campaign Replays ----
+    CampaignReplayListItem:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        levelId:
+          type: integer
+        levelName:
+          type: string
+        worldName:
+          type: string
+        userId:
+          type: integer
+        username:
+          type: string
+        coopMode:
+          type: boolean
+        buddyMode:
+          type: boolean
+        duration:
+          type: number
+          description: Duration in seconds
+        result:
+          type: string
+          enum: [completed, failed]
+        stars:
+          type: integer
+          minimum: 0
+          maximum: 3
+        createdAt:
+          type: string
+          format: date-time
+        fileSizeKB:
+          type: integer
+
+    # ---- Achievement Admin ----
+    AchievementInput:
+      type: object
+      required: [name, description, conditionType, conditionConfig]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+        icon:
+          type: string
+          maxLength: 10
+        category:
+          type: string
+          maxLength: 50
+        conditionType:
+          $ref: '#/components/schemas/AchievementConditionType'
+        conditionConfig:
+          type: object
+          additionalProperties: true
+        rewardType:
+          $ref: '#/components/schemas/AchievementRewardType'
+        rewardId:
+          type: integer
+          nullable: true
+        sortOrder:
+          type: integer
+
+    AchievementExportData:
+      type: object
+      properties:
+        _format:
+          type: string
+          enum: [blast-arena-achievement]
+        _version:
+          type: integer
+          enum: [1]
+        name:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        category:
+          type: string
+        conditionType:
+          $ref: '#/components/schemas/AchievementConditionType'
+        conditionConfig:
+          type: object
+          additionalProperties: true
+        rewardType:
+          $ref: '#/components/schemas/AchievementRewardType'
+        reward:
+          $ref: '#/components/schemas/CosmeticExportEntry'
+        sortOrder:
+          type: integer
+
+    AchievementExportEntry:
+      type: object
+      description: Achievement data without format/version headers (used in bundle and import)
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        category:
+          type: string
+        conditionType:
+          $ref: '#/components/schemas/AchievementConditionType'
+        conditionConfig:
+          type: object
+          additionalProperties: true
+        rewardType:
+          $ref: '#/components/schemas/AchievementRewardType'
+        reward:
+          $ref: '#/components/schemas/CosmeticExportEntry'
+        sortOrder:
+          type: integer
+
+    AchievementBundleExportData:
+      type: object
+      properties:
+        _format:
+          type: string
+          enum: [blast-arena-achievement-bundle]
+        _version:
+          type: integer
+          enum: [1]
+        achievements:
+          type: array
+          items:
+            $ref: '#/components/schemas/AchievementExportEntry'
+        cosmetics:
+          type: array
+          items:
+            $ref: '#/components/schemas/CosmeticBundleEntry'
+
+    AchievementImportConflict:
+      type: object
+      properties:
+        originalCosmeticId:
+          type: integer
+        cosmeticName:
+          type: string
+        existingId:
+          type: integer
+        existingName:
+          type: string
+
+    CosmeticBundleEntry:
+      type: object
+      properties:
+        originalId:
+          type: integer
+        data:
+          $ref: '#/components/schemas/CosmeticExportEntry'
+
+    # ---- Cosmetic Admin ----
+    CosmeticInput:
+      type: object
+      required: [name, type, config]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        type:
+          $ref: '#/components/schemas/CosmeticType'
+        config:
+          type: object
+          additionalProperties: true
+        rarity:
+          $ref: '#/components/schemas/CosmeticRarity'
+        unlockType:
+          $ref: '#/components/schemas/CosmeticUnlockType'
+        unlockRequirement:
+          type: object
+          nullable: true
+          additionalProperties: true
+        sortOrder:
+          type: integer
+
+    CosmeticExportData:
+      type: object
+      properties:
+        _format:
+          type: string
+          enum: [blast-arena-cosmetic]
+        _version:
+          type: integer
+          enum: [1]
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/CosmeticType'
+        config:
+          type: object
+          additionalProperties: true
+        rarity:
+          $ref: '#/components/schemas/CosmeticRarity'
+        unlockType:
+          $ref: '#/components/schemas/CosmeticUnlockType'
+        unlockRequirement:
+          type: object
+          nullable: true
+          additionalProperties: true
+        sortOrder:
+          type: integer
+
+    CosmeticExportEntry:
+      type: object
+      nullable: true
+      description: Cosmetic data without format/version headers (used in achievement rewards)
+      properties:
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/CosmeticType'
+        config:
+          type: object
+          additionalProperties: true
+        rarity:
+          $ref: '#/components/schemas/CosmeticRarity'
+        unlockType:
+          $ref: '#/components/schemas/CosmeticUnlockType'
+        unlockRequirement:
+          type: object
+          nullable: true
+          additionalProperties: true
+        sortOrder:
+          type: integer
