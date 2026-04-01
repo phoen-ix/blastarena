@@ -26,8 +26,8 @@ Open `http://localhost:8080` (or your configured `APP_EXTERNAL_PORT`). See `.env
 | **Teams** | 4-8 | 4 min | Two teams — last team standing. Friendly fire configurable |
 | **Battle Royale** | 4-8 | 5 min | Circular danger zone shrinks inward |
 | **Sudden Death** | 2-8 | 2 min | Start fully powered, no power-ups, one hit kills |
-| **Deathmatch** | 2-8 | 5 min | Respawn after death, first to 10 kills wins |
-| **King of the Hill** | 2-8 | 4 min | Control the 3x3 zone (moves every 30s with warning), first to 100 points |
+| **Deathmatch** | 2-8 | 5 min | Respawn after death, first to 15 kills wins |
+| **King of the Hill** | 2-8 | 4 min | Control the 3x3 zone (moves every 30s with warning), 2 pts/tick, first to 100 points |
 
 ## Controls
 
@@ -179,8 +179,11 @@ Documentation served via backend API from `docs/` directory (bind-mounted in dev
 
 - **Server-authoritative**: All game logic runs on the server at 20 ticks/sec
 - **Grid-based movement**: Players occupy exactly one tile at a time
+- **Procedural audio**: All SFX synthesized via Web Audio API (explosions, bombs, power-ups, death, countdown, victory/defeat) — no external audio files. Volume controls in Settings
+- **In-game minimap**: Canvas2D overlay showing tiles, players, bombs, explosions, zone boundaries, and KOTH hill. Toggleable in settings
+- **Kill feed with cause**: Death causes tracked (bomb, zone, lava, quicksand, spikes, dark rift, self, disconnect) with icons in kill feed and death banner
 - **Monorepo**: npm workspaces — `shared/` (types + constants), `backend/` (server), `frontend/` (client)
-- **Self-hosted assets**: All fonts and static resources served locally — no external CDN dependencies
+- **Self-hosted assets**: All fonts, sounds, and static resources served locally — no external CDN dependencies
 
 ## Internationalization
 

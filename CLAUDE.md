@@ -42,7 +42,9 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - **UI conventions**: Unified CSS classes: `.panel-header`/`.panel-content`, `.tab-bar`/`.tab-item`, `.data-table`, `.form-grid`/`.form-group`/`.input`/`.select`, `.toggle-switch`, `.setting-row`, `.option-chip`, `.mini-stat`, `.modal-header`/`.modal-body`/`.modal-footer`, `.btn`/`.btn-primary`/`.btn-secondary`/`.btn-ghost`/`.btn-sm`
 - **Gamepad UI nav**: `UIGamepadNavigator` spatial navigation — new interactive elements need `.sidebar-nav-item` or `.room-card` classes
 - **Rendering**: All sprites procedurally generated in `BootScene.generateTextures()` — no external image assets. `activeMoveAnim` Set on PlayerSprite prevents tween stacking. Conveyor belts use Phaser spritesheet animations (4 frames × 4 directions, 8fps); respects `settings.animations` flag. Power-up icons are procedural Canvas2D (`powerUpIcons.ts`) shared between BootScene and UI — no emoji `fillText`. Enemy addon fields on `EnemySpriteConfig` are optional with `?? false` / `?? 'none'` fallbacks
-- **HUD**: DOM-based overlay in HUDScene.ts. Timer counts up for campaign levels with no time limit (`roundTime >= 99999`), counts down otherwise
+- **Audio**: Web Audio API procedural SFX via `AudioManager` singleton + `SoundGenerator`. No external audio files — all sounds synthesized from oscillators and noise buffers. Lazy `AudioContext` init on first user gesture (browser autoplay policy). Phaser runs with `noAudio: true`. Volume controls (master, SFX, mute) in Settings preferences tab, persisted to localStorage key `blast-arena-audio`
+- **HUD**: DOM-based overlay in HUDScene.ts. Timer counts up for campaign levels with no time limit (`roundTime >= 99999`), counts down otherwise. In-game minimap (Canvas2D, 120×120px, bottom-right) shows tiles, players, bombs, explosions, zone/hill. Toggleable via settings, throttled to every 4 ticks. Kill feed shows cause icons (bomb, zone, hazard type, self, disconnect). Death banner for local player with killer info
+- **Kill feed**: `KillCause` type (`bomb|zone|lava|quicksand|spikes|dark_rift|disconnect|self`) tracks death source through `tickEvents.playerDied`. Cause icons in kill feed, `.hud-death-banner` overlay for local player deaths
 - **Countdown**: Synced server/client — 36 ticks (1.8s). Both block inputs during countdown
 - **Gamepad**: `pendingGamepadAction` latching survives 50ms tick throttle. Keyboard takes priority
 - **Input edge-detection**: Keyboard bomb/detonate/throw use `Phaser.Input.Keyboard.JustDown()` (fires once per press). Gamepad uses `bombDown && !prevBomb`. Local co-op uses same edge-detection pattern
@@ -145,7 +147,7 @@ Full-screen panel for admin/moderator roles. `staffMiddleware` (admin+moderator)
 - Bot teams stored in `MatchConfig.botTeams`; `room:setTeam` and `room:setBotTeam` socket events
 
 ### Game Modes
-FFA (2-8, last standing), Teams (4-8, 2 teams, friendly fire toggle), Battle Royale (4-8, shrinking zone), Sudden Death (2-8, maxed stats, one hit), Deathmatch (2-8, respawn, first to 10 kills), King of the Hill (2-8, control zone, first to 100; hill moves every 30s with 5s warning, `pendingHillZone` ghost outline)
+FFA (2-8, last standing), Teams (4-8, 2 teams, friendly fire toggle), Battle Royale (4-8, shrinking zone), Sudden Death (2-8, maxed stats, one hit), Deathmatch (2-8, respawn, first to 15 kills), King of the Hill (2-8, control zone, 2 pts/tick to 100; hill moves every 30s with 5s warning, `pendingHillZone` ghost outline)
 
 ### Power-Ups (9 types)
 bomb_up, fire_up, speed_up, shield, kick, pierce_bomb (through destructibles), remote_bomb (E to detonate, FIFO/ALL toggle), line_bomb (line in facing direction), bomb_throw (Q to throw 3 tiles over obstacles, weight 4 rare)
