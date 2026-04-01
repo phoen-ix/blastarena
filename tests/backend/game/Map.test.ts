@@ -72,4 +72,113 @@ describe('Map Generation', () => {
     }
     expect(differences).toBeGreaterThan(0);
   });
+
+  it('should handle minimum map size (9x9)', () => {
+    const map = generateMap(9, 9, 100);
+    expect(map.width).toBe(9);
+    expect(map.height).toBe(9);
+    expect(map.tiles.length).toBe(9);
+    expect(map.tiles[0].length).toBe(9);
+    expect(map.spawnPoints.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('should handle maximum map size (51x51)', () => {
+    const map = generateMap(51, 51, 200);
+    expect(map.width).toBe(51);
+    expect(map.height).toBe(51);
+    expect(map.tiles.length).toBe(51);
+    expect(map.tiles[0].length).toBe(51);
+    expect(map.spawnPoints.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('should generate more walls with higher wallDensity', () => {
+    const lowDensity = generateMap(15, 13, 42, 0.2);
+    const highDensity = generateMap(15, 13, 42, 0.8);
+
+    let lowCount = 0;
+    let highCount = 0;
+    for (let y = 0; y < 13; y++) {
+      for (let x = 0; x < 15; x++) {
+        if (lowDensity.tiles[y][x] === 'destructible') lowCount++;
+        if (highDensity.tiles[y][x] === 'destructible') highCount++;
+      }
+    }
+    expect(highCount).toBeGreaterThan(lowCount);
+  });
+
+  it('should generate fewer walls with wallDensity 0', () => {
+    const map = generateMap(15, 13, 42, 0);
+
+    let destructibleCount = 0;
+    for (let y = 0; y < 13; y++) {
+      for (let x = 0; x < 15; x++) {
+        if (map.tiles[y][x] === 'destructible') destructibleCount++;
+      }
+    }
+    expect(destructibleCount).toBe(0);
+  });
+
+  it('should include hazard tiles when hazardTiles array is non-empty', () => {
+    const map = generateMap(15, 13, 42, 0.3, ['lava', 'ice']);
+
+    let hazardCount = 0;
+    for (let y = 0; y < 13; y++) {
+      for (let x = 0; x < 15; x++) {
+        const tile = map.tiles[y][x];
+        if (tile === 'lava' || tile === 'ice') hazardCount++;
+      }
+    }
+    expect(hazardCount).toBeGreaterThan(0);
+  });
+
+  it('should not place hazard tiles on spawn points', () => {
+    const map = generateMap(15, 13, 42, 0.3, ['lava', 'ice', 'spikes']);
+
+    for (const sp of map.spawnPoints) {
+      expect(map.tiles[sp.y][sp.x]).toBe('spawn');
+    }
+  });
+
+  it('should not place hazard tiles on indestructible walls', () => {
+    const map = generateMap(15, 13, 42, 0.3, ['lava', 'ice', 'spikes']);
+
+    // Border walls remain walls
+    for (let x = 0; x < 15; x++) {
+      expect(map.tiles[0][x]).toBe('wall');
+      expect(map.tiles[12][x]).toBe('wall');
+    }
+    for (let y = 0; y < 13; y++) {
+      expect(map.tiles[y][0]).toBe('wall');
+      expect(map.tiles[y][14]).toBe('wall');
+    }
+    // Internal grid pattern walls remain walls
+    for (let y = 2; y < 12; y += 2) {
+      for (let x = 2; x < 14; x += 2) {
+        expect(map.tiles[y][x]).toBe('wall');
+      }
+    }
+  });
+
+  it('should have borders that are all wall tiles', () => {
+    const sizes = [
+      { w: 9, h: 9 },
+      { w: 15, h: 13 },
+      { w: 21, h: 17 },
+      { w: 51, h: 51 },
+    ];
+
+    for (const { w, h } of sizes) {
+      const map = generateMap(w, h, 99);
+      // Top and bottom borders
+      for (let x = 0; x < w; x++) {
+        expect(map.tiles[0][x]).toBe('wall');
+        expect(map.tiles[h - 1][x]).toBe('wall');
+      }
+      // Left and right borders
+      for (let y = 0; y < h; y++) {
+        expect(map.tiles[y][0]).toBe('wall');
+        expect(map.tiles[y][w - 1]).toBe('wall');
+      }
+    }
+  });
 });

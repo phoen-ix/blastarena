@@ -11,6 +11,11 @@ import {
   INVULNERABILITY_TICKS,
   MOVE_COOLDOWN_BASE,
   TICK_RATE,
+  DEATHMATCH_RESPAWN_TICKS,
+  DEATHMATCH_KILL_TARGET,
+  KOTH_ZONE_SIZE,
+  KOTH_SCORE_TARGET,
+  KOTH_POINTS_PER_TICK,
 } from '@blast-arena/shared';
 
 // Default small map config for most tests
@@ -1543,6 +1548,551 @@ describe('GameStateManager', () => {
 
       // Should NOT move — P2 blocks
       expect(p1.position).toEqual({ x: 3, y: 3 });
+    });
+  });
+
+  // ───────────────────────────────────────────────
+  // 20. Advanced Game Mechanics
+  // ───────────────────────────────────────────────
+  describe('Advanced game mechanics', () => {
+    /** Create a PlayerInput for throw action. */
+    function throwInput(): PlayerInput {
+      return { direction: null, action: 'throw', tick: 0, seq: ++seqCounter };
+    }
+
+    // --- Remote bomb detonation ---
+
+    it('should place remote bombs when player has hasRemoteBomb', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      startPlaying(gs);
+
+      placePlayer(p1, 3, 3);
+      p1.hasRemoteBomb = true;
+
+      gs.inputBuffer.addInput(1, actionInput('bomb'));
+      gs.processTick();
+
+      const bombs = Array.from(gs.bombs.values());
+      expect(bombs.length).toBe(1);
+      expect(bombs[0].bombType).toBe('remote');
+    });
+
+    it('should detonate remote bomb on detonate action', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      gs.addPlayer(2, 'Bob', null);
+      startPlaying(gs);
+
+      placePlayer(p1, 3, 3);
+      p1.hasRemoteBomb = true;
+
+      // Place a remote bomb
+      gs.inputBuffer.addInput(1, actionInput('bomb'));
+      gs.processTick();
+      expect(gs.bombs.size).toBe(1);
+
+      // Move player off the bomb so detonate input isn't consumed by bomb placement logic
+      placePlayer(p1, 5, 3);
+      clearCooldown(p1);
+
+      // Detonate it
+      gs.inputBuffer.addInput(1, actionInput('detonate'));
+      gs.processTick();
+
+      // Bomb should be gone, explosion should exist
+      expect(gs.bombs.size).toBe(0);
+      expect(gs.explosions.size).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should detonate oldest remote bomb first in FIFO mode', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      gs.addPlayer(2, 'Bob', null);
+      startPlaying(gs);
+
+      p1.hasRemoteBomb = true;
+      p1.remoteDetonateMode = 'fifo';
+      p1.maxBombs = 3;
+
+      // Place first bomb at (3,3)
+      placePlayer(p1, 3, 3);
+      gs.inputBuffer.addInput(1, actionInput('bomb'));
+      gs.processTick();
+      expect(gs.bombs.size).toBe(1);
+
+      // Move player off first bomb and place second bomb at (5,3)
+      placePlayer(p1, 5, 3);
+      clearCooldown(p1);
+      gs.inputBuffer.addInput(1, actionInput('bomb'));
+      gs.processTick();
+
+      expect(gs.bombs.size).toBe(2);
+
+      // Move player away from bombs before detonating
+      placePlayer(p1, 7, 3);
+      clearCooldown(p1);
+
+      // Detonate in FIFO — should remove the oldest (3,3)
+      gs.inputBuffer.addInput(1, actionInput('detonate'));
+      gs.processTick();
+
+      expect(gs.bombs.size).toBe(1);
+      const remaining = Array.from(gs.bombs.values())[0];
+      expect(remaining.position).toEqual({ x: 5, y: 3 });
+    });
+
+    // --- Conveyor belt mechanics ---
+
+    it('should push player in conveyor direction', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      startPlaying(gs);
+
+      // Place a conveyor_right tile at (3,3)
+      gs.map.tiles[3][3] = 'conveyor_right';
+      placePlayer(p1, 3, 3);
+      clearCooldown(p1);
+
+      gs.processTick();
+
+      expect(p1.position).toEqual({ x: 4, y: 3 });
+    });
+
+    it('should not push player into a wall via conveyor', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      startPlaying(gs);
+
+      // Place conveyor_left at column 1, which pushes toward column 0 (border wall)
+      gs.map.tiles[3][1] = 'conveyor_left';
+      placePlayer(p1, 1, 3);
+      clearCooldown(p1);
+
+      gs.processTick();
+
+      // Player should stay — wall blocks
+      expect(p1.position).toEqual({ x: 1, y: 3 });
+    });
+
+    it('should push player upward on conveyor_up', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      startPlaying(gs);
+
+      gs.map.tiles[5][3] = 'conveyor_up';
+      placePlayer(p1, 3, 5);
+      clearCooldown(p1);
+
+      gs.processTick();
+
+      expect(p1.position).toEqual({ x: 3, y: 4 });
+    });
+
+    // --- Teleporter mechanics ---
+
+    it('should teleport player from teleporter_a to teleporter_b on move', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      startPlaying(gs);
+
+      // Place teleporter pair
+      gs.map.tiles[3][5] = 'teleporter_a';
+      gs.map.tiles[7][9] = 'teleporter_b';
+
+      // Place player adjacent to teleporter_a, then move onto it
+      placePlayer(p1, 4, 3);
+      clearCooldown(p1);
+
+      gs.inputBuffer.addInput(1, moveInput('right'));
+      gs.processTick();
+
+      // Player should end up on teleporter_b
+      expect(p1.position).toEqual({ x: 9, y: 7 });
+    });
+
+    it('should teleport player from teleporter_b to teleporter_a on move', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      startPlaying(gs);
+
+      // Place teleporter pair
+      gs.map.tiles[3][5] = 'teleporter_a';
+      gs.map.tiles[7][8] = 'teleporter_b';
+
+      // Place player adjacent to teleporter_b, then move onto it
+      placePlayer(p1, 7, 7);
+      clearCooldown(p1);
+
+      gs.inputBuffer.addInput(1, moveInput('right'));
+      gs.processTick();
+
+      // Player should end up on teleporter_a
+      expect(p1.position).toEqual({ x: 5, y: 3 });
+    });
+
+    // --- King of the Hill ---
+
+    it('should initialize hill zone in king_of_the_hill mode', () => {
+      const kothGs = new GameStateManager({
+        ...BASE_CONFIG,
+        gameMode: 'king_of_the_hill',
+      });
+      kothGs.addPlayer(1, 'Alice', null);
+      kothGs.addPlayer(2, 'Bob', null);
+
+      expect(kothGs.hillZone).not.toBeNull();
+      expect(kothGs.hillZone!.width).toBe(KOTH_ZONE_SIZE);
+      expect(kothGs.hillZone!.height).toBe(KOTH_ZONE_SIZE);
+    });
+
+    it('should score KOTH points when one player is on hill', () => {
+      const kothGs = new GameStateManager({
+        ...BASE_CONFIG,
+        gameMode: 'king_of_the_hill',
+      });
+      const p1 = kothGs.addPlayer(1, 'Alice', null);
+      kothGs.addPlayer(2, 'Bob', null);
+      startPlaying(kothGs);
+
+      // Place player inside the hill zone
+      const hx = kothGs.hillZone!.x;
+      const hy = kothGs.hillZone!.y;
+      placePlayer(p1, hx, hy);
+
+      // Advance a few ticks
+      advanceTicks(kothGs, 5);
+
+      const score = kothGs.kothScores.get(1) || 0;
+      expect(score).toBe(5 * KOTH_POINTS_PER_TICK);
+    });
+
+    it('should not score KOTH when two players contest the hill', () => {
+      const kothGs = new GameStateManager({
+        ...BASE_CONFIG,
+        gameMode: 'king_of_the_hill',
+      });
+      const p1 = kothGs.addPlayer(1, 'Alice', null);
+      const p2 = kothGs.addPlayer(2, 'Bob', null);
+      startPlaying(kothGs);
+
+      // Both players inside the hill zone
+      const hx = kothGs.hillZone!.x;
+      const hy = kothGs.hillZone!.y;
+      placePlayer(p1, hx, hy);
+      placePlayer(p2, hx + 1, hy);
+
+      advanceTicks(kothGs, 5);
+
+      const score1 = kothGs.kothScores.get(1) || 0;
+      const score2 = kothGs.kothScores.get(2) || 0;
+      expect(score1).toBe(0);
+      expect(score2).toBe(0);
+    });
+
+    // --- Deathmatch advanced ---
+
+    it('should respawn dead player after DEATHMATCH_RESPAWN_TICKS exactly', () => {
+      const dmGs = new GameStateManager({ ...BASE_CONFIG, gameMode: 'deathmatch' });
+      const p1 = dmGs.addPlayer(1, 'Alice', null);
+      dmGs.addPlayer(2, 'Bob', null);
+      startPlaying(dmGs);
+
+      p1.die();
+
+      // One tick before respawn — sets the respawnTick, then tick toward it
+      advanceTicks(dmGs, DEATHMATCH_RESPAWN_TICKS);
+      expect(p1.alive).toBe(false);
+
+      // One more tick should trigger respawn
+      dmGs.processTick();
+      expect(p1.alive).toBe(true);
+    });
+
+    it('should increment kills on deathmatch kill and end at kill target', () => {
+      const dmGs = new GameStateManager({ ...BASE_CONFIG, gameMode: 'deathmatch' });
+      const p1 = dmGs.addPlayer(1, 'Alice', null);
+      const p2 = dmGs.addPlayer(2, 'Bob', null);
+      startPlaying(dmGs);
+
+      // Simulate kills up to the target
+      p1.kills = DEATHMATCH_KILL_TARGET - 1;
+
+      // Place bomb to kill p2
+      placePlayer(p1, 3, 3);
+      placePlayer(p2, 4, 3);
+      makeVulnerable(p2);
+
+      gs.inputBuffer.addInput(1, actionInput('bomb'));
+      // Use the deathmatch game state
+      dmGs.inputBuffer.addInput(1, actionInput('bomb'));
+      advanceTicks(dmGs, BOMB_TIMER_TICKS);
+
+      // p1 should have reached kill target and game should finish
+      if (p1.kills >= DEATHMATCH_KILL_TARGET) {
+        expect(dmGs.status).toBe('finished');
+      }
+    });
+
+    // --- Line bomb ---
+
+    it('should place bombs in a line when player has hasLineBomb', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      startPlaying(gs);
+
+      p1.hasLineBomb = true;
+      p1.maxBombs = 3;
+      p1.direction = 'right';
+      placePlayer(p1, 3, 3);
+
+      gs.inputBuffer.addInput(1, actionInput('bomb'));
+      gs.processTick();
+
+      // Should place bombs at (3,3), (4,3), (5,3) — one at feet + two in facing direction
+      const bombs = Array.from(gs.bombs.values());
+      expect(bombs.length).toBe(3);
+      const positions = bombs.map((b) => `${b.position.x},${b.position.y}`).sort();
+      expect(positions).toContain('3,3');
+      expect(positions).toContain('4,3');
+      expect(positions).toContain('5,3');
+    });
+
+    // --- Pierce bomb ---
+
+    it('should pass through destructible walls with pierce bomb', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      gs.addPlayer(2, 'Bob', null);
+      startPlaying(gs);
+
+      p1.hasPierceBomb = true;
+      p1.fireRange = 3;
+      placePlayer(p1, 3, 3);
+
+      // Place destructible walls in the blast path (right of bomb)
+      gs.map.tiles[3][4] = 'destructible';
+      gs.map.tiles[3][5] = 'destructible';
+
+      gs.inputBuffer.addInput(1, actionInput('bomb'));
+      advanceTicks(gs, BOMB_TIMER_TICKS);
+
+      // Both walls should be destroyed (pierce goes through)
+      expect(gs.map.tiles[3][4]).toBe('empty');
+      expect(gs.map.tiles[3][5]).toBe('empty');
+    });
+
+    // --- Bomb throw ---
+
+    it('should throw bomb 3 tiles away when player has hasBombThrow', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      startPlaying(gs);
+
+      p1.hasBombThrow = true;
+      p1.direction = 'right';
+      placePlayer(p1, 3, 3);
+
+      gs.inputBuffer.addInput(1, throwInput());
+      gs.processTick();
+
+      const bombs = Array.from(gs.bombs.values());
+      expect(bombs.length).toBe(1);
+      // Bomb should land 3 tiles away in facing direction
+      expect(bombs[0].position).toEqual({ x: 6, y: 3 });
+    });
+
+    it('should land bomb at closest valid tile if throw target is blocked', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      startPlaying(gs);
+
+      p1.hasBombThrow = true;
+      p1.direction = 'right';
+      placePlayer(p1, 3, 3);
+
+      // Block tile at x=6 (would be 3 tiles away)
+      gs.map.tiles[3][6] = 'wall';
+
+      gs.inputBuffer.addInput(1, throwInput());
+      gs.processTick();
+
+      const bombs = Array.from(gs.bombs.values());
+      expect(bombs.length).toBe(1);
+      // Should land on the next closest valid tile (x=5)
+      expect(bombs[0].position).toEqual({ x: 5, y: 3 });
+    });
+
+    // --- Bomb kick ---
+
+    it('should start sliding bomb when player with hasKick walks into it', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      const p2 = gs.addPlayer(2, 'Bob', null);
+      startPlaying(gs);
+
+      p1.hasKick = true;
+      placePlayer(p1, 3, 3);
+      placePlayer(p2, 9, 9); // far away
+
+      // Place a bomb at (4,3) — manually to control position
+      const { Bomb: BombClass } = require('../../../backend/src/game/Bomb');
+      const bomb = new Bomb({ x: 4, y: 3 }, 2, 1, 'normal');
+      gs.bombs.set(bomb.id, bomb);
+
+      clearCooldown(p1);
+
+      // Player tries to move right into the bomb
+      gs.inputBuffer.addInput(1, moveInput('right'));
+      gs.processTick();
+
+      // Bomb should start sliding right
+      expect(bomb.sliding).toBe('right');
+      // Player should stay (blocked by bomb)
+      expect(p1.position).toEqual({ x: 3, y: 3 });
+    });
+
+    // --- Shield mechanics ---
+
+    it('should absorb explosion damage with shield', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      const p2 = gs.addPlayer(2, 'Bob', null);
+      startPlaying(gs);
+
+      placePlayer(p1, 3, 3);
+      placePlayer(p2, 4, 3);
+      makeVulnerable(p2);
+      p2.hasShield = true;
+
+      // P1 places bomb next to P2
+      gs.inputBuffer.addInput(1, actionInput('bomb'));
+      advanceTicks(gs, BOMB_TIMER_TICKS);
+
+      // Shield should absorb, player still alive but shield gone
+      expect(p2.alive).toBe(true);
+      expect(p2.hasShield).toBe(false);
+      expect(p2.invulnerableTicks).toBe(10); // Brief post-shield invulnerability
+    });
+
+    // --- Power-up drop on death ---
+
+    it('should drop a power-up when a buffed player dies', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      const p2 = gs.addPlayer(2, 'Bob', null);
+      startPlaying(gs);
+
+      placePlayer(p1, 3, 3);
+      placePlayer(p2, 4, 3);
+      makeVulnerable(p2);
+
+      // Give P2 some power-ups so a drop is guaranteed
+      p2.maxBombs = 3; // 2 bomb_up stacks
+      p2.fireRange = 3; // 2 fire_up stacks
+      p2.speed = 2;
+      p2.hasKick = true;
+
+      const powerUpsBefore = gs.powerUps.size;
+
+      // Kill P2 via explosion
+      gs.inputBuffer.addInput(1, actionInput('bomb'));
+      advanceTicks(gs, BOMB_TIMER_TICKS);
+
+      expect(p2.alive).toBe(false);
+      // Should have dropped exactly 1 power-up
+      expect(gs.powerUps.size).toBe(powerUpsBefore + 1);
+    });
+
+    // --- Self-kill penalty ---
+
+    it('should decrement kills on self-kill', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      gs.addPlayer(2, 'Bob', null);
+      startPlaying(gs);
+
+      placePlayer(p1, 3, 3);
+      makeVulnerable(p1);
+      p1.kills = 2;
+
+      // Place bomb and stay on it
+      gs.inputBuffer.addInput(1, actionInput('bomb'));
+      advanceTicks(gs, BOMB_TIMER_TICKS);
+
+      expect(p1.alive).toBe(false);
+      expect(p1.selfKills).toBe(1);
+      expect(p1.kills).toBe(1); // 2 - 1 = 1
+    });
+
+    // --- Remote detonation mode toggle ---
+
+    it('should toggle remote detonation mode when no remote bombs are placed', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      gs.addPlayer(2, 'Bob', null);
+      startPlaying(gs);
+
+      p1.hasRemoteBomb = true;
+      expect(p1.remoteDetonateMode).toBe('all');
+
+      // Detonate with no bombs placed — should toggle mode
+      gs.inputBuffer.addInput(1, actionInput('detonate'));
+      gs.processTick();
+
+      expect(p1.remoteDetonateMode).toBe('fifo');
+    });
+
+    // --- KOTH win condition ---
+
+    it('should finish game when KOTH score target is reached', () => {
+      const kothGs = new GameStateManager({
+        ...BASE_CONFIG,
+        gameMode: 'king_of_the_hill',
+      });
+      const p1 = kothGs.addPlayer(1, 'Alice', null);
+      kothGs.addPlayer(2, 'Bob', null);
+      startPlaying(kothGs);
+
+      // Place player on hill and set score just below target
+      const hx = kothGs.hillZone!.x;
+      const hy = kothGs.hillZone!.y;
+      placePlayer(p1, hx, hy);
+      kothGs.kothScores.set(1, KOTH_SCORE_TARGET - 1);
+
+      kothGs.processTick();
+
+      expect(kothGs.winnerId).toBe(1);
+      expect(kothGs.finishReason).toContain('Alice');
+    });
+
+    // --- No KOTH hill in non-KOTH mode ---
+
+    it('should not have hill zone in non-KOTH game mode', () => {
+      const ffaGs = new GameStateManager({ ...BASE_CONFIG, gameMode: 'ffa' });
+      expect(ffaGs.hillZone).toBeNull();
+    });
+
+    // --- Conveyor belt pushes bombs ---
+
+    it('should push bomb on conveyor tile', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      startPlaying(gs);
+
+      placePlayer(p1, 1, 1); // Move player far away
+
+      // Place conveyor_down at (5,3) and a bomb on it
+      gs.map.tiles[3][5] = 'conveyor_down';
+      const bomb = new Bomb({ x: 5, y: 3 }, 1, 1, 'normal');
+      gs.bombs.set(bomb.id, bomb);
+
+      // Need multiple ticks — bomb has conveyor cooldown
+      // First tick: bomb gets pushed, then cooldown applies
+      gs.processTick();
+
+      // After first tick, bomb should move down (y+1)
+      expect(bomb.position).toEqual({ x: 5, y: 4 });
     });
   });
 });

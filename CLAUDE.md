@@ -226,7 +226,7 @@ npm test                    # Run all workspace tests (backend + frontend)
 npx jest --config tests/backend/jest.config.ts  # Backend only (from project root)
 cd frontend && npx vitest run                   # Frontend only
 ```
-- 1883 tests: 1841 backend (Jest, 56 suites) + 42 frontend (Vitest, 3 suites)
+- 2379 tests: 2337 backend (Jest, 75 suites) + 42 frontend (Vitest, 3 suites)
 - See [docs/testing.md](docs/testing.md) for full inventory, mocking patterns, and guide for writing new tests
 
 ## Documentation

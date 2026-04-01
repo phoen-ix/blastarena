@@ -1,10 +1,10 @@
 # Testing
 
-BlastArena has **1883 tests** across 59 test suites covering the full stack: game logic, backend services, API routes, middleware, utilities, and frontend.
+BlastArena has **2379 tests** across 78 test suites covering the full stack: game logic, backend services, API routes, socket handlers, middleware, utilities, and frontend.
 
 | Stack | Framework | Suites | Tests |
 |-------|-----------|--------|-------|
-| Backend | Jest + ts-jest | 56 | 1841 |
+| Backend | Jest + ts-jest | 75 | 2337 |
 | Frontend | Vitest + happy-dom | 3 | 42 |
 
 ## Running Tests
@@ -38,13 +38,14 @@ cd frontend && npx vitest                                     # Frontend watch m
 tests/
 ├── backend/
 │   ├── game/           17 files — core game logic
-│   ├── services/       20 files — business logic layer
-│   ├── routes/          9 files — API endpoint handlers
-│   ├── middleware/      4 files — auth, validation, rate limiting, errors
+│   ├── services/       28 files — business logic layer
+│   ├── routes/         12 files — API endpoint handlers
+│   ├── handlers/        4 files — Socket.io event handlers
+│   ├── middleware/      6 files — auth, validation, rate limiting, errors, email, locale
 │   ├── simulation/      1 file  — batch bot simulation runner
 │   ├── utils/           2 files — crypto, socket rate limiting
 │   └── shared/          1 file  — XP math
-└── shared/              2 files — grid utilities, validation (run by backend Jest)
+└── shared/              4 files — grid utilities, validation, map validation, puzzle (run by backend Jest)
 
 frontend/tests/
 ├── utils/               1 file  — HTML escaping
@@ -54,31 +55,31 @@ frontend/tests/
 
 ## Test Inventory
 
-### Game Logic (17 files, 486 tests)
+### Game Logic (17 files, 593 tests)
 
 Core game mechanics — these test the server-authoritative game state directly without mocks.
 
 | File | Tests | Coverage |
 |------|-------|----------|
-| `game/GameState.test.ts` | 75 | Full lifecycle, movement, bombs, explosions, power-ups, all 6 game modes |
-| `game/CampaignGame.test.ts` | 66 | Map building, spawn fallback chains, enemy spawning, win/loss conditions |
-| `game/Player.test.ts` | 62 | State management, movement cooldowns, power-up effects, shield, death, respawn |
+| `game/GameState.test.ts` | 100 | Full lifecycle, movement, bombs, explosions, power-ups, all 6 game modes, conveyors, teleporters, KOTH, deathmatch, remote/pierce/line bombs, bomb throw/kick, shield, self-kill |
+| `game/Player.test.ts` | 87 | State management, movement cooldowns, all 9 power-up effects, shield, death, respawn, buddy mode, remote detonation, frozen state, cosmetics |
+| `game/CampaignGame.test.ts` | 76 | Map building, spawn fallback chains, enemy spawning, win/loss, buddy mode, hazard tiles, boss enemies, puzzle tiles, covered tiles |
 | `game/EnemyAI.test.ts` | 52 | 5 movement patterns (wander, chase, patrol, guard, flee), pathfinding, boss behaviors |
 | `game/Enemy.test.ts` | 51 | Movement, speed divisor formula, boss phases, type config parsing |
 | `game/RoomManager.test.ts` | 35 | Room lifecycle, player connections, disconnect cleanup, state management |
 | `game/Explosion.test.ts` | 29 | Propagation, timing, chain reactions, wall destruction, pierce interaction |
-| `game/BotAI.test.ts` | 19 | BFS pathfinding, game phase system, stalemate breakers, bomb/pierce awareness |
-| `game/PowerUp.test.ts` | 15 | All 8 power-up types, grid placement, removal mechanics |
-| `game/GameRoom.test.ts` | 14 | Socket event handling, replay recording toggle, game over flow |
-| `game/InputBuffer.test.ts` | 10 | Input queuing, sequence numbering, deduplication |
-| `game/BattleRoyale.test.ts` | 8 | Zone shrinking mechanics, damage application |
-| `game/CollisionSystem.test.ts` | 7 | Collision detection, tile occupancy checks |
-| `game/Map.test.ts` | 7 | Map generation, tile types, indestructible wall grid pattern |
-| `game/Bomb.test.ts` | 3 | Bomb creation, countdown timer, detonation |
-| `game/GameLoop.test.ts` | 4 | Tick timing, game state progression, circuit breaker |
 | `game/HazardTiles.test.ts` | 29 | All 10 hazard tile types, slowing effects, instant-kill tiles, conveyors, teleporters, ice sliding, spikes cycling, dark rift, collision walkability |
+| `game/BotAI.test.ts` | 27 | BFS pathfinding, game phase system, stalemate breakers, bomb/pierce awareness, danger awareness, power-up seeking, aggression by difficulty |
+| `game/CollisionSystem.test.ts` | 24 | All walkable/non-walkable special tiles, reinforced walls, vine destruction, canBuddyMoveTo, out-of-bounds |
+| `game/PowerUp.test.ts` | 15 | All 8 power-up types, grid placement, removal mechanics |
+| `game/Map.test.ts` | 15 | Map generation, tile types, indestructible wall grid pattern, min/max sizes, wallDensity, hazard placement |
+| `game/GameRoom.test.ts` | 14 | Socket event handling, replay recording toggle, game over flow |
+| `game/Bomb.test.ts` | 13 | Bomb creation, countdown, detonation, remote/pierce types, REMOTE_BOMB_MAX_TIMER, sliding, toState() |
+| `game/InputBuffer.test.ts` | 10 | Input queuing, sequence numbering, deduplication |
+| `game/BattleRoyale.test.ts` | 14 | Zone shrinking, damage, boundary edge cases, center stability, asymmetric maps, toState() |
+| `game/GameLoop.test.ts` | 10 | Tick timing, game state progression, circuit breaker, double-start, onGameOver, setTickRate |
 
-### Services (20 files, 692 tests)
+### Services (28 files, 854 tests)
 
 Business logic layer — each service is tested with mocked database and Redis.
 
@@ -90,22 +91,30 @@ Business logic layer — each service is tested with mocked database and Redis.
 | `services/achievements.test.ts` | 49 | CRUD, all 4 condition types (cumulative/per-game/mode-specific/campaign), unlock + reward flow |
 | `services/botai.test.ts` | 46 | Upload, compile, update, reupload, delete, registry lifecycle, source download |
 | `services/elo.test.ts` | 44 | Expected score, K-factor scaling, FFA pairwise calc, team calc, processMatchElo, bot filtering |
+| `services/enemyai.test.ts` | 41 | Full CRUD, file upload/download, compilation on upload, registry load/unload on activate/deactivate, audit logging |
 | `services/admin.test.ts` | 41 | User CRUD, roles, deactivation, server stats, match history/detail, audit log, announcements |
 | `services/leaderboard.test.ts` | 40 | Pagination, privacy filtering, getRankForElo with/without sub-tiers, public profile, user rank |
 | `services/enemy-type.test.ts` | 39 | CRUD, bulk config fetch, JSON config parsing, isBoss extraction |
 | `services/campaign-progress.test.ts` | 32 | User state, level progress, star calculation, attempt/completion recording |
 | `services/replay.test.ts` | 32 | List/read/delete/placements, gzip decompression, file discovery on disk |
 | `services/friends.test.ts` | 26 | Send/accept/decline/cancel/remove/block/unblock, getFriends with presence, isBlocked, search |
+| `services/custom-maps.test.ts` | 25 | Full CRUD, JSON parsing with safeJsonParse fallback, snake_case→camelCase mapping, ownership enforcement |
 | `services/party.test.ts` | 24 | Create/join/leave/kick/disband, Lua script atomic join, invite CRUD |
+| `services/messages.test.ts` | 22 | sendMessage (friendship/block checks, truncation), getConversation (pagination), markRead, getUnreadCounts |
 | `services/botai-sandbox.test.ts` | 22 | Source scan, global access blocking, vm sandbox, import blocking, eval/Function blocking |
 | `services/season.test.ts` | 21 | CRUD, activate/deactivate, end with hard/soft reset, user history |
 | `services/auth.test.ts` | 20 | Register, login, refresh, logout, verify email, forgot/reset password, atomic reset |
+| `services/botai-registry.test.ts` | 18 | Built-in always registered, fallback to built-in, createInstance, cannot unload built-in |
 | `services/lobby.test.ts` | 17 | Room CRUD via Redis, join (atomic Lua), leave, ready toggle, teams |
+| `services/botai-compiler.test.ts` | 16 | scanAndBuildAI (file size, esbuild errors), compileBotAI (class finding, method validation), sandbox execution |
 | `services/user.test.ts` | 16 | Profile CRUD, username/email/password changes, admin bypass |
+| `services/enemyai-registry.test.ts` | 14 | Initialize, loadAI (sandbox + class finding), createInstance, unload/reload |
 | `services/settings.test.ts` | 13 | Get/set/defaults, registration toggle, chat mode settings |
+| `services/enemyai-compiler.test.ts` | 12 | compileEnemyAI with decide() validation, DUMMY_TYPE_CONFIG, export patterns |
 | `services/presence.test.ts` | 9 | Set/get/getBatch (MGET pipeline), remove, refresh TTL |
+| `services/buddy.test.ts` | 8 | getBuddySettings defaults, saveBuddySettings UPSERT with partial merge |
 
-### Routes / API (9 files, 486 tests)
+### Routes / API (12 files, 537 tests)
 
 HTTP endpoint tests — Express route handlers tested with mocked services and pass-through middleware.
 
@@ -115,18 +124,34 @@ HTTP endpoint tests — Express route handlers tested with mocked services and p
 | `routes/campaign.test.ts` | 177 | Worlds/levels/enemies CRUD, reorder, progress, import/export with conflict resolution |
 | `routes/auth.test.ts` | 26 | Register, login, logout, refresh, verify email, forgot/reset password, cookie handling |
 | `routes/user.test.ts` | 24 | Profile CRUD, email change (admin bypass), password validation, confirm-email public endpoint |
+| `routes/custom-maps.test.ts` | 23 | CRUD endpoints, validateCustomMap integration, Zod schema enforcement, ownership checks |
 | `routes/leaderboard.test.ts` | 21 | Leaderboard pagination, rank tiers/seasons, public profile, user rank with level/XP |
 | `routes/cosmetics.test.ts` | 20 | All cosmetics list, user cosmetics/equipped, equip endpoint, achievement progress |
+| `routes/messages.test.ts` | 16 | Conversation list, unread counts, paginated history, mark read, limit cap at 50 |
+| `routes/docs.test.ts` | 12 | Public/staff doc serving, path traversal prevention, whitelist enforcement, middleware presence |
 | `routes/lobby.test.ts` | 12 | Room list/create, user mapping, team assignment, middleware presence |
 | `routes/friends.test.ts` | 9 | Friends list, blocked users, search with presence, middleware checks |
 | `routes/health.test.ts` | 6 | Health check endpoint, response format |
 
-### Middleware (4 files, 36 tests)
+### Socket Handlers (4 files, 62 tests)
+
+Socket.io event handler tests — handlers tested with mock socket/io objects and captured callback invocations.
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `handlers/partyHandlers.test.ts` | 22 | Party lifecycle (create/invite/accept/decline/leave/kick/chat), room invites, disconnect cleanup |
+| `handlers/friendHandlers.test.ts` | 18 | All 8 socket events, notifyFriendsOnline/Offline, dual rate limiters |
+| `handlers/dmHandlers.test.ts` | 12 | dm:send (mode checks, sendMessage, dm:receive emission), dm:read (mark read, read receipt) |
+| `handlers/lobbyHandlers.test.ts` | 10 | Chat mode enforcement (disabled/admin_only/staff), message truncation, rate limiting |
+
+### Middleware (6 files, 55 tests)
 
 | File | Tests | Coverage |
 |------|-------|----------|
 | `middleware/auth-and-admin.test.ts` | 13 | JWT verification, admin/moderator role checks, staff middleware |
+| `middleware/emailVerified.test.ts` | 11 | 401/403/500 paths, DB query verification, next() never called on error |
 | `middleware/rateLimiter.test.ts` | 9 | Redis-backed rate limiting, in-memory fallback, per-IP tracking |
+| `middleware/locale.test.ts` | 8 | x-language priority, accept-language fallback, base language extraction, default 'en' |
 | `middleware/validation.test.ts` | 8 | Zod schema validation, field-level error details |
 | `middleware/errorHandler.test.ts` | 6 | Error response formatting, HTTP status codes, AppError handling |
 
@@ -136,11 +161,13 @@ HTTP endpoint tests — Express route handlers tested with mocked services and p
 |------|-------|----------|
 | `simulation/SimulationManager.test.ts` | 69 | Batch lifecycle, queue management (max 10), getHistory pagination, disk scanning, batch results/deletion |
 
-### Utilities & Shared (5 files, 72 tests)
+### Utilities & Shared (7 files, 165 tests)
 
 | File | Tests | Coverage |
 |------|-------|----------|
+| `../tests/shared/puzzle.test.ts` | 75 | All switch/gate helpers (4 colors), color extraction, round-trip construction, isPuzzleTile, constants |
 | `shared/xp.test.ts` | 29 | XP calculation, level-from-XP math, level-for-XP inverse, placement bonuses, multiplier |
+| `../tests/shared/mapValidation.test.ts` | 18 | Dimension validation, odd enforcement, border walls, spawn counts, teleporter pairing |
 | `utils/socketRateLimit.test.ts` | 12 | Sliding window per-socket, parallel per-IP rate limiters |
 | `../tests/shared/validation.test.ts` | 12 | Username, password, email, room name validation rules |
 | `../tests/shared/grid.test.ts` | 11 | Grid coordinate conversions, explosion cell calculation |
@@ -280,6 +307,38 @@ function mockReqRes(body = {}, params = {}, query = {}) {
 }
 ```
 
+### 6. Socket Handler Mocking
+
+Socket handler tests use mock socket/io objects with handler capture via `socket.on()`:
+
+```typescript
+function createMockSocket(overrides: Record<string, unknown> = {}) {
+  const handlers: Record<string, AnyFn> = {};
+  return {
+    id: 'socket-1',
+    data: { userId: 1, username: 'testuser', role: 'user', ...overrides },
+    on: jest.fn((event: string, handler: AnyFn) => { handlers[event] = handler; }),
+    join: jest.fn(),
+    leave: jest.fn(),
+    _handlers: handlers,  // access captured handlers for direct invocation
+  };
+}
+
+function createMockIO() {
+  const emitFn = jest.fn();
+  return {
+    emit: jest.fn(),
+    to: jest.fn().mockReturnValue({ emit: emitFn }),
+    in: jest.fn().mockReturnValue({ fetchSockets: jest.fn().mockResolvedValue([]) }),
+    _emitFn: emitFn,
+  };
+}
+
+// Register handlers, then invoke directly:
+registerHandlers(io as any, socket as any);
+await socket._handlers['event:name'](data, callback);
+```
+
 ## Writing New Tests
 
 ### File Naming
@@ -287,6 +346,7 @@ Place tests in the matching category directory:
 ```
 tests/backend/services/myNewService.test.ts
 tests/backend/routes/myNewRoute.test.ts
+tests/backend/handlers/myNewHandler.test.ts
 tests/backend/game/MyNewGameFeature.test.ts
 ```
 

@@ -607,4 +607,251 @@ describe('Player', () => {
       expect(player.respawnTick).toBe(60);
     });
   });
+
+  // ───────────────────────────────────────────────
+  // 11. Buddy Mode
+  // ───────────────────────────────────────────────
+  describe('buddy mode', () => {
+    it('should create buddy with isBuddy flag and buddyOwnerId', () => {
+      const buddy = new Player(-2001, 'Buddy', { x: 2, y: 2 }, 0, false, true, 1);
+      expect(buddy.isBuddy).toBe(true);
+      expect(buddy.buddyOwnerId).toBe(1);
+    });
+
+    it('should initialize buddy with reduced stats (1 bomb, 1 fire range)', () => {
+      const buddy = new Player(-2001, 'Buddy', { x: 2, y: 2 }, 0, false, true, 1);
+      expect(buddy.maxBombs).toBe(1);
+      expect(buddy.fireRange).toBe(1);
+    });
+
+    it('should not die when die() is called (buddy invulnerability)', () => {
+      const buddy = new Player(-2001, 'Buddy', { x: 2, y: 2 }, 0, false, true, 1);
+      buddy.die();
+      expect(buddy.alive).toBe(true);
+      expect(buddy.deaths).toBe(0);
+    });
+
+    it('should not increment deaths on die() for buddy', () => {
+      const buddy = new Player(-2001, 'Buddy', { x: 2, y: 2 }, 0, false, true, 1);
+      buddy.die();
+      buddy.die();
+      buddy.die();
+      expect(buddy.deaths).toBe(0);
+    });
+
+    it('should include isBuddy and buddyOwnerId in toState()', () => {
+      const buddy = new Player(-2001, 'Buddy', { x: 2, y: 2 }, 0, false, true, 1);
+      const state = buddy.toState();
+      expect(state.isBuddy).toBe(true);
+      expect(state.buddyOwnerId).toBe(1);
+    });
+
+    it('should not include isBuddy in toState() for normal players', () => {
+      const state = player.toState();
+      expect(state.isBuddy).toBeUndefined();
+      expect(state.buddyOwnerId).toBeUndefined();
+    });
+
+    it('should allow buddy to apply power-ups', () => {
+      const buddy = new Player(-2001, 'Buddy', { x: 2, y: 2 }, 0, false, true, 1);
+      buddy.applyPowerUp('bomb_up');
+      buddy.applyPowerUp('fire_up');
+      expect(buddy.maxBombs).toBe(2);
+      expect(buddy.fireRange).toBe(2);
+      expect(buddy.powerupsCollected).toBe(2);
+    });
+  });
+
+  // ───────────────────────────────────────────────
+  // 12. Bomb Throw Power-Up
+  // ───────────────────────────────────────────────
+  describe('bomb_throw', () => {
+    it('should grant hasBombThrow via applyPowerUp', () => {
+      expect(player.hasBombThrow).toBe(false);
+      player.applyPowerUp('bomb_throw');
+      expect(player.hasBombThrow).toBe(true);
+    });
+
+    it('should include hasBombThrow in toState()', () => {
+      player.applyPowerUp('bomb_throw');
+      const state = player.toState();
+      expect(state.hasBombThrow).toBe(true);
+    });
+
+    it('should reset hasBombThrow on respawn', () => {
+      player.applyPowerUp('bomb_throw');
+      expect(player.hasBombThrow).toBe(true);
+      player.die();
+      player.respawn({ x: 0, y: 0 });
+      expect(player.hasBombThrow).toBe(false);
+    });
+  });
+
+  // ───────────────────────────────────────────────
+  // 13. Remote Detonation Mode
+  // ───────────────────────────────────────────────
+  describe('remoteDetonateMode', () => {
+    it('should default to all mode', () => {
+      expect(player.remoteDetonateMode).toBe('all');
+    });
+
+    it('should include remoteDetonateMode in toState() only when hasRemoteBomb', () => {
+      const state = player.toState();
+      expect(state.remoteDetonateMode).toBeUndefined();
+
+      player.hasRemoteBomb = true;
+      const state2 = player.toState();
+      expect(state2.remoteDetonateMode).toBe('all');
+    });
+
+    it('should reflect fifo mode in toState()', () => {
+      player.hasRemoteBomb = true;
+      player.remoteDetonateMode = 'fifo';
+      const state = player.toState();
+      expect(state.remoteDetonateMode).toBe('fifo');
+    });
+
+    it('should reset remoteDetonateMode implicitly on respawn (hasRemoteBomb lost)', () => {
+      player.hasRemoteBomb = true;
+      player.remoteDetonateMode = 'fifo';
+      player.die();
+      player.respawn({ x: 0, y: 0 });
+      expect(player.hasRemoteBomb).toBe(false);
+      // remoteDetonateMode value persists but is irrelevant without hasRemoteBomb
+      const state = player.toState();
+      expect(state.remoteDetonateMode).toBeUndefined();
+    });
+  });
+
+  // ───────────────────────────────────────────────
+  // 14. Frozen State (Co-Op)
+  // ───────────────────────────────────────────────
+  describe('frozen state', () => {
+    it('should default frozen to false', () => {
+      expect(player.frozen).toBe(false);
+    });
+
+    it('should allow setting frozen to true', () => {
+      player.frozen = true;
+      expect(player.frozen).toBe(true);
+    });
+
+    it('should not affect canMove when frozen (frozen is handled externally)', () => {
+      player.frozen = true;
+      // canMove only checks alive && moveCooldown
+      expect(player.canMove()).toBe(true);
+    });
+  });
+
+  // ───────────────────────────────────────────────
+  // 15. Cosmetics
+  // ───────────────────────────────────────────────
+  describe('cosmetics', () => {
+    it('should default cosmetics to undefined', () => {
+      expect(player.cosmetics).toBeUndefined();
+    });
+
+    it('should allow setting cosmetics', () => {
+      player.cosmetics = {
+        colorHex: 0xff0000,
+        eyeStyle: 'angry',
+      };
+      expect(player.cosmetics).toBeDefined();
+      expect(player.cosmetics!.colorHex).toBe(0xff0000);
+    });
+
+    it('should include cosmetics in toState()', () => {
+      const cosmeticData = {
+        colorHex: 0x00ff00,
+        eyeStyle: 'happy',
+        trailConfig: { particleKey: 'fire', tint: 0xff0000, frequency: 100 },
+        bombSkinConfig: { baseColor: 0x333333, fuseColor: 0xff8800, label: 'classic' },
+      };
+      player.cosmetics = cosmeticData;
+      const state = player.toState();
+      expect(state.cosmetics).toEqual(cosmeticData);
+    });
+  });
+
+  // ───────────────────────────────────────────────
+  // 16. Movement Tracking
+  // ───────────────────────────────────────────────
+  describe('movedThisTick', () => {
+    it('should default movedThisTick to false', () => {
+      expect(player.movedThisTick).toBe(false);
+    });
+
+    it('should set movedThisTick to true on applyMoveCooldown', () => {
+      player.applyMoveCooldown();
+      expect(player.movedThisTick).toBe(true);
+    });
+
+    it('should not reset movedThisTick in tick()', () => {
+      player.applyMoveCooldown();
+      expect(player.movedThisTick).toBe(true);
+      player.tick();
+      // tick() does NOT reset movedThisTick — it is reset at top of processTick externally
+      expect(player.movedThisTick).toBe(true);
+    });
+  });
+
+  // ───────────────────────────────────────────────
+  // 17. All Nine Power-Ups (including bomb_throw)
+  // ───────────────────────────────────────────────
+  describe('all nine power-ups', () => {
+    it('should handle all 9 power-up types correctly', () => {
+      const allTypes: PowerUpType[] = [
+        'bomb_up',
+        'fire_up',
+        'speed_up',
+        'shield',
+        'kick',
+        'pierce_bomb',
+        'remote_bomb',
+        'line_bomb',
+        'bomb_throw',
+      ];
+      for (const type of allTypes) {
+        player.applyPowerUp(type);
+      }
+      expect(player.powerupsCollected).toBe(9);
+      expect(player.maxBombs).toBe(DEFAULT_MAX_BOMBS + 1);
+      expect(player.fireRange).toBe(DEFAULT_FIRE_RANGE + 1);
+      expect(player.speed).toBe(DEFAULT_SPEED + 1);
+      expect(player.hasShield).toBe(true);
+      expect(player.hasKick).toBe(true);
+      expect(player.hasPierceBomb).toBe(true);
+      expect(player.hasRemoteBomb).toBe(true);
+      expect(player.hasLineBomb).toBe(true);
+      expect(player.hasBombThrow).toBe(true);
+    });
+
+    it('should reset all 9 power-ups on respawn', () => {
+      const allTypes: PowerUpType[] = [
+        'bomb_up',
+        'fire_up',
+        'speed_up',
+        'shield',
+        'kick',
+        'pierce_bomb',
+        'remote_bomb',
+        'line_bomb',
+        'bomb_throw',
+      ];
+      for (const type of allTypes) {
+        player.applyPowerUp(type);
+      }
+      player.die();
+      player.respawn({ x: 0, y: 0 });
+      expect(player.maxBombs).toBe(DEFAULT_MAX_BOMBS);
+      expect(player.fireRange).toBe(DEFAULT_FIRE_RANGE);
+      expect(player.speed).toBe(DEFAULT_SPEED);
+      expect(player.hasShield).toBe(false);
+      expect(player.hasKick).toBe(false);
+      expect(player.hasPierceBomb).toBe(false);
+      expect(player.hasRemoteBomb).toBe(false);
+      expect(player.hasLineBomb).toBe(false);
+      expect(player.hasBombThrow).toBe(false);
+    });
+  });
 });

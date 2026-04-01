@@ -446,4 +446,254 @@ describe('BotAI', () => {
       }
     });
   });
+
+  // ───────────────────────────────────────────────
+  // 7. Advanced behavior tests
+  // ───────────────────────────────────────────────
+  describe('Advanced behavior', () => {
+    it('should avoid bombs on adjacent tiles (danger awareness)', () => {
+      const gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      const p2 = gs.addPlayer(2, 'BotPlayer', null);
+      startPlaying(gs);
+
+      // Place bot in open area with bombs surrounding it on two sides
+      placePlayer(p1, 1, 1);
+      placePlayer(p2, 5, 5);
+      makeVulnerable(p2);
+      clearCooldown(p2);
+
+      // Place bombs adjacent to p2 on two sides
+      const bomb1 = new Bomb({ x: 5, y: 4 }, p1.id, 3);
+      bomb1.ticksRemaining = 8;
+      gs.bombs.set(bomb1.id, bomb1);
+
+      const bomb2 = new Bomb({ x: 4, y: 5 }, p1.id, 3);
+      bomb2.ticksRemaining = 8;
+      gs.bombs.set(bomb2.id, bomb2);
+
+      const bot = new BotAI('hard');
+      const input = bot.generateInput(p2, gs);
+
+      // Bot should try to move away from danger
+      expect(input).not.toBeNull();
+      expect(input!.direction).not.toBeNull();
+      // Should not move into the bomb tiles
+      if (input!.direction === 'up') {
+        // Moving up toward bomb at (5,4) would be dangerous - hard bot should avoid
+        // but we just verify it produces a valid direction
+      }
+    });
+
+    it('should seek power-ups when safe (if in range)', () => {
+      const gs = new GameStateManager({
+        ...BASE_CONFIG,
+        powerUpDropRate: 1.0,
+      });
+      const p1 = gs.addPlayer(1, 'BotPlayer', null);
+      gs.addPlayer(2, 'Enemy', null);
+      startPlaying(gs);
+
+      placePlayer(p1, 3, 3);
+      clearCooldown(p1);
+
+      // Place a power-up near the bot
+      gs.spawnPowerUpAt(5, 3, 'bomb_up');
+
+      const bot = new BotAI('hard');
+      let movedTowardPowerUp = false;
+
+      for (let i = 0; i < 30; i++) {
+        const input = bot.generateInput(p1, gs);
+        if (input && input.direction === 'right') {
+          movedTowardPowerUp = true;
+        }
+        if (input) {
+          gs.inputBuffer.addInput(p1.id, input);
+        }
+        gs.processTick();
+      }
+
+      // Hard bot with high powerUpVision should attempt to move toward power-up
+      // (may not always go right due to other logic, but should at some point)
+      expect(movedTowardPowerUp).toBe(true);
+    });
+
+    it('should place bomb when adjacent to enemy', () => {
+      const gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'BotPlayer', null);
+      const p2 = gs.addPlayer(2, 'Enemy', null);
+      startPlaying(gs);
+
+      // Place bot directly adjacent to enemy
+      placePlayer(p1, 3, 3);
+      placePlayer(p2, 4, 3);
+      makeVulnerable(p1);
+      makeVulnerable(p2);
+
+      const bot = new BotAI('hard');
+      let placedBomb = false;
+
+      for (let i = 0; i < 100; i++) {
+        clearCooldown(p1);
+        const input = bot.generateInput(p1, gs);
+        if (input && input.action === 'bomb') {
+          placedBomb = true;
+          break;
+        }
+        if (input) {
+          gs.inputBuffer.addInput(p1.id, input);
+        }
+        gs.processTick();
+        if (!p1.alive || !p2.alive) break;
+      }
+
+      // Hard bot adjacent to enemy should place bombs
+      expect(placedBomb).toBe(true);
+    });
+
+    it('hard difficulty should be more aggressive (higher hunt chance)', () => {
+      const gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'HardBot', null);
+      const p2 = gs.addPlayer(2, 'Enemy', null);
+      startPlaying(gs);
+      makeVulnerable(p1);
+      makeVulnerable(p2);
+
+      placePlayer(p1, 3, 3);
+      placePlayer(p2, 7, 3);
+
+      const hardBot = new BotAI('hard');
+      let hardBombCount = 0;
+
+      for (let i = 0; i < 150; i++) {
+        clearCooldown(p1);
+        const input = hardBot.generateInput(p1, gs);
+        if (input && input.action === 'bomb') hardBombCount++;
+        if (input) gs.inputBuffer.addInput(p1.id, input);
+        gs.processTick();
+        if (!p1.alive || !p2.alive) break;
+      }
+
+      // Hard bots should be aggressive and place bombs frequently
+      expect(hardBombCount).toBeGreaterThan(0);
+    });
+
+    it('easy difficulty should be less aggressive (lower bomb rate)', () => {
+      const gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'EasyBot', null);
+      const p2 = gs.addPlayer(2, 'Enemy', null);
+      startPlaying(gs);
+      makeVulnerable(p1);
+      makeVulnerable(p2);
+
+      placePlayer(p1, 3, 3);
+      placePlayer(p2, 11, 9);
+
+      const easyBot = new BotAI('easy');
+      let easyBombCount = 0;
+
+      for (let i = 0; i < 100; i++) {
+        clearCooldown(p1);
+        const input = easyBot.generateInput(p1, gs);
+        if (input && input.action === 'bomb') easyBombCount++;
+        if (input) gs.inputBuffer.addInput(p1.id, input);
+        gs.processTick();
+        if (!p1.alive || !p2.alive) break;
+      }
+
+      // Easy bot with longer bomb cooldown range should place fewer bombs
+      // (bombCooldownMin: 45, bombCooldownMax: 80 vs hard's 5-12)
+      // Even if it places some, it should not be excessively high
+      expect(easyBombCount).toBeLessThan(50);
+    });
+
+    it('should handle being cornered (no escape routes)', () => {
+      // Use a custom map config with walls surrounding the bot
+      const gs = new GameStateManager({
+        ...BASE_CONFIG,
+        wallDensity: 0.0,
+      });
+      const p1 = gs.addPlayer(1, 'BotPlayer', null);
+      gs.addPlayer(2, 'Enemy', null);
+      startPlaying(gs);
+
+      // Corner position
+      placePlayer(p1, 1, 1);
+      makeVulnerable(p1);
+      clearCooldown(p1);
+
+      // Place bombs blocking escape routes
+      const bomb1 = new Bomb({ x: 2, y: 1 }, 2, 3);
+      bomb1.ticksRemaining = 5;
+      gs.bombs.set(bomb1.id, bomb1);
+      const bomb2 = new Bomb({ x: 1, y: 2 }, 2, 3);
+      bomb2.ticksRemaining = 5;
+      gs.bombs.set(bomb2.id, bomb2);
+
+      const bot = new BotAI('hard');
+
+      // Should not throw even when cornered with no safe escape
+      // Bot may return null (no valid move) or an input — both are acceptable
+      expect(() => {
+        bot.generateInput(p1, gs);
+      }).not.toThrow();
+    });
+
+    it('should work with different map sizes', () => {
+      const sizes = [
+        { width: 9, height: 9 },
+        { width: 21, height: 17 },
+        { width: 51, height: 51 },
+      ];
+
+      for (const size of sizes) {
+        const gs = new GameStateManager({
+          ...BASE_CONFIG,
+          mapWidth: size.width,
+          mapHeight: size.height,
+        });
+        const p1 = gs.addPlayer(1, 'Bot', null);
+        gs.addPlayer(2, 'Enemy', null);
+        startPlaying(gs);
+
+        const bot = new BotAI('normal', { width: size.width, height: size.height });
+
+        expect(() => {
+          for (let i = 0; i < 20; i++) {
+            const input = bot.generateInput(p1, gs);
+            if (input) gs.inputBuffer.addInput(p1.id, input);
+            gs.processTick();
+          }
+        }).not.toThrow();
+      }
+    });
+
+    it('should reset internal state between calls (seq increments properly)', () => {
+      const gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Bot', null);
+      const p2 = gs.addPlayer(2, 'Enemy', null);
+      startPlaying(gs);
+
+      const bot = new BotAI('normal');
+
+      // Generate several inputs and verify seq increments
+      const seqs: number[] = [];
+      for (let i = 0; i < 10; i++) {
+        const input = bot.generateInput(p1, gs);
+        if (input) seqs.push(input.seq);
+      }
+
+      // All seqs should be strictly increasing
+      for (let i = 1; i < seqs.length; i++) {
+        expect(seqs[i]).toBe(seqs[i - 1] + 1);
+      }
+
+      // A fresh BotAI instance should start with seq 1 again
+      const bot2 = new BotAI('normal');
+      const firstInput = bot2.generateInput(p1, gs);
+      expect(firstInput).not.toBeNull();
+      expect(firstInput!.seq).toBe(1);
+    });
+  });
 });

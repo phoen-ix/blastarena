@@ -110,4 +110,108 @@ describe('BattleRoyaleZone', () => {
     const zone = new BattleRoyaleZone(15, 11);
     expect(zone.getDamagePerTick()).toBe(BR_ZONE_DAMAGE_PER_TICK);
   });
+
+  it('should apply zone damage to a player outside zone after shrinking', () => {
+    const zone = new BattleRoyaleZone(15, 11);
+    const delayticks = BR_ZONE_INITIAL_DELAY_SECONDS * TICK_RATE;
+
+    // Shrink zone substantially
+    let tick = delayticks;
+    for (let phase = 0; phase < 50; phase++) {
+      zone.tick(tick);
+      tick++;
+    }
+    // Let currentRadius converge to targetRadius
+    for (let i = 0; i < 500; i++) {
+      zone.tick(tick);
+      tick++;
+    }
+
+    const state = zone.toState();
+    // Check a far corner - if it's outside the zone, damage should apply
+    const cornerInside = zone.isInsideZone(0, 0);
+    if (!cornerInside) {
+      // Player at (0,0) would take damage each tick
+      expect(zone.getDamagePerTick()).toBeGreaterThan(0);
+    }
+    // Center should always be safe
+    expect(zone.isInsideZone(state.centerX, state.centerY)).toBe(true);
+  });
+
+  it('player at exact zone boundary should be inside', () => {
+    const zone = new BattleRoyaleZone(15, 11);
+    const state = zone.toState();
+
+    // A point exactly at distance = currentRadius from center should be inside
+    // (isInsideZone uses <= comparison)
+    // Place a point at exactly currentRadius distance along the X axis
+    const boundaryX = state.centerX + state.currentRadius;
+    const boundaryY = state.centerY;
+
+    // The distance is exactly currentRadius, which satisfies <= currentRadius
+    expect(zone.isInsideZone(boundaryX, boundaryY)).toBe(true);
+  });
+
+  it('zone center should not change during shrinking', () => {
+    const zone = new BattleRoyaleZone(15, 11);
+    const initialState = zone.toState();
+    const initialCenterX = initialState.centerX;
+    const initialCenterY = initialState.centerY;
+
+    const delayticks = BR_ZONE_INITIAL_DELAY_SECONDS * TICK_RATE;
+
+    // Run many ticks through multiple shrink phases
+    let tick = 0;
+    for (let i = 0; i < 2000; i++) {
+      zone.tick(tick);
+      tick++;
+    }
+
+    const afterState = zone.toState();
+    expect(afterState.centerX).toBe(initialCenterX);
+    expect(afterState.centerY).toBe(initialCenterY);
+  });
+
+  it('should handle very wide map (51x11)', () => {
+    const zone = new BattleRoyaleZone(51, 11);
+    const state = zone.toState();
+
+    expect(state.centerX).toBe(Math.floor(51 / 2));
+    expect(state.centerY).toBe(Math.floor(11 / 2));
+    // Initial radius should be max(51, 11) = 51
+    expect(state.currentRadius).toBe(51);
+    expect(zone.isInsideZone(state.centerX, state.centerY)).toBe(true);
+  });
+
+  it('should handle very tall map (11x51)', () => {
+    const zone = new BattleRoyaleZone(11, 51);
+    const state = zone.toState();
+
+    expect(state.centerX).toBe(Math.floor(11 / 2));
+    expect(state.centerY).toBe(Math.floor(51 / 2));
+    // Initial radius should be max(11, 51) = 51
+    expect(state.currentRadius).toBe(51);
+    expect(zone.isInsideZone(state.centerX, state.centerY)).toBe(true);
+  });
+
+  it('toState() should include center, radius, shrinkRate, damagePerTick', () => {
+    const zone = new BattleRoyaleZone(15, 11);
+    const state = zone.toState();
+
+    expect(state).toHaveProperty('centerX');
+    expect(state).toHaveProperty('centerY');
+    expect(state).toHaveProperty('currentRadius');
+    expect(state).toHaveProperty('targetRadius');
+    expect(state).toHaveProperty('shrinkRate');
+    expect(state).toHaveProperty('damagePerTick');
+    expect(state).toHaveProperty('nextShrinkTick');
+
+    expect(typeof state.centerX).toBe('number');
+    expect(typeof state.centerY).toBe('number');
+    expect(typeof state.currentRadius).toBe('number');
+    expect(typeof state.targetRadius).toBe('number');
+    expect(typeof state.shrinkRate).toBe('number');
+    expect(typeof state.damagePerTick).toBe('number');
+    expect(typeof state.nextShrinkTick).toBe('number');
+  });
 });

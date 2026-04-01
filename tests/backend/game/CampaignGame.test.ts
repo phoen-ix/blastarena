@@ -3,6 +3,7 @@ import type {
   CampaignLevel,
   EnemyTypeConfig,
   StartingPowerUps,
+  SwitchVariant,
   TileType,
   PowerUpType,
   Position,
@@ -1096,6 +1097,261 @@ describe('CampaignGame', () => {
 
       const game = new CampaignGame([1], ['Player1'], level, enemyTypes, callbacks);
       expect(game.isFinished()).toBe(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────────
+  // 13. Buddy Mode & Advanced Features
+  // ─────────────────────────────────────────────────
+  describe('Buddy mode and advanced features', () => {
+    it('should initialize buddy mode when buddyMode config is true', () => {
+      const level = createMinimalLevel({
+        playerSpawns: [
+          { x: 1, y: 1 },
+          { x: 3, y: 1 },
+        ],
+      });
+      // buddyMode is the 7th constructor argument
+      const game = new CampaignGame(
+        [1, -2001],
+        ['Player1', 'Buddy'],
+        level,
+        new Map(),
+        callbacks,
+        null,
+        true,
+      );
+
+      expect(game.buddyMode).toBe(true);
+      // In buddy mode, coopMode should be false
+      expect(game.coopMode).toBe(false);
+      expect(game.isFinished()).toBe(false);
+    });
+
+    it('should apply buddy starting position near player', () => {
+      const tiles: TileType[][] = [];
+      for (let y = 0; y < 7; y++) {
+        tiles[y] = [];
+        for (let x = 0; x < 7; x++) {
+          if (x === 0 || y === 0 || x === 6 || y === 6) {
+            tiles[y][x] = 'wall';
+          } else {
+            tiles[y][x] = 'empty';
+          }
+        }
+      }
+      tiles[1][1] = 'spawn';
+      tiles[3][1] = 'spawn';
+
+      const level = createMinimalLevel({
+        tiles,
+        playerSpawns: [
+          { x: 1, y: 1 },
+          { x: 1, y: 3 },
+        ],
+      });
+
+      const game = new CampaignGame(
+        [1, -2001],
+        ['Player1', 'Buddy'],
+        level,
+        new Map(),
+        callbacks,
+        null,
+        true,
+      );
+
+      // Both player and buddy should be in the game
+      const player1 = game.getPlayer(1);
+      const buddy = game.getPlayer(-2001);
+      expect(player1).toBeDefined();
+      expect(buddy).toBeDefined();
+    });
+
+    it('should handle level with no timeLimit (high roundTime)', () => {
+      const level = createMinimalLevel({ timeLimit: 0 });
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
+
+      // timeLimit 0 means roundTime: 99999 (effectively no time limit)
+      expect(game.isFinished()).toBe(false);
+
+      // The game should still be constructable and startable
+      game.start();
+      expect(mockGameLoopStart).toHaveBeenCalled();
+    });
+
+    it('should handle level with hazard tiles in config', () => {
+      const tiles: TileType[][] = [];
+      for (let y = 0; y < 7; y++) {
+        tiles[y] = [];
+        for (let x = 0; x < 7; x++) {
+          if (x === 0 || y === 0 || x === 6 || y === 6) {
+            tiles[y][x] = 'wall';
+          } else {
+            tiles[y][x] = 'empty';
+          }
+        }
+      }
+      tiles[1][1] = 'spawn';
+      tiles[3][3] = 'spikes';
+      tiles[3][4] = 'lava';
+
+      const level = createMinimalLevel({
+        tiles,
+        hazardTiles: true,
+      });
+
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
+      expect(game.isFinished()).toBe(false);
+
+      // Verify the game state has the hazard tiles
+      const gs = game.getGameState();
+      expect(gs.map.tiles[3][3]).toBe('spikes');
+      expect(gs.map.tiles[3][4]).toBe('lava');
+    });
+
+    it('should handle multiple boss enemies', () => {
+      const boss1Config = createMinimalEnemyConfig({
+        isBoss: true,
+        hp: 10,
+        speed: 0.5,
+        bossPhases: [{ hpThreshold: 5, speedMultiplier: 2 }],
+      });
+      const boss2Config = createMinimalEnemyConfig({
+        isBoss: true,
+        hp: 15,
+        speed: 0.3,
+        bossPhases: [{ hpThreshold: 8, speedMultiplier: 1.5 }],
+      });
+
+      const enemyTypes = new Map<number, EnemyTypeConfig>();
+      enemyTypes.set(1, boss1Config);
+      enemyTypes.set(2, boss2Config);
+
+      const level = createMinimalLevel({
+        enemyPlacements: [
+          { enemyTypeId: 1, x: 3, y: 1 },
+          { enemyTypeId: 2, x: 1, y: 3 },
+        ],
+      });
+
+      const game = new CampaignGame([1], ['Player1'], level, enemyTypes, callbacks);
+      expect(game.isFinished()).toBe(false);
+
+      const enemies = game.getEnemies();
+      expect(enemies.size).toBe(2);
+    });
+
+    it('should apply bomb_throw power-up from level config', () => {
+      const startingPowerups: StartingPowerUps = {
+        bombThrow: true,
+      };
+
+      const level = createMinimalLevel({ startingPowerups });
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
+      expect(game.isFinished()).toBe(false);
+
+      // Verify the player has bomb_throw applied
+      const player = game.getPlayer(1);
+      expect(player).toBeDefined();
+      expect(player!.hasBombThrow).toBe(true);
+    });
+
+    it('should handle level with covered tiles', () => {
+      const tiles: TileType[][] = [];
+      for (let y = 0; y < 7; y++) {
+        tiles[y] = [];
+        for (let x = 0; x < 7; x++) {
+          if (x === 0 || y === 0 || x === 6 || y === 6) {
+            tiles[y][x] = 'wall';
+          } else {
+            tiles[y][x] = 'empty';
+          }
+        }
+      }
+      tiles[1][1] = 'spawn';
+      tiles[3][3] = 'destructible'; // wall hiding a special tile underneath
+
+      const level = createMinimalLevel({
+        tiles,
+        coveredTiles: [{ x: 3, y: 3, type: 'teleporter_a' as TileType }],
+      });
+
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
+      expect(game.isFinished()).toBe(false);
+    });
+
+    it('should handle level with puzzle tiles (switch/gate config)', () => {
+      const tiles: TileType[][] = [];
+      for (let y = 0; y < 7; y++) {
+        tiles[y] = [];
+        for (let x = 0; x < 7; x++) {
+          if (x === 0 || y === 0 || x === 6 || y === 6) {
+            tiles[y][x] = 'wall';
+          } else {
+            tiles[y][x] = 'empty';
+          }
+        }
+      }
+      tiles[1][1] = 'spawn';
+      tiles[3][3] = 'switch_red' as TileType;
+      tiles[3][5] = 'gate_red' as TileType;
+
+      const level = createMinimalLevel({
+        tiles,
+        puzzleConfig: {
+          switchVariants: {
+            '3,3': 'toggle' as SwitchVariant,
+          },
+        },
+      });
+
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
+      expect(game.isFinished()).toBe(false);
+    });
+
+    it('should track game session ID uniqueness across instances', () => {
+      const level = createMinimalLevel();
+      const sessionIds = new Set<string>();
+
+      for (let i = 0; i < 10; i++) {
+        const game = new CampaignGame([i + 1], [`Player${i}`], level, new Map(), callbacks);
+        sessionIds.add(game.sessionId);
+      }
+
+      // All 10 session IDs should be unique
+      expect(sessionIds.size).toBe(10);
+    });
+
+    it('should handle empty spawn points (fallback to defaults)', () => {
+      // Create a level with no explicit spawns and no spawn tiles
+      const tiles: TileType[][] = [];
+      for (let y = 0; y < 7; y++) {
+        tiles[y] = [];
+        for (let x = 0; x < 7; x++) {
+          if (x === 0 || y === 0 || x === 6 || y === 6) {
+            tiles[y][x] = 'wall';
+          } else {
+            tiles[y][x] = 'empty';
+          }
+        }
+      }
+
+      const level = createMinimalLevel({
+        tiles,
+        playerSpawns: [],
+      });
+
+      // Should not throw - buildGameMap should find first empty tile as fallback
+      const game = new CampaignGame([1], ['Player1'], level, new Map(), callbacks);
+      expect(game.isFinished()).toBe(false);
+
+      // Player should still be placed somewhere
+      const player = game.getPlayer(1);
+      expect(player).toBeDefined();
+      expect(player!.position).toBeDefined();
+      expect(player!.position.x).toBeGreaterThanOrEqual(1);
+      expect(player!.position.y).toBeGreaterThanOrEqual(1);
     });
   });
 });

@@ -92,4 +92,92 @@ describe('GameLoop', () => {
     loop.stop();
     processTickSpy.mockRestore();
   });
+
+  it('should not start if already running (double start protection)', () => {
+    const loop = new GameLoop(gameState, onTick, onGameOver);
+    loop.start();
+    expect(loop.isRunning()).toBe(true);
+
+    // Starting again should be a no-op (no error, no duplicate intervals)
+    loop.start();
+    expect(loop.isRunning()).toBe(true);
+
+    // Advance and verify onTick is not called double the expected rate
+    const callsBefore = onTick.mock.calls.length;
+    jest.advanceTimersByTime(50); // 1 tick
+    const callsAfter = onTick.mock.calls.length;
+    // Should only get roughly 1 new tick, not 2 (from duplicate intervals)
+    expect(callsAfter - callsBefore).toBeLessThanOrEqual(2);
+
+    loop.stop();
+  });
+
+  it('should call onGameOver callback when game finishes', () => {
+    const loop = new GameLoop(gameState, onTick, onGameOver, 20, true);
+
+    // Mock processTick to mark game as finished after a few ticks
+    let tickCount = 0;
+    const processTickSpy = jest.spyOn(gameState, 'processTick').mockImplementation(() => {
+      tickCount++;
+      if (tickCount >= 3) {
+        gameState.status = 'finished';
+      }
+    });
+
+    loop.start();
+    // Advance enough ticks for the game to finish
+    jest.advanceTimersByTime(50 * 5);
+
+    expect(onGameOver).toHaveBeenCalledTimes(1);
+    expect(loop.isRunning()).toBe(false);
+
+    processTickSpy.mockRestore();
+  });
+
+  it('setTickRate should change tick interval', () => {
+    const loop = new GameLoop(gameState, onTick, onGameOver, 20);
+    loop.start();
+
+    // Change to a faster tick rate
+    loop.setTickRate(40);
+    expect(loop.getTickRate()).toBe(40);
+
+    loop.stop();
+  });
+
+  it('getTickRate should return current rate', () => {
+    const loop = new GameLoop(gameState, onTick, onGameOver, 20);
+    expect(loop.getTickRate()).toBe(20);
+
+    const loop2 = new GameLoop(gameState, onTick, onGameOver, 10);
+    expect(loop2.getTickRate()).toBe(10);
+  });
+
+  it('should not process ticks after stop is called', () => {
+    const loop = new GameLoop(gameState, onTick, onGameOver, 20, true);
+    loop.start();
+
+    // Let a few ticks fire
+    jest.advanceTimersByTime(150);
+    const callsBeforeStop = onTick.mock.calls.length;
+    expect(callsBeforeStop).toBeGreaterThan(0);
+
+    loop.stop();
+
+    // Advance more time - no new ticks should fire
+    jest.advanceTimersByTime(500);
+    expect(onTick.mock.calls.length).toBe(callsBeforeStop);
+  });
+
+  it('isRunning should return true when started and false after stop', () => {
+    const loop = new GameLoop(gameState, onTick, onGameOver);
+
+    expect(loop.isRunning()).toBe(false);
+
+    loop.start();
+    expect(loop.isRunning()).toBe(true);
+
+    loop.stop();
+    expect(loop.isRunning()).toBe(false);
+  });
 });
