@@ -30,6 +30,7 @@ import { ReplayLogPanel } from '../game/ReplayLogPanel';
 import { EnemySpriteRenderer } from '../game/EnemySprite';
 import { EnemyTextureGenerator } from '../game/EnemyTextureGenerator';
 import { EmoteBubbleRenderer } from '../game/EmoteBubble';
+import { EmoteWheel } from '../game/EmoteWheel';
 import { generateThemedTileTextures, generateHazardTileTextures } from '../utils/campaignThemes';
 import { MapEventRenderer } from '../game/MapEventRenderer';
 import {
@@ -104,6 +105,7 @@ export class GameScene extends Phaser.Scene {
 
   // Emotes
   private emoteRenderer: EmoteBubbleRenderer | null = null;
+  private emoteWheel: EmoteWheel | null = null;
   private emoteKeyHandler: ((e: KeyboardEvent) => void) | null = null;
   private _emotePositions = new Map<number, { x: number; y: number }>();
 
@@ -247,10 +249,26 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    // Emote keys 1-6 (only when alive — spectator digit keys only fire when localPlayerDead)
+    // Emote keys 1-6 quick emotes + backtick for emote wheel
+    this.emoteWheel = new EmoteWheel();
     this.emoteKeyHandler = (e: KeyboardEvent) => {
       if (this.localPlayerDead) return;
       if (this.lastGameState?.status !== 'playing') return;
+
+      // Backtick toggles emote wheel
+      if (e.code === 'Backquote') {
+        e.preventDefault();
+        if (this.emoteWheel!.isVisible()) {
+          this.emoteWheel!.hide();
+        } else {
+          this.emoteWheel!.show((emoteId) => {
+            this.socketClient.emit('game:emote', { emoteId });
+          });
+        }
+        return;
+      }
+
+      // Digit 1-6 quick emotes (only when alive, spectator reuses when dead)
       const match = e.code.match(/^Digit([1-6])$/);
       if (match) {
         const emoteId = (parseInt(match[1]) - 1) as EmoteId;
@@ -1245,6 +1263,8 @@ export class GameScene extends Phaser.Scene {
     this.enemyRenderer = null;
     this.emoteRenderer?.destroy();
     this.emoteRenderer = null;
+    this.emoteWheel?.hide();
+    this.emoteWheel = null;
   }
 
   private pauseCampaign(): void {

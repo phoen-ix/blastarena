@@ -17,6 +17,7 @@ import {
   CampaignGameState,
   UserRole,
   getErrorMessage,
+  EMOTES,
 } from '@blast-arena/shared';
 import {
   setupFriendHandlers,
@@ -704,7 +705,8 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       const roomCode = socket.data.activeRoomCode;
       if (!roomCode) return;
 
-      if (typeof data.emoteId !== 'number' || data.emoteId < 0 || data.emoteId > 5) return;
+      if (typeof data.emoteId !== 'number' || data.emoteId < 0 || data.emoteId >= EMOTES.length)
+        return;
 
       const emoteMode = await settingsService.getEmoteMode();
       if (emoteMode === 'disabled') return;

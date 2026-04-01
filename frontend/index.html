@@ -1619,6 +1619,47 @@
       transition: opacity 0.5s;
     }
 
+    /* Emote Wheel */
+    .emote-wheel-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.3);
+    }
+    .emote-wheel-ring {
+      position: relative;
+      width: 0;
+      height: 0;
+    }
+    .emote-wheel-item {
+      position: absolute;
+      width: 64px;
+      height: 32px;
+      margin-left: -32px;
+      margin-top: -16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-surface);
+      color: var(--text);
+      font-family: var(--font-heading);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .emote-wheel-item:hover {
+      background: var(--primary);
+      color: #fff;
+      transform: translate(var(--tw-translate-x, 0), var(--tw-translate-y, 0)) scale(1.15);
+      z-index: 1;
+    }
+
     .hud-spectator-banner {
       position: absolute;
       bottom: 20px;
