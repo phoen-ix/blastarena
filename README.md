@@ -38,6 +38,7 @@ Open `http://localhost:8080` (or your configured `APP_EXTERNAL_PORT`). See `.env
 | `E` | B | Detonate remote bombs / Toggle FIFO mode |
 | `Q` | Y | Throw bomb (with Bomb Throw power-up) |
 | `1`-`6` | — | Quick emote (when alive) |
+| `` ` `` (backtick) | — | Open emote wheel (all 12 emotes) |
 | `Escape` | — | Pause (campaign) / Leave game (multiplayer) |
 | `1`-`9` | LB / RB | Spectate player (when dead) |
 
@@ -49,7 +50,7 @@ Walk into a bomb with the Kick power-up to send it sliding. Click a player name 
 |------|--------|
 | **Bomb Up** | +1 max bombs (up to 8) |
 | **Fire Up** | +1 explosion range (up to 8) |
-| **Speed Up** | Faster movement (up to 5 levels) |
+| **Speed Up** | Faster movement (up to 3 levels) |
 | **Shield** | Absorbs one hit from any source (no time limit, doesn't stack) |
 | **Kick** | Walk into bombs to kick them |
 | **Pierce Bomb** | Explosions pass through destructible walls |
@@ -75,6 +76,7 @@ Create and share custom maps for multiplayer rooms. The built-in map editor (ada
 - **Map picker** in room creation: choose from your own maps or community-published maps (grouped in dropdown). Selecting a custom map auto-disables map size and wall density settings and shows a pixel-art map preview
 - **Validation**: Maps must have odd dimensions (9-51), wall borders, 2-8 spawn points, and valid tile types. Validated both client-side and server-side
 - **Play count tracking**: Each game played on a custom map increments its play counter
+- **Community ratings**: Players can rate published maps 1-5 stars. Maps sorted by average rating on the community listing. Star ratings shown in room creation dropdown
 
 ## Bot AI
 
@@ -83,11 +85,11 @@ Three difficulty tiers optimized through 20,000+ simulation games:
 - **Normal**: BFS pathfinding, dynamic danger assessment, competitive
 - **Hard**: Deep search, chain reaction awareness, shield aggression, dominant
 
-Admins can upload custom AI implementations as TypeScript files. See [docs/bot-ai-guide.md](docs/bot-ai-guide.md) for the developer guide and [docs/bot-ai-internals.md](docs/bot-ai-internals.md) for built-in AI details.
+All bots feature team awareness (won't hunt, bomb, or kick teammates in team mode) and smart power-up value scoring (prioritize shield > speed > kick/throw > pierce > remote/line > fire > bomb; skip already-maxed power-ups). Admins can upload custom AI implementations as TypeScript files. See [docs/bot-ai-guide.md](docs/bot-ai-guide.md) for the developer guide and [docs/bot-ai-internals.md](docs/bot-ai-internals.md) for built-in AI details.
 
 ## Leaderboard & Ranking
 
-Elo-based competitive ranking across all game modes. Standard Elo formula with adaptive K-factor. Seasonal system with admin-defined dates, history archiving, and hard/soft resets. Six rank tiers (Bronze through Champion) with optional sub-tiers (I/II/III) — all admin-configurable. Leaderboard view with season filtering (hidden when no seasons) and clickable profiles leading to full-page profile views. Rank and level badges displayed next to usernames in lobby. Elo deltas and XP gains shown on game-over screen.
+Elo-based competitive ranking across all game modes. Standard Elo formula with adaptive K-factor. Seasonal system with admin-defined dates, history archiving, and hard/soft resets. Six rank tiers (Bronze through Champion) with optional sub-tiers (I/II/III) — all admin-configurable. Leaderboard view with season filtering (hidden when no seasons) and clickable profiles leading to full-page profile views. Rank and level badges displayed next to usernames in lobby. Elo deltas and XP gains shown on game-over screen. **Match History** sidebar view shows recent matches with mode, result, K/D, placement, duration, and per-mode stat breakdown (win rate, avg kills) with pagination.
 
 ## Player XP & Levels
 
@@ -125,7 +127,7 @@ All actions audit-logged. See [docs/admin-and-systems.md](docs/admin-and-systems
 - **Room Invites**: Invite friends directly to your current room. Invite toasts with Accept/Decline buttons (30s auto-dismiss).
 - **Lobby Chat**: Global ephemeral chat for all connected lobby users. Collapsible panel bottom-right. Users can hide via Settings > Preferences > Chat toggle.
 - **Direct Messages**: Full-page two-column view (conversation sidebar + active conversation). Persistent messages between friends with unread badges, real-time delivery, read receipts.
-- **In-Game Emotes**: 6 predefined quick phrases (GG, Help!, Nice!, Oops, Taunt, Thanks) — keys 1-6 during gameplay. Floating bubbles above player sprites with 3s cooldown.
+- **In-Game Emotes**: 12 emotes (GG, Help!, Nice!, Oops, Taunt, Thanks, Wow, Sorry, Let's Go!, No!, Wait, Boom!) — keys 1-6 for quick emotes, backtick (`) opens radial emote wheel for all 12. Floating bubbles above player sprites with 3s cooldown.
 - **Spectator Chat**: Dead players can text chat during live games. Collapsible panel bottom-left, role-colored usernames, 3/sec rate limit.
 - **Rematch Voting**: After game over, players vote for rematch. >50% triggers auto-restart with same settings. 30s timeout. Solo games (1 human + bots) show direct "Play Again" button instead of voting.
 - **Admin Chat Controls**: All chat features (party chat, lobby chat, DMs, emotes, spectator chat) individually configurable: everyone (default), staff only, admin only, or fully disabled.
@@ -263,12 +265,12 @@ blast-arena/
 ## Testing & Linting
 
 ```bash
-npm test                    # Run all test suites (2379 tests)
+npm test                    # Run all test suites (2385 tests)
 npm run lint                # ESLint across all workspaces
 npm run format:check        # Prettier format check
 ```
 
-2379 tests across 78 suites: game logic (593), services (854), routes (537), handlers (62), middleware (55), simulation (69), utilities (165), frontend (42). See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
+2385 tests across 78 suites: game logic (599), services (854), routes (537), handlers (62), middleware (55), simulation (69), utilities (165), frontend (42). See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
 
 ## Documentation
 

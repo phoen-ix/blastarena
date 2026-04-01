@@ -1,5 +1,11 @@
-import { PlayerInput, Direction, Position, TileType } from '@blast-arena/shared';
-import { MOVE_COOLDOWN_BASE, BOMB_TIMER_TICKS } from '@blast-arena/shared';
+import { PlayerInput, Direction, Position, TileType, PowerUpType } from '@blast-arena/shared';
+import {
+  MOVE_COOLDOWN_BASE,
+  BOMB_TIMER_TICKS,
+  MAX_SPEED,
+  MAX_FIRE_RANGE,
+  MAX_BOMBS,
+} from '@blast-arena/shared';
 import { Player } from './Player';
 import { GameStateManager } from './GameState';
 import { GameLogger } from '../utils/gameLogger';
@@ -16,6 +22,37 @@ const DIR_DELTA_ARRAY = Object.values(DIR_DELTA);
 
 function isDestructibleTile(tile: TileType): boolean {
   return tile === 'destructible' || tile === ('destructible_cracked' as TileType);
+}
+
+/** Returns true if two players are on the same team (team mode only) */
+function isTeammate(self: Player, other: Player): boolean {
+  return self.team !== null && other.team === self.team;
+}
+
+/** Score a power-up based on how useful it is to the player (higher = better) */
+function scorePowerUp(type: PowerUpType, player: Player): number {
+  switch (type) {
+    case 'shield':
+      return player.hasShield ? 1 : 10;
+    case 'speed_up':
+      return player.speed >= MAX_SPEED ? 0 : 8;
+    case 'kick':
+      return player.hasKick ? 0 : 7;
+    case 'bomb_throw':
+      return player.hasBombThrow ? 0 : 7;
+    case 'pierce_bomb':
+      return player.hasPierceBomb ? 0 : 6;
+    case 'remote_bomb':
+      return player.hasRemoteBomb ? 0 : 5;
+    case 'line_bomb':
+      return player.hasLineBomb ? 0 : 5;
+    case 'fire_up':
+      return player.fireRange >= MAX_FIRE_RANGE ? 0 : 4;
+    case 'bomb_up':
+      return player.maxBombs >= MAX_BOMBS ? 0 : 3;
+    default:
+      return 2;
+  }
 }
 
 export interface IBotAI {
@@ -90,7 +127,7 @@ const DIFFICULTY_PRESETS: Record<'easy' | 'normal' | 'hard', BotDifficultyConfig
     bombCooldownMin: 15,
     bombCooldownMax: 25,
     escapeCheckBeforeBomb: true,
-    huntChance: 0.90,
+    huntChance: 0.9,
     powerUpVision: 8,
     optimalMoveChance: 0.8,
     useKick: true,
@@ -198,10 +235,7 @@ export class BotAI implements IBotAI {
     if (mapSize) {
       const referenceArea = 15 * 13;
       const scale = Math.max(1, Math.sqrt((mapSize.width * mapSize.height) / referenceArea));
-      this.config.huntSearchDepth = Math.min(
-        80,
-        Math.round(this.config.huntSearchDepth * scale),
-      );
+      this.config.huntSearchDepth = Math.min(80, Math.round(this.config.huntSearchDepth * scale));
       this.config.escapeSearchDepth = Math.min(
         25,
         Math.round(this.config.escapeSearchDepth * scale),
@@ -210,10 +244,7 @@ export class BotAI implements IBotAI {
         5,
         Math.round(this.config.roamAfterIdleTicks / scale),
       );
-      this.config.powerUpVision = Math.min(
-        40,
-        Math.round(this.config.powerUpVision * scale),
-      );
+      this.config.powerUpVision = Math.min(40, Math.round(this.config.powerUpVision * scale));
     }
   }
 
@@ -265,12 +296,15 @@ export class BotAI implements IBotAI {
 
     const bombPositions = Array.from(state.bombs.values()).map((b) => b.position);
     // Cache alive enemies once — reused for stalemate detection, roaming, etc.
+    // In team mode, teammates are excluded from enemies but included in otherPlayers (for collision)
     const aliveEnemies: Player[] = [];
     const otherPlayers: Position[] = [];
     for (const p of state.players.values()) {
       if (p.id !== player.id && p.alive) {
-        aliveEnemies.push(p);
         otherPlayers.push(p.position);
+        if (!isTeammate(player, p)) {
+          aliveEnemies.push(p);
+        }
       }
     }
 
@@ -512,6 +546,7 @@ export class BotAI implements IBotAI {
                 if (
                   other.id !== player.id &&
                   other.alive &&
+                  !isTeammate(player, other) &&
                   other.position.x === cx &&
                   other.position.y === cy
                 ) {
@@ -532,7 +567,12 @@ export class BotAI implements IBotAI {
         if (!enemyInBlast) {
           for (const bomb of ownRemoteBombs) {
             for (const other of state.players.values()) {
-              if (other.id !== player.id && other.alive && other.invulnerableTicks <= 0) {
+              if (
+                other.id !== player.id &&
+                other.alive &&
+                !isTeammate(player, other) &&
+                other.invulnerableTicks <= 0
+              ) {
                 const dist =
                   Math.abs(other.position.x - bomb.position.x) +
                   Math.abs(other.position.y - bomb.position.y);
@@ -626,9 +666,7 @@ export class BotAI implements IBotAI {
           this.remoteBlockedTicks = 0;
         }
         const delayedSelfUnblock =
-          movementBlockedByOwnBomb &&
-          !selfInBlast &&
-          (this.remoteBlockedTicks > 10 || nearbyEnemy);
+          movementBlockedByOwnBomb && !selfInBlast && (this.remoteBlockedTicks > 10 || nearbyEnemy);
 
         const shouldDetonate =
           (enemyInBlast && !selfInBlast) ||
@@ -637,8 +675,7 @@ export class BotAI implements IBotAI {
           delayedSelfUnblock ||
           (ownRemoteBombs.length >= player.maxBombs &&
             !selfInBlast &&
-            (this.remoteBombHoldTicks >= this.config.remoteHoldThreshold ||
-              this.stalemateActive));
+            (this.remoteBombHoldTicks >= this.config.remoteHoldThreshold || this.stalemateActive));
 
         if (shouldDetonate) {
           this.remoteBombHoldTicks = 0;
@@ -677,90 +714,90 @@ export class BotAI implements IBotAI {
       ) {
         // Skip bomb placement — let hunt/roam reposition first
       } else {
-
-      // Dead-end check: require more walkable dirs at high fire range
-      let walkableDirs = 0;
-      for (const dir of DIRECTIONS) {
-        if (state.collisionSystem.canMoveTo(pos.x, pos.y, dir, bombPositions, otherPlayers)) {
-          walkableDirs++;
+        // Dead-end check: require more walkable dirs at high fire range
+        let walkableDirs = 0;
+        for (const dir of DIRECTIONS) {
+          if (state.collisionSystem.canMoveTo(pos.x, pos.y, dir, bombPositions, otherPlayers)) {
+            walkableDirs++;
+          }
         }
-      }
-      const minWalkableDirs = this.stalemateActive ? 1 : player.fireRange >= 5 ? 3 : 2;
+        const minWalkableDirs = this.stalemateActive ? 1 : player.fireRange >= 5 ? 3 : 2;
 
-      const canEscape =
-        this.stalemateActive ||
-        (this.config.shieldAggression && player.hasShield) ||
-        (walkableDirs >= minWalkableDirs &&
-          !this.hasOwnBombNearby(pos, state, player) &&
-          (!this.config.escapeCheckBeforeBomb ||
-            this.canEscapeAfterBomb(
-              pos,
-              state,
-              player,
-              bombPositions,
-              otherPlayers,
-              explosionCells,
-            )));
+        const canEscape =
+          this.stalemateActive ||
+          (this.config.shieldAggression && player.hasShield) ||
+          (walkableDirs >= minWalkableDirs &&
+            !this.hasOwnBombNearby(pos, state, player) &&
+            (!this.config.escapeCheckBeforeBomb ||
+              this.canEscapeAfterBomb(
+                pos,
+                state,
+                player,
+                bombPositions,
+                otherPlayers,
+                explosionCells,
+              )));
 
-      if (canEscape) {
-        // Dynamic bomb cooldown based on game phase and proximity
-        const nearEnemy = nearestEnemyDist !== null && nearestEnemyDist <= 5;
-        let cdMin: number, cdMax: number;
-        if (lateGame) {
-          cdMin =
-            this.config.lateGameBombCooldownMin > 0
-              ? this.config.lateGameBombCooldownMin
-              : Math.floor(this.config.bombCooldownMin / 2);
-          cdMax =
-            this.config.lateGameBombCooldownMax > 0
-              ? this.config.lateGameBombCooldownMax
-              : Math.floor(this.config.bombCooldownMax / 2);
-        } else if (nearEnemy || midGame) {
-          cdMin = Math.floor(this.config.bombCooldownMin * 0.75);
-          cdMax = Math.floor(this.config.bombCooldownMax * 0.75);
-        } else {
-          cdMin = this.config.bombCooldownMin;
-          cdMax = this.config.bombCooldownMax;
-        }
+        if (canEscape) {
+          // Dynamic bomb cooldown based on game phase and proximity
+          const nearEnemy = nearestEnemyDist !== null && nearestEnemyDist <= 5;
+          let cdMin: number, cdMax: number;
+          if (lateGame) {
+            cdMin =
+              this.config.lateGameBombCooldownMin > 0
+                ? this.config.lateGameBombCooldownMin
+                : Math.floor(this.config.bombCooldownMin / 2);
+            cdMax =
+              this.config.lateGameBombCooldownMax > 0
+                ? this.config.lateGameBombCooldownMax
+                : Math.floor(this.config.bombCooldownMax / 2);
+          } else if (nearEnemy || midGame) {
+            cdMin = Math.floor(this.config.bombCooldownMin * 0.75);
+            cdMax = Math.floor(this.config.bombCooldownMax * 0.75);
+          } else {
+            cdMin = this.config.bombCooldownMin;
+            cdMax = this.config.bombCooldownMax;
+          }
 
-        if (this.isEnemyInBlastRange(pos, state, player)) {
-          // During stalemate, skip bombing invulnerable enemies (post-shield-break)
-          let hasVulnerableTarget = true;
-          if (this.stalemateActive) {
-            hasVulnerableTarget = false;
-            for (const { dx, dy } of DIR_DELTA_ARRAY) {
-              for (let i = 1; i <= player.fireRange + 1; i++) {
-                const cx = pos.x + dx * i;
-                const cy = pos.y + dy * i;
-                const tile = state.collisionSystem.getTileAt(cx, cy);
-                if (tile === 'wall' || (isDestructibleTile(tile) && !player.hasPierceBomb)) break;
-                for (const other of state.players.values()) {
-                  if (
-                    other.id !== player.id &&
-                    other.alive &&
-                    other.position.x === cx &&
-                    other.position.y === cy &&
-                    other.invulnerableTicks <= 0
-                  ) {
-                    hasVulnerableTarget = true;
+          if (this.isEnemyInBlastRange(pos, state, player)) {
+            // During stalemate, skip bombing invulnerable enemies (post-shield-break)
+            let hasVulnerableTarget = true;
+            if (this.stalemateActive) {
+              hasVulnerableTarget = false;
+              for (const { dx, dy } of DIR_DELTA_ARRAY) {
+                for (let i = 1; i <= player.fireRange + 1; i++) {
+                  const cx = pos.x + dx * i;
+                  const cy = pos.y + dy * i;
+                  const tile = state.collisionSystem.getTileAt(cx, cy);
+                  if (tile === 'wall' || (isDestructibleTile(tile) && !player.hasPierceBomb)) break;
+                  for (const other of state.players.values()) {
+                    if (
+                      other.id !== player.id &&
+                      other.alive &&
+                      !isTeammate(player, other) &&
+                      other.position.x === cx &&
+                      other.position.y === cy &&
+                      other.invulnerableTicks <= 0
+                    ) {
+                      hasVulnerableTarget = true;
+                    }
                   }
                 }
               }
             }
+            if (hasVulnerableTarget) {
+              this.bombCooldown = cdMin + Math.floor(Math.random() * (cdMax - cdMin));
+              logDecision('bomb_offensive', { cooldown: this.bombCooldown });
+              return { seq: this.seq, direction: null, action: 'bomb', tick: state.tick };
+            }
           }
-          if (hasVulnerableTarget) {
+
+          if (this.isNearDestructible(pos, state)) {
             this.bombCooldown = cdMin + Math.floor(Math.random() * (cdMax - cdMin));
-            logDecision('bomb_offensive', { cooldown: this.bombCooldown });
+            logDecision('bomb_wall', { cooldown: this.bombCooldown });
             return { seq: this.seq, direction: null, action: 'bomb', tick: state.tick };
           }
         }
-
-        if (this.isNearDestructible(pos, state)) {
-          this.bombCooldown = cdMin + Math.floor(Math.random() * (cdMax - cdMin));
-          logDecision('bomb_wall', { cooldown: this.bombCooldown });
-          return { seq: this.seq, direction: null, action: 'bomb', tick: state.tick };
-        }
-      }
       } // end remote bomb self-block guard else
     }
 
@@ -784,7 +821,14 @@ export class BotAI implements IBotAI {
     }
 
     // Priority 4: Move toward a power-up (BFS pathfinding)
-    const powerUpDir = this.findPowerUpDirection(pos, state, danger, bombPositions, otherPlayers);
+    const powerUpDir = this.findPowerUpDirection(
+      pos,
+      state,
+      danger,
+      bombPositions,
+      otherPlayers,
+      player,
+    );
     if (powerUpDir) {
       this.lastDirection = powerUpDir;
       logDecision('seek_powerup', { dir: powerUpDir });
@@ -793,7 +837,14 @@ export class BotAI implements IBotAI {
 
     // Priority 4.5: Move toward hill zone in KOTH mode
     if (state.hillZone) {
-      const hillDir = this.findHillZoneDirection(pos, state, danger, bombPositions, otherPlayers, explosionCells);
+      const hillDir = this.findHillZoneDirection(
+        pos,
+        state,
+        danger,
+        bombPositions,
+        otherPlayers,
+        explosionCells,
+      );
       if (hillDir) {
         this.lastDirection = hillDir;
         logDecision('seek_hill', { dir: hillDir });
@@ -807,8 +858,7 @@ export class BotAI implements IBotAI {
     const effectiveHuntChance = midGame
       ? Math.min(this.config.huntChance + 0.1, 1)
       : this.config.huntChance;
-    const shouldHunt =
-      this.huntLockTicks > 0 || lateGame || Math.random() < effectiveHuntChance;
+    const shouldHunt = this.huntLockTicks > 0 || lateGame || Math.random() < effectiveHuntChance;
 
     if (shouldHunt) {
       // Hunt oscillation detection (Fix C): detect stuck hunting patterns
@@ -1010,14 +1060,10 @@ export class BotAI implements IBotAI {
     const effectiveIdleTicks = midGame
       ? Math.floor(this.config.roamAfterIdleTicks / 2)
       : this.config.roamAfterIdleTicks;
-    if (
-      lateGame ||
-      (effectiveIdleTicks > 0 && this.ticksSinceEnemyContact >= effectiveIdleTicks)
-    ) {
+    if (lateGame || (effectiveIdleTicks > 0 && this.ticksSinceEnemyContact >= effectiveIdleTicks)) {
       // While roaming, bomb walls that block the path toward enemy
       // Skip if oscillating (bouncing between ≤2 tiles) — bombing our own path is suicidal
-      const isOscillating =
-        this.posHistory.length >= 4 && new Set(this.posHistory).size <= 2;
+      const isOscillating = this.posHistory.length >= 4 && new Set(this.posHistory).size <= 2;
       if (
         !isOscillating &&
         this.bombCooldown <= 0 &&
@@ -1036,7 +1082,14 @@ export class BotAI implements IBotAI {
         if (wallToward) {
           const canEscapeRoam =
             !this.config.escapeCheckBeforeBomb ||
-            this.canEscapeAfterBomb(pos, state, player, bombPositions, otherPlayers, explosionCells);
+            this.canEscapeAfterBomb(
+              pos,
+              state,
+              player,
+              bombPositions,
+              otherPlayers,
+              explosionCells,
+            );
           if (canEscapeRoam) {
             this.bombCooldown = this.config.bombCooldownMin;
             logDecision('bomb_roam', { dir: wallToward });
@@ -1082,7 +1135,14 @@ export class BotAI implements IBotAI {
     }
 
     // Priority 7: Wander
-    const wanderDir = this.pickSafeWander(pos, state, danger, bombPositions, otherPlayers, explosionCells);
+    const wanderDir = this.pickSafeWander(
+      pos,
+      state,
+      danger,
+      bombPositions,
+      otherPlayers,
+      explosionCells,
+    );
     if (wanderDir) {
       this.lastDirection = wanderDir;
       logDecision('wander', { dir: wanderDir });
@@ -1099,7 +1159,7 @@ export class BotAI implements IBotAI {
   ): number | null {
     let minDist: number | null = null;
     for (const other of state.players.values()) {
-      if (other.id !== player.id && other.alive) {
+      if (other.id !== player.id && other.alive && !isTeammate(player, other)) {
         const dist = Math.abs(other.position.x - pos.x) + Math.abs(other.position.y - pos.y);
         if (minDist === null || dist < minDist) minDist = dist;
       }
@@ -1177,8 +1237,7 @@ export class BotAI implements IBotAI {
         let minDist = Infinity;
         for (const cellKey of blastCells) {
           const [cx, cy] = cellKey.split(',');
-          const dist =
-            Math.abs(Number(cx) - botPos.x) + Math.abs(Number(cy) - botPos.y);
+          const dist = Math.abs(Number(cx) - botPos.x) + Math.abs(Number(cy) - botPos.y);
           if (dist < minDist) minDist = dist;
         }
         if (minDist > movesBeforeDetonation + 1) continue;
@@ -1326,6 +1385,7 @@ export class BotAI implements IBotAI {
           if (
             other.id !== player.id &&
             other.alive &&
+            !isTeammate(player, other) &&
             other.position.x === cx &&
             other.position.y === cy
           ) {
@@ -1371,8 +1431,7 @@ export class BotAI implements IBotAI {
             break;
           }
         }
-        if (hasBomb || futureBombPositions.some((p) => p.x === nx && p.y === ny))
-          break;
+        if (hasBomb || futureBombPositions.some((p) => p.x === nx && p.y === ny)) break;
         futureBombPositions.push({ x: nx, y: ny });
         placed++;
       }
@@ -1520,6 +1579,7 @@ export class BotAI implements IBotAI {
   /**
    * BFS pathfinding toward the nearest power-up.
    * Uses orderedDirs() so lastDirection is explored first, giving stable tie-breaking.
+   * Scores power-ups by value to the player — skips worthless ones and prefers high-value at same depth.
    */
   private findPowerUpDirection(
     pos: Position,
@@ -1527,18 +1587,27 @@ export class BotAI implements IBotAI {
     danger: Set<string>,
     bombPositions: Position[],
     otherPlayers: Position[],
+    player: Player,
   ): Direction | null {
     if (state.powerUps.size === 0) return null;
 
-    const powerUpPositions = new Set<string>();
+    // Build position → score map; skip power-ups with score 0 (already maxed)
+    const powerUpScores = new Map<string, number>();
     for (const pu of state.powerUps.values()) {
-      powerUpPositions.add(`${pu.position.x},${pu.position.y}`);
+      const score = scorePowerUp(pu.type, player);
+      if (score > 0) {
+        powerUpScores.set(`${pu.position.x},${pu.position.y}`, score);
+      }
     }
+    if (powerUpScores.size === 0) return null;
 
     const visited = new Set<string>();
     visited.add(`${pos.x},${pos.y}`);
     let frontier: { pos: Position; firstDir: Direction }[] = [];
 
+    // Check immediate neighbors — return best at depth 0
+    let bestDir: Direction | null = null;
+    let bestScore = 0;
     for (const dir of this.orderedDirs()) {
       const newPos = state.collisionSystem.canMoveTo(
         pos.x,
@@ -1551,14 +1620,21 @@ export class BotAI implements IBotAI {
       const key = `${newPos.x},${newPos.y}`;
       if (danger.has(key)) continue;
       visited.add(key);
-      if (powerUpPositions.has(key)) return dir;
+      const score = powerUpScores.get(key);
+      if (score !== undefined && score > bestScore) {
+        bestScore = score;
+        bestDir = dir;
+      }
       if (!this.wouldOscillate(newPos)) {
         frontier.push({ pos: newPos, firstDir: dir });
       }
     }
+    if (bestDir) return bestDir;
 
     for (let depth = 0; depth < this.config.powerUpVision && frontier.length > 0; depth++) {
       const next: { pos: Position; firstDir: Direction }[] = [];
+      let depthBestDir: Direction | null = null;
+      let depthBestScore = 0;
       for (const entry of frontier) {
         for (const dir of DIRECTIONS) {
           const newPos = state.collisionSystem.canMoveTo(
@@ -1572,10 +1648,15 @@ export class BotAI implements IBotAI {
           const key = `${newPos.x},${newPos.y}`;
           if (visited.has(key) || danger.has(key)) continue;
           visited.add(key);
-          if (powerUpPositions.has(key)) return entry.firstDir;
+          const score = powerUpScores.get(key);
+          if (score !== undefined && score > depthBestScore) {
+            depthBestScore = score;
+            depthBestDir = entry.firstDir;
+          }
           next.push({ pos: newPos, firstDir: entry.firstDir });
         }
       }
+      if (depthBestDir) return depthBestDir;
       frontier = next;
     }
 
@@ -1650,11 +1731,11 @@ export class BotAI implements IBotAI {
     bombPositions: Position[],
     otherPlayers: Position[],
     aggressive: boolean = false,
-    explosionCells?: Set<string>,
+    _explosionCells?: Set<string>,
   ): Direction | null {
     const enemyPositions = new Set<string>();
     for (const other of state.players.values()) {
-      if (other.id !== player.id && other.alive) {
+      if (other.id !== player.id && other.alive && !isTeammate(player, other)) {
         enemyPositions.add(`${other.position.x},${other.position.y}`);
       }
     }
@@ -1735,7 +1816,7 @@ export class BotAI implements IBotAI {
     let nearestEnemy: Position | null = null;
     let nearestDist = Infinity;
     for (const other of state.players.values()) {
-      if (other.id !== player.id && other.alive) {
+      if (other.id !== player.id && other.alive && !isTeammate(player, other)) {
         const dist = Math.abs(other.position.x - pos.x) + Math.abs(other.position.y - pos.y);
         if (dist < nearestDist) {
           nearestDist = dist;
@@ -1804,7 +1885,7 @@ export class BotAI implements IBotAI {
     let nearestEnemy: Position | null = null;
     let nearestDist = Infinity;
     for (const other of state.players.values()) {
-      if (other.id !== player.id && other.alive) {
+      if (other.id !== player.id && other.alive && !isTeammate(player, other)) {
         const dist = Math.abs(other.position.x - pos.x) + Math.abs(other.position.y - pos.y);
         if (dist < nearestDist) {
           nearestDist = dist;
@@ -2091,6 +2172,7 @@ export class BotAI implements IBotAI {
             if (
               other.id !== player.id &&
               other.alive &&
+              !isTeammate(player, other) &&
               other.position.x === cx &&
               other.position.y === cy
             ) {

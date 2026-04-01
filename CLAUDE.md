@@ -89,7 +89,8 @@ User-created maps for multiplayer. `LevelEditorScene` with `editorMode: 'custom_
 - **DB**: `custom_maps` table (migration 026), `created_by` FK, `is_published` flag, `play_count`
 - **API**: CRUD at `/maps/mine`, `/maps/published`, `/maps/:id`. Validation via `shared/src/utils/mapValidation.ts` (odd dims 9-51, border walls, 2-8 spawns, teleporter pairing)
 - **Room integration**: `MatchConfig.customMapId` validated in `room:create`. `selectedHazardTiles`/`selectedMapEvents` specify active types (all enabled by default). Map loaded from DB on `room:start`, passed to `GameStateManager`
-- **Frontend**: `MapsView` for listing. Room creation shows map dropdown, disables size/density when custom map selected
+- **Ratings**: `map_ratings` table (migration 031, user_id + map_id unique). 1-5 star rating via `POST /maps/:id/rate`. `GET /maps/:id/rating` for user's rating. Published maps sorted by avg_rating DESC. `rateMap()` uses INSERT ON DUPLICATE KEY UPDATE
+- **Frontend**: `MapsView` for listing. Room creation shows map dropdown with star ratings, disables size/density when custom map selected
 
 ## Progression & Rewards
 - **Elo**: K=32 for <30 games, K=16 otherwise. FFA: pairwise with placement-based scores. Teams: average Elo per team
@@ -97,6 +98,7 @@ User-created maps for multiplayer. `LevelEditorScene` with `editorMode: 'custom_
 - **Achievements**: 4 condition types: `cumulative`, `per_game`, `mode_specific`, `campaign`. Each can reward a cosmetic
 - **Cosmetics**: 4 types: `color`, `eyes`, `trail`, `bomb_skin`. In `PlayerState.toState()` (NOT `toTickState()` — static per game). Color priority: cosmetic → team → index-based. Settings cosmetics tab has live preview panel: `drawPlayerSprite()` + `drawBombSprite()` from `playerCanvas.ts` (Canvas2D), trail shown as colored dot + name
 - **XP**: kills×50 + bombs×5 + powerups×10 + completion(25) + placement + win(100). Level N→N+1 costs N×100 XP
+- **Match History**: `GET /user/matches` with pagination (page, limit capped at 50). `MatchHistoryView` in sidebar shows recent matches (mode, result, K/D, placement, duration) and per-mode stat breakdown (win rate, avg kills). `getMatchHistory()` in user service
 - **Rematch voting**: >50% threshold. `humanPlayerIds` filters `id > 0` (excludes bots); solo with bots shows "Play Again" instead
 - **Account deletion**: `DELETE /user/account` with password confirmation. Hard delete with FK CASCADE. Admin accounts cannot self-delete
 
@@ -105,7 +107,7 @@ User-created maps for multiplayer. `LevelEditorScene` with `editorMode: 'custom_
 - **Presence**: Redis ephemeral keys (`presence:{userId}`) with 120s TTL, batch MGET pipeline
 - **Parties**: Redis-only (1hr TTL). Atomic join via Lua script. Party follows leader into rooms
 - **DMs**: Persistent (DB), between friends only. Unread counts per sender
-- **Emotes**: Keys 1-6 during gameplay (only when `!localPlayerDead` — no conflict with spectator digit keys 1-9)
+- **Emotes**: 12 emotes (GG, Help!, Nice!, Oops, Taunt, Thanks, Wow, Sorry, Let's Go!, No!, Wait, Boom!). Keys 1-6 for quick emotes, backtick (`) opens radial `EmoteWheel` for all 12. Only when `!localPlayerDead`. Server validates `emoteId < EMOTES.length`
 - **All social chat features** admin-configurable via `ChatMode` (`'everyone' | 'staff' | 'admin_only' | 'disabled'`)
 - Each socket joins `user:{userId}` room on connect. Lobby chat toggle via `lobbychat-toggle` window event
 
@@ -118,7 +120,7 @@ Full-screen panel for admin/moderator roles. `staffMiddleware` (admin+moderator)
 - See [docs/admin-and-systems.md](docs/admin-and-systems.md) for full details
 
 ## AI Systems
-- **Bot AI**: Three-layer sandbox (source scan, esbuild bundle, `vm.runInContext()` with 5s timeout). Crash recovery falls back to built-in. See [docs/bot-ai-guide.md](docs/bot-ai-guide.md)
+- **Bot AI**: Three-layer sandbox (source scan, esbuild bundle, `vm.runInContext()` with 5s timeout). Crash recovery falls back to built-in. Team awareness: `isTeammate()` filter excludes same-team players from all enemy detection (hunt, bomb, kick, remote detonation). Power-up value scoring: `scorePowerUp()` ranks by usefulness (shield=10 > speed=8 > kick/throw=7 > pierce=6 > remote/line=5 > fire=4 > bomb=3), skips already-maxed power-ups. See [docs/bot-ai-guide.md](docs/bot-ai-guide.md)
 - **Enemy AI**: Same sandbox pipeline. `IEnemyAI.decide(context)` returns `{ direction, placeBomb }`. Crash recovery falls back to built-in `processEnemyAI()`. See [docs/enemy-ai-guide.md](docs/enemy-ai-guide.md)
 - **Simulations**: Admin-only batch runner. See [docs/admin-and-systems.md](docs/admin-and-systems.md#bot-simulation-system)
 
@@ -228,7 +230,7 @@ npm test                    # Run all workspace tests (backend + frontend)
 npx jest --config tests/backend/jest.config.ts  # Backend only (from project root)
 cd frontend && npx vitest run                   # Frontend only
 ```
-- 2379 tests: 2337 backend (Jest, 75 suites) + 42 frontend (Vitest, 3 suites)
+- 2385 tests: 2343 backend (Jest, 75 suites) + 42 frontend (Vitest, 3 suites)
 - See [docs/testing.md](docs/testing.md) for full inventory, mocking patterns, and guide for writing new tests
 
 ## Documentation
