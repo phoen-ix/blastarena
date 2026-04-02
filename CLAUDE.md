@@ -241,7 +241,7 @@ cd frontend && npx vitest run                   # Frontend only
 - [Campaign System](docs/campaign.md) — enemies, levels, editor, progress
 - [Admin Panel & Systems](docs/admin-and-systems.md) — admin tabs, bot AI management, simulations, accounts
 - [Replay System](docs/replay-system.md) — recording, playback, controls, API
-- [Socket.io Events](docs/socket-events.md) — real-time event reference (86 events, rate limits, room patterns)
+- [Socket.io Events](docs/socket-events.md) — real-time event reference (100 events, rate limits, room patterns)
 - [Performance & Internals](docs/performance-and-internals.md) — optimizations, game logging
 - [Infrastructure & Security](docs/infrastructure.md) — security, resilience, Docker, migrations
 - [Testing](docs/testing.md) — test inventory, mocking patterns, writing new tests
