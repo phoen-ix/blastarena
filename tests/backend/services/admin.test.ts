@@ -68,6 +68,8 @@ import {
   setBanner,
   clearBanner,
   getActiveBanner,
+  previewCleanup,
+  executeCleanup,
 } from '../../../backend/src/services/admin';
 import { AppError } from '../../../backend/src/middleware/errorHandler';
 
@@ -829,6 +831,174 @@ describe('admin service', () => {
       const result = await getActiveBanner();
 
       expect(result).toBeNull();
+    });
+  });
+
+  // ── previewCleanup ────────────────────────────────────────────────
+
+  describe('previewCleanup', () => {
+    it('returns count of unverified users older than N days', async () => {
+      mockQuery.mockResolvedValueOnce([{ total: 12 }]);
+
+      const result = await previewCleanup('unverified', 30);
+
+      expect(result).toEqual({ count: 12 });
+      const sql = mockQuery.mock.calls[0][0] as string;
+      expect(sql).toContain('email_verified = FALSE');
+      expect(sql).toContain('INTERVAL ? DAY');
+      expect(mockQuery.mock.calls[0][1]).toContain(30);
+    });
+
+    it('returns count of inactive users older than N days', async () => {
+      mockQuery.mockResolvedValueOnce([{ total: 5 }]);
+
+      const result = await previewCleanup('inactive', 90);
+
+      expect(result).toEqual({ count: 5 });
+      const sql = mockQuery.mock.calls[0][0] as string;
+      expect(sql).toContain('last_login');
+      // days param appears twice (for last_login and created_at fallback)
+      expect(mockQuery.mock.calls[0][1]).toEqual([90, 90]);
+    });
+
+    it('returns count of deactivated users without days param', async () => {
+      mockQuery.mockResolvedValueOnce([{ total: 3 }]);
+
+      const result = await previewCleanup('deactivated');
+
+      expect(result).toEqual({ count: 3 });
+      const sql = mockQuery.mock.calls[0][0] as string;
+      expect(sql).toContain('is_deactivated = TRUE');
+    });
+
+    it('returns zero count when no users match', async () => {
+      mockQuery.mockResolvedValueOnce([{ total: 0 }]);
+
+      const result = await previewCleanup('unverified', 1);
+
+      expect(result).toEqual({ count: 0 });
+    });
+
+    it('always filters to role = user only', async () => {
+      mockQuery.mockResolvedValueOnce([{ total: 0 }]);
+
+      await previewCleanup('deactivated');
+
+      const sql = mockQuery.mock.calls[0][0] as string;
+      expect(sql).toContain("role = 'user'");
+    });
+  });
+
+  // ── executeCleanup ────────────────────────────────────────────────
+
+  describe('executeCleanup', () => {
+    it('deletes matching users and returns count', async () => {
+      mockQuery.mockResolvedValueOnce([{ id: 10 }, { id: 11 }, { id: 12 }]); // SELECT ids
+      mockExecute.mockResolvedValueOnce({}); // INSERT audit log
+      mockGetIO.mockReturnValue({
+        in: jest.fn().mockReturnValue({ disconnectSockets: jest.fn() }),
+      });
+      mockExecute.mockResolvedValueOnce({}); // DELETE
+
+      const result = await executeCleanup(1, 'unverified', 30);
+
+      expect(result).toEqual({ deleted: 3 });
+      // Audit log records bulk_delete
+      expect(mockExecute.mock.calls[0][1][1]).toBe('bulk_delete');
+      expect(mockExecute.mock.calls[0][1][3]).toBe(0); // target_id = 0 for bulk
+      // Delete uses IN clause with user ids
+      const deleteSql = mockExecute.mock.calls[1][0] as string;
+      expect(deleteSql).toContain('DELETE FROM users WHERE id IN');
+      expect(mockExecute.mock.calls[1][1]).toEqual([10, 11, 12]);
+    });
+
+    it('returns deleted: 0 when no users match', async () => {
+      mockQuery.mockResolvedValueOnce([]); // no matching users
+
+      const result = await executeCleanup(1, 'inactive', 365);
+
+      expect(result).toEqual({ deleted: 0 });
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it('disconnects sockets before deleting users', async () => {
+      const mockDisconnect = jest.fn();
+      const mockIn = jest.fn().mockReturnValue({ disconnectSockets: mockDisconnect });
+      mockQuery.mockResolvedValueOnce([{ id: 20 }, { id: 21 }]);
+      mockExecute.mockResolvedValueOnce({}); // audit log
+      mockGetIO.mockReturnValue({ in: mockIn });
+      mockExecute.mockResolvedValueOnce({}); // DELETE
+
+      await executeCleanup(1, 'deactivated');
+
+      expect(mockIn).toHaveBeenCalledWith('user:20');
+      expect(mockIn).toHaveBeenCalledWith('user:21');
+      expect(mockDisconnect).toHaveBeenCalledTimes(2);
+      expect(mockDisconnect).toHaveBeenCalledWith(true);
+    });
+
+    it('proceeds with deletion even if socket server is unavailable', async () => {
+      mockQuery.mockResolvedValueOnce([{ id: 30 }]);
+      mockExecute.mockResolvedValueOnce({}); // audit log
+      mockGetIO.mockImplementation(() => {
+        throw new Error('Socket.io not initialized');
+      });
+      mockExecute.mockResolvedValueOnce({}); // DELETE
+
+      const result = await executeCleanup(1, 'unverified', 7);
+
+      expect(result).toEqual({ deleted: 1 });
+      // Should still have audit log + DELETE calls
+      expect(mockExecute).toHaveBeenCalledTimes(2);
+    });
+
+    it('excludes the admin performing the cleanup from deletion', async () => {
+      mockQuery.mockResolvedValueOnce([{ id: 50 }]);
+      mockExecute.mockResolvedValueOnce({});
+      mockGetIO.mockReturnValue({
+        in: jest.fn().mockReturnValue({ disconnectSockets: jest.fn() }),
+      });
+      mockExecute.mockResolvedValueOnce({});
+
+      await executeCleanup(99, 'inactive', 60);
+
+      // The SELECT query should include admin exclusion
+      const selectSql = mockQuery.mock.calls[0][0] as string;
+      expect(selectSql).toContain('id != ?');
+      expect(mockQuery.mock.calls[0][1]).toContain(99);
+    });
+
+    it('logs audit action with cleanup details before deletion', async () => {
+      mockQuery.mockResolvedValueOnce([{ id: 40 }, { id: 41 }]);
+      mockExecute.mockResolvedValueOnce({}); // audit log
+      mockGetIO.mockReturnValue({
+        in: jest.fn().mockReturnValue({ disconnectSockets: jest.fn() }),
+      });
+      mockExecute.mockResolvedValueOnce({}); // DELETE
+
+      await executeCleanup(5, 'unverified', 14);
+
+      const auditParams = mockExecute.mock.calls[0][1];
+      expect(auditParams[0]).toBe(5); // adminId
+      expect(auditParams[1]).toBe('bulk_delete');
+      expect(auditParams[2]).toBe('user');
+      expect(auditParams[3]).toBe(0); // target_id = 0 for bulk
+      const details = JSON.parse(auditParams[4]);
+      expect(details).toEqual({ type: 'unverified', days: 14, count: 2 });
+    });
+
+    it('stores null days in audit log for deactivated cleanup', async () => {
+      mockQuery.mockResolvedValueOnce([{ id: 60 }]);
+      mockExecute.mockResolvedValueOnce({});
+      mockGetIO.mockReturnValue({
+        in: jest.fn().mockReturnValue({ disconnectSockets: jest.fn() }),
+      });
+      mockExecute.mockResolvedValueOnce({});
+
+      await executeCleanup(1, 'deactivated');
+
+      const details = JSON.parse(mockExecute.mock.calls[0][1][4]);
+      expect(details.days).toBeNull();
     });
   });
 });

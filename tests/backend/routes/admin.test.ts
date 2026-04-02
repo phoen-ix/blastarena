@@ -23,6 +23,8 @@ const mockSendToast = jest.fn<AnyFn>();
 const mockSetBanner = jest.fn<AnyFn>();
 const mockClearBanner = jest.fn<AnyFn>();
 const mockGetActiveBanner = jest.fn<AnyFn>();
+const mockPreviewCleanup = jest.fn<AnyFn>();
+const mockExecuteCleanup = jest.fn<AnyFn>();
 
 jest.mock('../../../backend/src/services/admin', () => ({
   createUser: mockCreateUser,
@@ -40,6 +42,8 @@ jest.mock('../../../backend/src/services/admin', () => ({
   setBanner: mockSetBanner,
   clearBanner: mockClearBanner,
   getActiveBanner: mockGetActiveBanner,
+  previewCleanup: mockPreviewCleanup,
+  executeCleanup: mockExecuteCleanup,
 }));
 
 // --- replayService ---
@@ -2234,6 +2238,101 @@ describe('DELETE /admin/ai/:id', () => {
 });
 
 // ============================================================================
+// ACCOUNT CLEANUP ROUTES
+// ============================================================================
+
+describe('POST /admin/users/cleanup/preview', () => {
+  const handler = getHandler('post', '/admin/users/cleanup/preview');
+
+  it('returns count from previewCleanup', async () => {
+    mockPreviewCleanup.mockResolvedValue({ count: 7 });
+    const req = mockReq({ body: { type: 'unverified', days: 30 } });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+    expect(mockPreviewCleanup).toHaveBeenCalledWith('unverified', 30);
+    expect(res._json).toEqual({ count: 7 });
+  });
+
+  it('calls previewCleanup for deactivated type without days', async () => {
+    mockPreviewCleanup.mockResolvedValue({ count: 3 });
+    const req = mockReq({ body: { type: 'deactivated' } });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+    expect(mockPreviewCleanup).toHaveBeenCalledWith('deactivated', undefined);
+    expect(res._json).toEqual({ count: 3 });
+  });
+
+  it('calls previewCleanup for inactive type', async () => {
+    mockPreviewCleanup.mockResolvedValue({ count: 0 });
+    const req = mockReq({ body: { type: 'inactive', days: 90 } });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+    expect(mockPreviewCleanup).toHaveBeenCalledWith('inactive', 90);
+    expect(res._json).toEqual({ count: 0 });
+  });
+
+  it('passes errors to next()', async () => {
+    const err = new Error('db fail');
+    mockPreviewCleanup.mockRejectedValue(err);
+    const req = mockReq({ body: { type: 'unverified', days: 7 } });
+    const res = mockRes();
+    const next = jest.fn();
+    await handler(req, res, next);
+    expect(next).toHaveBeenCalledWith(err);
+  });
+
+  it('has adminOnlyMiddleware', () => {
+    expect(hasAdminOnly('post', '/admin/users/cleanup/preview')).toBe(true);
+  });
+});
+
+describe('POST /admin/users/cleanup/execute', () => {
+  const handler = getHandler('post', '/admin/users/cleanup/execute');
+
+  it('returns deleted count from executeCleanup', async () => {
+    mockExecuteCleanup.mockResolvedValue({ deleted: 5 });
+    const req = mockReq({ body: { type: 'unverified', days: 30 } });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+    expect(mockExecuteCleanup).toHaveBeenCalledWith(1, 'unverified', 30);
+    expect(res._json).toEqual({ deleted: 5 });
+  });
+
+  it('passes adminId from req.user', async () => {
+    mockExecuteCleanup.mockResolvedValue({ deleted: 2 });
+    const req = mockReq({
+      user: { userId: 42, username: 'superadmin', role: 'admin' },
+      body: { type: 'inactive', days: 60 },
+    });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+    expect(mockExecuteCleanup).toHaveBeenCalledWith(42, 'inactive', 60);
+  });
+
+  it('handles deactivated cleanup without days', async () => {
+    mockExecuteCleanup.mockResolvedValue({ deleted: 1 });
+    const req = mockReq({ body: { type: 'deactivated' } });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+    expect(mockExecuteCleanup).toHaveBeenCalledWith(1, 'deactivated', undefined);
+  });
+
+  it('passes errors to next()', async () => {
+    const err = new Error('delete failed');
+    mockExecuteCleanup.mockRejectedValue(err);
+    const req = mockReq({ body: { type: 'deactivated' } });
+    const res = mockRes();
+    const next = jest.fn();
+    await handler(req, res, next);
+    expect(next).toHaveBeenCalledWith(err);
+  });
+
+  it('has adminOnlyMiddleware', () => {
+    expect(hasAdminOnly('post', '/admin/users/cleanup/execute')).toBe(true);
+  });
+});
+
+// ============================================================================
 // MIDDLEWARE PRESENCE — Router-level use() and inline adminOnlyMiddleware
 // ============================================================================
 
@@ -2284,6 +2383,8 @@ describe('Middleware presence', () => {
       { method: 'put', path: '/admin/users/:id/deactivate' },
       { method: 'put', path: '/admin/users/:id/password' },
       { method: 'delete', path: '/admin/users/:id' },
+      { method: 'post', path: '/admin/users/cleanup/preview' },
+      { method: 'post', path: '/admin/users/cleanup/execute' },
       { method: 'get', path: '/admin/stats' },
       { method: 'delete', path: '/admin/matches/:id' },
       { method: 'delete', path: '/admin/matches' },
