@@ -51,8 +51,6 @@
       "ariaLabel": "Usu\u0144 u\u017cytkownika",
       "title": "Trwale usu\u0144 u\u017cytkownika",
       "description": "To trwale usunie <strong style=\"color:var(--text);\">{{username}}</strong> i wszystkie powi\u0105zane dane. Tej operacji nie mo\u017cna cofn\u0105\u0107.",
-      "confirmPrompt": "Wpisz nazw\u0119 u\u017cytkownika, aby potwierdzi\u0107:",
-      "confirmAriaLabel": "Wpisz nazw\u0119 u\u017cytkownika, aby potwierdzi\u0107 usuni\u0119cie",
       "cancel": "Anuluj",
       "confirm": "Usu\u0144"
     },

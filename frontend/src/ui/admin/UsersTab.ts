@@ -196,30 +196,19 @@ export class UsersTab {
       <div class="modal" style="max-width:420px;">
         <h2 style="margin-bottom:12px;color:var(--danger);">${t('admin:users.deleteModal.title')}</h2>
         <p style="color:var(--text-dim);font-size:14px;">${t('admin:users.deleteModal.description', { username: escapeHtml(username) })}</p>
-        <p style="color:var(--text-dim);font-size:13px;margin-top:8px;">${t('admin:users.deleteModal.confirmPrompt')}</p>
-        <input type="text" class="confirm-input" id="delete-confirm-input" placeholder="${escapeAttr(username)}" aria-label="${escapeAttr(t('admin:users.deleteModal.confirmAriaLabel'))}">
         <div class="modal-actions" style="margin-top:16px;">
           <button class="btn btn-secondary" id="delete-cancel">${t('admin:users.deleteModal.cancel')}</button>
-          <button class="btn-danger" style="padding:8px 16px;font-size:14px;opacity:0.5;" id="delete-confirm" disabled>${t('admin:users.deleteModal.confirm')}</button>
+          <button class="btn-danger" style="padding:8px 16px;font-size:14px;" id="delete-confirm">${t('admin:users.deleteModal.confirm')}</button>
         </div>
       </div>
     `;
     document.getElementById('ui-overlay')!.appendChild(modal);
 
-    const input = modal.querySelector('#delete-confirm-input') as HTMLInputElement;
-    const confirmBtn = modal.querySelector('#delete-confirm') as HTMLButtonElement;
-
-    input.addEventListener('input', () => {
-      const matches = input.value === username;
-      confirmBtn.disabled = !matches;
-      confirmBtn.style.opacity = matches ? '1' : '0.5';
-    });
-
     modal.querySelector('#delete-cancel')!.addEventListener('click', () => modal.remove());
     modal.addEventListener('click', (e) => {
       if (e.target === modal) modal.remove();
     });
-    confirmBtn.addEventListener('click', async () => {
+    modal.querySelector('#delete-confirm')!.addEventListener('click', async () => {
       modal.remove();
       await this.doDelete(userId);
     });

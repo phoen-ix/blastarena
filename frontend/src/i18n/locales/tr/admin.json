@@ -51,8 +51,6 @@
       "ariaLabel": "Kullaniciyi Sil",
       "title": "Kullaniciyi Kalici Olarak Sil",
       "description": "Bu islem <strong style=\"color:var(--text);\">{{username}}</strong> kullanicisini ve tum verilerini kalici olarak silecektir. Bu islem geri alinamaz.",
-      "confirmPrompt": "Onaylamak icin kullanici adini yazin:",
-      "confirmAriaLabel": "Silmeyi onaylamak icin kullanici adini yazin",
       "cancel": "Iptal",
       "confirm": "Sil"
     },

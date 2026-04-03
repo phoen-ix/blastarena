@@ -10,6 +10,8 @@ export class VerificationUI {
   private notifications: NotificationUI;
   private onVerified: () => void;
   private checkInterval: ReturnType<typeof setInterval> | null = null;
+  private resendUsed = false;
+  private countdownInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(authManager: AuthManager, notifications: NotificationUI, onVerified: () => void) {
     this.authManager = authManager;
@@ -68,6 +70,8 @@ export class VerificationUI {
   }
 
   private async handleResend(): Promise<void> {
+    if (this.resendUsed) return;
+
     const emailInput = this.overlay.querySelector('#verify-email-input') as HTMLInputElement;
     const email = emailInput.value.trim();
     const statusEl = this.overlay.querySelector('#verify-status')!;
@@ -81,12 +85,30 @@ export class VerificationUI {
     btn.disabled = true;
     try {
       await ApiClient.post('/auth/resend-verification', { email }, true);
+      this.resendUsed = true;
       statusEl.innerHTML = `<span class="text-success">${t('auth:verification.resent')}</span>`;
+      this.startResendCountdown(btn);
     } catch (err: unknown) {
       statusEl.innerHTML = `<span class="text-danger">${getErrorMessage(err)}</span>`;
-    } finally {
       btn.disabled = false;
     }
+  }
+
+  private startResendCountdown(btn: HTMLButtonElement): void {
+    let remaining = 120;
+    btn.textContent = t('auth:verification.resendCountdown', { seconds: remaining });
+    this.countdownInterval = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        if (this.countdownInterval) {
+          clearInterval(this.countdownInterval);
+          this.countdownInterval = null;
+        }
+        btn.textContent = t('auth:verification.resendLimitReached');
+      } else {
+        btn.textContent = t('auth:verification.resendCountdown', { seconds: remaining });
+      }
+    }, 1000);
   }
 
   private async checkVerification(): Promise<void> {
@@ -151,6 +173,10 @@ export class VerificationUI {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
+    }
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
     }
   }
 }

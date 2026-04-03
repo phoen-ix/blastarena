@@ -51,8 +51,6 @@
       "ariaLabel": "Elimina utente",
       "title": "Elimina utente permanentemente",
       "description": "Questo eliminerà permanentemente <strong style=\"color:var(--text);\">{{username}}</strong> e tutti i relativi dati. Questa azione è irreversibile.",
-      "confirmPrompt": "Digita il nome utente per confermare:",
-      "confirmAriaLabel": "Digita il nome utente per confermare l'eliminazione",
       "cancel": "Annulla",
       "confirm": "Elimina"
     },

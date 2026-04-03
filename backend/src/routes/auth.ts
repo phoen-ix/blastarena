@@ -151,7 +151,7 @@ router.get(
 
 router.post(
   '/auth/resend-verification',
-  rateLimiter({ windowMs: 15 * 60 * 1000, maxRequests: 3 }),
+  rateLimiter({ windowMs: 120_000, maxRequests: 1 }),
   authMiddleware,
   async (req, res, next) => {
     try {

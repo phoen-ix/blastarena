@@ -51,8 +51,6 @@
       "ariaLabel": "Supprimer l'utilisateur",
       "title": "Supprimer l'utilisateur d\u00e9finitivement",
       "description": "Cela supprimera d\u00e9finitivement <strong style=\"color:var(--text);\">{{username}}</strong> et toutes ses donn\u00e9es. Cette action est irr\u00e9versible.",
-      "confirmPrompt": "Tapez le nom d'utilisateur pour confirmer :",
-      "confirmAriaLabel": "Tapez le nom d'utilisateur pour confirmer la suppression",
       "cancel": "Annuler",
       "confirm": "Supprimer"
     },

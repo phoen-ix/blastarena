@@ -51,8 +51,6 @@
       "ariaLabel": "Ta bort användare",
       "title": "Ta bort användare permanent",
       "description": "Detta kommer permanent ta bort <strong style=\"color:var(--text);\">{{username}}</strong> och all deras data. Denna åtgärd kan inte ångras.",
-      "confirmPrompt": "Skriv användarnamnet för att bekräfta:",
-      "confirmAriaLabel": "Skriv användarnamn för att bekräfta borttagning",
       "cancel": "Avbryt",
       "confirm": "Ta bort"
     },

@@ -51,8 +51,6 @@
       "ariaLabel": "Eliminar Usuario",
       "title": "Eliminar Usuario Permanentemente",
       "description": "Esto eliminará permanentemente a <strong style=\"color:var(--text);\">{{username}}</strong> y todos sus datos. Esta acción no se puede deshacer.",
-      "confirmPrompt": "Escribe el nombre de usuario para confirmar:",
-      "confirmAriaLabel": "Escribe el nombre de usuario para confirmar la eliminación",
       "cancel": "Cancelar",
       "confirm": "Eliminar"
     },

@@ -51,8 +51,6 @@
       "ariaLabel": "Slet bruger",
       "title": "Slet bruger permanent",
       "description": "Dette vil permanent slette <strong style=\"color:var(--text);\">{{username}}</strong> og alle deres data. Denne handling kan ikke fortrydes.",
-      "confirmPrompt": "Skriv brugernavnet for at bekr\u00e6fte:",
-      "confirmAriaLabel": "Skriv brugernavn for at bekr\u00e6fte sletning",
       "cancel": "Annuller",
       "confirm": "Slet"
     },

@@ -51,8 +51,6 @@
       "ariaLabel": "Excluir Usu\u00e1rio",
       "title": "Excluir Usu\u00e1rio Permanentemente",
       "description": "Isso excluir\u00e1 permanentemente <strong style=\"color:var(--text);\">{{username}}</strong> e todos os seus dados. Esta a\u00e7\u00e3o n\u00e3o pode ser desfeita.",
-      "confirmPrompt": "Digite o nome de usu\u00e1rio para confirmar:",
-      "confirmAriaLabel": "Digite o nome de usu\u00e1rio para confirmar a exclus\u00e3o",
       "cancel": "Cancelar",
       "confirm": "Excluir"
     },

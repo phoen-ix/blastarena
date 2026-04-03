@@ -51,8 +51,6 @@
       "ariaLabel": "Gebruiker verwijderen",
       "title": "Gebruiker permanent verwijderen",
       "description": "Dit verwijdert <strong style=\"color:var(--text);\">{{username}}</strong> en alle bijbehorende gegevens permanent. Deze actie kan niet ongedaan worden gemaakt.",
-      "confirmPrompt": "Typ de gebruikersnaam ter bevestiging:",
-      "confirmAriaLabel": "Typ gebruikersnaam ter bevestiging van verwijdering",
       "cancel": "Annuleren",
       "confirm": "Verwijderen"
     },

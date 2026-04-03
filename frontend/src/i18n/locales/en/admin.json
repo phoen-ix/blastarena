@@ -51,8 +51,6 @@
       "ariaLabel": "Delete User",
       "title": "Delete User Permanently",
       "description": "This will permanently delete <strong style=\"color:var(--text);\">{{username}}</strong> and all their data. This action cannot be undone.",
-      "confirmPrompt": "Type the username to confirm:",
-      "confirmAriaLabel": "Type username to confirm deletion",
       "cancel": "Cancel",
       "confirm": "Delete"
     },

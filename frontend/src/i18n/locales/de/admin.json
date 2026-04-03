@@ -51,8 +51,6 @@
       "ariaLabel": "Benutzer löschen",
       "title": "Benutzer endgültig löschen",
       "description": "Dies löscht <strong style=\"color:var(--text);\">{{username}}</strong> und alle zugehörigen Daten unwiderruflich.",
-      "confirmPrompt": "Gib den Benutzernamen zur Bestätigung ein:",
-      "confirmAriaLabel": "Benutzernamen zur Bestätigung eingeben",
       "cancel": "Abbrechen",
       "confirm": "Löschen"
     },
