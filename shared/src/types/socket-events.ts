@@ -186,6 +186,11 @@ export interface ServerToClientEvents {
   'room:list': (rooms: RoomListItem[]) => void;
   'game:start': (state: GameState) => void;
   'game:state': (state: GameState) => void;
+  'game:bombThrown': (data: {
+    bombId: string;
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+  }) => void;
   'game:explosion': (data: { cells: { x: number; y: number }[]; ownerId: number }) => void;
   'game:powerupCollected': (data: {
     playerId: number;

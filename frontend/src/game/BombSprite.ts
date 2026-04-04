@@ -3,6 +3,11 @@ import { BombState, PlayerCosmeticData, TILE_SIZE } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 import { BootScene } from '../scenes/BootScene';
 
+interface PendingThrow {
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+}
+
 export class BombSpriteRenderer {
   private scene: Phaser.Scene;
   private sprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
@@ -10,9 +15,19 @@ export class BombSpriteRenderer {
   private sparkEmitters: Map<string, Phaser.GameObjects.Particles.ParticleEmitter> = new Map();
   private playerCosmetics: Map<number, PlayerCosmeticData> = new Map();
   private _activeIds = new Set<string>();
+  private pendingThrows: Map<string, PendingThrow> = new Map();
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+  }
+
+  /** Register a bomb throw — called before update() so the arc animation plays on creation */
+  registerThrow(
+    bombId: string,
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+  ): void {
+    this.pendingThrows.set(bombId, { from, to });
   }
 
   setPlayerCosmetics(cosmetics: Map<number, PlayerCosmeticData>): void {
@@ -88,9 +103,45 @@ export class BombSpriteRenderer {
           }
         }
 
-        const sprite = this.scene.add.sprite(posX, posY, textureKey);
+        // Check if this bomb was thrown — start at origin and arc to landing position
+        const throwData = this.pendingThrows.get(bomb.id);
+        this.pendingThrows.delete(bomb.id);
+
+        const startX = throwData ? throwData.from.x * TILE_SIZE + TILE_SIZE / 2 : posX;
+        const startY = throwData ? throwData.from.y * TILE_SIZE + TILE_SIZE / 2 : posY;
+
+        const sprite = this.scene.add.sprite(startX, startY, textureKey);
         sprite.setDepth(5);
         this.sprites.set(bomb.id, sprite);
+
+        if (throwData) {
+          // Arc animation: tween position with a vertical arc using onUpdate
+          const dx = posX - startX;
+          const dy = posY - startY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const arcHeight = Math.max(20, dist * 0.4);
+
+          sprite.setDepth(15); // Above other sprites during flight
+          sprite.setScale(0.8);
+
+          this.scene.tweens.add({
+            targets: sprite,
+            x: posX,
+            y: posY,
+            scale: 1,
+            duration: 300,
+            ease: 'Sine.easeOut',
+            onUpdate: (tween) => {
+              // Parabolic arc offset: peak at midpoint
+              const p = tween.progress;
+              const arc = -4 * arcHeight * p * (p - 1);
+              sprite.y = startY + (posY - startY) * p - arc;
+            },
+            onComplete: () => {
+              sprite.setDepth(5);
+            },
+          });
+        }
 
         if (isRemote) {
           // Remote bombs: pulsing scale + slow alpha blink (blue texture distinguishes them)

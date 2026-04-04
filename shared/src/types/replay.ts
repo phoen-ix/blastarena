@@ -40,6 +40,7 @@ export interface ReplayTickEvents {
     type: string;
     position: Position;
   }[];
+  bombThrown?: { bombId: string; from: Position; to: Position }[];
 }
 
 export interface ReplayTileDiff {

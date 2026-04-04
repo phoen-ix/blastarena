@@ -61,6 +61,7 @@ class SeededRandom {
 
 export interface CampaignSessionCallbacks {
   onStateUpdate: (state: CampaignGameState) => void;
+  onBombThrown?: (data: { bombId: string; from: Position; to: Position }) => void;
   onPlayerDied: (playerId: number, livesRemaining: number, respawnPosition: Position) => void;
   onEnemyDied: (enemyId: number, position: Position, isBoss: boolean) => void;
   onExitOpened: (position: Position) => void;
@@ -545,6 +546,11 @@ export class CampaignGame {
     }
 
     this.campaignTick();
+
+    // Emit bomb thrown events BEFORE state so client can prepare arc animations
+    for (const thrown of this.gameState.tickEvents.bombThrown) {
+      this.callbacks.onBombThrown?.(thrown);
+    }
 
     // Broadcast combined state
     const state = this.toCampaignState();

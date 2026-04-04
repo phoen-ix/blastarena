@@ -130,7 +130,8 @@ export class GameStateManager {
     explosions: { cells: { x: number; y: number }[]; ownerId: number }[];
     playerDied: { playerId: number; killerId: number | null; cause: KillCause }[];
     powerupCollected: { playerId: number; type: string; position: { x: number; y: number } }[];
-  } = { explosions: [], playerDied: [], powerupCollected: [] };
+    bombThrown: { bombId: string; from: { x: number; y: number }; to: { x: number; y: number } }[];
+  } = { explosions: [], playerDied: [], powerupCollected: [], bombThrown: [] };
 
   // Shuffled spawn indices for fair spawn assignment
   private shuffledSpawnIndices: number[] = [];
@@ -336,7 +337,7 @@ export class GameStateManager {
     this._processingTick = true;
 
     // Clear per-tick event buffers and caches
-    this.tickEvents = { explosions: [], playerDied: [], powerupCollected: [] };
+    this.tickEvents = { explosions: [], playerDied: [], powerupCollected: [], bombThrown: [] };
     this._alivePlayersCache = null;
 
     // Check if grace period has elapsed
@@ -1453,6 +1454,11 @@ export class GameStateManager {
         bombPosSet.add(`${landPos.x},${landPos.y}`);
         player.bombCount++;
         player.bombsPlaced++;
+        this.tickEvents.bombThrown.push({
+          bombId: bomb.id,
+          from: { ...player.position },
+          to: { ...landPos },
+        });
         this.gameLogger?.logBomb('place', player.id, player.username, landPos, player.fireRange);
       }
     }

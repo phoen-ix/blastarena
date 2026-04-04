@@ -26,6 +26,11 @@ interface TickEvents {
     type: string;
     position: { x: number; y: number };
   }[];
+  bombThrown: {
+    bombId: string;
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+  }[];
 }
 
 export class ReplayRecorder {
@@ -110,13 +115,17 @@ export class ReplayRecorder {
     if (
       tickEvents.explosions.length > 0 ||
       tickEvents.playerDied.length > 0 ||
-      tickEvents.powerupCollected.length > 0
+      tickEvents.powerupCollected.length > 0 ||
+      tickEvents.bombThrown.length > 0
     ) {
       events = {
         explosions: tickEvents.explosions,
         playerDied: tickEvents.playerDied,
         powerupCollected: tickEvents.powerupCollected,
       };
+      if (tickEvents.bombThrown.length > 0) {
+        events.bombThrown = tickEvents.bombThrown;
+      }
     }
 
     const frame: ReplayFrame = {

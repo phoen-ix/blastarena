@@ -349,10 +349,16 @@ export class GameRoom {
     this.checkDisconnectGracePeriods();
 
     const room = `room:${this.code}`;
+    const events = this.gameState.tickEvents;
+
+    // Emit bomb thrown events BEFORE state so client can prepare arc animations
+    for (const thrown of events.bombThrown) {
+      this.io.to(room).emit('game:bombThrown', thrown);
+    }
+
     this.io.to(room).emit('game:state', state);
 
     // Emit discrete game events
-    const events = this.gameState.tickEvents;
     for (const explosion of events.explosions) {
       this.io.to(room).emit('game:explosion', explosion);
     }

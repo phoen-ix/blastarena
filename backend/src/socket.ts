@@ -1090,6 +1090,9 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
             onStateUpdate: (state) => {
               emitToCampaign('campaign:state', state);
             },
+            onBombThrown: (data) => {
+              emitToCampaign('game:bombThrown', data);
+            },
             onPlayerDied: (playerId, livesRemaining, respawnPosition) => {
               emitToCampaign('campaign:playerDied', { playerId, livesRemaining, respawnPosition });
             },

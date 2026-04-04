@@ -164,6 +164,7 @@ export class GameScene extends Phaser.Scene {
     this.socketClient.off('game:state');
     this.socketClient.off('game:over');
     this.socketClient.off('game:emote');
+    this.socketClient.off('game:bombThrown');
     // Remove only OUR campaign:state handler — HUDScene also listens on this event
     if (this.campaignStateHandler) {
       this.socketClient.off('campaign:state', this.campaignStateHandler);
@@ -237,6 +238,11 @@ export class GameScene extends Phaser.Scene {
     this.countdownOverlay = new CountdownOverlay(this);
     this.mapEventRenderer = new MapEventRenderer(this);
     this.emoteRenderer = new EmoteBubbleRenderer(this);
+
+    // Listen for bomb throws to animate arc before state arrives
+    this.socketClient.on('game:bombThrown', (data) => {
+      this.bombRenderer.registerThrow(data.bombId, data.from, data.to);
+    });
 
     // Listen for emotes from other players
     this.socketClient.on('game:emote', (data) => {
@@ -894,6 +900,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleReplayTickEvents(events: ReplayTickEvents): void {
+    if (events.bombThrown) {
+      for (const thrown of events.bombThrown) {
+        this.bombRenderer.registerThrow(thrown.bombId, thrown.from, thrown.to);
+      }
+    }
     for (const explosion of events.explosions) {
       this.effectSystem.triggerExplosion(explosion);
     }
@@ -1455,6 +1466,7 @@ export class GameScene extends Phaser.Scene {
   shutdown(): void {
     this.socketClient.off('game:state');
     this.socketClient.off('game:over');
+    this.socketClient.off('game:bombThrown');
     this.socketClient.off('sim:state');
     this.socketClient.off('sim:gameTransition');
     this.socketClient.off('sim:completed');

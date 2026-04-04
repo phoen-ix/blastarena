@@ -130,6 +130,7 @@ Full-screen panel for admin/moderator roles. `staffMiddleware` (admin+moderator)
 - 20 tick/sec server game loop (GameLoop.ts → GameState.ts)
 - GameState.processTick(): bot AI → inputs → movement → conveyors → bomb slide → bomb timers → explosions → collisions → power-ups → hazards → KOTH scoring → map events → zone → deathmatch respawns → time check → win check
 - Bomb kick: player with hasKick walking into bomb sets bomb.sliding; advances 1 tile/tick until blocked
+- Bomb throw: `game:bombThrown` event emitted before `game:state` with `{ bombId, from, to }`. `BombSpriteRenderer.registerThrow()` queues arc animation (parabolic tween, 300ms). Also recorded in `ReplayTickEvents.bombThrown` for replay playback
 - Spawn position randomization: Fisher-Yates shuffle using seeded RNG, deterministic for replays
 - Self-kills subtract 1 from kill score (owner.kills decremented, owner.selfKills incremented)
 - Power-up drop on kill: dying players drop one random collected power-up. Weighted by stacked amounts
@@ -242,7 +243,7 @@ cd frontend && npx vitest run                   # Frontend only
 - [Campaign System](docs/campaign.md) — enemies, levels, editor, progress
 - [Admin Panel & Systems](docs/admin-and-systems.md) — admin tabs, bot AI management, simulations, accounts
 - [Replay System](docs/replay-system.md) — recording, playback, controls, API
-- [Socket.io Events](docs/socket-events.md) — real-time event reference (100 events, rate limits, room patterns)
+- [Socket.io Events](docs/socket-events.md) — real-time event reference (101 events, rate limits, room patterns)
 - [Performance & Internals](docs/performance-and-internals.md) — optimizations, game logging
 - [Infrastructure & Security](docs/infrastructure.md) — security, resilience, Docker, migrations
 - [Testing](docs/testing.md) — test inventory, mocking patterns, writing new tests
