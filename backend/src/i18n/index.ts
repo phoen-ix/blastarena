@@ -8,7 +8,7 @@ export async function initI18n(): Promise<void> {
   await i18n.use(FsBackend).init({
     fallbackLng: 'en',
     supportedLngs: ['en', 'de', 'fr', 'es', 'it', 'pt', 'pl', 'nl', 'tr', 'sv', 'nb', 'da'],
-    ns: ['common', 'game', 'server', 'email'],
+    ns: ['server', 'email'],
     defaultNS: 'server',
     backend: {
       loadPath: path.resolve(__dirname, '../../locales/{{lng}}/{{ns}}.json'),

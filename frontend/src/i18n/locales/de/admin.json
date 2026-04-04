@@ -90,7 +90,31 @@
     "reactivateSuccess": "Benutzer reaktiviert",
     "deleteSuccess": "Benutzer endgültig gelöscht",
     "revokeSessions": "Sitzungen widerrufen",
-    "revokeSessionsSuccess": "Benutzersitzungen widerrufen"
+    "revokeSessionsSuccess": "Benutzersitzungen widerrufen",
+    "cleanup": {
+      "button": "Account Cleanup",
+      "title": "Account Cleanup",
+      "description": "Permanently delete user accounts matching the selected criteria. Admin and moderator accounts are always excluded.",
+      "typeLabel": "Cleanup type",
+      "typeUnverified": "Unverified",
+      "typeUnverifiedDesc": "Accounts that never verified their email",
+      "typeInactive": "Inactive",
+      "typeInactiveDesc": "Accounts with no login activity",
+      "typeDeactivated": "Deactivated",
+      "typeDeactivatedDesc": "Accounts already deactivated by an admin",
+      "daysLabel": "Older than (days)",
+      "daysPlaceholder": "e.g. 30",
+      "previewButton": "Preview",
+      "previewResult": "{{count}} account(s) match this criteria",
+      "previewNone": "No accounts match this criteria",
+      "confirmPrompt": "Type DELETE to confirm:",
+      "confirmPlaceholder": "DELETE",
+      "confirmAriaLabel": "Type DELETE to confirm bulk deletion",
+      "deleteButton": "Delete {{count}} accounts",
+      "cancel": "Cancel",
+      "success": "Deleted {{deleted}} account(s)",
+      "errorDaysRequired": "Days threshold is required for this cleanup type"
+    }
   },
   "matches": {
     "deleteAllMatches": "Alle Partien löschen",

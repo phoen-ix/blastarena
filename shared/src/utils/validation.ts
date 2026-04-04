@@ -13,7 +13,7 @@ export const ROOM_NAME_REGEX = /^[a-zA-Z0-9 _-]+$/;
  * i18n validation result: returns { key, params } for translation,
  * or null if valid. Use `translateValidation()` to get the translated string.
  */
-export interface ValidationError {
+interface ValidationError {
   key: string;
   params?: Record<string, string | number>;
 }

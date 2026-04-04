@@ -203,7 +203,7 @@ Gzipped JSON replays with tile diffs. See [docs/replay-system.md](docs/replay-sy
 ## Internationalization (i18n)
 Full-stack i18n via **i18next**. Frontend: `i18next-http-backend` + `i18next-browser-languagedetector`; backend: `i18next-fs-backend`.
 - **Pattern**: `t('namespace:section.key')` with `{{variable}}` interpolation. Import `t` from `frontend/src/i18n/index.ts` or `backend/src/i18n/index.ts`
-- **Namespaces**: shared (`common`, `game`), frontend-only (`ui`, `auth`, `hud`, `admin`, `campaign`, `help`, `editor`, `errors`), backend-only (`server`, `email`)
+- **Namespaces**: shared (`common`, `game`), frontend-only (`ui`, `auth`, `hud`, `admin`, `campaign`, `help`, `editor`, `errors`), backend-only (`server`, `email`). Backend i18n config only loads `server` + `email`; shared namespaces are bundled into frontend at build time
 - **Locale files**: `{workspace}/src/i18n/locales/{lng}/*.json`. Build scripts merge shared + workspace-specific locales
 - **Key conventions**: Dots are key separators — never use decimal numbers as JSON keys (use `"low30"` not `"0.3"`). View titles use getter: `get title() { return t('ui:...'); }` (not static)
 - **Variable shadowing**: When importing `{ t }` from i18n, lambda parameters named `t` must be renamed (e.g., `(tab) =>`)

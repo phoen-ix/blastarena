@@ -48,17 +48,6 @@ export function createSocketRateLimiter(maxPerSecond: number) {
 
 type SocketRateLimiter = ReturnType<typeof createSocketRateLimiter>;
 
-export function getSocketIp(socket: {
-  handshake: { headers: Record<string, string | string[] | undefined> };
-}): string {
-  const xRealIp = socket.handshake.headers['x-real-ip'];
-  const forwarded = socket.handshake.headers['x-forwarded-for'];
-  const forwardedStr = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  return (
-    (typeof xRealIp === 'string' ? xRealIp : forwardedStr?.split(',')[0]?.trim()) || 'unknown'
-  );
-}
-
 export function createRateLimiters() {
   // Per-socket limiters
   const inputLimiter = createSocketRateLimiter(30); // game:input — 30/sec (game is 20 tps)
