@@ -1247,8 +1247,12 @@ export class GameStateManager {
 
       const dx = bomb.sliding === 'left' ? -1 : bomb.sliding === 'right' ? 1 : 0;
       const dy = bomb.sliding === 'up' ? -1 : bomb.sliding === 'down' ? 1 : 0;
-      const nextX = bomb.position.x + dx;
-      const nextY = bomb.position.y + dy;
+      let nextX = bomb.position.x + dx;
+      let nextY = bomb.position.y + dy;
+      if (this.map.wrapping) {
+        nextX = ((nextX % this.map.width) + this.map.width) % this.map.width;
+        nextY = ((nextY % this.map.height) + this.map.height) % this.map.height;
+      }
       if (this.collisionSystem.isWalkable(nextX, nextY)) {
         let blocked = false;
         for (const other of this.bombs.values()) {
@@ -1625,6 +1629,10 @@ export class GameStateManager {
 
   /** Set a tile type and track the change for tile diff broadcast */
   setTileTracked(x: number, y: number, type: TileType): void {
+    if (this.map.wrapping) {
+      x = ((x % this.map.width) + this.map.width) % this.map.width;
+      y = ((y % this.map.height) + this.map.height) % this.map.height;
+    }
     if (x < 0 || x >= this.map.width || y < 0 || y >= this.map.height) return;
     this.map.tiles[y][x] = type;
     this._dirtyTiles.set(`${x},${y}`, { x, y, type });
@@ -1633,6 +1641,10 @@ export class GameStateManager {
 
   /** Destroy a tile and track the change for delta broadcasting */
   private destroyTileTracked(x: number, y: number): boolean {
+    if (this.map.wrapping) {
+      x = ((x % this.map.width) + this.map.width) % this.map.width;
+      y = ((y % this.map.height) + this.map.height) % this.map.height;
+    }
     const result = this.collisionSystem.destroyTile(x, y);
     // Track tile change regardless of whether it was "destroyed" (cracked counts too)
     if (x >= 0 && x < this.map.width && y >= 0 && y < this.map.height) {
@@ -1692,8 +1704,12 @@ export class GameStateManager {
         // Try to kick a bomb in the movement direction
         const dx = input.direction === 'left' ? -1 : input.direction === 'right' ? 1 : 0;
         const dy = input.direction === 'up' ? -1 : input.direction === 'down' ? 1 : 0;
-        const targetX = player.position.x + dx;
-        const targetY = player.position.y + dy;
+        let targetX = player.position.x + dx;
+        let targetY = player.position.y + dy;
+        if (this.map.wrapping) {
+          targetX = ((targetX % this.map.width) + this.map.width) % this.map.width;
+          targetY = ((targetY % this.map.height) + this.map.height) % this.map.height;
+        }
 
         for (const bomb of this.bombs.values()) {
           if (bomb.position.x === targetX && bomb.position.y === targetY && !bomb.sliding) {
@@ -1766,6 +1782,11 @@ export class GameStateManager {
         let cx = player.position.x + dx;
         let cy = player.position.y + dy;
         while (player.canPlaceBomb()) {
+          // Wrap coordinates for toroidal maps
+          if (this.map.wrapping) {
+            cx = ((cx % this.map.width) + this.map.width) % this.map.width;
+            cy = ((cy % this.map.height) + this.map.height) % this.map.height;
+          }
           const tileKey = `${cx},${cy}`;
           // Check if the tile is walkable, has no bomb, and has no player
           if (!this.collisionSystem.isWalkable(cx, cy)) break;
@@ -1971,8 +1992,12 @@ export class GameStateManager {
 
       const dx = convDir === 'left' ? -1 : convDir === 'right' ? 1 : 0;
       const dy = convDir === 'up' ? -1 : convDir === 'down' ? 1 : 0;
-      const nextX = bomb.position.x + dx;
-      const nextY = bomb.position.y + dy;
+      let nextX = bomb.position.x + dx;
+      let nextY = bomb.position.y + dy;
+      if (this.map.wrapping) {
+        nextX = ((nextX % this.map.width) + this.map.width) % this.map.width;
+        nextY = ((nextY % this.map.height) + this.map.height) % this.map.height;
+      }
       const nextKey = `${nextX},${nextY}`;
 
       const blocked =

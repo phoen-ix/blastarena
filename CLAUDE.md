@@ -168,7 +168,8 @@ Full-screen panel for admin/moderator roles. `staffMiddleware` (admin+moderator)
 
 ## Open World Mode (WIP)
 Persistent bomb arena as the default landing experience. Players auto-join on page load. Developed on `feature/open-world` branch.
-- **Toroidal map**: Wrapping 51x41 grid (default, no border walls). Coordinates wrap via `wrapX`/`wrapY` from `shared/src/utils/wrap.ts`. CollisionSystem wraps coordinates, `Map.ts` generates borderless maps with distributed spawns, `getExplosionCells` wraps, BotAI uses `wrappedManhattanDistance`
+- **Toroidal map**: Wrapping 51x41 grid (default, no border walls). Coordinates wrap via `wrapX`/`wrapY` from `shared/src/utils/wrap.ts`. CollisionSystem wraps coordinates, `Map.ts` generates borderless maps with distributed spawns, `getExplosionCells` wraps, BotAI uses `wrappedManhattanDistance`. For odd-dimension wrapping maps, the last even col/row is skipped in wall grid generation to avoid double-walls at the wrapping seam
+- **Ghost rendering**: 8 offset copies of the tilemap (`TileMapRenderer.createGhostTiles()`) for seamless visual wrapping. Entity renderers (player, bomb, explosion, power-up) create ghost sprites at world-size offsets near edges. Ghost sprites sync visual properties (tint, scale, alpha) from canonical sprites each frame. Player ghost overlays include shield graphics, name labels, and team indicators via `PlayerSpriteRenderer.updatePlayerGhosts()`
 - **Guest access**: Unauthenticated players connect without JWT via `SocketClient.connectAsGuest()`. Guest IDs start at `OPENWORLD_GUEST_ID_START` (-3000)
 - **Backend**: `OpenWorldManager` singleton (`backend/src/game/OpenWorldManager.ts`) manages the persistent world. GameState time limit check excluded via `!this.isOpenWorld`
 - **Round cycle**: Configurable duration (default 300s), freeze period between rounds, map regeneration. Round timer managed by OpenWorldManager
@@ -177,9 +178,10 @@ Persistent bomb arena as the default landing experience. Players auto-join on pa
 - **Admin**: `GET/PUT /admin/settings/open_world`, public status: `GET /admin/settings/open_world/status`
 - **Socket events**: `openworld:join` (with ack callback), `openworld:leave`, `openworld:input`, `openworld:state`, `openworld:info`, `openworld:roundEnd`, `openworld:roundStart`, `openworld:playerJoined`, `openworld:playerLeft`
 - **Frontend**: `OpenWorldView` (ILobbyView), auto-joins via socket emit in `render()`. Uses static `import game from '../../main'` (not dynamic import). MenuScene shows guest play option when not authenticated. LobbyScene defaults to openWorld view
-- **GameScene**: Handles open world via `openWorldMode` flag — uses `openworld:state`/`openworld:input` events, no game-over flow
+- **GameScene**: Handles open world via `openWorldMode` flag — uses `openworld:state`/`openworld:input` events, no game-over flow. Camera uses shortest-path wrapping interpolation. Respawn exits spectator mode and snaps camera to new position
+- **Remote detonate**: Defaults to `'fifo'` mode in open world (oldest bomb first). Players can toggle to `'all'` by pressing detonate with no remote bombs placed
 - **Migration**: `033_open_world.sql` seeds settings into `server_settings`
-- **WIP items**: Ghost tile rendering for wrapping edges, HUD round timer/leaderboard, camera wrapping smoothing still need work
+- **WIP items**: HUD round timer/leaderboard
 
 ## Game Reference
 

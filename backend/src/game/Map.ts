@@ -56,7 +56,10 @@ export function generateMap(
         }
       }
       // Internal grid pattern: walls on even row AND even column
+      // For wrapping maps with odd dimensions, skip last even col/row
+      // to avoid double-walls at the wrapping seam (x=width-1 adjacent to x=0)
       if (x % 2 === 0 && y % 2 === 0) {
+        if (wrapping && (x === width - 1 || y === height - 1)) continue;
         tiles[y][x] = 'wall';
       }
     }

@@ -196,12 +196,14 @@ Documentation served via backend API from `docs/` directory (bind-mounted in dev
 
 Persistent bomb arena that serves as the default landing experience. Players auto-join on page load — no room creation needed. Supports guest access for unauthenticated players (no account required to play).
 
-- **Toroidal map**: Wrapping 51x41 grid with no border walls. Players, bombs, and explosions wrap seamlessly across edges
+- **Toroidal map**: Wrapping 51x41 grid with no border walls. Players, bombs, and explosions wrap seamlessly across edges — the world feels infinite in every direction
+- **Ghost rendering**: Tilemap and all entities (players with shield/labels, bombs, explosions, power-ups) render ghost copies at wrapping edges for seamless visual continuity
 - **Guest play**: Unauthenticated visitors can jump in immediately via the menu screen guest option
 - **Round cycle**: Configurable round duration (default 5 minutes) with freeze period between rounds and automatic map regeneration
 - **Live scoring**: Stats tracked in real-time with periodic database persistence
+- **Remote bombs**: Default to FIFO detonation (oldest first) in open world; toggle to all-at-once by pressing detonate with none placed
 - **Admin controls**: Server settings for enabling/disabling, round duration, and map configuration. Settings prefixed `open_world_` in the admin dashboard
-- **WIP items**: Ghost tile rendering for wrapping edges, HUD round timer and leaderboard, camera wrapping smoothing
+- **WIP items**: HUD round timer and leaderboard
 
 ## Internationalization
 

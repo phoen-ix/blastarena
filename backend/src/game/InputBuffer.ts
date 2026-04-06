@@ -41,4 +41,12 @@ export class InputBuffer {
   clearAll(): void {
     this.buffers.clear();
   }
+
+  /** Check if any player has pending inputs */
+  hasInputs(): boolean {
+    for (const buffer of this.buffers.values()) {
+      if (buffer.length > 0) return true;
+    }
+    return false;
+  }
 }

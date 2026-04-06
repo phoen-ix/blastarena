@@ -27,6 +27,9 @@ export class PlayerSpriteRenderer {
   /** Previous positions per player for detecting movement */
   private prevPositions: Map<number, { x: number; y: number }> = new Map();
 
+  /** Wrapping map dimensions (set for open world) */
+  wrappingWorldSize: { w: number; h: number } | null = null;
+
   /** Players currently in a squash/stretch tween (prevents stacking) */
   private activeMoveAnim: Set<number> = new Set();
 
@@ -44,6 +47,14 @@ export class PlayerSpriteRenderer {
 
   /** Trail particle emitters per player */
   private trailEmitters: Map<number, Phaser.GameObjects.Particles.ParticleEmitter> = new Map();
+
+  /** Ghost sprites for wrapping maps (same pattern as BombSpriteRenderer) */
+  private ghostSprites: Map<number, Phaser.GameObjects.Image[]> = new Map();
+
+  /** Ghost copies of player overlays for wrapping maps */
+  private ghostShieldGraphics: Map<number, Phaser.GameObjects.Graphics[]> = new Map();
+  private ghostLabels: Map<number, Phaser.GameObjects.Text[]> = new Map();
+  private ghostTeamIndicators: Map<number, Phaser.GameObjects.Graphics[]> = new Map();
 
   /** Buddy mode: player ID, size, and glow color */
   private buddyPlayerId: number | null = null;
@@ -171,6 +182,14 @@ export class PlayerSpriteRenderer {
             this.buddyGlowGraphics.delete(player.id);
           }
 
+          // Clean up ghost sprites and overlays
+          const ghostsDeath = this.ghostSprites.get(player.id);
+          if (ghostsDeath) {
+            for (const g of ghostsDeath) g.destroy();
+            this.ghostSprites.delete(player.id);
+          }
+          this.destroyGhostOverlays(player.id);
+
           // Clean up tracking maps
           this.prevShieldState.delete(player.id);
           this.prevPositions.delete(player.id);
@@ -257,9 +276,25 @@ export class PlayerSpriteRenderer {
         this.prevShieldState.set(player.id, player.hasShield);
       }
 
-      // Interpolate position
-      sprite.x = Phaser.Math.Linear(sprite.x, targetX, 0.45);
-      sprite.y = Phaser.Math.Linear(sprite.y, targetY, 0.45);
+      // Interpolate position (wrapping-aware for toroidal maps)
+      // Sprite stays in canonical range [0, worldW). Ghost sprites handle edge visibility.
+      if (this.wrappingWorldSize) {
+        const { w, h } = this.wrappingWorldSize;
+        let dx = targetX - sprite.x;
+        let dy = targetY - sprite.y;
+        if (dx > w / 2) dx -= w;
+        else if (dx < -w / 2) dx += w;
+        if (dy > h / 2) dy -= h;
+        else if (dy < -h / 2) dy += h;
+        sprite.x += dx * 0.45;
+        sprite.y += dy * 0.45;
+        // Wrap to canonical range
+        sprite.x = ((sprite.x % w) + w) % w;
+        sprite.y = ((sprite.y % h) + h) % h;
+      } else {
+        sprite.x = Phaser.Math.Linear(sprite.x, targetX, 0.45);
+        sprite.y = Phaser.Math.Linear(sprite.y, targetY, 0.45);
+      }
 
       // Update texture based on direction
       const customPrefix = this.customTexturePrefix.get(player.id);
@@ -427,7 +462,197 @@ export class PlayerSpriteRenderer {
       if (teamGfx) {
         teamGfx.setPosition(sprite.x, sprite.y);
       }
+
+      // Ghost sprites for wrapping maps (entity visible on both sides of the edge)
+      if (this.wrappingWorldSize) {
+        this.updatePlayerGhosts(
+          player.id,
+          sprite.x,
+          sprite.y,
+          sprite.texture.key,
+          sprite.displayWidth,
+        );
+      }
     });
+  }
+
+  /** Create/update ghost copies of a player sprite and overlays near wrapping edges */
+  private updatePlayerGhosts(
+    playerId: number,
+    px: number,
+    py: number,
+    textureKey: string,
+    displaySize: number,
+  ): void {
+    if (!this.wrappingWorldSize) return;
+    const { w, h } = this.wrappingWorldSize;
+    // Threshold: half the world size ensures ghosts cover any viewport width up to the world size
+    const thresholdX = w / 2;
+    const thresholdY = h / 2;
+    const nearLeft = px < thresholdX;
+    const nearRight = px > w - thresholdX;
+    const nearTop = py < thresholdY;
+    const nearBottom = py > h - thresholdY;
+
+    const offsets: { ox: number; oy: number }[] = [];
+    if (nearLeft) offsets.push({ ox: w, oy: 0 });
+    if (nearRight) offsets.push({ ox: -w, oy: 0 });
+    if (nearTop) offsets.push({ ox: 0, oy: h });
+    if (nearBottom) offsets.push({ ox: 0, oy: -h });
+    if (nearLeft && nearTop) offsets.push({ ox: w, oy: h });
+    if (nearLeft && nearBottom) offsets.push({ ox: w, oy: -h });
+    if (nearRight && nearTop) offsets.push({ ox: -w, oy: h });
+    if (nearRight && nearBottom) offsets.push({ ox: -w, oy: -h });
+
+    let ghosts = this.ghostSprites.get(playerId);
+
+    if (ghosts && ghosts.length !== offsets.length) {
+      for (const g of ghosts) g.destroy();
+      ghosts = undefined;
+      this.ghostSprites.delete(playerId);
+      // Offset count changed — destroy overlay ghosts so they get re-created
+      this.destroyGhostOverlays(playerId);
+    }
+
+    if (offsets.length === 0) {
+      if (ghosts) {
+        for (const g of ghosts) g.destroy();
+        this.ghostSprites.delete(playerId);
+      }
+      this.destroyGhostOverlays(playerId);
+      return;
+    }
+
+    if (!ghosts) {
+      ghosts = offsets.map(({ ox, oy }) => {
+        const img = this.scene.add.image(px + ox, py + oy, textureKey);
+        img.setDepth(10);
+        img.setDisplaySize(displaySize, displaySize);
+        return img;
+      });
+      this.ghostSprites.set(playerId, ghosts);
+    } else {
+      for (let i = 0; i < offsets.length; i++) {
+        ghosts[i].setPosition(px + offsets[i].ox, py + offsets[i].oy);
+        ghosts[i].setTexture(textureKey);
+        ghosts[i].setDisplaySize(displaySize, displaySize);
+      }
+    }
+
+    // --- Ghost overlays: shield, label, team indicator ---
+
+    // Shield ghosts
+    const canonicalShield = this.shieldGraphics.get(playerId);
+    if (canonicalShield) {
+      let gShields = this.ghostShieldGraphics.get(playerId);
+      if (!gShields || gShields.length !== offsets.length) {
+        if (gShields) for (const g of gShields) g.destroy();
+        gShields = offsets.map(() => {
+          const gfx = this.scene.add.graphics();
+          gfx.setDepth(12);
+          return gfx;
+        });
+        this.ghostShieldGraphics.set(playerId, gShields);
+      }
+      const time = this.scene.time.now;
+      const oscillation = 0.25 + 0.15 * Math.sin(time * 0.005);
+      const radius = (TILE_SIZE - 4) / 2 + 4;
+      for (let i = 0; i < offsets.length; i++) {
+        gShields[i].clear();
+        gShields[i].fillStyle(0x44ff44, oscillation);
+        gShields[i].fillCircle(0, 0, radius);
+        gShields[i].lineStyle(2, 0x88ffaa, oscillation + 0.2);
+        gShields[i].strokeCircle(0, 0, radius);
+        gShields[i].setPosition(
+          canonicalShield.x + offsets[i].ox,
+          canonicalShield.y + offsets[i].oy,
+        );
+      }
+    } else {
+      const gShields = this.ghostShieldGraphics.get(playerId);
+      if (gShields) {
+        for (const g of gShields) g.destroy();
+        this.ghostShieldGraphics.delete(playerId);
+      }
+    }
+
+    // Label ghosts
+    const canonicalLabel = this.labels.get(playerId);
+    if (canonicalLabel) {
+      let gLabels = this.ghostLabels.get(playerId);
+      if (!gLabels || gLabels.length !== offsets.length) {
+        if (gLabels) for (const g of gLabels) g.destroy();
+        gLabels = offsets.map(() => {
+          const txt = this.scene.add
+            .text(0, 0, canonicalLabel.text, {
+              fontSize: '11px',
+              color: canonicalLabel.style.color as string,
+              stroke: '#000000',
+              strokeThickness: 2,
+            })
+            .setOrigin(0.5, 1)
+            .setDepth(11);
+          return txt;
+        });
+        this.ghostLabels.set(playerId, gLabels);
+      }
+      for (let i = 0; i < offsets.length; i++) {
+        gLabels[i].setPosition(canonicalLabel.x + offsets[i].ox, canonicalLabel.y + offsets[i].oy);
+      }
+    } else {
+      const gLabels = this.ghostLabels.get(playerId);
+      if (gLabels) {
+        for (const g of gLabels) g.destroy();
+        this.ghostLabels.delete(playerId);
+      }
+    }
+
+    // Team indicator ghosts
+    const canonicalTeam = this.teamIndicators.get(playerId);
+    if (canonicalTeam) {
+      let gTeam = this.ghostTeamIndicators.get(playerId);
+      if (!gTeam || gTeam.length !== offsets.length) {
+        if (gTeam) for (const g of gTeam) g.destroy();
+        const team = this.playerTeams.get(playerId);
+        const teamColor = team === 0 ? 0xe94560 : 0x44aaff;
+        gTeam = offsets.map(() => {
+          const gfx = this.scene.add.graphics();
+          gfx.setDepth(9);
+          gfx.fillStyle(teamColor, 0.35);
+          gfx.fillRoundedRect(-TILE_SIZE / 2 + 1, TILE_SIZE / 2 - 5, TILE_SIZE - 2, 4, 2);
+          return gfx;
+        });
+        this.ghostTeamIndicators.set(playerId, gTeam);
+      }
+      for (let i = 0; i < offsets.length; i++) {
+        gTeam[i].setPosition(canonicalTeam.x + offsets[i].ox, canonicalTeam.y + offsets[i].oy);
+      }
+    } else {
+      const gTeam = this.ghostTeamIndicators.get(playerId);
+      if (gTeam) {
+        for (const g of gTeam) g.destroy();
+        this.ghostTeamIndicators.delete(playerId);
+      }
+    }
+  }
+
+  /** Destroy all ghost overlay objects for a player */
+  private destroyGhostOverlays(playerId: number): void {
+    const gShields = this.ghostShieldGraphics.get(playerId);
+    if (gShields) {
+      for (const g of gShields) g.destroy();
+      this.ghostShieldGraphics.delete(playerId);
+    }
+    const gLabels = this.ghostLabels.get(playerId);
+    if (gLabels) {
+      for (const g of gLabels) g.destroy();
+      this.ghostLabels.delete(playerId);
+    }
+    const gTeam = this.ghostTeamIndicators.get(playerId);
+    if (gTeam) {
+      for (const g of gTeam) g.destroy();
+      this.ghostTeamIndicators.delete(playerId);
+    }
   }
 
   getSprite(id: number): Phaser.GameObjects.Sprite | undefined {
@@ -446,6 +671,22 @@ export class PlayerSpriteRenderer {
     this.buddyGlowGraphics.clear();
     for (const emitter of this.dustEmitters.values()) emitter.destroy();
     this.dustEmitters.clear();
+    for (const ghosts of this.ghostSprites.values()) {
+      for (const g of ghosts) g.destroy();
+    }
+    this.ghostSprites.clear();
+    for (const arr of this.ghostShieldGraphics.values()) {
+      for (const g of arr) g.destroy();
+    }
+    this.ghostShieldGraphics.clear();
+    for (const arr of this.ghostLabels.values()) {
+      for (const g of arr) g.destroy();
+    }
+    this.ghostLabels.clear();
+    for (const arr of this.ghostTeamIndicators.values()) {
+      for (const g of arr) g.destroy();
+    }
+    this.ghostTeamIndicators.clear();
     this.playerColorIndex.clear();
     this.playerTeams.clear();
     this.prevShieldState.clear();
@@ -484,6 +725,13 @@ export class PlayerSpriteRenderer {
       glowGfx.destroy();
       this.buddyGlowGraphics.delete(id);
     }
+
+    const ghostsRemove = this.ghostSprites.get(id);
+    if (ghostsRemove) {
+      for (const g of ghostsRemove) g.destroy();
+      this.ghostSprites.delete(id);
+    }
+    this.destroyGhostOverlays(id);
 
     const dustEmitter = this.dustEmitters.get(id);
     if (dustEmitter) {

@@ -218,7 +218,6 @@ export class GameScene extends Phaser.Scene {
     this.openWorldMode = !!this.registry.get('openWorldMode');
     this.registry.remove('openWorldMode');
     const openWorldPlayerId = this.registry.get('openWorldPlayerId') as number | undefined;
-    this.registry.remove('openWorldPlayerId');
 
     // Set local player ID — open world guests get server-assigned negative IDs
     this.localPlayerId = openWorldPlayerId ?? this.authManager.getUser()?.id ?? 0;
@@ -302,7 +301,22 @@ export class GameScene extends Phaser.Scene {
     this.playerRenderer = new PlayerSpriteRenderer(this, this.localPlayerId);
     this.bombRenderer = new BombSpriteRenderer(this);
     this.explosionRenderer = new ExplosionRenderer(this);
+    if (initialState?.map?.wrapping) {
+      const wrapSize = {
+        w: initialState.map.width * TILE_SIZE,
+        h: initialState.map.height * TILE_SIZE,
+      };
+      this.playerRenderer.wrappingWorldSize = wrapSize;
+      this.bombRenderer.wrappingWorldSize = wrapSize;
+      this.explosionRenderer.wrappingWorldSize = wrapSize;
+    }
     this.powerUpRenderer = new PowerUpRenderer(this);
+    if (initialState?.map?.wrapping) {
+      this.powerUpRenderer.wrappingWorldSize = {
+        w: initialState.map.width * TILE_SIZE,
+        h: initialState.map.height * TILE_SIZE,
+      };
+    }
     this.zoneRenderer = new ShrinkingZoneRenderer(this);
     this.hillZoneRenderer = new HillZoneRenderer(this);
     this.countdownOverlay = new CountdownOverlay(this);
@@ -383,6 +397,7 @@ export class GameScene extends Phaser.Scene {
         initialState.map.width,
         initialState.map.height,
         campaignTheme,
+        initialState.map.wrapping ?? false,
       );
       this.updateState(initialState);
     }
@@ -768,9 +783,24 @@ export class GameScene extends Phaser.Scene {
         const cam = this.cameras.main;
         this.freeCamX = cam.scrollX + cam.width / 2;
         this.freeCamY = cam.scrollY + cam.height / 2;
-      } else if (this.localPlayerDead && me && me.alive && this.campaignMode) {
-        // Player respawned in campaign — exit spectator mode
+      } else if (this.localPlayerDead && me && me.alive) {
+        // Player respawned (campaign, deathmatch, open world) — exit spectator mode
         this.localPlayerDead = false;
+        this.spectateTargetId = null;
+        // Snap camera to respawn position (avoid slow lerp from distant free-cam)
+        const cam = this.cameras.main;
+        const px = me.position.x * TILE_SIZE + TILE_SIZE / 2;
+        const py = me.position.y * TILE_SIZE + TILE_SIZE / 2;
+        let snapX = px - cam.width / 2;
+        let snapY = py - cam.height / 2;
+        if (this.openWorldMode && this.lastGameState?.map?.wrapping) {
+          const worldW = this.lastGameState.map.width * TILE_SIZE;
+          const worldH = this.lastGameState.map.height * TILE_SIZE;
+          snapX = ((snapX % worldW) + worldW) % worldW;
+          snapY = ((snapY % worldH) + worldH) % worldH;
+        }
+        cam.scrollX = snapX;
+        cam.scrollY = snapY;
       }
     }
 
@@ -816,7 +846,7 @@ export class GameScene extends Phaser.Scene {
     const worldW = mapW * TILE_SIZE;
     const worldH = mapH * TILE_SIZE;
 
-    // Wrapping maps: no camera bounds, camera follows player freely
+    // Wrapping maps: no bounds — ghost tiles handle the visual continuity
     if (this.lastGameState?.map?.wrapping || this.openWorldMode) {
       cam.removeBounds();
       cam.centerOn(worldW / 2, worldH / 2);
@@ -1132,8 +1162,35 @@ export class GameScene extends Phaser.Scene {
 
     const sprite = this.playerRenderer.getSprite(this.localPlayerId);
     if (!sprite) return;
-    cam.scrollX = Phaser.Math.Linear(cam.scrollX, sprite.x - cam.width / 2, 0.15);
-    cam.scrollY = Phaser.Math.Linear(cam.scrollY, sprite.y - cam.height / 2, 0.15);
+
+    const targetX = sprite.x - cam.width / 2;
+    const targetY = sprite.y - cam.height / 2;
+
+    if (this.openWorldMode && this.lastGameState?.map?.wrapping) {
+      const worldW = this.lastGameState.map.width * TILE_SIZE;
+      const worldH = this.lastGameState.map.height * TILE_SIZE;
+
+      // Wrap target to canonical range, then shortest-path interpolation
+      const wrappedTargetX = ((targetX % worldW) + worldW) % worldW;
+      const wrappedTargetY = ((targetY % worldH) + worldH) % worldH;
+
+      let dx = wrappedTargetX - cam.scrollX;
+      let dy = wrappedTargetY - cam.scrollY;
+      if (dx > worldW / 2) dx -= worldW;
+      else if (dx < -worldW / 2) dx += worldW;
+      if (dy > worldH / 2) dy -= worldH;
+      else if (dy < -worldH / 2) dy += worldH;
+
+      cam.scrollX += dx * 0.15;
+      cam.scrollY += dy * 0.15;
+
+      // Keep camera in canonical range
+      cam.scrollX = ((cam.scrollX % worldW) + worldW) % worldW;
+      cam.scrollY = ((cam.scrollY % worldH) + worldH) % worldH;
+    } else {
+      cam.scrollX = Phaser.Math.Linear(cam.scrollX, targetX, 0.15);
+      cam.scrollY = Phaser.Math.Linear(cam.scrollY, targetY, 0.15);
+    }
   }
 
   /** Poll gamepad Start (pause) and Y (emote wheel) — runs every frame, unthrottled */

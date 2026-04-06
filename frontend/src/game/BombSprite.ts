@@ -16,6 +16,8 @@ export class BombSpriteRenderer {
   private playerCosmetics: Map<number, PlayerCosmeticData> = new Map();
   private _activeIds = new Set<string>();
   private pendingThrows: Map<string, PendingThrow> = new Map();
+  public wrappingWorldSize: { w: number; h: number } | null = null;
+  private ghostSprites: Map<string, Phaser.GameObjects.Image[]> = new Map();
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -88,6 +90,9 @@ export class BombSpriteRenderer {
             }
           }
         }
+
+        // Sync ghost sprites: position, texture, and visual properties (tint, scale, alpha)
+        this.updateGhosts(bomb.id, posX, posY, existing.texture.key, existing);
       } else {
         // Create new bomb sprite — use different texture for remote bombs or custom skins
         const isRemote = bomb.bombType === 'remote';
@@ -190,6 +195,74 @@ export class BombSpriteRenderer {
     }
   }
 
+  private updateGhosts(
+    bombId: string,
+    px: number,
+    py: number,
+    textureKey: string,
+    canonical?: Phaser.GameObjects.Sprite,
+  ): void {
+    if (!this.wrappingWorldSize) return;
+    const { w, h } = this.wrappingWorldSize;
+    const thresholdX = w / 2;
+    const thresholdY = h / 2;
+    const nearLeft = px < thresholdX;
+    const nearRight = px > w - thresholdX;
+    const nearTop = py < thresholdY;
+    const nearBottom = py > h - thresholdY;
+
+    const offsets: { ox: number; oy: number }[] = [];
+    if (nearLeft) offsets.push({ ox: w, oy: 0 });
+    if (nearRight) offsets.push({ ox: -w, oy: 0 });
+    if (nearTop) offsets.push({ ox: 0, oy: h });
+    if (nearBottom) offsets.push({ ox: 0, oy: -h });
+    if (nearLeft && nearTop) offsets.push({ ox: w, oy: h });
+    if (nearLeft && nearBottom) offsets.push({ ox: w, oy: -h });
+    if (nearRight && nearTop) offsets.push({ ox: -w, oy: h });
+    if (nearRight && nearBottom) offsets.push({ ox: -w, oy: -h });
+
+    let ghosts = this.ghostSprites.get(bombId);
+
+    // Remove old ghosts if count changed
+    if (ghosts && ghosts.length !== offsets.length) {
+      for (const g of ghosts) g.destroy();
+      ghosts = undefined;
+      this.ghostSprites.delete(bombId);
+    }
+
+    if (offsets.length === 0) {
+      if (ghosts) {
+        for (const g of ghosts) g.destroy();
+        this.ghostSprites.delete(bombId);
+      }
+      return;
+    }
+
+    if (!ghosts) {
+      ghosts = offsets.map(({ ox, oy }) => {
+        const img = this.scene.add.image(px + ox, py + oy, textureKey);
+        img.setDepth(5);
+        return img;
+      });
+      this.ghostSprites.set(bombId, ghosts);
+    }
+
+    // Sync position, texture, and visual properties from canonical sprite
+    for (let i = 0; i < offsets.length; i++) {
+      ghosts[i].setPosition(px + offsets[i].ox, py + offsets[i].oy);
+      ghosts[i].setTexture(textureKey);
+      if (canonical) {
+        ghosts[i].setScale(canonical.scaleX, canonical.scaleY);
+        ghosts[i].setAlpha(canonical.alpha);
+        if (canonical.tintTopLeft !== 0xffffff) {
+          ghosts[i].setTint(canonical.tintTopLeft);
+        } else {
+          ghosts[i].clearTint();
+        }
+      }
+    }
+  }
+
   destroy(): void {
     for (const [id] of this.sprites) {
       this.removeBomb(id);
@@ -197,6 +270,10 @@ export class BombSpriteRenderer {
     this.sprites.clear();
     this.pulseTweens.clear();
     this.sparkEmitters.clear();
+    for (const ghosts of this.ghostSprites.values()) {
+      for (const g of ghosts) g.destroy();
+    }
+    this.ghostSprites.clear();
   }
 
   private removeBomb(id: string): void {
@@ -216,6 +293,12 @@ export class BombSpriteRenderer {
     if (emitter) {
       emitter.destroy();
       this.sparkEmitters.delete(id);
+    }
+
+    const ghosts = this.ghostSprites.get(id);
+    if (ghosts) {
+      for (const g of ghosts) g.destroy();
+      this.ghostSprites.delete(id);
     }
   }
 }

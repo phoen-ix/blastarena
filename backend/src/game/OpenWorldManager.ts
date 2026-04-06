@@ -17,6 +17,8 @@ import { GameStateManager, GameConfig } from './GameState';
 import { GameLoop } from './GameLoop';
 import { OpenWorldSettings, getOpenWorldSettings, isOpenWorldEnabled } from '../services/settings';
 import { logger } from '../utils/logger';
+import { GameLogger } from '../utils/gameLogger';
+import { ReplayRecorder } from '../utils/replayRecorder';
 import { execute } from '../db/connection';
 import {
   ClientToServerEvents,
@@ -85,6 +87,11 @@ class OpenWorldManager {
   private pendingStats: Map<number, PendingStats> = new Map();
   private lastStatsFlushTick: number = 0;
 
+  // Replay recording (only active ticks)
+  private replayRecorder: ReplayRecorder | null = null;
+  private lastActivityTick: number = 0;
+  private static readonly ACTIVITY_RECORD_WINDOW = 60; // Record 3s after last activity
+
   async init(io: TypedServer): Promise<void> {
     this.io = io;
     const enabled = await isOpenWorldEnabled();
@@ -142,6 +149,7 @@ class OpenWorldManager {
     for (const [playerId, playerData] of this.players) {
       const player = this.gameState.addPlayerLive(playerId, playerData.username);
       player.invulnerableTicks = OPENWORLD_JOIN_INVULNERABILITY_TICKS;
+      player.remoteDetonateMode = 'fifo';
       // Reset per-round tracking
       playerData.kills = 0;
       playerData.deaths = 0;
@@ -151,6 +159,25 @@ class OpenWorldManager {
 
     this.freezeTick = null;
     this.lastStatsFlushTick = 0;
+    this.lastActivityTick = 0;
+
+    // Set up replay recording for this round
+    const initialState = this.gameState.toState();
+    this.replayRecorder = new ReplayRecorder(
+      `openworld_r${this.roundNumber}`,
+      'open_world',
+      initialState,
+    );
+    this.replayRecorder.setSessionId(`openworld_r${this.roundNumber}_${Date.now()}`);
+
+    const gameLogger = new GameLogger(
+      `openworld_r${this.roundNumber}`,
+      'open_world',
+      this.players.size,
+      { verbosity: 'full' },
+    );
+    gameLogger.replayRecorder = this.replayRecorder;
+    this.gameState.gameLogger = gameLogger;
 
     this.gameLoop = new GameLoop(
       this.gameState,
@@ -166,6 +193,17 @@ class OpenWorldManager {
     if (!this.gameState || !this.io) return;
 
     const tick = this.gameState.tick;
+
+    // Broadcast discrete game events for EffectSystem (sounds, screen shake)
+    for (const explosion of this.gameState.tickEvents.explosions) {
+      this.io.to('openworld').emit('game:explosion', explosion);
+    }
+    for (const thrown of this.gameState.tickEvents.bombThrown) {
+      this.io.to('openworld').emit('game:bombThrown', thrown);
+    }
+    for (const pickup of this.gameState.tickEvents.powerupCollected) {
+      this.io.to('openworld').emit('game:powerupCollected', pickup);
+    }
 
     // Process kill events for live scoring + broadcast
     if (this.gameState.tickEvents.playerDied.length > 0) {
@@ -192,6 +230,28 @@ class OpenWorldManager {
         if (victim && !victim.isGuest && victim.userId > 0) {
           this.queueStatUpdate(victim.userId, 'death');
         }
+      }
+    }
+
+    // Record replay frame when there's activity (inputs update lastActivityTick in handleInput)
+    if (this.replayRecorder) {
+      // Events (explosions, deaths) also extend the recording window
+      const hasEvents =
+        this.gameState.tickEvents.explosions.length > 0 ||
+        this.gameState.tickEvents.playerDied.length > 0 ||
+        this.gameState.tickEvents.powerupCollected.length > 0 ||
+        this.gameState.tickEvents.bombThrown.length > 0;
+
+      if (hasEvents) {
+        this.lastActivityTick = tick;
+      }
+
+      // Record during activity and for a short window after
+      if (tick - this.lastActivityTick <= OpenWorldManager.ACTIVITY_RECORD_WINDOW) {
+        this.replayRecorder.recordTick(
+          { ...state, map: { ...state.map, tiles: this.gameState.map.tiles } },
+          this.gameState.tickEvents,
+        );
       }
     }
 
@@ -253,6 +313,9 @@ class OpenWorldManager {
 
     // Flush remaining stats
     this.flushStats();
+
+    // Save replay for this round (if any frames were recorded)
+    this.finalizeReplay();
 
     // Stop old game loop
     this.gameLoop?.stop();
@@ -326,6 +389,7 @@ class OpenWorldManager {
     // Add to game
     const player = this.gameState.addPlayerLive(userId, username);
     player.invulnerableTicks = OPENWORLD_JOIN_INVULNERABILITY_TICKS;
+    player.remoteDetonateMode = 'fifo';
 
     const playerData: OpenWorldPlayer = {
       socketId,
@@ -383,6 +447,9 @@ class OpenWorldManager {
     if (this.freezeTick !== null) return;
 
     this.gameState.inputBuffer.addInput(userId, input);
+
+    // Mark activity for replay recording
+    this.lastActivityTick = this.gameState.tick;
   }
 
   async handleSettingsChange(): Promise<void> {
@@ -457,6 +524,7 @@ class OpenWorldManager {
 
   shutdown(): void {
     this.flushStats();
+    this.finalizeReplay();
     this.gameLoop?.stop();
     this.gameLoop = null;
     this.gameState = null;
@@ -464,6 +532,30 @@ class OpenWorldManager {
     this.socketToPlayer.clear();
     this.freezeTick = null;
     this.enabled = false;
+  }
+
+  private finalizeReplay(): void {
+    if (!this.replayRecorder) return;
+
+    const leaderboard = this.getLeaderboard();
+    const winner = leaderboard.length > 0 ? leaderboard[0] : null;
+
+    this.replayRecorder.finalize({
+      winnerId: winner?.playerId ?? null,
+      winnerTeam: null,
+      reason: `Round ${this.roundNumber} ended`,
+      placements: leaderboard.map((e, i) => ({
+        playerId: e.playerId,
+        username: e.username,
+        placement: i + 1,
+        kills: e.kills,
+        deaths: e.deaths,
+      })),
+    });
+
+    this.replayRecorder = null;
+    // Close the game logger stream
+    this.gameState?.gameLogger?.logGameOver(null, []);
   }
 
   private broadcastInfo(): void {

@@ -27,6 +27,9 @@ export class OpenWorldView implements ILobbyView {
     return t('ui:openWorld.title');
   }
 
+  /** Track whether we've auto-joined this session (prevents re-join loop on game exit) */
+  private static hasAutoJoined = false;
+
   private deps: ViewDeps;
   private container: HTMLElement | null = null;
   private infoHandler: ((data: OpenWorldInfo) => void) | null = null;
@@ -75,8 +78,50 @@ export class OpenWorldView implements ILobbyView {
     this.bindSocketListeners();
     this.startTimerCountdown();
 
-    // Auto-join immediately
-    this.joinWorld();
+    if (!OpenWorldView.hasAutoJoined) {
+      // First visit this session — auto-join immediately
+      OpenWorldView.hasAutoJoined = true;
+      this.joinWorld();
+    } else {
+      // Returning from game — show lobby with join button
+      this.renderLobby(status);
+    }
+  }
+
+  private renderLobby(status: OpenWorldStatus): void {
+    if (!this.container) return;
+    const timeStr = this.formatTime(this.roundTimeRemaining);
+
+    this.container.innerHTML = `
+      <div style="padding:1rem; max-width:500px; margin:0 auto; text-align:center;">
+        <div class="panel-content" style="padding:1.5rem;">
+          <div style="display:flex; justify-content:center; gap:1.5rem; margin-bottom:1rem;">
+            <span class="mini-stat" id="ow-players">
+              ${t('ui:openWorld.playerCount', { current: status.playerCount, max: status.maxPlayers })}
+            </span>
+            <span class="mini-stat" id="ow-round">${t('ui:openWorld.roundNumber', { number: status.roundNumber })}</span>
+            <span class="mini-stat" id="ow-timer">${t('ui:openWorld.roundTimer', { time: timeStr })}</span>
+          </div>
+          <button class="btn btn-primary btn-lg" id="ow-join-btn" style="width:100%; max-width:280px;">
+            ${t('ui:openWorld.joinButton')}
+          </button>
+        </div>
+      </div>`;
+
+    this.container.querySelector('#ow-join-btn')?.addEventListener('click', () => {
+      const btn = this.container?.querySelector('#ow-join-btn') as HTMLButtonElement;
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = t('ui:openWorld.joining');
+      }
+      this.joinWorld();
+    });
+  }
+
+  private formatTime(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
   }
 
   private joinWorld(): void {
@@ -138,6 +183,17 @@ export class OpenWorldView implements ILobbyView {
   private bindSocketListeners(): void {
     this.infoHandler = (data) => {
       this.roundTimeRemaining = data.roundTimeRemaining;
+      const playersEl = this.container?.querySelector('#ow-players');
+      if (playersEl) {
+        playersEl.textContent = t('ui:openWorld.playerCount', {
+          current: data.playerCount,
+          max: data.maxPlayers,
+        });
+      }
+      const roundEl = this.container?.querySelector('#ow-round');
+      if (roundEl) {
+        roundEl.textContent = t('ui:openWorld.roundNumber', { number: data.roundNumber });
+      }
     };
     this.deps.socketClient.on('openworld:info', this.infoHandler);
 
@@ -156,6 +212,12 @@ export class OpenWorldView implements ILobbyView {
     this.stopTimerCountdown();
     this.timerInterval = setInterval(() => {
       this.roundTimeRemaining = Math.max(0, this.roundTimeRemaining - 1);
+      const timerEl = this.container?.querySelector('#ow-timer');
+      if (timerEl) {
+        timerEl.textContent = t('ui:openWorld.roundTimer', {
+          time: this.formatTime(this.roundTimeRemaining),
+        });
+      }
     }, 1000);
   }
 

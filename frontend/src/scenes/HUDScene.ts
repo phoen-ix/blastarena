@@ -88,7 +88,8 @@ export class HUDScene extends Phaser.Scene {
     this.events.once('shutdown', this.shutdown, this);
 
     const authManager = this.registry.get('authManager');
-    this.localPlayerId = authManager.getUser()?.id ?? 0;
+    const openWorldPlayerId = this.registry.get('openWorldPlayerId') as number | undefined;
+    this.localPlayerId = openWorldPlayerId ?? authManager.getUser()?.id ?? 0;
     this.localPlayerDead = false;
 
     // Force spectator mode for simulation/replay viewers
@@ -365,8 +366,20 @@ export class HUDScene extends Phaser.Scene {
       ) {
         this.mountSpectatorActionBar();
       }
-    } else if (this.localPlayerDead && this.campaignMode && me && me.alive) {
+    } else if (this.localPlayerDead && me && me.alive) {
+      // Player respawned (campaign, deathmatch, open world)
       this.localPlayerDead = false;
+      // Unmount spectator UI on respawn
+      if (this.spectatorChat) {
+        this.spectatorChat.destroy();
+        this.spectatorChat = null;
+        this.spectatorChatMounted = false;
+      }
+      if (this.spectatorActionBar) {
+        this.spectatorActionBar.destroy();
+        this.spectatorActionBar = null;
+        this.spectatorActionBarMounted = false;
+      }
     }
 
     // Update spectator action bar energy
