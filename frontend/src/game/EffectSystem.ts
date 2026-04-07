@@ -12,6 +12,7 @@ export class EffectSystem {
   private pendingShakeIntensity: number = 0;
   private pendingShakeDuration: number = 0;
   private shakeScheduled: boolean = false;
+  wrappingMapSize: { width: number; height: number } | null = null;
 
   private explosionHandler:
     | ((data: { cells: { x: number; y: number }[]; ownerId: number }) => void)
@@ -133,12 +134,20 @@ export class EffectSystem {
     const camCenterX = cam.scrollX + cam.width / 2;
     const camCenterY = cam.scrollY + cam.height / 2;
 
-    // Find closest explosion cell to camera center
+    // Find closest explosion cell to camera center (wrapped distance for toroidal maps)
+    const worldW = this.wrappingMapSize ? this.wrappingMapSize.width * TILE_SIZE : 0;
+    const worldH = this.wrappingMapSize ? this.wrappingMapSize.height * TILE_SIZE : 0;
     let minDist = Infinity;
     for (const cell of cells) {
       const px = cell.x * TILE_SIZE + TILE_SIZE / 2;
       const py = cell.y * TILE_SIZE + TILE_SIZE / 2;
-      const dist = Math.abs(px - camCenterX) + Math.abs(py - camCenterY);
+      let dx = Math.abs(px - camCenterX);
+      let dy = Math.abs(py - camCenterY);
+      if (this.wrappingMapSize) {
+        dx = Math.min(dx, worldW - dx);
+        dy = Math.min(dy, worldH - dy);
+      }
+      const dist = dx + dy;
       if (dist < minDist) minDist = dist;
     }
 

@@ -311,6 +311,10 @@ export class GameScene extends Phaser.Scene {
       this.playerRenderer.wrappingWorldSize = wrapSize;
       this.bombRenderer.wrappingWorldSize = wrapSize;
       this.explosionRenderer.wrappingWorldSize = wrapSize;
+      this.effectSystem.wrappingMapSize = {
+        width: initialState.map.width,
+        height: initialState.map.height,
+      };
     }
     this.powerUpRenderer = new PowerUpRenderer(this);
     if (initialState?.map?.wrapping) {
