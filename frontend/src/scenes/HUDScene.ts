@@ -69,6 +69,7 @@ export class HUDScene extends Phaser.Scene {
   private minimapCtx: CanvasRenderingContext2D | null = null;
   private minimapEnabled: boolean = true;
   private minimapTileSize: number = 0;
+  private minimapTiles: TileType[][] | null = null;
   private lastMinimapTick: number = -1;
 
   constructor() {
@@ -157,6 +158,7 @@ export class HUDScene extends Phaser.Scene {
     this.minimapContainer = null;
     this.minimapCanvas = null;
     this.minimapCtx = null;
+    this.minimapTiles = null;
     this.lastMinimapTick = -1;
     if (this.minimapEnabled) {
       this.minimapContainer = document.createElement('div');
@@ -560,6 +562,16 @@ export class HUDScene extends Phaser.Scene {
     const map = state.map;
     const maxSize = 140;
 
+    // Maintain local tile copy (tick states omit full tiles for bandwidth)
+    if (map.tiles && map.tiles.length > 0) {
+      this.minimapTiles = map.tiles.map((row) => [...row]);
+    } else if (this.minimapTiles && state.tileDiffs) {
+      for (const diff of state.tileDiffs) {
+        this.minimapTiles[diff.y][diff.x] = diff.type;
+      }
+    }
+    if (!this.minimapTiles) return;
+
     // Lazily create canvas on first state with map data
     if (!this.minimapCanvas) {
       const ts = Math.max(1, Math.floor(maxSize / Math.max(map.width, map.height)));
@@ -578,7 +590,7 @@ export class HUDScene extends Phaser.Scene {
     // Draw tiles
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
-        ctx.fillStyle = this.getMinimapTileColor(map.tiles[y][x]);
+        ctx.fillStyle = this.getMinimapTileColor(this.minimapTiles[y][x]);
         ctx.fillRect(x * ts, y * ts, ts, ts);
       }
     }
@@ -815,6 +827,7 @@ export class HUDScene extends Phaser.Scene {
     this.killFeedEl?.remove();
     this.minimapContainer?.remove();
     this.minimapContainer = null;
+    this.minimapTiles = null;
     this.minimapCanvas = null;
     this.minimapCtx = null;
     this.campaignHudEl?.remove();
