@@ -21,6 +21,9 @@ export const MAX_FIRE_RANGE = 8;
 // At speed 1: 5 ticks (4 moves/sec), speed 2 (max): 4 ticks (5 moves/sec)
 export const MOVE_COOLDOWN_BASE = 5;
 
+// Bomb throw
+export const BOMB_THROW_RANGE = 3; // base throw range in tiles
+
 // Timings (in ticks at 20 tps)
 export const BOMB_TIMER_TICKS = 60; // 3 seconds
 export const EXPLOSION_DURATION_TICKS = 10; // 0.5 seconds

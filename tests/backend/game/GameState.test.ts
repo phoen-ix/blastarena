@@ -1923,6 +1923,96 @@ describe('GameStateManager', () => {
       expect(bombs[0].position).toEqual({ x: 5, y: 3 });
     });
 
+    it('should throw bomb over 3+ consecutive walls to first open tile', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      startPlaying(gs);
+
+      p1.hasBombThrow = true;
+      p1.direction = 'right';
+      placePlayer(p1, 3, 3);
+
+      // Block tiles at x=4,5,6 (distance 1,2,3) with walls
+      gs.map.tiles[3][4] = 'wall';
+      gs.map.tiles[3][5] = 'wall';
+      gs.map.tiles[3][6] = 'wall';
+
+      gs.inputBuffer.addInput(1, throwInput());
+      gs.processTick();
+
+      const bombs = Array.from(gs.bombs.values());
+      expect(bombs.length).toBe(1);
+      expect(bombs[0].position).toEqual({ x: 7, y: 3 });
+    });
+
+    it('should throw bomb over many consecutive walls', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      startPlaying(gs);
+
+      p1.hasBombThrow = true;
+      p1.direction = 'right';
+      placePlayer(p1, 1, 3);
+
+      // Block tiles at x=2 through x=10
+      for (let x = 2; x <= 10; x++) {
+        gs.map.tiles[3][x] = 'wall';
+      }
+
+      gs.inputBuffer.addInput(1, throwInput());
+      gs.processTick();
+
+      const bombs = Array.from(gs.bombs.values());
+      expect(bombs.length).toBe(1);
+      expect(bombs[0].position).toEqual({ x: 11, y: 3 });
+    });
+
+    it('should fall back to player feet when all tiles blocked to map edge', () => {
+      gs = new GameStateManager(BASE_CONFIG);
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      startPlaying(gs);
+
+      p1.hasBombThrow = true;
+      p1.direction = 'right';
+      placePlayer(p1, 3, 3);
+
+      // Block all tiles from x=4 to x=14
+      for (let x = 4; x < 15; x++) {
+        gs.map.tiles[3][x] = 'wall';
+      }
+
+      gs.inputBuffer.addInput(1, throwInput());
+      gs.processTick();
+
+      const bombs = Array.from(gs.bombs.values());
+      expect(bombs.length).toBe(1);
+      expect(bombs[0].position).toEqual({ x: 3, y: 3 });
+    });
+
+    it('should throw bomb across wrapping map edge', () => {
+      gs = new GameStateManager({ ...BASE_CONFIG, wrapping: true });
+      const p1 = gs.addPlayer(1, 'Alice', null);
+      startPlaying(gs);
+
+      p1.hasBombThrow = true;
+      p1.direction = 'right';
+      placePlayer(p1, 13, 3);
+
+      // Block the 3 tiles within base range (wrapping around)
+      gs.map.tiles[3][14] = 'wall';
+      gs.map.tiles[3][0] = 'wall';
+      gs.map.tiles[3][1] = 'wall';
+      // Tile at x=2 should be open
+      gs.map.tiles[3][2] = 'empty';
+
+      gs.inputBuffer.addInput(1, throwInput());
+      gs.processTick();
+
+      const bombs = Array.from(gs.bombs.values());
+      expect(bombs.length).toBe(1);
+      expect(bombs[0].position).toEqual({ x: 2, y: 3 });
+    });
+
     // --- Bomb kick ---
 
     it('should start sliding bomb when player with hasKick walks into it', () => {

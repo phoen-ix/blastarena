@@ -121,26 +121,45 @@ export class BombSpriteRenderer {
 
         if (throwData) {
           // Arc animation: tween position with a vertical arc using onUpdate
-          const dx = posX - startX;
-          const dy = posY - startY;
+          let dx = posX - startX;
+          let dy = posY - startY;
+
+          // Wrap-aware: use shortest-path pixel delta for toroidal maps
+          if (this.wrappingWorldSize) {
+            const { w, h } = this.wrappingWorldSize;
+            if (dx > w / 2) dx -= w;
+            else if (dx < -w / 2) dx += w;
+            if (dy > h / 2) dy -= h;
+            else if (dy < -h / 2) dy += h;
+          }
+
           const dist = Math.sqrt(dx * dx + dy * dy);
           const arcHeight = Math.max(20, dist * 0.4);
 
+          // Recompute start so the animation follows the shortest path
+          const adjStartX = posX - dx;
+          const adjStartY = posY - dy;
+          sprite.setPosition(adjStartX, adjStartY);
+
           sprite.setDepth(15); // Above other sprites during flight
           sprite.setScale(0.8);
+
+          // Scale duration for long throws (300ms base for 3 tiles, up to 600ms)
+          const baseDist = 3 * TILE_SIZE;
+          const duration = Math.min(600, Math.max(300, (dist / baseDist) * 300));
 
           this.scene.tweens.add({
             targets: sprite,
             x: posX,
             y: posY,
             scale: 1,
-            duration: 300,
+            duration,
             ease: 'Sine.easeOut',
             onUpdate: (tween) => {
               // Parabolic arc offset: peak at midpoint
               const p = tween.progress;
               const arc = -4 * arcHeight * p * (p - 1);
-              sprite.y = startY + (posY - startY) * p - arc;
+              sprite.y = adjStartY + dy * p - arc;
             },
             onComplete: () => {
               sprite.setDepth(5);

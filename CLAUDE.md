@@ -151,7 +151,7 @@ Full-screen panel for admin/moderator roles. `staffMiddleware` (admin+moderator)
 - 20 tick/sec server game loop (GameLoop.ts → GameState.ts)
 - GameState.processTick(): bot AI → inputs → movement → conveyors → bomb slide → bomb timers → explosions → collisions → power-ups → hazards → puzzle tiles → KOTH scoring → map events → spectator actions → zone → deathmatch respawns → time check → win check
 - Bomb kick: player with hasKick walking into bomb sets bomb.sliding; advances 1 tile/tick until blocked
-- Bomb throw: `game:bombThrown` event emitted before `game:state` with `{ bombId, from, to }`. `BombSpriteRenderer.registerThrow()` queues arc animation (parabolic tween, 300ms). Also recorded in `ReplayTickEvents.bombThrown` for replay playback
+- Bomb throw: `game:bombThrown` event emitted before `game:state` with `{ bombId, from, to }`. `BombSpriteRenderer.registerThrow()` queues arc animation (parabolic tween, 300-600ms scaled by distance). Also recorded in `ReplayTickEvents.bombThrown` for replay playback. Two-phase landing: prefer furthest valid tile within `BOMB_THROW_RANGE` (3), then search beyond up to half map (wrapping) or full map (non-wrapping) for first open tile. Arc animation uses shortest-path pixel delta on wrapping maps
 - Spawn position randomization: Fisher-Yates shuffle using seeded RNG, deterministic for replays
 - Self-kills subtract 1 from kill score (owner.kills decremented, owner.selfKills incremented)
 - Power-up drop on kill: dying players drop one random collected power-up. Weighted by stacked amounts
@@ -193,7 +193,7 @@ Persistent bomb arena as the default landing experience. Players auto-join on pa
 FFA (2-8, last standing), Teams (4-8, 2 teams, friendly fire toggle), Battle Royale (4-8, shrinking zone), Sudden Death (2-8, maxed stats, one hit), Deathmatch (2-8, respawn, first to 15 kills), King of the Hill (2-8, control zone, 2 pts/tick to 100; hill moves every 30s with 5s warning, `pendingHillZone` ghost outline)
 
 ### Power-Ups (9 types)
-bomb_up, fire_up, speed_up, shield, kick, pierce_bomb (through destructibles), remote_bomb (E to detonate, FIFO/ALL toggle), line_bomb (line in facing direction), bomb_throw (Q to throw 3 tiles over obstacles, weight 4 rare)
+bomb_up, fire_up, speed_up, shield, kick, pierce_bomb (through destructibles), remote_bomb (E to detonate, FIFO/ALL toggle), line_bomb (line in facing direction), bomb_throw (Q to throw over obstacles — lands up to 3 tiles away normally, flies further over consecutive walls, weight 4 rare)
 
 ### Map Features
 - **Reinforced walls** (optional): 2 hits — first cracks (`destructible_cracked`), second destroys

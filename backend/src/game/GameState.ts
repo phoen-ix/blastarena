@@ -27,6 +27,7 @@ import {
   SPECTATOR_SPEED_ZONE_DURATION_TICKS,
   SPECTATOR_SPAWN_EXCLUSION_RADIUS,
   SPECTATOR_WARNING_TICKS,
+  BOMB_THROW_RANGE,
 } from '@blast-arena/shared';
 import { QUICKSAND_KILL_TICKS, SPIKE_SAFE_TICKS, SPIKE_CYCLE_TICKS } from '@blast-arena/shared';
 import { isSlowingTile } from '@blast-arena/shared';
@@ -1825,7 +1826,7 @@ export class GameStateManager {
       }
     }
 
-    // Bomb throw: throw a bomb 3 tiles in facing direction, flying over walls
+    // Bomb throw: throw a bomb in facing direction, flying over walls/obstacles
     if (input.action === 'throw' && player.hasBombThrow && player.canPlaceBomb()) {
       const bombType: BombType = player.hasRemoteBomb
         ? 'remote'
@@ -1836,26 +1837,46 @@ export class GameStateManager {
       const dir = player.direction;
       const dx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
       const dy = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
-      const throwRange = 3;
+      const dim = dx !== 0 ? this.map.width : this.map.height;
+      // Wrapping maps: cap at half dimension (beyond that, closer from other side)
+      // Non-wrapping maps: full dimension (out-of-bounds break limits naturally)
+      const maxRange = this.map.wrapping ? Math.floor(dim / 2) : dim;
 
-      // Find the landing position: fly over everything, land on last valid tile
+      // Find the landing position: fly over everything, land on valid tile
       let landPos: Position | null = null;
-      for (let i = throwRange; i >= 1; i--) {
+
+      // Phase 1: within base throw range, prefer furthest valid tile
+      for (let i = BOMB_THROW_RANGE; i >= 1; i--) {
         let tx = player.position.x + dx * i;
         let ty = player.position.y + dy * i;
-        // Wrap for toroidal maps, or bounds check for normal maps
         if (this.map.wrapping) {
           tx = ((tx % this.map.width) + this.map.width) % this.map.width;
           ty = ((ty % this.map.height) + this.map.height) % this.map.height;
         } else {
           if (tx < 0 || tx >= this.map.width || ty < 0 || ty >= this.map.height) continue;
         }
-        // Must be walkable (can't land on walls)
         if (!this.collisionSystem.isWalkable(tx, ty)) continue;
-        // Must not already have a bomb
         if (bombPosSet.has(`${tx},${ty}`)) continue;
         landPos = { x: tx, y: ty };
         break;
+      }
+
+      // Phase 2: if base range fully blocked, search beyond (nearest first)
+      if (!landPos) {
+        for (let i = BOMB_THROW_RANGE + 1; i <= maxRange; i++) {
+          let tx = player.position.x + dx * i;
+          let ty = player.position.y + dy * i;
+          if (this.map.wrapping) {
+            tx = ((tx % this.map.width) + this.map.width) % this.map.width;
+            ty = ((ty % this.map.height) + this.map.height) % this.map.height;
+          } else {
+            if (tx < 0 || tx >= this.map.width || ty < 0 || ty >= this.map.height) break;
+          }
+          if (!this.collisionSystem.isWalkable(tx, ty)) continue;
+          if (bombPosSet.has(`${tx},${ty}`)) continue;
+          landPos = { x: tx, y: ty };
+          break;
+        }
       }
 
       // Fallback: place at feet if no valid landing position found

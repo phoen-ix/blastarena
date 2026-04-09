@@ -56,7 +56,7 @@ Walk into a bomb with the Kick power-up to send it sliding. Click a player name 
 | **Pierce Bomb** | Explosions pass through destructible walls |
 | **Remote Bomb** | Bombs don't auto-detonate; press E to detonate all (10s safety max). Toggle FIFO mode (oldest first) by pressing E with no bombs placed |
 | **Line Bomb** | Places a line of bombs in facing direction |
-| **Bomb Throw** | Press Q to throw a bomb 3 tiles in facing direction, flying over walls and obstacles |
+| **Bomb Throw** | Press Q to throw a bomb in facing direction, flying over walls and obstacles. Lands up to 3 tiles away normally; flies further over consecutive walls to find the first open tile |
 
 Killed players drop one random collected power-up at their death position. All power-up icons are procedurally drawn (no emoji) for consistent rendering across all platforms.
 
