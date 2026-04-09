@@ -201,6 +201,12 @@ export class HUDScene extends Phaser.Scene {
     };
     gameScene.events.on('stateUpdate', this.stateUpdateHandler);
 
+    // Seed minimap tiles from initial state — GameScene emits stateUpdate during
+    // its create() before HUDScene registers its listener, so we miss the full tiles
+    if (this.minimapEnabled && initialState?.map?.tiles?.length) {
+      this.minimapTiles = initialState.map.tiles.map((row) => [...row]);
+    }
+
     // Campaign mode: add lives/enemy counter, hide player list and kill feed
     this.campaignMode = !!this.registry.get('campaignMode');
     if (this.campaignMode) {
