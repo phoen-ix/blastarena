@@ -15,7 +15,14 @@ import {
   sendEmailTakenRegistrationWarning,
 } from './email';
 import { AppError } from '../middleware/errorHandler';
-import { AuthPayload, PublicUser, AuthResponse, UserRole } from '@blast-arena/shared';
+import {
+  AuthPayload,
+  PublicUser,
+  AuthResponse,
+  UserRole,
+  TotpChallengeResponse,
+} from '@blast-arena/shared';
+import * as totpService from './totp';
 import { logger } from '../utils/logger';
 import { UserRow, RefreshTokenJoinRow, IdRow, IdWithLanguageRow } from '../db/types';
 import * as cosmeticsService from './cosmetics';
@@ -27,6 +34,7 @@ function toPublicUser(row: UserRow | RefreshTokenJoinRow): PublicUser {
     role: row.role as UserRole,
     language: 'language' in row ? (row.language as string) : 'en',
     emailVerified: !!row.email_verified,
+    twoFactorEnabled: !!row.totp_enabled,
   };
 }
 
@@ -167,6 +175,7 @@ export async function register(
     role: 'user',
     language,
     emailVerified: false,
+    twoFactorEnabled: false,
   };
   const accessToken = generateAccessToken({ userId: user.id, username, role: 'user' });
 
@@ -175,7 +184,7 @@ export async function register(
 
 export async function verifyCredentials(username: string, password: string): Promise<PublicUser> {
   const rows = await query<UserRow[]>(
-    'SELECT id, username, password_hash, role, language, is_deactivated, email_verified FROM users WHERE username = ?',
+    'SELECT id, username, password_hash, role, language, is_deactivated, email_verified, totp_enabled FROM users WHERE username = ?',
     [username],
   );
 
@@ -200,9 +209,31 @@ export async function verifyCredentials(username: string, password: string): Pro
 export async function login(
   username: string,
   password: string,
-): Promise<{ auth: AuthResponse; refreshToken: string }> {
+): Promise<{ auth: AuthResponse; refreshToken: string } | TotpChallengeResponse> {
   const publicUser = await verifyCredentials(username, password);
 
+  // Check if TOTP is enabled — return challenge instead of tokens
+  if (publicUser.twoFactorEnabled) {
+    const config = getConfig();
+    const totpToken = jwt.sign(
+      {
+        userId: publicUser.id,
+        username: publicUser.username,
+        role: publicUser.role,
+        purpose: 'totp-challenge',
+      },
+      config.JWT_SECRET,
+      { expiresIn: '5m' } as jwt.SignOptions,
+    );
+    return { totpRequired: true, totpToken };
+  }
+
+  return completeLogin(publicUser);
+}
+
+async function completeLogin(
+  publicUser: PublicUser,
+): Promise<{ auth: AuthResponse; refreshToken: string }> {
   // Update last login
   await execute('UPDATE users SET last_login = NOW() WHERE id = ?', [publicUser.id]);
 
@@ -228,6 +259,41 @@ export async function login(
   return { auth: { user: publicUser, accessToken }, refreshToken };
 }
 
+export async function completeTotpLogin(
+  totpToken: string,
+  code: string,
+): Promise<{ auth: AuthResponse; refreshToken: string }> {
+  const config = getConfig();
+
+  let decoded: { userId: number; username: string; role: string; purpose?: string };
+  try {
+    decoded = jwt.verify(totpToken, config.JWT_SECRET) as typeof decoded;
+  } catch {
+    throw new AppError('Invalid or expired 2FA token', 401, 'INVALID_TOKEN');
+  }
+
+  if (decoded.purpose !== 'totp-challenge') {
+    throw new AppError('Invalid token purpose', 401, 'INVALID_TOKEN');
+  }
+
+  const verified = await totpService.verifyCode(decoded.userId, code);
+  if (!verified) {
+    throw new AppError('Invalid verification code', 401, 'INVALID_TOTP_CODE');
+  }
+
+  // Re-query user to get current state
+  const rows = await query<UserRow[]>(
+    'SELECT id, username, role, language, email_verified, totp_enabled, is_deactivated FROM users WHERE id = ?',
+    [decoded.userId],
+  );
+  if (rows.length === 0 || rows[0].is_deactivated) {
+    throw new AppError('Account not found or deactivated', 401, 'INVALID_CREDENTIALS');
+  }
+
+  const publicUser = toPublicUser(rows[0]);
+  return completeLogin(publicUser);
+}
+
 export async function refreshAccessToken(
   refreshTokenValue: string,
 ): Promise<{ auth: AuthResponse; refreshToken: string }> {
@@ -235,7 +301,7 @@ export async function refreshAccessToken(
 
   const rows = await query<RefreshTokenJoinRow[]>(
     `SELECT rt.id, rt.user_id, rt.expires_at, rt.revoked,
-            u.username, u.role, u.language, u.is_deactivated, u.email_verified
+            u.username, u.role, u.language, u.is_deactivated, u.email_verified, u.totp_enabled
      FROM refresh_tokens rt
      JOIN users u ON u.id = rt.user_id
      WHERE rt.token_hash = ?`,

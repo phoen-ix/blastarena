@@ -5,6 +5,8 @@ import { emailVerifiedMiddleware } from '../middleware/emailVerified';
 import { validate } from '../middleware/validation';
 import * as userService from '../services/user';
 import * as buddyService from '../services/buddy';
+import * as totpService from '../services/totp';
+import { rateLimiter } from '../middleware/rateLimiter';
 import {
   USERNAME_MIN_LENGTH,
   USERNAME_MAX_LENGTH,
@@ -257,5 +259,61 @@ router.get('/user/confirm-email/:token', async (req, res, next) => {
     next(err);
   }
 });
+
+// ── TOTP Two-Factor Authentication ──────────────────────────────────
+
+const totpConfirmSchema = z.object({
+  code: z.string().length(6),
+});
+
+const totpDisableSchema = z.object({
+  password: z.string().min(1),
+  code: z.string().min(6).max(10),
+});
+
+router.post(
+  '/user/totp/setup',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  rateLimiter({ windowMs: 15 * 60 * 1000, maxRequests: 5 }),
+  async (req, res, next) => {
+    try {
+      const result = await totpService.beginSetup(req.user!.userId, req.user!.username);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/user/totp/confirm',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  validate(totpConfirmSchema),
+  async (req, res, next) => {
+    try {
+      await totpService.confirmSetup(req.user!.userId, req.body.code);
+      res.json({ message: 'Two-factor authentication enabled successfully' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/user/totp/disable',
+  authMiddleware,
+  emailVerifiedMiddleware,
+  validate(totpDisableSchema),
+  async (req, res, next) => {
+    try {
+      await totpService.disable(req.user!.userId, req.body.password, req.body.code);
+      res.json({ message: 'Two-factor authentication disabled successfully' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 export default router;

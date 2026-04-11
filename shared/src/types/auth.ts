@@ -17,6 +17,7 @@ export interface PublicUser {
   role: UserRole;
   language: string;
   emailVerified: boolean;
+  twoFactorEnabled: boolean;
 }
 
 export interface AuthPayload {
@@ -48,4 +49,21 @@ export interface RefreshToken {
   expiresAt: Date;
   revoked: boolean;
   createdAt: Date;
+}
+
+export interface TotpChallengeResponse {
+  totpRequired: true;
+  totpToken: string;
+}
+
+export interface TotpSetupResponse {
+  qrDataUri: string;
+  secret: string;
+  backupCodes: string[];
+}
+
+export function isTotpChallengeResponse(
+  response: AuthResponse | TotpChallengeResponse,
+): response is TotpChallengeResponse {
+  return 'totpRequired' in response && (response as TotpChallengeResponse).totpRequired === true;
 }

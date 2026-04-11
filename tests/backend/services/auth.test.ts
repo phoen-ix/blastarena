@@ -82,6 +82,7 @@ describe('Auth Service', () => {
         role: 'user',
         language: 'en',
         emailVerified: false,
+        twoFactorEnabled: false,
       });
       expect(result.accessToken).toBeDefined();
       expect(typeof result.accessToken).toBe('string');
@@ -147,6 +148,7 @@ describe('Auth Service', () => {
       language: 'en',
       is_deactivated: false,
       email_verified: true,
+      totp_enabled: false,
     };
 
     it('should return auth and refreshToken on success', async () => {
@@ -155,15 +157,19 @@ describe('Auth Service', () => {
 
       const result = await authService.login('testuser', 'password');
 
-      expect(result.auth.user).toEqual({
-        id: 10,
-        username: 'testuser',
-        role: 'user',
-        language: 'en',
-        emailVerified: true,
-      });
-      expect(result.auth.accessToken).toBeDefined();
-      expect(result.refreshToken).toBeDefined();
+      expect('totpRequired' in result).toBe(false);
+      if ('auth' in result) {
+        expect(result.auth.user).toEqual({
+          id: 10,
+          username: 'testuser',
+          role: 'user',
+          language: 'en',
+          emailVerified: true,
+          twoFactorEnabled: false,
+        });
+        expect(result.auth.accessToken).toBeDefined();
+        expect(result.refreshToken).toBeDefined();
+      }
     });
 
     it('should throw 401 when user is not found', async () => {
@@ -229,6 +235,8 @@ describe('Auth Service', () => {
       role: 'user',
       language: 'en',
       is_deactivated: false,
+      email_verified: false,
+      totp_enabled: false,
     };
 
     it('should rotate token and return new auth on success', async () => {
@@ -243,6 +251,7 @@ describe('Auth Service', () => {
         role: 'user',
         language: 'en',
         emailVerified: false,
+        twoFactorEnabled: false,
       });
       expect(result.auth.accessToken).toBeDefined();
       expect(result.refreshToken).toBeDefined();

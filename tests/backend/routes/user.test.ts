@@ -20,8 +20,18 @@ jest.mock('../../../backend/src/services/user', () => ({
   confirmEmailChange: mockConfirmEmailChange,
 }));
 
+jest.mock('../../../backend/src/services/totp', () => ({
+  beginSetup: jest.fn(),
+  confirmSetup: jest.fn(),
+  disable: jest.fn(),
+}));
+
 jest.mock('../../../backend/src/middleware/auth', () => ({
   authMiddleware: jest.fn((_req: any, _res: any, next: any) => next()),
+}));
+
+jest.mock('../../../backend/src/middleware/rateLimiter', () => ({
+  rateLimiter: jest.fn(() => (_req: any, _res: any, next: any) => next()),
 }));
 
 jest.mock('../../../backend/src/middleware/validation', () => ({

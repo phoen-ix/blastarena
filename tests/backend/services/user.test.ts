@@ -94,6 +94,7 @@ describe('user service', () => {
         level: 1,
         is_profile_public: true,
         accept_friend_requests: true,
+        totp_enabled: false,
       };
       mockQuery.mockResolvedValueOnce([row]);
 
@@ -105,6 +106,7 @@ describe('user service', () => {
         emailHint: 'a***@e***.com',
         role: 'user',
         emailVerified: true,
+        twoFactorEnabled: false,
         pendingEmailHint: null,
         createdAt: new Date('2025-01-01'),
         stats: {

@@ -168,7 +168,14 @@ describe('POST /lobby/rooms', () => {
     await handler(req, res as unknown as Response, next as NextFunction);
 
     expect(mockCreateRoom).toHaveBeenCalledWith(
-      { id: 42, username: 'bob', role: 'admin', language: 'en', emailVerified: true },
+      {
+        id: 42,
+        username: 'bob',
+        role: 'admin',
+        language: 'en',
+        emailVerified: true,
+        twoFactorEnabled: false,
+      },
       'Admin Room',
       { gameMode: 'teams', maxPlayers: 8 },
     );
@@ -218,6 +225,7 @@ describe('POST /lobby/rooms', () => {
       role: 'moderator',
       language: 'en',
       emailVerified: true,
+      twoFactorEnabled: false,
     });
     expect(userArg).not.toHaveProperty('userId');
   });

@@ -1,5 +1,10 @@
 import { ApiClient } from './ApiClient';
-import { AuthResponse, PublicUser } from '@blast-arena/shared';
+import {
+  AuthResponse,
+  PublicUser,
+  TotpChallengeResponse,
+  isTotpChallengeResponse,
+} from '@blast-arena/shared';
 import { i18n } from '../i18n';
 
 export type AuthChangeCallback = (user: PublicUser | null) => void;
@@ -9,6 +14,7 @@ export class AuthManager {
   private currentUser: PublicUser | null = null;
   private listeners: AuthChangeCallback[] = [];
   private _isGuest: boolean = false;
+  private pendingTotpToken: string | null = null;
 
   constructor() {
     ApiClient.setAuthManager(this);
@@ -39,6 +45,7 @@ export class AuthManager {
       role: 'user',
       language: 'en',
       emailVerified: false,
+      twoFactorEnabled: false,
     };
     this.notify();
   }
@@ -87,15 +94,32 @@ export class AuthManager {
     this.setAuth(response);
   }
 
-  async login(username: string, password: string): Promise<void> {
-    const response = await ApiClient.post<AuthResponse>(
+  get hasPendingTotp(): boolean {
+    return this.pendingTotpToken !== null;
+  }
+
+  async login(username: string, password: string): Promise<'success' | 'totp-required'> {
+    const response = await ApiClient.post<AuthResponse | TotpChallengeResponse>(
       '/auth/login',
-      {
-        username,
-        password,
-      },
+      { username, password },
       true,
     );
+    if (isTotpChallengeResponse(response)) {
+      this.pendingTotpToken = response.totpToken;
+      return 'totp-required';
+    }
+    this.setAuth(response);
+    return 'success';
+  }
+
+  async verifyTotp(code: string): Promise<void> {
+    if (!this.pendingTotpToken) throw new Error('No pending TOTP challenge');
+    const response = await ApiClient.post<AuthResponse>(
+      '/auth/verify-totp',
+      { totpToken: this.pendingTotpToken, code },
+      true,
+    );
+    this.pendingTotpToken = null;
     this.setAuth(response);
   }
 

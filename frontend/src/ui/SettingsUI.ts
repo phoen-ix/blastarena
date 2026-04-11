@@ -224,6 +224,24 @@ export class SettingsUI {
           <button class="btn btn-primary" id="acct-change-password">${t('settings.account.changePassword')}</button>
         </div>
 
+        <hr class="settings-separator">
+
+        <div class="content-section">
+          <h3 class="settings-section-title">${t('settings.account.twoFactor.title')}</h3>
+          ${
+            profile.twoFactorEnabled
+              ? `
+            <p class="settings-hint" style="color:var(--success);margin-bottom:var(--sp-3);">${t('settings.account.twoFactor.enabled')}</p>
+            <button class="btn btn-secondary" id="acct-disable-2fa">${t('settings.account.twoFactor.disable')}</button>
+          `
+              : `
+            <p class="settings-hint" style="margin-bottom:var(--sp-3);">${t('settings.account.twoFactor.description')}</p>
+            <button class="btn btn-primary" id="acct-enable-2fa">${t('settings.account.twoFactor.enable')}</button>
+          `
+          }
+          <div id="acct-2fa-status" class="settings-status"></div>
+        </div>
+
         ${
           !isAdmin
             ? `
@@ -347,11 +365,200 @@ export class SettingsUI {
       });
     }
 
+    // Enable 2FA
+    const enable2faBtn = this.contentEl.querySelector('#acct-enable-2fa');
+    if (enable2faBtn) {
+      enable2faBtn.addEventListener('click', () => this.showSetup2FAModal());
+    }
+
+    // Disable 2FA
+    const disable2faBtn = this.contentEl.querySelector('#acct-disable-2fa');
+    if (disable2faBtn) {
+      disable2faBtn.addEventListener('click', () => this.showDisable2FAModal());
+    }
+
     // Delete account
     const deleteBtn = this.contentEl.querySelector('#acct-delete-account');
     if (deleteBtn) {
       deleteBtn.addEventListener('click', () => this.showDeleteAccountModal());
     }
+  }
+
+  private async showSetup2FAModal(): Promise<void> {
+    let setupData: { qrDataUri: string; secret: string; backupCodes: string[] };
+    try {
+      setupData = await ApiClient.post('/user/totp/setup');
+    } catch (err: unknown) {
+      this.notifications.error(getErrorMessage(err));
+      return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', t('settings.account.twoFactor.setupTitle'));
+    modal.innerHTML = `
+      <div class="modal" style="max-width:480px;">
+        <h2>${t('settings.account.twoFactor.setupTitle')}</h2>
+
+        <p style="margin:var(--sp-2) 0;color:var(--text-dim);">${t('settings.account.twoFactor.scanQr')}</p>
+        <div style="text-align:center;margin:var(--sp-3) 0;">
+          <img src="${setupData.qrDataUri}" alt="TOTP QR Code" style="width:200px;height:200px;image-rendering:pixelated;border-radius:var(--radius);background:#fff;padding:8px;">
+        </div>
+
+        <p style="margin:var(--sp-2) 0;color:var(--text-dim);">${t('settings.account.twoFactor.manualEntry')}</p>
+        <div style="display:flex;gap:var(--sp-2);align-items:center;margin-bottom:var(--sp-3);">
+          <code style="flex:1;padding:var(--sp-2);background:var(--bg-inset);border-radius:var(--radius);font-size:14px;letter-spacing:2px;word-break:break-all;user-select:all;">${setupData.secret}</code>
+          <button class="btn btn-secondary btn-sm" id="totp-copy-secret">${t('settings.account.twoFactor.copy')}</button>
+        </div>
+
+        <details style="margin-bottom:var(--sp-3);">
+          <summary style="cursor:pointer;color:var(--text-dim);font-size:13px;">${t('settings.account.twoFactor.backupTitle')}</summary>
+          <p style="margin:var(--sp-1) 0;color:var(--text-dim);font-size:13px;">${t('settings.account.twoFactor.backupDescription')}</p>
+          <pre style="padding:var(--sp-2);background:var(--bg-inset);border-radius:var(--radius);font-size:13px;user-select:all;">${setupData.backupCodes.join('\n')}</pre>
+        </details>
+
+        <p style="margin:var(--sp-2) 0;color:var(--text-dim);">${t('settings.account.twoFactor.confirmCode')}</p>
+        <div class="form-group">
+          <input type="text" class="input" id="totp-confirm-code" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
+        </div>
+        <div id="totp-setup-status" class="settings-status" style="margin-bottom:var(--sp-2);"></div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="totp-setup-cancel">${t('settings.account.twoFactor.cancel')}</button>
+          <button class="btn btn-primary" id="totp-setup-confirm">${t('settings.account.twoFactor.confirm')}</button>
+        </div>
+      </div>
+    `;
+
+    const releaseFocusTrap = trapFocus(modal);
+    const closeModal = () => {
+      releaseFocusTrap();
+      document.removeEventListener('keydown', escHandler);
+      modal.remove();
+    };
+    modal.querySelector('#totp-setup-cancel')!.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+    const escHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    document.addEventListener('keydown', escHandler);
+
+    modal.querySelector('#totp-copy-secret')!.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(setupData.secret);
+        const btn = modal.querySelector('#totp-copy-secret') as HTMLButtonElement;
+        btn.textContent = t('settings.account.twoFactor.copied');
+        setTimeout(() => {
+          btn.textContent = t('settings.account.twoFactor.copy');
+        }, 2000);
+      } catch {
+        /* clipboard not available */
+      }
+    });
+
+    modal.querySelector('#totp-setup-confirm')!.addEventListener('click', async () => {
+      const code = (modal.querySelector('#totp-confirm-code') as HTMLInputElement).value.trim();
+      const statusEl = modal.querySelector('#totp-setup-status')!;
+      if (!code || code.length < 6) {
+        statusEl.innerHTML = `<span class="text-danger">${t('auth:totp.invalidCode')}</span>`;
+        return;
+      }
+      const btn = modal.querySelector('#totp-setup-confirm') as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = t('settings.account.twoFactor.confirming');
+      try {
+        await ApiClient.post('/user/totp/confirm', { code });
+        closeModal();
+        this.notifications.success(t('settings.account.twoFactor.enableSuccess'));
+        if (this.contentEl) {
+          this.contentEl.innerHTML = '';
+          await this.renderAccountTab();
+        }
+      } catch (err: unknown) {
+        btn.disabled = false;
+        btn.textContent = t('settings.account.twoFactor.confirm');
+        statusEl.innerHTML = `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`;
+      }
+    });
+
+    modal.querySelector('#totp-confirm-code')!.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter') {
+        (modal.querySelector('#totp-setup-confirm') as HTMLButtonElement).click();
+      }
+    });
+
+    document.getElementById('ui-overlay')!.appendChild(modal);
+    (modal.querySelector('#totp-confirm-code') as HTMLInputElement).focus();
+  }
+
+  private showDisable2FAModal(): void {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', t('settings.account.twoFactor.disableTitle'));
+    modal.innerHTML = `
+      <div class="modal" style="max-width:440px;">
+        <h2>${t('settings.account.twoFactor.disableTitle')}</h2>
+        <p style="margin:var(--sp-3) 0;color:var(--text-dim);">${t('settings.account.twoFactor.disableDescription')}</p>
+        <div class="form-group settings-field-stack">
+          <input type="password" class="input" id="disable-2fa-password" placeholder="${t('settings.account.twoFactor.disablePassword')}" autocomplete="current-password">
+          <input type="text" class="input" id="disable-2fa-code" placeholder="${t('settings.account.twoFactor.disableCode')}" inputmode="numeric" autocomplete="one-time-code" maxlength="10">
+        </div>
+        <div id="disable-2fa-status" class="settings-status" style="margin-bottom:var(--sp-2);"></div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="disable-2fa-cancel">${t('settings.account.twoFactor.cancel')}</button>
+          <button class="btn" style="background:var(--danger);color:#fff;" id="disable-2fa-confirm">${t('settings.account.twoFactor.disableConfirm')}</button>
+        </div>
+      </div>
+    `;
+
+    const releaseFocusTrap = trapFocus(modal);
+    const closeModal = () => {
+      releaseFocusTrap();
+      document.removeEventListener('keydown', escHandler);
+      modal.remove();
+    };
+    modal.querySelector('#disable-2fa-cancel')!.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+    const escHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    document.addEventListener('keydown', escHandler);
+
+    modal.querySelector('#disable-2fa-confirm')!.addEventListener('click', async () => {
+      const password = (modal.querySelector('#disable-2fa-password') as HTMLInputElement).value;
+      const code = (modal.querySelector('#disable-2fa-code') as HTMLInputElement).value.trim();
+      const statusEl = modal.querySelector('#disable-2fa-status')!;
+      if (!password || !code) {
+        statusEl.innerHTML = `<span class="text-danger">${t('settings.account.passwordFieldsRequired')}</span>`;
+        return;
+      }
+      const btn = modal.querySelector('#disable-2fa-confirm') as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = t('settings.account.twoFactor.disabling');
+      try {
+        await ApiClient.post('/user/totp/disable', { password, code });
+        closeModal();
+        this.notifications.success(t('settings.account.twoFactor.disableSuccess'));
+        if (this.contentEl) {
+          this.contentEl.innerHTML = '';
+          await this.renderAccountTab();
+        }
+      } catch (err: unknown) {
+        btn.disabled = false;
+        btn.textContent = t('settings.account.twoFactor.disableConfirm');
+        statusEl.innerHTML = `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`;
+      }
+    });
+
+    document.getElementById('ui-overlay')!.appendChild(modal);
+    (modal.querySelector('#disable-2fa-password') as HTMLInputElement).focus();
   }
 
   private showDeleteAccountModal(): void {

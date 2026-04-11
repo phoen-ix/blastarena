@@ -92,7 +92,14 @@ function createMockRoom(overrides: Partial<Room> = {}): Room {
   return {
     code: 'ABC123',
     name: 'Test Room',
-    host: { id: 1, username: 'host', role: 'user' as const, language: 'en', emailVerified: true },
+    host: {
+      id: 1,
+      username: 'host',
+      role: 'user' as const,
+      language: 'en',
+      emailVerified: true,
+      twoFactorEnabled: false,
+    },
     players: [
       {
         user: {
@@ -101,6 +108,7 @@ function createMockRoom(overrides: Partial<Room> = {}): Room {
           role: 'user' as const,
           language: 'en',
           emailVerified: true,
+          twoFactorEnabled: false,
         },
         ready: true,
         team: null,
@@ -112,6 +120,7 @@ function createMockRoom(overrides: Partial<Room> = {}): Room {
           role: 'user' as const,
           language: 'en',
           emailVerified: true,
+          twoFactorEnabled: false,
         },
         ready: true,
         team: null,
@@ -544,6 +553,7 @@ describe('RoomManager', () => {
                 role: 'user' as const,
                 language: 'en',
                 emailVerified: true,
+                twoFactorEnabled: false,
               },
               ready: true,
               team: 0,
@@ -555,6 +565,7 @@ describe('RoomManager', () => {
                 role: 'user' as const,
                 language: 'en',
                 emailVerified: true,
+                twoFactorEnabled: false,
               },
               ready: true,
               team: 0,
@@ -566,6 +577,7 @@ describe('RoomManager', () => {
                 role: 'user' as const,
                 language: 'en',
                 emailVerified: true,
+                twoFactorEnabled: false,
               },
               ready: true,
               team: 1,
@@ -577,6 +589,7 @@ describe('RoomManager', () => {
                 role: 'user' as const,
                 language: 'en',
                 emailVerified: true,
+                twoFactorEnabled: false,
               },
               ready: true,
               team: 1,

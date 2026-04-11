@@ -9,7 +9,7 @@ export class AuthUI {
   private overlay: HTMLElement;
   private authManager: AuthManager;
   private notifications: NotificationUI;
-  private mode: 'login' | 'register' | 'forgot' = 'login';
+  private mode: 'login' | 'register' | 'forgot' | 'totp' = 'login';
   private onAuthenticated: () => void;
   private registrationEnabled: boolean = true;
   private displayImprint: boolean = false;
@@ -92,6 +92,9 @@ export class AuthUI {
         break;
       case 'forgot':
         this.renderForgotPassword();
+        break;
+      case 'totp':
+        this.renderTotpVerification();
         break;
     }
   }
@@ -342,7 +345,12 @@ export class AuthUI {
     errorEl.textContent = '';
 
     try {
-      await this.authManager.login(username, password);
+      const result = await this.authManager.login(username, password);
+      if (result === 'totp-required') {
+        this.mode = 'totp';
+        this.render();
+        return;
+      }
       this.notifications.success(t('auth:login.welcomeBack'));
       this.hide();
       this.onAuthenticated();
@@ -351,6 +359,68 @@ export class AuthUI {
     } finally {
       btn.disabled = false;
       btn.textContent = t('auth:login.submit');
+    }
+  }
+
+  private renderTotpVerification(): void {
+    this.overlay.innerHTML = `
+      <div class="auth-form">
+        <h2>${t('auth:totp.title')}</h2>
+        <p class="auth-totp-hint">${t('auth:totp.description')}</p>
+        <div class="form-group">
+          <label for="totp-code">${t('auth:totp.codePlaceholder')}</label>
+          <input type="text" id="totp-code" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" maxlength="10">
+        </div>
+        <p class="auth-totp-backup-hint">${t('auth:totp.backupHint')}</p>
+        <div class="form-error" id="totp-error"></div>
+        <button class="btn btn-primary" id="totp-btn">${t('auth:totp.submit')}</button>
+        <div class="auth-switch">
+          <a id="switch-login-back">${t('auth:totp.backToLogin')}</a>
+        </div>
+      </div>
+    `;
+
+    this.overlay
+      .querySelector('#totp-btn')!
+      .addEventListener('click', () => this.handleTotpVerify());
+    this.overlay.querySelector('#totp-code')!.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter') this.handleTotpVerify();
+    });
+    this.overlay.querySelector('#switch-login-back')!.addEventListener('click', () => {
+      this.mode = 'login';
+      this.render();
+    });
+
+    this.pushGamepadContext();
+
+    // Auto-focus the code input
+    (this.overlay.querySelector('#totp-code') as HTMLInputElement)?.focus();
+  }
+
+  private async handleTotpVerify(): Promise<void> {
+    const code = (document.getElementById('totp-code') as HTMLInputElement).value.trim();
+    const errorEl = document.getElementById('totp-error')!;
+    const btn = document.getElementById('totp-btn') as HTMLButtonElement;
+
+    if (!code) {
+      errorEl.textContent = t('auth:totp.invalidCode');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = t('auth:totp.submitting');
+    errorEl.textContent = '';
+
+    try {
+      await this.authManager.verifyTotp(code);
+      this.notifications.success(t('auth:login.welcomeBack'));
+      this.hide();
+      this.onAuthenticated();
+    } catch (err: unknown) {
+      errorEl.textContent = this.translateError(err);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = t('auth:totp.submit');
     }
   }
 

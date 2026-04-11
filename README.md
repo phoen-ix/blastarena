@@ -135,6 +135,7 @@ All actions audit-logged. See [docs/admin-and-systems.md](docs/admin-and-systems
 - **Rematch Voting**: After game over, players vote for rematch. >50% triggers auto-restart with same settings. 30s timeout. Solo games (1 human + bots) show direct "Play Again" button instead of voting.
 - **Admin Chat Controls**: All chat features (party chat, lobby chat, DMs, emotes, spectator chat) individually configurable: everyone (default), staff only, admin only, or fully disabled.
 - **Imprint & GitHub**: Admin-toggled links displayed on the login page footer and as right-aligned items in the Help tab bar. Imprint text editable in Dashboard; shown as modal on login, inline tab in Help. GitHub link opens repo in new tab.
+- **Two-Factor Authentication**: Optional TOTP 2FA in Settings > Account. Enable by scanning a QR code (or entering the secret manually) with any authenticator app (Google Authenticator, Authy, 1Password, etc.). 10 one-time backup codes provided during setup. Login prompts for 6-digit code when 2FA is active. Disable requires password + authenticator code. TOTP secrets encrypted at rest with AES-256-GCM.
 - **Account Deletion**: Self-service account deletion in Settings > Account. Password confirmation required. Permanently removes all user data (stats, replays, maps, messages, friends). Admin accounts are protected from self-deletion.
 
 ## Game Replays
@@ -250,7 +251,7 @@ Full i18n support via [i18next](https://www.i18next.com/). All UI strings are ex
 | Backend | Node.js + Express + TypeScript |
 | Real-time | Socket.io |
 | Database | MariaDB 11 + Redis 7 |
-| Auth | JWT + bcrypt + httpOnly cookies, HMAC-SHA256 email hashing, email verification enforcement (max 3 resends), email enumeration prevention |
+| Auth | JWT + bcrypt + httpOnly cookies, HMAC-SHA256 email hashing, email verification enforcement (max 3 resends), email enumeration prevention, optional TOTP 2FA |
 | Security | CSP + HSTS + COOP + Trusted Types, parameterized queries, nginx + Express rate limiting, Zod socket event validation, DOMPurify, email verification on REST + socket, atomic token operations, role-from-DB socket auth |
 | Validation | Zod |
 | Container | Docker Compose |

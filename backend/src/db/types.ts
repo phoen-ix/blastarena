@@ -36,6 +36,9 @@ export interface UserRow extends RowDataPacket {
   email_change_token: string | null;
   email_change_expires: Date | null;
   verification_resend_count: number;
+  totp_secret: string | null;
+  totp_enabled: boolean;
+  totp_backup_codes: string | null;
 }
 
 /** Refresh token joined with user */
@@ -49,6 +52,7 @@ export interface RefreshTokenJoinRow extends RowDataPacket {
   language: string;
   is_deactivated: boolean;
   email_verified: boolean;
+  totp_enabled: boolean;
 }
 
 /** User profile joined with stats */
@@ -75,6 +79,7 @@ export interface UserProfileRow extends RowDataPacket {
   level: number | null;
   is_profile_public: boolean;
   accept_friend_requests: boolean;
+  totp_enabled: boolean;
 }
 
 /** User with email change fields */

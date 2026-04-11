@@ -74,6 +74,7 @@ router.post(
           role: req.user!.role,
           language: 'en',
           emailVerified: true,
+          twoFactorEnabled: false,
         },
         req.body.name,
         req.body.config,

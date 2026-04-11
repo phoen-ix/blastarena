@@ -272,6 +272,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       role: socket.data.role,
       language: socket.data.locale || 'en',
       emailVerified: !socket.data.isGuest,
+      twoFactorEnabled: false,
     };
 
     // Guest connections only need open world handlers — skip room/lobby/friend setup

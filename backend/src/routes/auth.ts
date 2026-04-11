@@ -77,15 +77,49 @@ router.post(
   async (req, res, next) => {
     try {
       const { username, password } = req.body;
-      const { auth, refreshToken } = await authService.login(username, password);
+      const result = await authService.login(username, password);
+
+      if ('totpRequired' in result) {
+        return res.json(result);
+      }
 
       // Set refresh token as httpOnly cookie
+      const config = getConfig();
+      res.cookie('refreshToken', result.refreshToken, {
+        httpOnly: true,
+        secure: config.APP_URL.startsWith('https'),
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        path: '/api/auth',
+      });
+
+      res.json(result.auth);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+const verifyTotpSchema = z.object({
+  totpToken: z.string(),
+  code: z.string().min(6).max(10),
+});
+
+router.post(
+  '/auth/verify-totp',
+  rateLimiter({ windowMs: 15 * 60 * 1000, maxRequests: 10 }),
+  validate(verifyTotpSchema),
+  async (req, res, next) => {
+    try {
+      const { totpToken, code } = req.body;
+      const { auth, refreshToken } = await authService.completeTotpLogin(totpToken, code);
+
       const config = getConfig();
       res.cookie('refreshToken', refreshToken, {
         httpOnly: true,
         secure: config.APP_URL.startsWith('https'),
         sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        maxAge: 7 * 24 * 60 * 60 * 1000,
         path: '/api/auth',
       });
 

@@ -24,7 +24,7 @@ import {
 export async function getUserProfile(userId: number) {
   const rows = await query<UserProfileRow[]>(
     `SELECT u.id, u.username, u.email_hint, u.role, u.email_verified,
-            u.pending_email_hint, u.created_at,
+            u.pending_email_hint, u.created_at, u.totp_enabled,
             s.total_matches, s.total_wins, s.total_kills, s.total_deaths,
             s.total_bombs, s.total_powerups, s.total_playtime,
             s.win_streak, s.best_win_streak, s.elo_rating, s.peak_elo,
@@ -47,6 +47,7 @@ export async function getUserProfile(userId: number) {
     emailHint: row.email_hint,
     role: row.role,
     emailVerified: row.email_verified,
+    twoFactorEnabled: !!row.totp_enabled,
     pendingEmailHint: row.pending_email_hint || null,
     createdAt: row.created_at,
     stats: {

@@ -23,6 +23,35 @@ export function hashEmail(email: string, pepper: string): string {
   return crypto.createHmac('sha256', pepper).update(email.toLowerCase().trim()).digest('hex');
 }
 
+export function encryptTotpSecret(secret: string, keyHex: string): string {
+  const key = Buffer.from(keyHex, 'hex');
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
+}
+
+export function decryptTotpSecret(encrypted: string, keyHex: string): string {
+  const [ivHex, authTagHex, ciphertextHex] = encrypted.split(':');
+  const key = Buffer.from(keyHex, 'hex');
+  const iv = Buffer.from(ivHex, 'hex');
+  const authTag = Buffer.from(authTagHex, 'hex');
+  const ciphertext = Buffer.from(ciphertextHex, 'hex');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(authTag);
+  return decipher.update(ciphertext) + decipher.final('utf8');
+}
+
+export function generateBackupCodes(count: number = 10): string[] {
+  const codes: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const hex = crypto.randomBytes(4).toString('hex');
+    codes.push(`${hex.slice(0, 4)}-${hex.slice(4, 8)}`);
+  }
+  return codes;
+}
+
 export function generateEmailHint(email: string): string {
   const normalized = email.toLowerCase().trim();
   const atIdx = normalized.indexOf('@');
