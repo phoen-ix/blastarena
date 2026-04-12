@@ -24,5 +24,9 @@ export const OPENWORLD_GUEST_ID_START = -3000;
 // Score tracking: batch DB writes every N ticks
 export const OPENWORLD_STATS_FLUSH_TICKS = 10 * TICK_RATE; // 10 seconds
 
+// AFK timeout
+export const OPENWORLD_DEFAULT_AFK_TIMEOUT = 60; // seconds
+export const OPENWORLD_AFK_CHECK_TICKS = 5 * TICK_RATE; // check every 5 seconds
+
 // Info broadcast interval
 export const OPENWORLD_INFO_BROADCAST_TICKS = 5 * TICK_RATE; // 5 seconds

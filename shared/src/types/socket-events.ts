@@ -348,6 +348,7 @@ export interface ServerToClientEvents {
     roundTimeRemaining: number;
     roundNumber: number;
   }) => void;
+  'openworld:afkKick': () => void;
 
   // Admin settings broadcast
   'admin:settingsChanged': (data: { key: string; value?: unknown }) => void;

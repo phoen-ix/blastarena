@@ -123,6 +123,7 @@ export class GameScene extends Phaser.Scene {
   private openWorldRoundStartHandler:
     | ((data: { roundNumber: number; state: GameState }) => void)
     | null = null;
+  private openWorldAfkKickHandler: (() => void) | null = null;
 
   // Campaign pause
   private paused: boolean = false;
@@ -214,6 +215,10 @@ export class GameScene extends Phaser.Scene {
     if (this.openWorldRoundStartHandler) {
       this.socketClient.off('openworld:roundStart', this.openWorldRoundStartHandler);
       this.openWorldRoundStartHandler = null;
+    }
+    if (this.openWorldAfkKickHandler) {
+      this.socketClient.off('openworld:afkKick', this.openWorldAfkKickHandler);
+      this.openWorldAfkKickHandler = null;
     }
 
     // Detect open world mode
@@ -656,6 +661,14 @@ export class GameScene extends Phaser.Scene {
         this.events.emit('openWorldRoundStart', data);
       };
       this.socketClient.on('openworld:roundStart', this.openWorldRoundStartHandler);
+
+      // Handle AFK kick — return to lobby
+      this.openWorldAfkKickHandler = () => {
+        this.registry.remove('currentRoom');
+        this.scene.stop('HUDScene');
+        this.scene.start('LobbyScene');
+      };
+      this.socketClient.on('openworld:afkKick', this.openWorldAfkKickHandler);
 
       // Escape key to toggle leave menu
       this.pauseKeyHandler = (e: KeyboardEvent) => {
@@ -1738,6 +1751,10 @@ export class GameScene extends Phaser.Scene {
     if (this.openWorldRoundStartHandler) {
       this.socketClient.off('openworld:roundStart', this.openWorldRoundStartHandler);
       this.openWorldRoundStartHandler = null;
+    }
+    if (this.openWorldAfkKickHandler) {
+      this.socketClient.off('openworld:afkKick', this.openWorldAfkKickHandler);
+      this.openWorldAfkKickHandler = null;
     }
     this.socketClient.off('sim:state');
     this.socketClient.off('sim:gameTransition');

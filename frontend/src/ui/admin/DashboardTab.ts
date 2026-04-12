@@ -47,6 +47,7 @@ export class DashboardTab {
     mapHeight: number;
     wallDensity: number;
     respawnDelay: number;
+    afkTimeoutSeconds: number;
   } = {
     enabled: true,
     guestAccess: true,
@@ -56,6 +57,7 @@ export class DashboardTab {
     mapHeight: 41,
     wallDensity: 0.5,
     respawnDelay: 3,
+    afkTimeoutSeconds: 60,
   };
 
   constructor(notifications: NotificationUI) {
@@ -299,6 +301,10 @@ export class DashboardTab {
           <input id="ow-respawn-delay" type="number" min="1" max="30" value="${this.owSettings.respawnDelay}" class="admin-select" style="width:70px;">
         </div>
         <div class="setting-item">
+          <span class="setting-item-label">AFK Timeout (s)</span>
+          <input id="ow-afk-timeout" type="number" min="0" max="600" value="${this.owSettings.afkTimeoutSeconds}" class="admin-select" style="width:70px;" title="0 = disabled">
+        </div>
+        <div class="setting-item">
           <button id="ow-save-btn" class="btn btn-primary" style="padding:6px 16px;font-size:13px;">Save Open World Settings</button>
         </div>
       </div>
@@ -367,6 +373,9 @@ export class DashboardTab {
         mapHeight: parseInt((card.querySelector('#ow-map-height') as HTMLInputElement).value),
         wallDensity: parseFloat((card.querySelector('#ow-wall-density') as HTMLInputElement).value),
         respawnDelay: parseInt((card.querySelector('#ow-respawn-delay') as HTMLInputElement).value),
+        afkTimeoutSeconds: parseInt(
+          (card.querySelector('#ow-afk-timeout') as HTMLInputElement).value,
+        ),
       };
       try {
         await ApiClient.put('/admin/settings/open_world', settings);

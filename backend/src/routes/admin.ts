@@ -534,6 +534,7 @@ router.put(
         mapHeight: 'open_world_map_height',
         wallDensity: 'open_world_wall_density',
         respawnDelay: 'open_world_respawn_delay',
+        afkTimeoutSeconds: 'open_world_afk_timeout',
       };
 
       for (const [key, dbKey] of Object.entries(keyMap)) {

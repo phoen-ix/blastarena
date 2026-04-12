@@ -147,6 +147,7 @@ export interface OpenWorldSettings {
   mapHeight: number;
   wallDensity: number;
   respawnDelay: number;
+  afkTimeoutSeconds: number;
 }
 
 export async function getOpenWorldSettings(): Promise<OpenWorldSettings> {
@@ -159,6 +160,7 @@ export async function getOpenWorldSettings(): Promise<OpenWorldSettings> {
     'open_world_map_height',
     'open_world_wall_density',
     'open_world_respawn_delay',
+    'open_world_afk_timeout',
   ];
   const rows = await query<SettingRow[]>(
     `SELECT setting_key, setting_value FROM server_settings WHERE setting_key IN (${keys.map(() => '?').join(',')})`,
@@ -174,6 +176,7 @@ export async function getOpenWorldSettings(): Promise<OpenWorldSettings> {
     mapHeight: parseInt(map.get('open_world_map_height') ?? '41', 10),
     wallDensity: parseFloat(map.get('open_world_wall_density') ?? '0.5'),
     respawnDelay: parseInt(map.get('open_world_respawn_delay') ?? '3', 10),
+    afkTimeoutSeconds: parseInt(map.get('open_world_afk_timeout') ?? '60', 10),
   };
 }
 

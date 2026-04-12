@@ -11,6 +11,8 @@ import {
   OPENWORLD_STATS_FLUSH_TICKS,
   OPENWORLD_INFO_BROADCAST_TICKS,
   OPENWORLD_MAX_PLAYERS_CAP,
+  OPENWORLD_AFK_CHECK_TICKS,
+  OPENWORLD_DEFAULT_AFK_TIMEOUT,
   OpenWorldScoreEntry,
 } from '@blast-arena/shared';
 import { GameStateManager, GameConfig } from './GameState';
@@ -40,6 +42,7 @@ interface OpenWorldPlayer {
   username: string;
   isGuest: boolean;
   joinTick: number;
+  lastInputTick: number;
   kills: number;
   deaths: number;
   score: number;
@@ -155,6 +158,7 @@ class OpenWorldManager {
       playerData.deaths = 0;
       playerData.score = 0;
       playerData.joinTick = this.gameState.tick;
+      playerData.lastInputTick = this.gameState.tick;
     }
 
     this.freezeTick = null;
@@ -259,6 +263,11 @@ class OpenWorldManager {
     if (tick - this.lastStatsFlushTick >= OPENWORLD_STATS_FLUSH_TICKS) {
       this.flushStats();
       this.lastStatsFlushTick = tick;
+    }
+
+    // AFK check — kick idle players periodically
+    if (tick % OPENWORLD_AFK_CHECK_TICKS === 0) {
+      this.checkAfkPlayers(tick);
     }
 
     // Check round timer
@@ -397,6 +406,7 @@ class OpenWorldManager {
       username,
       isGuest,
       joinTick: this.gameState.tick,
+      lastInputTick: this.gameState.tick,
       kills: 0,
       deaths: 0,
       score: 0,
@@ -448,7 +458,11 @@ class OpenWorldManager {
 
     this.gameState.inputBuffer.addInput(userId, input);
 
-    // Mark activity for replay recording
+    // Track player activity for AFK detection and replay recording
+    const playerData = this.players.get(userId);
+    if (playerData) {
+      playerData.lastInputTick = this.gameState.tick;
+    }
     this.lastActivityTick = this.gameState.tick;
   }
 
@@ -473,6 +487,34 @@ class OpenWorldManager {
         this.gameState.roundTime = settings.roundTime;
         this.gameState.openWorldRespawnTicks = settings.respawnDelay * TICK_RATE;
       }
+    }
+  }
+
+  private checkAfkPlayers(tick: number): void {
+    const timeoutSeconds = this.settings?.afkTimeoutSeconds ?? OPENWORLD_DEFAULT_AFK_TIMEOUT;
+    if (timeoutSeconds <= 0) return; // 0 = disabled
+
+    const timeoutTicks = timeoutSeconds * TICK_RATE;
+    const toKick: Array<{ socketId: string; userId: number }> = [];
+
+    for (const [userId, playerData] of this.players) {
+      if (tick - playerData.lastInputTick >= timeoutTicks) {
+        toKick.push({ socketId: playerData.socketId, userId });
+      }
+    }
+
+    for (const { socketId, userId } of toKick) {
+      logger.info({ userId, socketId }, 'Kicking AFK player from open world');
+
+      // Notify the player before removing them
+      const socket = this.io?.sockets.sockets.get(socketId);
+      if (socket) {
+        socket.emit('openworld:afkKick');
+        socket.leave('openworld');
+        socket.data.inOpenWorld = false;
+      }
+
+      this.handleLeave(socketId);
     }
   }
 
