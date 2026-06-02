@@ -21,6 +21,7 @@ export class MenuScene extends Phaser.Scene {
   private notifications!: NotificationUI;
   private authUI!: AuthUI;
   private landingContainer: HTMLElement | null = null;
+  private connectingText: Phaser.GameObjects.Text | null = null;
 
   constructor() {
     super({ key: 'MenuScene' });
@@ -66,7 +67,9 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.add
+    // Shown only during the brief auto-login check; removed once we know whether to authenticate
+    // or fall back to the landing page (otherwise it lingers behind the landing buttons).
+    this.connectingText = this.add
       .text(width / 2, height / 2 + 60, t('ui:menu.connecting'), {
         fontSize: '14px',
         color: colors.textMutedHex,
@@ -93,6 +96,10 @@ export class MenuScene extends Phaser.Scene {
 
   /** Show landing page with guest play, login, and register options */
   private async showLanding(): Promise<void> {
+    // Auto-login resolved (no session) — clear the transient "Connecting..." label.
+    this.connectingText?.destroy();
+    this.connectingText = null;
+
     // Fetch open world status for guest button visibility
     let owStatus: OpenWorldStatus | null = null;
     try {
