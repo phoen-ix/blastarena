@@ -18,6 +18,10 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-dev_pass}
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production}
       LOG_LEVEL: ${LOG_LEVEL:-debug}
+      # Local-dev access URL. Drives socket.io CORS and the cookie `secure` flag, so it must match
+      # the origin the browser uses (http://127.0.0.1:8280). The .env APP_URL is the prod domain
+      # (used behind the host reverse proxy); override it here for direct local access.
+      APP_URL: http://127.0.0.1:8280
     volumes:
       - ./shared:/app/shared
       - ./backend:/app/backend
@@ -39,7 +43,7 @@ services:
       target: frontend-dev
     container_name: ${COMPOSE_PROJECT_NAME:-blast-arena}-frontend
     environment:
-      APP_URL: ${APP_URL:-http://localhost:8080}
+      APP_URL: http://127.0.0.1:8280
     ports:
       - "127.0.0.1:5173:5173"
     volumes:
@@ -61,7 +65,7 @@ services:
       frontend:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/api/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/api/health"]
       interval: 15s
       timeout: 5s
       retries: 3

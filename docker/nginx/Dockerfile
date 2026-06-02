@@ -30,7 +30,9 @@ COPY frontend/ ./frontend/
 
 EXPOSE 5173
 
-CMD ["npx", "--workspace=frontend", "vite", "--host", "0.0.0.0"]
+# Regenerate public/locales from source before starting Vite (the `predev` hook is bypassed when
+# Vite is run directly), so the HTTP-served locale files match the source of truth.
+CMD ["sh", "-c", "node frontend/scripts/copy-locales.cjs && npx --workspace=frontend vite --host 0.0.0.0"]
 
 # Stage 3: Dev nginx (proxies to Vite dev server)
 FROM nginx:alpine AS nginx-dev
