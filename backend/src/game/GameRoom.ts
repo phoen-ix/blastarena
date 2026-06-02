@@ -658,6 +658,7 @@ export class GameRoom {
 
   stop(): void {
     this.gameLoop.stop();
+    this.gameState.disposeAIs(); // free any isolated custom bot AIs (audit C1)
   }
 
   isRunning(): boolean {

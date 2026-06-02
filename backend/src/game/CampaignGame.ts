@@ -31,6 +31,7 @@ import { Player } from './Player';
 import { Bomb } from './Bomb';
 import { processEnemyAI, IEnemyAI, EnemyAIContext, EnemyAIResult } from './EnemyAI';
 import { getEnemyAIRegistry } from './registry';
+import { disposeAI } from '../services/IsolatedAIRunner';
 import { PuzzleTileProcessor } from './PuzzleTileProcessor';
 import { ReplayRecorder } from '../utils/replayRecorder';
 import { GameLogger } from '../utils/gameLogger';
@@ -334,6 +335,9 @@ export class CampaignGame {
   stop(): void {
     this.gameLoop.stop();
     this.finished = true;
+    // Free any isolated custom enemy-AI isolates (audit C1)
+    for (const ai of this.enemyAIs.values()) disposeAI(ai);
+    this.enemyAIs.clear();
   }
 
   pause(): void {
@@ -681,7 +685,8 @@ export class CampaignGame {
             const context = this.buildEnemyAIContext(enemy, bombPositions);
             result = customAI.decide(context);
           } catch (err: unknown) {
-            // Crash recovery: fall back to built-in pattern for this enemy
+            // Crash recovery: dispose the isolate and fall back to built-in pattern for this enemy
+            disposeAI(customAI);
             this.enemyAIs.delete(enemy.id);
             logger.warn(
               { enemyId: enemy.id, error: err instanceof Error ? err.message : String(err) },

@@ -5,16 +5,23 @@ import { IEnemyAI, EnemyAIContext } from '../game/EnemyAI';
 import { query } from '../db/connection';
 import { EnemyAIRow } from '../db/types';
 import { loadBotAIInSandbox } from './botai-compiler';
+import { IsolatedEnemyAI } from './IsolatedAIRunner';
 
 type EnemyAIConstructor = new (
   difficulty: 'easy' | 'normal' | 'hard',
   typeConfig: EnemyAIContext['self']['typeConfig'],
 ) => IEnemyAI;
 
+/**
+ * Trusted seeded enemy AIs (uploaded_by IS NULL — our own source) run in-process as a class.
+ * Untrusted admin uploads run in an `isolated-vm` isolate per instance (created lazily). (audit C1)
+ */
+type LoadedEnemy = { kind: 'class'; ctor: EnemyAIConstructor } | { kind: 'isolated'; code: string };
+
 const ENEMY_AI_BASE_DIR = path.join(process.cwd(), 'enemy-ai');
 
 export class EnemyAIRegistry {
-  private loaded: Map<string, EnemyAIConstructor> = new Map();
+  private loaded: Map<string, LoadedEnemy> = new Map();
 
   async initialize(): Promise<void> {
     fs.mkdirSync(ENEMY_AI_BASE_DIR, { recursive: true });
@@ -23,8 +30,9 @@ export class EnemyAIRegistry {
 
     for (const row of rows) {
       try {
-        this.loadAI(row.id);
-        logger.info({ aiId: row.id, name: row.name }, 'Loaded custom EnemyAI');
+        // Seeded (built-in) AIs have no uploader and are trusted; uploads are isolated.
+        this.loadAI(row.id, row.uploaded_by == null);
+        logger.info({ aiId: row.id, name: row.name }, 'Loaded EnemyAI');
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         logger.warn(
@@ -42,23 +50,46 @@ export class EnemyAIRegistry {
     difficulty: 'easy' | 'normal' | 'hard',
     typeConfig: EnemyAIContext['self']['typeConfig'],
   ): IEnemyAI | null {
-    const Constructor = this.loaded.get(aiId);
-    if (!Constructor) {
+    const entry = this.loaded.get(aiId);
+    if (!entry) {
       logger.warn({ aiId }, 'Requested enemy AI not found, falling back to built-in patterns');
       return null;
     }
-    return new Constructor(difficulty, typeConfig);
+    if (entry.kind === 'class') {
+      return new entry.ctor(difficulty, typeConfig);
+    }
+    // Untrusted upload — run in an isolate. On build/instantiation failure, return null so the
+    // caller falls back to the built-in patterns.
+    try {
+      return new IsolatedEnemyAI(entry.code, difficulty, typeConfig);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warn({ aiId, error: msg }, 'Failed to create isolated enemy AI, falling back');
+      return null;
+    }
   }
 
-  loadAI(id: string): void {
+  /**
+   * @param trusted - true for seeded/built-in AIs (run in-process); false (default) isolates the
+   *   code. Untrusted is the safe default.
+   */
+  loadAI(id: string, trusted = false): void {
     const jsPath = path.join(ENEMY_AI_BASE_DIR, id, 'compiled.js');
     if (!fs.existsSync(jsPath)) {
       throw new Error(`Compiled enemy AI file not found: ${jsPath}`);
     }
 
     const code = fs.readFileSync(jsPath, 'utf-8');
-    const mod = loadBotAIInSandbox(code);
 
+    if (!trusted) {
+      // Untrusted upload: store the compiled code; it runs in an isolate at instance creation.
+      // (Already structurally validated at upload time by compileEnemyAI.) (audit C1)
+      this.loaded.set(id, { kind: 'isolated', code });
+      return;
+    }
+
+    // Trusted seeded AI — load in-process as a class.
+    const mod = loadBotAIInSandbox(code);
     let AIClass: EnemyAIConstructor | undefined;
     if (typeof mod.default === 'function' && mod.default.prototype?.decide) {
       AIClass = mod.default as EnemyAIConstructor;
@@ -66,7 +97,6 @@ export class EnemyAIRegistry {
       typeof mod === 'function' &&
       (mod as unknown as { prototype: Record<string, unknown> }).prototype?.decide
     ) {
-      // Handle module.exports = Class (mod itself is the constructor)
       AIClass = mod as unknown as EnemyAIConstructor;
     } else {
       for (const val of Object.values(mod)) {
@@ -84,16 +114,16 @@ export class EnemyAIRegistry {
       throw new Error('No class with decide() found in compiled module');
     }
 
-    this.loaded.set(id, AIClass);
+    this.loaded.set(id, { kind: 'class', ctor: AIClass });
   }
 
   unloadAI(id: string): void {
     this.loaded.delete(id);
   }
 
-  reloadAI(id: string): void {
+  reloadAI(id: string, trusted = false): void {
     this.unloadAI(id);
-    this.loadAI(id);
+    this.loadAI(id, trusted);
   }
 
   isLoaded(id: string): boolean {

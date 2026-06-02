@@ -97,7 +97,7 @@ export async function seedDefaultEnemyAIs(): Promise<void> {
         [id, def.name, def.description, def.filename, Buffer.byteLength(def.source)],
       );
 
-      getEnemyAIRegistry().loadAI(id);
+      getEnemyAIRegistry().loadAI(id, true); // seeded AIs are trusted — run in-process
       seeded++;
 
       logger.info({ aiId: id, name: def.name }, 'Seeded default enemy AI');

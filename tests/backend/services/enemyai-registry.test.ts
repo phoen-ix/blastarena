@@ -24,10 +24,18 @@ jest.mock('fs', () => ({
   },
 }));
 
-// ── Sandbox mock ────────────────────────────────────────────────────────────
+// ── Sandbox mock (used to load TRUSTED seeded AIs in-process) ────────────────
 const mockLoadBotAIInSandbox = jest.fn<AnyFn>();
 jest.mock('../../../backend/src/services/botai-compiler', () => ({
   loadBotAIInSandbox: mockLoadBotAIInSandbox,
+}));
+
+// ── Isolated runner mock (used for UNTRUSTED uploads) ────────────────────────
+const MockIsolatedEnemyAI = jest.fn<AnyFn>();
+jest.mock('../../../backend/src/services/IsolatedAIRunner', () => ({
+  IsolatedEnemyAI: MockIsolatedEnemyAI,
+  IsolatedBotAI: jest.fn(),
+  disposeAI: jest.fn(),
 }));
 
 // ── Logger mock ─────────────────────────────────────────────────────────────
@@ -36,8 +44,6 @@ jest.mock('../../../backend/src/utils/logger', () => ({
 }));
 
 import { EnemyAIRegistry } from '../../../backend/src/services/enemyai-registry';
-
-// ── Helper: mock enemy AI class with decide() ──────────────────────────────
 
 function makeMockEnemyAIClass() {
   const MockClass = jest.fn<AnyFn>();
@@ -53,24 +59,20 @@ describe('EnemyAIRegistry', () => {
     registry = new EnemyAIRegistry();
   });
 
-  // ── initialize ─────────────────────────────────────────────────────────
-
   describe('initialize', () => {
     it('should create the enemy-ai base directory', async () => {
       mockQuery.mockResolvedValue([]);
-
       await registry.initialize();
-
       expect(mockMkdirSync).toHaveBeenCalledWith(expect.stringContaining('enemy-ai'), {
         recursive: true,
       });
     });
 
-    it('should load all active enemy AIs from the database', async () => {
+    it('loads seeded AIs (uploaded_by NULL) in-process and uploads in isolates', async () => {
       const MockClass = makeMockEnemyAIClass();
       mockQuery.mockResolvedValue([
-        { id: 'ai-1', name: 'Chaser', is_active: true },
-        { id: 'ai-2', name: 'Patrol', is_active: true },
+        { id: 'seed-1', name: 'Hunter', is_active: true, uploaded_by: null },
+        { id: 'upload-1', name: 'Custom', is_active: true, uploaded_by: 7 },
       ]);
       mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue('compiled code');
@@ -78,21 +80,20 @@ describe('EnemyAIRegistry', () => {
 
       await registry.initialize();
 
-      expect(registry.isLoaded('ai-1')).toBe(true);
-      expect(registry.isLoaded('ai-2')).toBe(true);
+      expect(registry.isLoaded('seed-1')).toBe(true);
+      expect(registry.isLoaded('upload-1')).toBe(true);
       expect(registry.getLoadedIds()).toHaveLength(2);
+      // The trusted seed went through the in-process loader; the upload did NOT.
+      expect(mockLoadBotAIInSandbox).toHaveBeenCalledTimes(1);
     });
 
-    it('should skip AIs that fail to load and continue with others', async () => {
-      const MockClass = makeMockEnemyAIClass();
+    it('should skip AIs whose compiled file is missing and continue with others', async () => {
       mockQuery.mockResolvedValue([
-        { id: 'broken-ai', name: 'Broken' },
-        { id: 'good-ai', name: 'Good' },
+        { id: 'broken-ai', name: 'Broken', uploaded_by: 1 },
+        { id: 'good-ai', name: 'Good', uploaded_by: 1 },
       ]);
-      // First AI: file not found, second AI: success
       mockExistsSync.mockReturnValueOnce(false).mockReturnValueOnce(true);
       mockReadFileSync.mockReturnValue('compiled code');
-      mockLoadBotAIInSandbox.mockReturnValue({ default: MockClass });
 
       await registry.initialize();
 
@@ -101,147 +102,117 @@ describe('EnemyAIRegistry', () => {
     });
   });
 
-  // ── loadAI ─────────────────────────────────────────────────────────────
-
   describe('loadAI', () => {
-    it('should load an AI from compiled.js via sandbox and register it', () => {
+    it('untrusted (default): stores compiled code without in-process eval', () => {
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue('var EnemyAI = ...');
+
+      registry.loadAI('upload-1');
+
+      expect(mockReadFileSync).toHaveBeenCalledWith(
+        expect.stringContaining('compiled.js'),
+        'utf-8',
+      );
+      expect(mockLoadBotAIInSandbox).not.toHaveBeenCalled();
+      expect(registry.isLoaded('upload-1')).toBe(true);
+    });
+
+    it('trusted: loads the class in-process via the sandbox loader', () => {
       const MockClass = makeMockEnemyAIClass();
       mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue('var EnemyAI = ...');
       mockLoadBotAIInSandbox.mockReturnValue({ default: MockClass });
 
-      registry.loadAI('ai-1');
+      registry.loadAI('seed-1', true);
 
-      expect(mockExistsSync).toHaveBeenCalledWith(expect.stringContaining('compiled.js'));
-      expect(mockReadFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('compiled.js'),
-        'utf-8',
-      );
       expect(mockLoadBotAIInSandbox).toHaveBeenCalledWith('var EnemyAI = ...');
-      expect(registry.isLoaded('ai-1')).toBe(true);
+      expect(registry.isLoaded('seed-1')).toBe(true);
     });
 
     it('should throw when compiled file does not exist', () => {
       mockExistsSync.mockReturnValue(false);
-
       expect(() => registry.loadAI('missing-ai')).toThrow('Compiled enemy AI file not found');
     });
 
-    it('should throw when no class with decide() is found in module', () => {
+    it('trusted: throws when no class with decide() is found', () => {
       mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue('code');
-      // Return a module with no decide() method
       mockLoadBotAIInSandbox.mockReturnValue({ default: 'not a class' });
 
-      expect(() => registry.loadAI('bad-ai')).toThrow('No class with decide() found');
-    });
-
-    it('should find AI class as module.exports = Class (mod itself is constructor)', () => {
-      const MockClass = makeMockEnemyAIClass();
-      mockExistsSync.mockReturnValue(true);
-      mockReadFileSync.mockReturnValue('code');
-      // mod itself is the constructor function with decide
-      mockLoadBotAIInSandbox.mockReturnValue(MockClass);
-
-      registry.loadAI('direct-export');
-
-      expect(registry.isLoaded('direct-export')).toBe(true);
-    });
-
-    it('should find AI class from named exports when default is not a class', () => {
-      const MockClass = makeMockEnemyAIClass();
-      mockExistsSync.mockReturnValue(true);
-      mockReadFileSync.mockReturnValue('code');
-      // No default export, but a named export with decide()
-      mockLoadBotAIInSandbox.mockReturnValue({ SomeEnemyAI: MockClass });
-
-      registry.loadAI('named-export');
-
-      expect(registry.isLoaded('named-export')).toBe(true);
+      expect(() => registry.loadAI('bad-ai', true)).toThrow('No class with decide() found');
     });
   });
 
-  // ── createInstance ─────────────────────────────────────────────────────
-
   describe('createInstance', () => {
-    it('should create a new instance using the loaded constructor', () => {
+    it('trusted: instantiates the in-process class', () => {
       const MockClass = makeMockEnemyAIClass();
       mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue('code');
       mockLoadBotAIInSandbox.mockReturnValue({ default: MockClass });
 
-      registry.loadAI('ai-1');
-      const instance = registry.createInstance('ai-1', 'normal', { speed: 1 } as never);
+      registry.loadAI('seed-1', true);
+      const instance = registry.createInstance('seed-1', 'normal', { speed: 1 } as never);
 
       expect(instance).not.toBeNull();
       expect(MockClass).toHaveBeenCalledWith('normal', { speed: 1 });
+      expect(MockIsolatedEnemyAI).not.toHaveBeenCalled();
+    });
+
+    it('untrusted: creates an isolate-backed instance', () => {
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue('CODE');
+
+      registry.loadAI('upload-1'); // untrusted by default
+      const instance = registry.createInstance('upload-1', 'hard', { speed: 2 } as never);
+
+      expect(instance).not.toBeNull();
+      expect(MockIsolatedEnemyAI).toHaveBeenCalledWith('CODE', 'hard', { speed: 2 });
+    });
+
+    it('untrusted: returns null if the isolate fails to build', () => {
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue('CODE');
+      MockIsolatedEnemyAI.mockImplementationOnce(() => {
+        throw new Error('isolate boom');
+      });
+
+      registry.loadAI('upload-1');
+      expect(registry.createInstance('upload-1', 'normal', {} as never)).toBeNull();
     });
 
     it('should return null when the AI is not loaded', () => {
-      const instance = registry.createInstance('nonexistent', 'hard', {} as never);
-
-      expect(instance).toBeNull();
+      expect(registry.createInstance('nonexistent', 'hard', {} as never)).toBeNull();
     });
   });
 
-  // ── unloadAI ───────────────────────────────────────────────────────────
-
-  describe('unloadAI', () => {
-    it('should remove a loaded AI from the registry', () => {
-      const MockClass = makeMockEnemyAIClass();
+  describe('unloadAI / reloadAI / getLoadedIds', () => {
+    it('unloadAI removes a loaded AI', () => {
       mockExistsSync.mockReturnValue(true);
-      mockReadFileSync.mockReturnValue('code');
-      mockLoadBotAIInSandbox.mockReturnValue({ default: MockClass });
-
-      registry.loadAI('ai-1');
-      expect(registry.isLoaded('ai-1')).toBe(true);
-
-      registry.unloadAI('ai-1');
-      expect(registry.isLoaded('ai-1')).toBe(false);
-    });
-  });
-
-  // ── reloadAI ───────────────────────────────────────────────────────────
-
-  describe('reloadAI', () => {
-    it('should unload and re-load the AI', () => {
-      const MockClass1 = makeMockEnemyAIClass();
-      const MockClass2 = makeMockEnemyAIClass();
-      mockExistsSync.mockReturnValue(true);
-      mockReadFileSync.mockReturnValue('code');
-      mockLoadBotAIInSandbox
-        .mockReturnValueOnce({ default: MockClass1 })
-        .mockReturnValueOnce({ default: MockClass2 });
-
-      registry.loadAI('ai-1');
-      registry.reloadAI('ai-1');
-
-      expect(registry.isLoaded('ai-1')).toBe(true);
-      // Sandbox was called twice (initial load + reload)
-      expect(mockLoadBotAIInSandbox).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  // ── getLoadedIds ───────────────────────────────────────────────────────
-
-  describe('getLoadedIds', () => {
-    it('should return empty array when nothing is loaded', () => {
-      expect(registry.getLoadedIds()).toEqual([]);
+      mockReadFileSync.mockReturnValue('CODE');
+      registry.loadAI('upload-1');
+      expect(registry.isLoaded('upload-1')).toBe(true);
+      registry.unloadAI('upload-1');
+      expect(registry.isLoaded('upload-1')).toBe(false);
     });
 
-    it('should return all loaded AI ids', () => {
-      const MockClass = makeMockEnemyAIClass();
+    it('reloadAI re-reads the compiled file', () => {
       mockExistsSync.mockReturnValue(true);
-      mockReadFileSync.mockReturnValue('code');
-      mockLoadBotAIInSandbox.mockReturnValue({ default: MockClass });
+      mockReadFileSync.mockReturnValue('CODE');
+      registry.loadAI('upload-1');
+      registry.reloadAI('upload-1');
+      expect(registry.isLoaded('upload-1')).toBe(true);
+      expect(mockReadFileSync).toHaveBeenCalledTimes(2);
+    });
 
-      registry.loadAI('ai-1');
-      registry.loadAI('ai-2');
-
+    it('getLoadedIds returns all loaded ids', () => {
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue('CODE');
+      registry.loadAI('a');
+      registry.loadAI('b');
       const ids = registry.getLoadedIds();
       expect(ids).toHaveLength(2);
-      expect(ids).toContain('ai-1');
-      expect(ids).toContain('ai-2');
+      expect(ids).toContain('a');
+      expect(ids).toContain('b');
     });
   });
 });

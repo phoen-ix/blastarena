@@ -91,6 +91,7 @@ export class SimulationRunner extends EventEmitter {
 
         this.results.push(result);
         this.gamesCompleted = i + 1;
+        this.currentGame.dispose(); // free isolated custom bot AIs before the next game (audit C1)
         this.currentGame = null;
 
         // Emit progress and result

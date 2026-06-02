@@ -42,6 +42,11 @@ A custom bot AI is a TypeScript class that controls bot players during gameplay.
 
 The built-in AI (BotAI.ts) is always available as a reference implementation and fallback. You can download it from the AI tab.
 
+**Sandboxing (security):** Uploaded AIs run inside an isolated V8 sandbox (`isolated-vm`) — a separate heap with no access to `require`, `process`, the filesystem, or the network. Each `generateInput()` call has a hard CPU timeout; if your AI throws or runs too long, the engine logs it and falls back to the built-in AI for that bot. Two consequences for your code:
+
+- `console` and the optional `logger` argument are **no-ops** inside the sandbox — they won't print or record anything. Use the returned `PlayerInput` to drive behavior; don't rely on logging side effects.
+- The `player`/`state` objects (and the players/bombs/etc. they contain) are **rebuilt fresh each tick** from a snapshot, so object identity is **not stable across ticks**. Don't use them as `Map`/`WeakMap`/`Set` keys or compare with `===` across calls — key on the numeric ids (`player.id`, `bomb.id`) instead. All documented fields and methods work as before.
+
 ---
 
 ## Quick Start
@@ -73,8 +78,8 @@ export class MyBot {
 
     return {
       seq: ++this.seq,
-      direction: null,  // No movement
-      action: null,     // No action
+      direction: null, // No movement
+      action: null, // No action
       tick: state.tick,
     };
   }
@@ -121,10 +126,10 @@ Return `null` to skip this tick (no input). Otherwise return a `PlayerInput`:
 
 ```typescript
 interface PlayerInput {
-  seq: number;                          // Increment each call
-  direction: Direction | null;          // 'up' | 'down' | 'left' | 'right' | null
-  action: 'bomb' | 'detonate' | null;  // Place bomb, detonate remotes, or nothing
-  tick: number;                         // state.tick
+  seq: number; // Increment each call
+  direction: Direction | null; // 'up' | 'down' | 'left' | 'right' | null
+  action: 'bomb' | 'detonate' | null; // Place bomb, detonate remotes, or nothing
+  tick: number; // state.tick
 }
 ```
 
@@ -141,50 +146,50 @@ The first parameter to `generateInput()`. Represents your bot.
 
 **Identity:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `number` | Unique ID. Bots have negative IDs (-(i+1)) |
-| `username` | `string` | Display name |
-| `isBot` | `boolean` | Always `true` for your bot |
-| `team` | `number \| null` | `0` = Red, `1` = Blue, `null` = no team |
+| Field      | Type             | Description                                |
+| ---------- | ---------------- | ------------------------------------------ |
+| `id`       | `number`         | Unique ID. Bots have negative IDs (-(i+1)) |
+| `username` | `string`         | Display name                               |
+| `isBot`    | `boolean`        | Always `true` for your bot                 |
+| `team`     | `number \| null` | `0` = Red, `1` = Blue, `null` = no team    |
 
 **Position and Status:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `position` | `{ x, y }` | Current grid coordinates |
-| `alive` | `boolean` | Whether the player is alive |
-| `direction` | `Direction` | Current facing direction |
-| `moveCooldown` | `number` | Ticks until next move allowed |
-| `invulnerableTicks` | `number` | Remaining invulnerability ticks (after spawn/shield break) |
+| Field               | Type        | Description                                                |
+| ------------------- | ----------- | ---------------------------------------------------------- |
+| `position`          | `{ x, y }`  | Current grid coordinates                                   |
+| `alive`             | `boolean`   | Whether the player is alive                                |
+| `direction`         | `Direction` | Current facing direction                                   |
+| `moveCooldown`      | `number`    | Ticks until next move allowed                              |
+| `invulnerableTicks` | `number`    | Remaining invulnerability ticks (after spawn/shield break) |
 
 **Abilities:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `maxBombs` | `number` | Max simultaneous bombs (1-8) |
-| `bombCount` | `number` | Currently placed bombs |
-| `fireRange` | `number` | Explosion range (1-8) |
-| `speed` | `number` | Movement speed (1-2). Speed 2 = faster cooldown |
-| `hasShield` | `boolean` | Has shield (absorbs one explosion) |
-| `hasKick` | `boolean` | Can kick bombs by walking into them |
-| `hasPierceBomb` | `boolean` | Explosions pass through destructible walls |
+| Field           | Type      | Description                                        |
+| --------------- | --------- | -------------------------------------------------- |
+| `maxBombs`      | `number`  | Max simultaneous bombs (1-8)                       |
+| `bombCount`     | `number`  | Currently placed bombs                             |
+| `fireRange`     | `number`  | Explosion range (1-8)                              |
+| `speed`         | `number`  | Movement speed (1-2). Speed 2 = faster cooldown    |
+| `hasShield`     | `boolean` | Has shield (absorbs one explosion)                 |
+| `hasKick`       | `boolean` | Can kick bombs by walking into them                |
+| `hasPierceBomb` | `boolean` | Explosions pass through destructible walls         |
 | `hasRemoteBomb` | `boolean` | Bombs don't auto-detonate; use `'detonate'` action |
-| `hasLineBomb` | `boolean` | Places a line of bombs in facing direction |
+| `hasLineBomb`   | `boolean` | Places a line of bombs in facing direction         |
 
 **Stats:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `kills` | `number` | Kill count |
-| `deaths` | `number` | Death count |
+| Field       | Type     | Description                             |
+| ----------- | -------- | --------------------------------------- |
+| `kills`     | `number` | Kill count                              |
+| `deaths`    | `number` | Death count                             |
 | `selfKills` | `number` | Self-kill count (subtracted from score) |
 
 **Methods:**
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `canMove()` | `boolean` | `true` if alive and movement cooldown is 0 |
+| Method           | Returns   | Description                                |
+| ---------------- | --------- | ------------------------------------------ |
+| `canMove()`      | `boolean` | `true` if alive and movement cooldown is 0 |
 | `canPlaceBomb()` | `boolean` | `true` if alive and `bombCount < maxBombs` |
 
 ### GameStateManager
@@ -193,102 +198,102 @@ The second parameter. The entire game state.
 
 **Core State:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `tick` | `number` | Current tick (increments each frame, 20/sec) |
-| `status` | `string` | `'countdown'`, `'playing'`, or `'finished'` |
-| `players` | `Map<number, Player>` | All players (alive and dead) by ID |
-| `bombs` | `Map<string, Bomb>` | All active bombs by UUID |
-| `explosions` | `Map<string, Explosion>` | All active explosions by UUID |
-| `powerUps` | `Map<string, PowerUp>` | All uncollected power-ups by UUID |
-| `map` | `Map object` | The game map (see [Map](#map)) |
-| `collisionSystem` | `CollisionSystem` | Walkability and collision checks |
+| Field             | Type                     | Description                                  |
+| ----------------- | ------------------------ | -------------------------------------------- |
+| `tick`            | `number`                 | Current tick (increments each frame, 20/sec) |
+| `status`          | `string`                 | `'countdown'`, `'playing'`, or `'finished'`  |
+| `players`         | `Map<number, Player>`    | All players (alive and dead) by ID           |
+| `bombs`           | `Map<string, Bomb>`      | All active bombs by UUID                     |
+| `explosions`      | `Map<string, Explosion>` | All active explosions by UUID                |
+| `powerUps`        | `Map<string, PowerUp>`   | All uncollected power-ups by UUID            |
+| `map`             | `Map object`             | The game map (see [Map](#map))               |
+| `collisionSystem` | `CollisionSystem`        | Walkability and collision checks             |
 
 **Game Mode State:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `zone` | `BattleRoyaleZone \| null` | The shrinking zone (Battle Royale mode only) |
-| `hillZone` | `{ x, y, width, height } \| null` | Center zone (KOTH mode only, 3x3) |
-| `kothScores` | `Map<number, number>` | KOTH scores per player ID |
-| `winnerId` | `number \| null` | Winner's player ID (null while playing) |
-| `winnerTeam` | `number \| null` | Winning team (null if not decided/not teams) |
-| `roundTime` | `number` | Round duration in seconds |
+| Field        | Type                              | Description                                  |
+| ------------ | --------------------------------- | -------------------------------------------- |
+| `zone`       | `BattleRoyaleZone \| null`        | The shrinking zone (Battle Royale mode only) |
+| `hillZone`   | `{ x, y, width, height } \| null` | Center zone (KOTH mode only, 3x3)            |
+| `kothScores` | `Map<number, number>`             | KOTH scores per player ID                    |
+| `winnerId`   | `number \| null`                  | Winner's player ID (null while playing)      |
+| `winnerTeam` | `number \| null`                  | Winning team (null if not decided/not teams) |
+| `roundTime`  | `number`                          | Round duration in seconds                    |
 
 **Configuration:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `reinforcedWalls` | `boolean` | Destructible walls take 2 hits |
+| Field             | Type      | Description                                    |
+| ----------------- | --------- | ---------------------------------------------- |
+| `reinforcedWalls` | `boolean` | Destructible walls take 2 hits                 |
 | `enableMapEvents` | `boolean` | Meteor strikes and power-up rain events active |
 
 **Methods:**
 
-| Method | Returns | Description |
-|--------|---------|-------------|
+| Method              | Returns    | Description                 |
+| ------------------- | ---------- | --------------------------- |
 | `getAlivePlayers()` | `Player[]` | All currently alive players |
 
 ### Bomb
 
 Represents an active bomb on the map.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `string` | Unique UUID |
-| `position` | `{ x, y }` | Grid position |
-| `ownerId` | `number` | Player ID of who placed it |
-| `fireRange` | `number` | Blast radius (1-8) |
-| `ticksRemaining` | `number` | Ticks until detonation. Normal: starts at 60 (3s). Remote: starts at 200 (10s safety max) |
-| `sliding` | `Direction \| null` | Direction if being kicked, `null` if stationary |
-| `bombType` | `string` | `'normal'`, `'remote'`, or `'pierce'` |
-| `isPierce` | `boolean` | (getter) Whether bomb blasts through destructible walls |
-| `isRemote` | `boolean` | (getter) Whether bomb requires manual detonation |
+| Field            | Type                | Description                                                                               |
+| ---------------- | ------------------- | ----------------------------------------------------------------------------------------- |
+| `id`             | `string`            | Unique UUID                                                                               |
+| `position`       | `{ x, y }`          | Grid position                                                                             |
+| `ownerId`        | `number`            | Player ID of who placed it                                                                |
+| `fireRange`      | `number`            | Blast radius (1-8)                                                                        |
+| `ticksRemaining` | `number`            | Ticks until detonation. Normal: starts at 60 (3s). Remote: starts at 200 (10s safety max) |
+| `sliding`        | `Direction \| null` | Direction if being kicked, `null` if stationary                                           |
+| `bombType`       | `string`            | `'normal'`, `'remote'`, or `'pierce'`                                                     |
+| `isPierce`       | `boolean`           | (getter) Whether bomb blasts through destructible walls                                   |
+| `isRemote`       | `boolean`           | (getter) Whether bomb requires manual detonation                                          |
 
 ### Explosion
 
 Represents an active explosion on the map.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `string` | Unique UUID |
-| `cells` | `{ x, y }[]` | All cells affected by this explosion |
-| `ownerId` | `number` | Player ID of bomb owner |
-| `ticksRemaining` | `number` | Ticks until explosion fades (starts at 10 = 0.5s) |
+| Field            | Type         | Description                                       |
+| ---------------- | ------------ | ------------------------------------------------- |
+| `id`             | `string`     | Unique UUID                                       |
+| `cells`          | `{ x, y }[]` | All cells affected by this explosion              |
+| `ownerId`        | `number`     | Player ID of bomb owner                           |
+| `ticksRemaining` | `number`     | Ticks until explosion fades (starts at 10 = 0.5s) |
 
-| Method | Returns | Description |
-|--------|---------|-------------|
+| Method               | Returns   | Description                             |
+| -------------------- | --------- | --------------------------------------- |
 | `containsCell(x, y)` | `boolean` | Whether a position is in this explosion |
 
 ### PowerUp
 
 Represents an uncollected power-up on the map.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `string` | Unique UUID |
-| `position` | `{ x, y }` | Grid position |
-| `type` | `PowerUpType` | One of: `bomb_up`, `fire_up`, `speed_up`, `shield`, `kick`, `pierce_bomb`, `remote_bomb`, `line_bomb` |
+| Field      | Type          | Description                                                                                           |
+| ---------- | ------------- | ----------------------------------------------------------------------------------------------------- |
+| `id`       | `string`      | Unique UUID                                                                                           |
+| `position` | `{ x, y }`    | Grid position                                                                                         |
+| `type`     | `PowerUpType` | One of: `bomb_up`, `fire_up`, `speed_up`, `shield`, `kick`, `pierce_bomb`, `remote_bomb`, `line_bomb` |
 
 ### CollisionSystem
 
 Accessed via `state.collisionSystem`. Handles map-level walkability checks.
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `isWalkable(x, y)` | `boolean` | Whether a tile can be walked on (doesn't check bombs/players) |
-| `getTileAt(x, y)` | `TileType` | Tile type at position. Returns `'wall'` if out of bounds |
+| Method             | Returns    | Description                                                   |
+| ------------------ | ---------- | ------------------------------------------------------------- |
+| `isWalkable(x, y)` | `boolean`  | Whether a tile can be walked on (doesn't check bombs/players) |
+| `getTileAt(x, y)`  | `TileType` | Tile type at position. Returns `'wall'` if out of bounds      |
 
 ### Map
 
 Accessed via `state.map`.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `width` | `number` | Map width in tiles (always odd) |
-| `height` | `number` | Map height in tiles (always odd) |
-| `tiles` | `TileType[][]` | 2D array of tiles. Access as `tiles[y][x]` (row-major) |
-| `spawnPoints` | `{ x, y }[]` | Player spawn positions |
-| `seed` | `number` | Map generation seed |
+| Field         | Type           | Description                                            |
+| ------------- | -------------- | ------------------------------------------------------ |
+| `width`       | `number`       | Map width in tiles (always odd)                        |
+| `height`      | `number`       | Map height in tiles (always odd)                       |
+| `tiles`       | `TileType[][]` | 2D array of tiles. Access as `tiles[y][x]` (row-major) |
+| `spawnPoints` | `{ x, y }[]`   | Player spawn positions                                 |
+| `seed`        | `number`       | Map generation seed                                    |
 
 ---
 
@@ -302,12 +307,12 @@ type Direction = 'up' | 'down' | 'left' | 'right';
 
 Direction deltas on the grid:
 
-| Direction | dx | dy |
-|-----------|----|----|
-| `'up'` | 0 | -1 |
-| `'down'` | 0 | +1 |
-| `'left'` | -1 | 0 |
-| `'right'` | +1 | 0 |
+| Direction | dx  | dy  |
+| --------- | --- | --- |
+| `'up'`    | 0   | -1  |
+| `'down'`  | 0   | +1  |
+| `'left'`  | -1  | 0   |
+| `'right'` | +1  | 0   |
 
 ### Position
 
@@ -322,17 +327,17 @@ interface Position {
 
 ```typescript
 type TileType =
-  | 'empty'              // Walkable open tile
-  | 'wall'               // Indestructible wall (blocks movement and explosions)
-  | 'destructible'       // Destructible wall (can be blown up)
+  | 'empty' // Walkable open tile
+  | 'wall' // Indestructible wall (blocks movement and explosions)
+  | 'destructible' // Destructible wall (can be blown up)
   | 'destructible_cracked' // Cracked wall (reinforced mode: one more hit to destroy)
-  | 'spawn'              // Spawn point (walkable)
-  | 'teleporter_a'       // Teleporter A (instant transport to matching B)
-  | 'teleporter_b'       // Teleporter B (instant transport to matching A)
-  | 'conveyor_up'        // Conveyor belt (forces movement upward)
-  | 'conveyor_down'      // Conveyor belt (forces movement downward)
-  | 'conveyor_left'      // Conveyor belt (forces movement left)
-  | 'conveyor_right';    // Conveyor belt (forces movement right)
+  | 'spawn' // Spawn point (walkable)
+  | 'teleporter_a' // Teleporter A (instant transport to matching B)
+  | 'teleporter_b' // Teleporter B (instant transport to matching A)
+  | 'conveyor_up' // Conveyor belt (forces movement upward)
+  | 'conveyor_down' // Conveyor belt (forces movement downward)
+  | 'conveyor_left' // Conveyor belt (forces movement left)
+  | 'conveyor_right'; // Conveyor belt (forces movement right)
 ```
 
 Walkable tiles: `empty`, `spawn`, `teleporter_a`, `teleporter_b`, `conveyor_*`
@@ -341,14 +346,14 @@ Walkable tiles: `empty`, `spawn`, `teleporter_a`, `teleporter_b`, `conveyor_*`
 
 ```typescript
 type PowerUpType =
-  | 'bomb_up'      // +1 max bombs
-  | 'fire_up'      // +1 fire range
-  | 'speed_up'     // +1 speed (max 2)
-  | 'shield'       // Absorbs one explosion hit
-  | 'kick'         // Walk into bombs to kick them
-  | 'pierce_bomb'  // Explosions pass through destructible walls
-  | 'remote_bomb'  // Bombs don't auto-detonate; use 'detonate' action
-  | 'line_bomb';   // Place a line of bombs in facing direction
+  | 'bomb_up' // +1 max bombs
+  | 'fire_up' // +1 fire range
+  | 'speed_up' // +1 speed (max 2)
+  | 'shield' // Absorbs one explosion hit
+  | 'kick' // Walk into bombs to kick them
+  | 'pierce_bomb' // Explosions pass through destructible walls
+  | 'remote_bomb' // Bombs don't auto-detonate; use 'detonate' action
+  | 'line_bomb'; // Place a line of bombs in facing direction
 ```
 
 ---
@@ -359,46 +364,46 @@ These are the key timing and gameplay constants from `shared/src/constants/game.
 
 ### Tick Rate
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `TICK_RATE` | `20` | Ticks per second |
-| `TICK_MS` | `50` | Milliseconds per tick |
+| Constant    | Value | Description           |
+| ----------- | ----- | --------------------- |
+| `TICK_RATE` | `20`  | Ticks per second      |
+| `TICK_MS`   | `50`  | Milliseconds per tick |
 
 ### Movement
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `MOVE_COOLDOWN_BASE` | `5` | Ticks between moves at speed 1 (4 moves/sec) |
-| | `4` | At speed 2 (5 moves/sec) — calculated as `MOVE_COOLDOWN_BASE - speed + 1` |
+| Constant             | Value | Description                                                               |
+| -------------------- | ----- | ------------------------------------------------------------------------- |
+| `MOVE_COOLDOWN_BASE` | `5`   | Ticks between moves at speed 1 (4 moves/sec)                              |
+|                      | `4`   | At speed 2 (5 moves/sec) — calculated as `MOVE_COOLDOWN_BASE - speed + 1` |
 
 ### Bombs and Explosions
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `BOMB_TIMER_TICKS` | `60` | Ticks before auto-detonation (3 seconds) |
-| `EXPLOSION_DURATION_TICKS` | `10` | Ticks explosions stay active (0.5 seconds) |
-| `INVULNERABILITY_TICKS` | `40` | Invulnerability after spawn/shield break (2 seconds) |
+| Constant                   | Value | Description                                          |
+| -------------------------- | ----- | ---------------------------------------------------- |
+| `BOMB_TIMER_TICKS`         | `60`  | Ticks before auto-detonation (3 seconds)             |
+| `EXPLOSION_DURATION_TICKS` | `10`  | Ticks explosions stay active (0.5 seconds)           |
+| `INVULNERABILITY_TICKS`    | `40`  | Invulnerability after spawn/shield break (2 seconds) |
 
 ### Player Limits
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `DEFAULT_MAX_BOMBS` | `1` | Starting bomb capacity |
-| `DEFAULT_FIRE_RANGE` | `1` | Starting fire range |
-| `DEFAULT_SPEED` | `1` | Starting speed |
-| `MAX_BOMBS` | `8` | Maximum bomb capacity |
-| `MAX_FIRE_RANGE` | `8` | Maximum fire range |
-| `MAX_SPEED` | `2` | Maximum speed |
+| Constant             | Value | Description            |
+| -------------------- | ----- | ---------------------- |
+| `DEFAULT_MAX_BOMBS`  | `1`   | Starting bomb capacity |
+| `DEFAULT_FIRE_RANGE` | `1`   | Starting fire range    |
+| `DEFAULT_SPEED`      | `1`   | Starting speed         |
+| `MAX_BOMBS`          | `8`   | Maximum bomb capacity  |
+| `MAX_FIRE_RANGE`     | `8`   | Maximum fire range     |
+| `MAX_SPEED`          | `2`   | Maximum speed          |
 
 ### Game Mode Specific
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `DEATHMATCH_RESPAWN_TICKS` | `60` | 3 seconds respawn delay |
-| `DEATHMATCH_KILL_TARGET` | `10` | Kills to win deathmatch |
-| `KOTH_ZONE_SIZE` | `3` | 3x3 center zone |
-| `KOTH_SCORE_TARGET` | `100` | Points to win KOTH |
-| `KOTH_POINTS_PER_TICK` | `1` | Points per tick while controlling hill |
+| Constant                   | Value | Description                            |
+| -------------------------- | ----- | -------------------------------------- |
+| `DEATHMATCH_RESPAWN_TICKS` | `60`  | 3 seconds respawn delay                |
+| `DEATHMATCH_KILL_TARGET`   | `10`  | Kills to win deathmatch                |
+| `KOTH_ZONE_SIZE`           | `3`   | 3x3 center zone                        |
+| `KOTH_SCORE_TARGET`        | `100` | Points to win KOTH                     |
+| `KOTH_POINTS_PER_TICK`     | `1`   | Points per tick while controlling hill |
 
 ---
 
@@ -414,13 +419,13 @@ Calculate which cells a bomb explosion would affect:
 import { getExplosionCells } from '@blast-arena/shared';
 
 const cells = getExplosionCells(
-  bombX,        // Origin X
-  bombY,        // Origin Y
-  fireRange,    // Blast radius
-  map.width,    // Map width
-  map.height,   // Map height
-  map.tiles,    // 2D tile array
-  pierce,       // Whether explosion passes through destructible walls
+  bombX, // Origin X
+  bombY, // Origin Y
+  fireRange, // Blast radius
+  map.width, // Map width
+  map.height, // Map height
+  map.tiles, // 2D tile array
+  pierce, // Whether explosion passes through destructible walls
 );
 // Returns: { x: number, y: number }[]
 ```
@@ -432,10 +437,7 @@ The explosion expands in 4 cardinal directions up to `range` tiles. It always in
 ```typescript
 import { manhattanDistance } from '@blast-arena/shared';
 
-const dist = manhattanDistance(
-  { x: 1, y: 2 },
-  { x: 4, y: 6 },
-); // Returns 7
+const dist = manhattanDistance({ x: 1, y: 2 }, { x: 4, y: 6 }); // Returns 7
 ```
 
 ### isInBounds
@@ -454,15 +456,15 @@ Your constructor receives a `difficulty` parameter (`'easy'`, `'normal'`, or `'h
 
 **Suggested scaling by difficulty:**
 
-| Behavior | Easy | Normal | Hard |
-|----------|------|--------|------|
-| Reaction time | Slow (add delays) | Medium | Instant |
-| Search depth | Shallow (2-6) | Medium (8-25) | Deep (15-40) |
-| Bomb placement | Conservative, random mistakes | Calculated | Aggressive, optimal |
-| Power-up seeking | Short range | Medium range | Long range |
-| Enemy hunting | Rarely (15%) | Often (90%) | Almost always (95%) |
-| Escape planning | Poor | Good | Perfect with chain reactions |
-| Deliberate mistakes | ~25% wrong moves | None | None |
+| Behavior            | Easy                          | Normal        | Hard                         |
+| ------------------- | ----------------------------- | ------------- | ---------------------------- |
+| Reaction time       | Slow (add delays)             | Medium        | Instant                      |
+| Search depth        | Shallow (2-6)                 | Medium (8-25) | Deep (15-40)                 |
+| Bomb placement      | Conservative, random mistakes | Calculated    | Aggressive, optimal          |
+| Power-up seeking    | Short range                   | Medium range  | Long range                   |
+| Enemy hunting       | Rarely (15%)                  | Often (90%)   | Almost always (95%)          |
+| Escape planning     | Poor                          | Good          | Perfect with chain reactions |
+| Deliberate mistakes | ~25% wrong moves              | None          | None                         |
 
 The `mapSize` parameter lets you scale search depths for larger maps. The built-in AI scales proportionally to the ratio of map area vs the 15x13 reference:
 
@@ -478,14 +480,14 @@ const scale = Math.max(1, Math.sqrt((mapSize.width * mapSize.height) / reference
 
 Your AI should adapt its strategy to the current game mode. You can detect the mode by observing the game state:
 
-| Mode | Detection | Strategy Notes |
-|------|-----------|----------------|
-| **Free for All** | No zone, no hillZone, no respawns | Last one standing. Balance offense/defense |
-| **Teams** | Players have non-null `team` values | Coordinate with teammates, don't kill allies |
-| **Battle Royale** | `state.zone` is not null | Stay inside the shrinking zone. Zone damage kills |
-| **Sudden Death** | All players start maxed (8 bombs, 8 range, max speed, kick) | One hit kills. Be extremely careful |
-| **Deathmatch** | Players respawn after death | Maximize kills, don't worry about dying. First to 10 wins |
-| **King of the Hill** | `state.hillZone` is not null | Control the 3x3 center zone for points. First to 100 wins |
+| Mode                 | Detection                                                   | Strategy Notes                                            |
+| -------------------- | ----------------------------------------------------------- | --------------------------------------------------------- |
+| **Free for All**     | No zone, no hillZone, no respawns                           | Last one standing. Balance offense/defense                |
+| **Teams**            | Players have non-null `team` values                         | Coordinate with teammates, don't kill allies              |
+| **Battle Royale**    | `state.zone` is not null                                    | Stay inside the shrinking zone. Zone damage kills         |
+| **Sudden Death**     | All players start maxed (8 bombs, 8 range, max speed, kick) | One hit kills. Be extremely careful                       |
+| **Deathmatch**       | Players respawn after death                                 | Maximize kills, don't worry about dying. First to 10 wins |
+| **King of the Hill** | `state.hillZone` is not null                                | Control the 3x3 center zone for points. First to 100 wins |
 
 **Detecting teams:** Check `player.team !== null`. Teammates have the same `team` value. Avoid killing teammates (when friendly fire is off, your bombs won't damage them anyway, but you still waste bombs).
 
@@ -518,14 +520,15 @@ generateInput(player, state, logger) {
 
 **Available logging methods:**
 
-| Method | Parameters | When to Use |
-|--------|-----------|-------------|
-| `logBotDecision(botId, decision, details)` | `number, string, string` | Log any AI decision |
+| Method                                                    | Parameters                                 | When to Use             |
+| --------------------------------------------------------- | ------------------------------------------ | ----------------------- |
+| `logBotDecision(botId, decision, details)`                | `number, string, string`                   | Log any AI decision     |
 | `logBotPathfinding(botId, algorithm, pathLength, target)` | `number, string, number, Position \| null` | Log pathfinding results |
-| `logMovement(playerId, playerName, from, to, direction)` | Movement events (auto-logged by engine) |
-| `logBomb(event, ownerId, ownerName, pos, fireRange?)` | Bomb events (auto-logged by engine) |
+| `logMovement(playerId, playerName, from, to, direction)`  | Movement events (auto-logged by engine)    |
+| `logBomb(event, ownerId, ownerName, pos, fireRange?)`     | Bomb events (auto-logged by engine)        |
 
 Log verbosity is configured per game/simulation:
+
 - **Normal** — Only tick snapshots every 5 ticks
 - **Detailed** — Tick snapshots every 2 ticks + movements + pickups
 - **Full** — Every tick + explosion detail + bot pathfinding + your logBotDecision calls
@@ -537,9 +540,11 @@ Log verbosity is configured per game/simulation:
 When you upload a `.ts` file via the admin panel, the server runs this pipeline:
 
 ### 1. File Size Check
+
 Maximum **500KB** source file.
 
 ### 2. Dangerous Import Scan
+
 The following Node.js modules are **forbidden** (both `require()` and `import` syntax):
 
 `fs`, `child_process`, `net`, `http`, `https`, `dgram`, `cluster`, `worker_threads`, `vm`, `os`, `dns`, `tls`, `readline`
@@ -547,10 +552,13 @@ The following Node.js modules are **forbidden** (both `require()` and `import` s
 This is defense-in-depth — only admins can upload, but these modules have no legitimate use in a bot AI.
 
 ### 3. TypeScript Compilation
+
 The server uses esbuild to transpile your TypeScript to JavaScript. Any syntax errors or type errors that esbuild catches will be reported back.
 
 ### 4. Structure Validation
+
 The compiled code is loaded and checked:
+
 - Must export a class (default export or named export)
 - The class prototype must have a `generateInput` method
 - The class must be instantiable with `new YourClass('normal')` without throwing
@@ -560,9 +568,11 @@ If any step fails, you get the error details in the upload modal.
 ### What You Can Import
 
 You **can** import from:
+
 - `@blast-arena/shared` — Types, constants, utility functions
 
 You **cannot** import from:
+
 - Node.js built-in modules (blocked list above)
 - External npm packages (not available at runtime)
 - Other project files (your AI runs in isolation)
@@ -574,21 +584,26 @@ In practice, most AI logic is self-contained. Use the types from `@blast-arena/s
 ## Runtime Behavior
 
 ### Execution
+
 - `generateInput()` is called **once per tick** (20 times per second) for each bot using your AI
 - Each bot gets its own class instance — state is not shared between bots
 - The function should return quickly. Long-running computations block the game tick for all players.
 
 ### Error Handling
+
 If your `generateInput()` throws an exception:
+
 1. The error is logged to the game logger
 2. That specific bot is **immediately replaced** with the built-in AI (normal difficulty)
 3. The game continues without interruption
 4. The replacement is permanent for that game — your AI won't be retried
 
 ### Memory
+
 Your class instance persists for the entire game. You can store state across ticks (position history, cooldown timers, pathfinding caches, etc.) as instance fields.
 
 ### No Side Effects
+
 Your AI has no access to the filesystem, network, or other system resources. It can only read game state and return input decisions.
 
 ---
@@ -598,13 +613,7 @@ Your AI has no access to the filesystem, network, or other system resources. It 
 Here's a functional bot AI with danger avoidance, enemy hunting, power-up collection, and bomb placement:
 
 ```typescript
-import {
-  PlayerInput,
-  Direction,
-  Position,
-  TileType,
-  getExplosionCells,
-} from '@blast-arena/shared';
+import { PlayerInput, Direction, Position, TileType, getExplosionCells } from '@blast-arena/shared';
 import { Player } from './Player';
 import { GameStateManager } from './GameState';
 import { GameLogger } from '../utils/gameLogger';
@@ -671,9 +680,9 @@ export class ExampleBot {
     }
 
     // Step 4: Hunt enemies
-    const enemies = state.getAlivePlayers().filter(
-      (p) => p.id !== player.id && (player.team === null || p.team !== player.team),
-    );
+    const enemies = state
+      .getAlivePlayers()
+      .filter((p) => p.id !== player.id && (player.team === null || p.team !== player.team));
 
     if (enemies.length > 0) {
       // Find nearest enemy
@@ -689,8 +698,12 @@ export class ExampleBot {
       if (dist <= player.fireRange + 1 && this.bombCooldown <= 0 && player.canPlaceBomb()) {
         // Check if enemy is in blast range
         const blastCells = getExplosionCells(
-          x, y, player.fireRange,
-          state.map.width, state.map.height, state.map.tiles,
+          x,
+          y,
+          player.fireRange,
+          state.map.width,
+          state.map.height,
+          state.map.tiles,
           player.hasPierceBomb,
         );
         const enemyInBlast = blastCells.some(
@@ -707,7 +720,11 @@ export class ExampleBot {
       // Move toward enemy using BFS
       direction = this.bfsToward(player, state, nearest.position, dangerCells);
       if (direction) {
-        logger?.logBotDecision(player.id, 'hunt', `Hunting toward (${nearest.position.x},${nearest.position.y})`);
+        logger?.logBotDecision(
+          player.id,
+          'hunt',
+          `Hunting toward (${nearest.position.x},${nearest.position.y})`,
+        );
       }
     }
 
@@ -725,8 +742,12 @@ export class ExampleBot {
         // Detonate if any enemy is in blast range of our remote bombs
         for (const bomb of ownRemoteBombs) {
           const blast = getExplosionCells(
-            bomb.position.x, bomb.position.y, bomb.fireRange,
-            state.map.width, state.map.height, state.map.tiles,
+            bomb.position.x,
+            bomb.position.y,
+            bomb.fireRange,
+            state.map.width,
+            state.map.height,
+            state.map.tiles,
             bomb.isPierce,
           );
           const enemyHit = enemies.some((e) =>
@@ -744,10 +765,7 @@ export class ExampleBot {
   }
 
   /** Collect all cells that are in bomb blast zones */
-  private getDangerCells(
-    state: GameStateManager,
-    fireRange: number,
-  ): Set<string> {
+  private getDangerCells(state: GameStateManager, fireRange: number): Set<string> {
     const danger = new Set<string>();
 
     // Active explosions
@@ -760,8 +778,12 @@ export class ExampleBot {
     // Bomb blast zones
     for (const bomb of state.bombs.values()) {
       const cells = getExplosionCells(
-        bomb.position.x, bomb.position.y, bomb.fireRange,
-        state.map.width, state.map.height, state.map.tiles,
+        bomb.position.x,
+        bomb.position.y,
+        bomb.fireRange,
+        state.map.width,
+        state.map.height,
+        state.map.tiles,
         bomb.isPierce,
       );
       for (const cell of cells) {
@@ -848,11 +870,7 @@ export class ExampleBot {
         const nx = cx + DIR_DELTA[dir].dx;
         const ny = cy + DIR_DELTA[dir].dy;
         const key = `${nx},${ny}`;
-        if (
-          state.collisionSystem.isWalkable(nx, ny) &&
-          !visited.has(key) &&
-          !danger.has(key)
-        ) {
+        if (state.collisionSystem.isWalkable(nx, ny) && !visited.has(key) && !danger.has(key)) {
           if (nx === target.x && ny === target.y) return firstDir;
           visited.add(key);
           queue.push({ x: nx, y: ny, firstDir });
@@ -897,8 +915,12 @@ export class ExampleBot {
 
     // Simulate our own bomb's blast zone
     const newBlast = getExplosionCells(
-      x, y, player.fireRange,
-      state.map.width, state.map.height, state.map.tiles,
+      x,
+      y,
+      player.fireRange,
+      state.map.width,
+      state.map.height,
+      state.map.tiles,
       player.hasPierceBomb,
     );
     const combinedDanger = new Set(existingDanger);
@@ -957,6 +979,7 @@ export class ExampleBot {
 ```
 
 This example AI:
+
 - Flees from danger (active explosions and bomb blast zones)
 - Seeks nearby power-ups using BFS pathfinding
 - Hunts the nearest enemy using BFS
@@ -973,29 +996,34 @@ It's simpler than the built-in AI (which has 2000+ lines of logic), but demonstr
 ## Tips and Best Practices
 
 ### Performance
+
 - `generateInput()` runs on the game thread. Keep it under 1ms per call.
 - Avoid allocating large arrays every tick. Cache and reuse data structures.
 - BFS with a depth limit is better than unlimited graph search.
 - Pre-compute danger zones once per tick, not per-decision.
 
 ### Common Patterns
+
 - **Danger avoidance** comes first. Always check if you're in a blast zone before anything else.
 - **Bomb placement safety**: Always verify you can escape before placing a bomb. Use `getExplosionCells()` to simulate your own bomb's blast, then check for safe adjacent tiles.
 - **Movement cooldown**: `player.canMove()` tells you if input will actually move the bot. You can still return a direction when on cooldown — the engine will buffer it.
 - **Sequence numbers**: Increment `seq` every call. The engine uses it for input ordering.
 
 ### Difficulty Scaling
+
 - **Easy bots should lose**. Add deliberate mistakes: random wrong directions, unnecessary bombs, delayed reactions.
 - **Normal bots should be competitive** but beatable. Good pathfinding, decent danger avoidance, some aggression.
 - **Hard bots should be challenging**. Deep search, chain reaction awareness, optimal bomb placement, no wasted moves.
 
 ### Debugging
+
 - Download the built-in AI from the admin panel as reference — it covers every edge case.
 - Use `logger?.logBotDecision()` liberally during development. Set simulation log verbosity to "Full" to see all logs.
 - Run simulations in real-time mode to visually observe your bot's behavior.
 - If your AI crashes, check the game logs for the error message. The fallback to builtin means the game won't break, but you'll want to fix the bug.
 
 ### Things to Watch Out For
+
 - **Tiles are `tiles[y][x]`**, not `tiles[x][y]`. Row-major order.
 - **Bomb positions can change** if a bomb is being kicked (`bomb.sliding !== null`).
 - **Dead players are still in `state.players`** — filter by `player.alive` when looking for enemies.

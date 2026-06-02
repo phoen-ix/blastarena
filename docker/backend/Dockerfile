@@ -1,4 +1,5 @@
-FROM node:20-alpine AS builder
+# Node 22 (LTS) is required by isolated-vm (>=22); its musl prebuild loads with no build toolchain.
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -17,7 +18,7 @@ COPY backend/ ./backend/
 # Build shared first, then backend
 RUN npm run build --workspace=shared && npm run build --workspace=backend
 
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 

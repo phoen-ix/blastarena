@@ -4,21 +4,28 @@ import { logger } from '../utils/logger';
 import { BotAI, IBotAI } from '../game/BotAI';
 import { query } from '../db/connection';
 import { BotAIRow } from '../db/types';
-import { loadBotAIInSandbox } from './botai-compiler';
+import { IsolatedBotAI } from './IsolatedAIRunner';
 
 type BotAIConstructor = new (
   difficulty: 'easy' | 'normal' | 'hard',
   mapSize?: { width: number; height: number },
 ) => IBotAI;
 
+/**
+ * A loaded bot AI is either the trusted built-in class (run in-process) or untrusted custom code
+ * (run in an `isolated-vm` isolate per instance, created lazily). All DB-loaded bot AIs are
+ * untrusted uploads — the built-in is registered directly as a class. (audit C1)
+ */
+type LoadedBot = { kind: 'class'; ctor: BotAIConstructor } | { kind: 'isolated'; code: string };
+
 const AI_BASE_DIR = path.join(process.cwd(), 'ai');
 
 export class BotAIRegistry {
-  private loaded: Map<string, BotAIConstructor> = new Map();
+  private loaded: Map<string, LoadedBot> = new Map();
 
   constructor() {
     // Always register built-in AI so it's available even without initialize()
-    this.loaded.set('builtin', BotAI as unknown as BotAIConstructor);
+    this.loaded.set('builtin', { kind: 'class', ctor: BotAI as unknown as BotAIConstructor });
   }
 
   async initialize(): Promise<void> {
@@ -53,12 +60,26 @@ export class BotAIRegistry {
     mapSize?: { width: number; height: number },
   ): IBotAI {
     const id = aiId || 'builtin';
-    const Constructor = this.loaded.get(id);
-    if (!Constructor) {
+    const entry = this.loaded.get(id);
+    if (!entry) {
       logger.warn({ aiId: id }, 'Requested AI not found, falling back to builtin');
       return new BotAI(difficulty, mapSize);
     }
-    return new Constructor(difficulty, mapSize);
+    if (entry.kind === 'class') {
+      return new entry.ctor(difficulty, mapSize);
+    }
+    // Untrusted custom AI — run it in an isolate. If the isolate fails to build/instantiate the
+    // class, fall back to the built-in so a broken upload can't break game creation.
+    try {
+      return new IsolatedBotAI(entry.code, difficulty, mapSize);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warn(
+        { aiId: id, error: msg },
+        'Failed to create isolated bot AI, falling back to builtin',
+      );
+      return new BotAI(difficulty, mapSize);
+    }
   }
 
   loadAI(id: string): void {
@@ -67,36 +88,11 @@ export class BotAIRegistry {
       throw new Error(`Compiled AI file not found: ${jsPath}`);
     }
 
+    // Custom bot AIs are untrusted: store the compiled code and run it in an isolate when an
+    // instance is created (createInstance). The code was already structurally validated at upload
+    // time by compileBotAI; we do NOT evaluate it in-process here. (audit C1)
     const code = fs.readFileSync(jsPath, 'utf-8');
-    const mod = loadBotAIInSandbox(code);
-
-    // Find the AI class in exports
-    let AIClass: BotAIConstructor | undefined;
-    if (typeof mod.default === 'function' && mod.default.prototype?.generateInput) {
-      AIClass = mod.default as BotAIConstructor;
-    } else if (
-      typeof mod === 'function' &&
-      (mod as unknown as { prototype: Record<string, unknown> }).prototype?.generateInput
-    ) {
-      // Handle module.exports = Class (mod itself is the constructor)
-      AIClass = mod as unknown as BotAIConstructor;
-    } else {
-      for (const val of Object.values(mod)) {
-        if (
-          typeof val === 'function' &&
-          (val as { prototype: Record<string, unknown> }).prototype?.generateInput
-        ) {
-          AIClass = val as BotAIConstructor;
-          break;
-        }
-      }
-    }
-
-    if (!AIClass) {
-      throw new Error('No class with generateInput() found in compiled module');
-    }
-
-    this.loaded.set(id, AIClass);
+    this.loaded.set(id, { kind: 'isolated', code });
   }
 
   unloadAI(id: string): void {

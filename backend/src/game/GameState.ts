@@ -51,6 +51,7 @@ import { generateMap } from './Map';
 import { InputBuffer } from './InputBuffer';
 import { IBotAI } from './BotAI';
 import { getBotAIRegistry } from '../services/botai-registry';
+import { disposeAI } from '../services/IsolatedAIRunner';
 import { GameLogger } from '../utils/gameLogger';
 import { PuzzleTileProcessor } from './PuzzleTileProcessor';
 
@@ -386,8 +387,15 @@ export class GameStateManager {
   removePlayer(id: number): void {
     this.inputBuffer.clear(id);
     this.players.delete(id);
+    disposeAI(this.botAIs.get(id)); // free the isolate if this was an isolated custom AI
     this.botAIs.delete(id);
     this._alivePlayersCache = null;
+  }
+
+  /** Dispose all bot-AI isolates. Call on game teardown to avoid leaking isolates. (audit C1) */
+  disposeAIs(): void {
+    for (const ai of this.botAIs.values()) disposeAI(ai);
+    this.botAIs.clear();
   }
 
   /** Add a player to a live open world game at a safe spawn position */
@@ -495,11 +503,12 @@ export class GameStateManager {
                 this._lastBotInputs.delete(botId);
               }
             } catch (err: unknown) {
-              // Custom AI crashed — replace with built-in fallback
+              // Custom AI crashed/timed out — dispose its isolate and replace with built-in fallback
               const msg = err instanceof Error ? err.message : String(err);
               if (this.gameLogger) {
                 this.gameLogger.logBotDecision(botId, 'ai_crash', `Custom AI error: ${msg}`);
               }
+              disposeAI(ai);
               this.botAIs.set(
                 botId,
                 getBotAIRegistry().createInstance('builtin', this.botDifficulty, {

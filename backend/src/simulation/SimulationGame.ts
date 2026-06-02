@@ -1,4 +1,10 @@
-import { GAME_MODES, TICK_RATE, MAX_SPEED, SimulationConfig, SimulationGameResult } from '@blast-arena/shared';
+import {
+  GAME_MODES,
+  TICK_RATE,
+  MAX_SPEED,
+  SimulationConfig,
+  SimulationGameResult,
+} from '@blast-arena/shared';
 import { GameStateManager } from '../game/GameState';
 import { GameLogger } from '../utils/gameLogger';
 import { ReplayRecorder } from '../utils/replayRecorder';
@@ -121,7 +127,11 @@ export class SimulationGame {
 
     // Set up replay recorder (conditional on config)
     if (config.recordReplays !== false) {
-      this.replayRecorder = new ReplayRecorder(`sim_${simNum}`, config.gameMode, this.gameState.toState());
+      this.replayRecorder = new ReplayRecorder(
+        `sim_${simNum}`,
+        config.gameMode,
+        this.gameState.toState(),
+      );
       this.replayRecorder.setMatchId(gameIndex);
       this.gameLogger.replayRecorder = this.replayRecorder;
     }
@@ -227,6 +237,11 @@ export class SimulationGame {
 
   cancel(): void {
     this.cancelled = true;
+  }
+
+  /** Release any isolated custom bot-AI isolates. Call after the game completes (audit C1). */
+  dispose(): void {
+    this.gameState.disposeAIs();
   }
 
   private finalize(): SimulationGameResult {
