@@ -62,8 +62,10 @@ router.post(
       const emailError = validateEmail(email);
       if (emailError) return res.status(400).json({ error: emailError });
 
+      // Uniform 200 response whether or not the email was already registered (no session issued —
+      // the account must verify its email before logging in). (audit EMAIL-005)
       const result = await authService.register(username, email, password, req.locale || 'en');
-      res.status(201).json(result);
+      res.status(200).json(result);
     } catch (err) {
       next(err);
     }

@@ -169,9 +169,9 @@ describe('POST /auth/register', () => {
     handler = getHandler('post', '/auth/register');
   });
 
-  it('returns 201 with registration result on success', async () => {
+  it('returns 200 with a uniform registration result on success (no session)', async () => {
     mockIsRegistrationEnabled.mockResolvedValue(true);
-    const result = { message: 'Registration successful' };
+    const result = { emailVerificationRequired: true };
     mockRegister.mockResolvedValue(result);
 
     const req = mockReq({
@@ -180,8 +180,10 @@ describe('POST /auth/register', () => {
     const res = mockRes();
     await handler(req, res, jest.fn());
 
-    expect(res._status).toBe(201);
+    // Uniform 200 + no cookie set, so email existence can't be inferred from the response. (audit EMAIL-005)
+    expect(res._status).toBe(200);
     expect(res._json).toEqual(result);
+    expect(res._cookie).toBeNull();
   });
 
   it('returns 403 when registration is disabled', async () => {

@@ -1,6 +1,7 @@
 import { ApiClient } from './ApiClient';
 import {
   AuthResponse,
+  RegisterResponse,
   PublicUser,
   TotpChallengeResponse,
   isTotpChallengeResponse,
@@ -83,7 +84,9 @@ export class AuthManager {
   }
 
   async register(username: string, email: string, password: string): Promise<void> {
-    const response = await ApiClient.post<AuthResponse>(
+    // No auto-login: registration issues no session. The account must verify its email and then
+    // log in. (audit EMAIL-005)
+    await ApiClient.post<RegisterResponse>(
       '/auth/register',
       {
         username,
@@ -92,7 +95,6 @@ export class AuthManager {
       },
       true,
     );
-    this.setAuth(response);
   }
 
   get hasPendingTotp(): boolean {

@@ -42,6 +42,15 @@ export interface AuthResponse {
   accessToken: string;
 }
 
+/**
+ * Registration response. No session is issued at registration — the account must verify its email
+ * before signing in. The shape is identical whether or not the email was already registered, so it
+ * cannot be used to enumerate registered emails. (audit EMAIL-005)
+ */
+export interface RegisterResponse {
+  emailVerificationRequired: true;
+}
+
 export interface RefreshToken {
   id: number;
   userId: number;

@@ -442,9 +442,11 @@ export class AuthUI {
 
     try {
       await this.authManager.register(username, email, password);
+      // No auto-login: the account must verify its email first. Surface the "check your email"
+      // message and return to the login view to sign in afterwards. (audit EMAIL-005)
       this.notifications.success(t('auth:register.success'));
-      this.hide();
-      this.onAuthenticated();
+      this.mode = 'login';
+      this.render();
     } catch (err: unknown) {
       errorEl.textContent = this.translateError(err);
     } finally {

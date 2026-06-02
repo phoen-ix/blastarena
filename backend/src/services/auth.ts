@@ -19,6 +19,7 @@ import {
   AuthPayload,
   PublicUser,
   AuthResponse,
+  RegisterResponse,
   UserRole,
   TotpChallengeResponse,
 } from '@blast-arena/shared';
@@ -120,7 +121,7 @@ export async function register(
   email: string,
   password: string,
   language = 'en',
-): Promise<AuthResponse> {
+): Promise<RegisterResponse> {
   const config = getConfig();
   const normalizedEmail = email.toLowerCase();
   const emailHash = hashEmail(normalizedEmail, config.EMAIL_PEPPER);
@@ -134,18 +135,22 @@ export async function register(
     throw new AppError('Username already taken', 409, 'CONFLICT');
   }
 
-  // Check email — never reveal existence
+  // Check email — never reveal existence. If the email is already registered we warn the existing
+  // owner and return the SAME response as a successful registration, so the response cannot be used
+  // to tell whether an email is registered. The hashPassword call keeps the timing comparable to
+  // the real-registration path below. (audit EMAIL-005)
   const emailExists = await query<IdWithLanguageRow[]>(
     'SELECT id, language FROM users WHERE email_hash = ?',
     [emailHash],
   );
   if (emailExists.length > 0) {
+    await hashPassword(password);
     sendEmailTakenRegistrationWarning(normalizedEmail, emailExists[0].language || 'en').catch(
       (err) => {
         logger.error({ err }, 'Failed to send email-taken registration warning');
       },
     );
-    throw new AppError('Registration could not be completed', 400, 'REGISTRATION_FAILED');
+    return { emailVerificationRequired: true };
   }
 
   const passwordHash = await hashPassword(password);
@@ -170,17 +175,8 @@ export async function register(
     logger.error({ err }, 'Failed to send verification email');
   });
 
-  const user: PublicUser = {
-    id: result.insertId,
-    username,
-    role: 'user',
-    language,
-    emailVerified: false,
-    twoFactorEnabled: false,
-  };
-  const accessToken = generateAccessToken({ userId: user.id, username, role: 'user' });
-
-  return { user, accessToken };
+  // No session is issued at registration — the account must verify its email before logging in.
+  return { emailVerificationRequired: true };
 }
 
 export async function verifyCredentials(username: string, password: string): Promise<PublicUser> {

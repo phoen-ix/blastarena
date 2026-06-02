@@ -69,23 +69,18 @@ describe('Auth Service', () => {
   });
 
   describe('register', () => {
-    it('should return user object and accessToken on success', async () => {
+    it('returns a uniform emailVerificationRequired response with no session on success', async () => {
       mockQuery.mockResolvedValueOnce([]); // username check
       mockQuery.mockResolvedValueOnce([]); // email check
       mockExecute.mockResolvedValue({ insertId: 42, affectedRows: 1 });
 
       const result = await authService.register('newuser', 'new@test.com', 'password123');
 
-      expect(result.user).toEqual({
-        id: 42,
-        username: 'newuser',
-        role: 'user',
-        language: 'en',
-        emailVerified: false,
-        twoFactorEnabled: false,
-      });
-      expect(result.accessToken).toBeDefined();
-      expect(typeof result.accessToken).toBe('string');
+      // No auto-login: registration issues no session token. (audit EMAIL-005)
+      expect(result).toEqual({ emailVerificationRequired: true });
+      const asRecord = result as unknown as Record<string, unknown>;
+      expect(asRecord.accessToken).toBeUndefined();
+      expect(asRecord.user).toBeUndefined();
     });
 
     it('should throw 409 on duplicate username', async () => {
@@ -100,21 +95,17 @@ describe('Auth Service', () => {
       }
     });
 
-    it('should throw generic 400 on duplicate email without revealing existence', async () => {
+    it('returns the same response as success on duplicate email (no enumeration) and warns the owner', async () => {
       mockQuery.mockResolvedValueOnce([]); // username free
       mockQuery.mockResolvedValueOnce([{ id: 1, language: 'de' }]); // email taken
 
-      try {
-        await authService.register('newuser', 'taken@test.com', 'pass');
-        expect(true).toBe(false);
-      } catch (err) {
-        expect(err).toBeInstanceOf(AppError);
-        expect((err as InstanceType<typeof AppError>).statusCode).toBe(400);
-        expect((err as InstanceType<typeof AppError>).message).toBe(
-          'Registration could not be completed',
-        );
-      }
+      const result = await authService.register('newuser', 'taken@test.com', 'pass');
+
+      // Indistinguishable from a successful registration. (audit EMAIL-005)
+      expect(result).toEqual({ emailVerificationRequired: true });
       expect(mockSendEmailTakenRegistrationWarning).toHaveBeenCalledWith('taken@test.com', 'de');
+      // No account is created for an already-registered email.
+      expect(mockExecute).not.toHaveBeenCalled();
     });
 
     it('should call hashPassword with the provided password', async () => {
@@ -134,7 +125,7 @@ describe('Auth Service', () => {
 
       const result = await authService.register('user2', 'user2@test.com', 'pass');
 
-      expect(result.user).toBeDefined();
+      expect(result.emailVerificationRequired).toBe(true);
       expect(mockSendVerificationEmail).toHaveBeenCalled();
     });
   });
