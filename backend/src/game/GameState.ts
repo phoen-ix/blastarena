@@ -873,9 +873,10 @@ export class GameStateManager {
         // Spawn 3-5 random power-ups
         const count = 3 + Math.floor(this.rng.next() * 3);
         for (let i = 0; i < count && emptyTiles.length > 0; i++) {
+          const type = this.getRandomEnabledPowerUp();
+          if (!type) break; // no enabled power-ups — nothing to rain
           const idx = Math.floor(this.rng.next() * emptyTiles.length);
           const pos = emptyTiles.splice(idx, 1)[0];
-          const type = this.getRandomEnabledPowerUp();
           const powerUp = new PowerUp(pos, type);
           this.powerUps.set(powerUp.id, powerUp);
         }
@@ -1088,9 +1089,13 @@ export class GameStateManager {
       for (const player of this.players.values()) {
         if (!player.alive) continue;
         if (player.isBuddy) continue; // Buddy is immune to zone damage
+        if (player.invulnerableTicks > 0) continue; // respect the post-shield/respawn window
         if (!this.zone.isInsideZone(player.position.x, player.position.y)) {
           if (player.hasShield) {
             player.hasShield = false;
+            // Grant the same invulnerability window as every other damage source after a shield
+            // break, so zone damage cannot immediately re-hit on the next tick. (audit ZONE-SHIELD-1)
+            player.invulnerableTicks = 10;
           } else {
             player.die();
             this.invalidateAliveCache();
@@ -1291,7 +1296,8 @@ export class GameStateManager {
     this.spikePhase = (this.spikePhase + 1) % SPIKE_CYCLE_TICKS;
 
     // Transition from safe to lethal
-    if (prevPhase < SPIKE_SAFE_TICKS && this.spikePhase >= SPIKE_SAFE_TICKS) {
+    const justActivated = prevPhase < SPIKE_SAFE_TICKS && this.spikePhase >= SPIKE_SAFE_TICKS;
+    if (justActivated) {
       for (const pos of this.spikePositions) {
         this.setTileTracked(pos.x, pos.y, 'spikes_active');
       }
@@ -1304,8 +1310,9 @@ export class GameStateManager {
       }
     }
 
-    // Kill players on active spikes
-    if (this.spikePhase >= SPIKE_SAFE_TICKS) {
+    // Kill players on active spikes. Skip the activation tick itself so players who were already
+    // standing on the tile get one tick of grace (the tile shows 'spikes_active') to move. (audit SPIKE-SHIELD-1)
+    if (this.spikePhase >= SPIKE_SAFE_TICKS && !justActivated) {
       for (const player of this.players.values()) {
         if (!player.alive || player.invulnerableTicks > 0 || player.frozen) continue;
         const tile = this.collisionSystem.getTileAt(player.position.x, player.position.y);
@@ -1578,7 +1585,8 @@ export class GameStateManager {
 
   private applySpectatorPowerup(position: Position): void {
     // Drop a random enabled power-up
-    const type = this.enabledPowerUps[Math.floor(this.rng.next() * this.enabledPowerUps.length)];
+    const type = this.getRandomEnabledPowerUp();
+    if (!type) return; // no enabled power-ups — nothing to drop (audit POWERUP-EMPTY-ARRAY-1)
     const powerUp = new PowerUp(position, type);
     this.powerUps.set(powerUp.id, powerUp);
     this.mapEvents.push({
@@ -2089,8 +2097,10 @@ export class GameStateManager {
           this.rng.next() < this.powerUpDropRate
         ) {
           const type = this.getRandomEnabledPowerUp();
-          const powerUp = new PowerUp(cell, type);
-          this.powerUps.set(powerUp.id, powerUp);
+          if (type) {
+            const powerUp = new PowerUp(cell, type);
+            this.powerUps.set(powerUp.id, powerUp);
+          }
         }
       }
     }
@@ -2118,7 +2128,9 @@ export class GameStateManager {
     }
   }
 
-  private getRandomEnabledPowerUp(): PowerUpType {
+  /** Pick a random enabled power-up, or null when none are enabled. (audit POWERUP-EMPTY-ARRAY-1) */
+  private getRandomEnabledPowerUp(): PowerUpType | null {
+    if (this.enabledPowerUps.length === 0) return null;
     return this.enabledPowerUps[Math.floor(this.rng.next() * this.enabledPowerUps.length)];
   }
 

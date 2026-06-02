@@ -473,13 +473,32 @@ export async function startRoom(code: string): Promise<Room | null> {
   return JSON.parse(result);
 }
 
-export async function updateRoomStatus(code: string, status: Room['status']): Promise<void> {
-  const redis = getRedis();
-  const room = await getRoom(code);
-  if (!room) return;
+// Atomically set a room's status, preserving all other fields. The previous JS read-modify-write
+// could lose concurrent mutations and let a status revert race a concurrent room:start. An optional
+// expectedStatus performs a compare-and-swap so a revert only applies if the status is unchanged.
+// KEYS[1]=room key, ARGV[1]=new status, ARGV[2]=expected status ('' = no check). (audit REDIS-RACE-2)
+const SET_ROOM_STATUS_LUA = `
+local data = redis.call('GET', KEYS[1])
+if not data then
+  return 'ERR:NOT_FOUND'
+end
+local room = cjson.decode(data)
+if ARGV[2] ~= '' and room.status ~= ARGV[2] then
+  return 'ERR:STATUS_MISMATCH'
+end
+room.status = ARGV[1]
+local updated = cjson.encode(room)
+redis.call('SET', KEYS[1], updated, 'EX', ${ROOM_TTL_SECONDS})
+return updated
+`;
 
-  room.status = status;
-  await redis.set(`room:${code}`, JSON.stringify(room), 'EX', ROOM_TTL_SECONDS);
+export async function updateRoomStatus(
+  code: string,
+  status: Room['status'],
+  expectedStatus?: Room['status'],
+): Promise<void> {
+  const redis = getRedis();
+  await redis.eval(SET_ROOM_STATUS_LUA, 1, `room:${code}`, status, expectedStatus ?? '');
 }
 
 export async function getPlayerRoom(userId: number): Promise<string | null> {

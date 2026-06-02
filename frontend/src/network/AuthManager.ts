@@ -14,6 +14,7 @@ export class AuthManager {
   private currentUser: PublicUser | null = null;
   private listeners: AuthChangeCallback[] = [];
   private _isGuest: boolean = false;
+  private _loggingOut: boolean = false;
   private pendingTotpToken: string | null = null;
 
   constructor() {
@@ -141,13 +142,16 @@ export class AuthManager {
   }
 
   async logout(): Promise<void> {
+    if (this._loggingOut) return;
+    this._loggingOut = true;
     try {
-      await ApiClient.post('/auth/logout');
+      await ApiClient.post('/auth/logout', undefined, true);
     } catch {
       // Ignore errors during logout
     }
     this.accessToken = null;
     this.currentUser = null;
+    this._loggingOut = false;
     this.notify();
   }
 

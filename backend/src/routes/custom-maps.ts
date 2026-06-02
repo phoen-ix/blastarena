@@ -72,7 +72,7 @@ router.post(
       const spawnPoints = data.spawnPoints as Position[];
 
       // Server-side validation
-      const errors = validateCustomMap(tiles, data.mapWidth, data.mapHeight);
+      const errors = validateCustomMap(tiles, data.mapWidth, data.mapHeight, spawnPoints);
       if (errors.length > 0) {
         throw new AppError(errors[0], 400);
       }
@@ -112,7 +112,7 @@ router.put(
       const tiles = data.tiles as TileType[][];
       const spawnPoints = data.spawnPoints as Position[];
 
-      const errors = validateCustomMap(tiles, data.mapWidth, data.mapHeight);
+      const errors = validateCustomMap(tiles, data.mapWidth, data.mapHeight, spawnPoints);
       if (errors.length > 0) {
         throw new AppError(errors[0], 400);
       }

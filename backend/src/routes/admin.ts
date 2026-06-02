@@ -18,6 +18,7 @@ import { invalidateTransporter, sendTestEmail } from '../services/email';
 import { getSimulationManager, getIO } from '../game/registry';
 import { openWorldManager } from '../game/OpenWorldManager';
 import { execute } from '../db/connection';
+import { logger } from '../utils/logger';
 import {
   SimulationConfig,
   GameDefaults,
@@ -29,6 +30,7 @@ import {
   CosmeticExportData,
   AchievementImportConflict,
   THEME_IDS,
+  OPENWORLD_MAX_PLAYERS_CAP,
 } from '@blast-arena/shared';
 import { getErrorMessage } from '@blast-arena/shared';
 import multer from 'multer';
@@ -517,11 +519,39 @@ router.get(
   },
 );
 
+// Validate open-world settings: numeric fields must be in-range numbers, not arbitrary strings.
+// Without this, values like mapWidth:"abc" or respawnDelay:-50 were cast via String() and stored,
+// later parsing to NaN/negative and corrupting map generation and the game loop. (audit AUTHZ-2)
+const openWorldSettingsSchema = z
+  .object({
+    enabled: z.boolean(),
+    guestAccess: z.boolean(),
+    maxPlayers: z.number().int().min(2).max(OPENWORLD_MAX_PLAYERS_CAP),
+    roundTime: z.number().int().min(30).max(3600),
+    mapWidth: z
+      .number()
+      .int()
+      .min(9)
+      .max(101)
+      .refine((n) => n % 2 === 1, 'mapWidth must be an odd number'),
+    mapHeight: z
+      .number()
+      .int()
+      .min(9)
+      .max(101)
+      .refine((n) => n % 2 === 1, 'mapHeight must be an odd number'),
+    wallDensity: z.number().min(0).max(0.9),
+    respawnDelay: z.number().int().min(0).max(60),
+    afkTimeoutSeconds: z.number().int().min(0).max(3600),
+  })
+  .partial();
+
 // Admin: update open world settings
 router.put(
   '/admin/settings/open_world',
   authMiddleware,
   adminOnlyMiddleware,
+  validate(openWorldSettingsSchema),
   async (req, res, next) => {
     try {
       const updates = req.body as Record<string, string | number | boolean>;
@@ -910,7 +940,10 @@ router.post(
       await sendTestEmail(req.body.to, req.locale || 'en');
       res.json({ message: 'Test email sent successfully' });
     } catch (err) {
-      res.status(400).json({ error: `Failed to send test email: ${getErrorMessage(err)}` });
+      // Log the detailed SMTP error server-side; return a generic message so SMTP/server details
+      // are not echoed back to the client. (audit ERR-002)
+      logger.error({ err: getErrorMessage(err) }, 'Test email send failed');
+      res.status(400).json({ error: 'Failed to send test email' });
     }
   },
 );
@@ -1192,6 +1225,9 @@ router.get('/admin/actions', adminOnlyMiddleware, async (req, res, next) => {
 router.post(
   '/admin/announcements/toast',
   rateLimiter({ windowMs: 60000, maxRequests: 10 }),
+  // Broadcasting to all users is an admin-only action, matching the banner endpoint below.
+  // Previously only the global staffMiddleware gated it, letting moderators broadcast. (audit AUTHZ-1)
+  adminOnlyMiddleware,
   validate(toastSchema),
   async (req, res, next) => {
     try {
@@ -1352,14 +1388,18 @@ const simulationConfigSchema = z.object({
   botAiId: z.string().max(36).optional(),
 });
 
-router.get('/admin/simulations', adminOnlyMiddleware, (req, res) => {
+// Rate-limit the simulation read endpoints: each performs an unbounded recursive filesystem scan
+// (+ gzip decompress for replays), so repeated calls are a disk/CPU DoS even for admins. (audit DOS-1/2/3)
+const simReadLimiter = rateLimiter({ windowMs: 10_000, maxRequests: 15 });
+
+router.get('/admin/simulations', adminOnlyMiddleware, simReadLimiter, (req, res) => {
   const mgr = getSimulationManager();
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
   res.json(mgr.getHistory(page, limit));
 });
 
-router.get('/admin/simulations/:batchId', adminOnlyMiddleware, (req, res) => {
+router.get('/admin/simulations/:batchId', adminOnlyMiddleware, simReadLimiter, (req, res) => {
   const mgr = getSimulationManager();
   const data = mgr.getBatchResults(req.params.batchId);
   if (!data) {
@@ -1372,6 +1412,7 @@ router.get('/admin/simulations/:batchId', adminOnlyMiddleware, (req, res) => {
 router.get(
   '/admin/simulations/:batchId/replay/:gameIndex',
   adminOnlyMiddleware,
+  simReadLimiter,
   async (req, res, next) => {
     try {
       const mgr = getSimulationManager();
@@ -1804,22 +1845,40 @@ router.get('/admin/settings/rank_tiers', adminOnlyMiddleware, async (_req, res, 
   }
 });
 
-router.put('/admin/settings/rank_tiers', adminOnlyMiddleware, async (req, res, next) => {
-  try {
-    const config = req.body as RankConfig;
-    if (!config.tiers || !Array.isArray(config.tiers)) {
-      return res.status(400).json({ error: 'Invalid rank config: tiers must be an array' });
-    }
-    await settingsService.setRankConfig(config);
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [req.user!.userId, 'settings_update', 'setting', 0, 'Updated rank tiers'],
-    );
-    res.json(config);
-  } catch (err) {
-    next(err);
-  }
+// Field-level validation so stored rank tiers can't contain invalid types (null names, string
+// elo bounds, etc.) that later break leaderboard rendering. (audit AUTHZ-3)
+const rankTiersSchema = z.object({
+  tiers: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(50),
+        minElo: z.number().int(),
+        maxElo: z.number().int(),
+        color: z.string().min(1).max(32),
+      }),
+    )
+    .min(1),
+  subTiersEnabled: z.boolean(),
 });
+
+router.put(
+  '/admin/settings/rank_tiers',
+  adminOnlyMiddleware,
+  validate(rankTiersSchema),
+  async (req, res, next) => {
+    try {
+      const config = req.body as RankConfig;
+      await settingsService.setRankConfig(config);
+      await execute(
+        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user!.userId, 'settings_update', 'setting', 0, 'Updated rank tiers'],
+      );
+      res.json(config);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // ===== Achievements (admin CRUD) =====
 

@@ -1227,7 +1227,7 @@ export class CampaignGame {
 
     // Detect players who just moved onto ice
     for (const player of this.gameState.players.values()) {
-      if (!player.alive || player.frozen) continue;
+      if (!player.alive || player.isBuddy || player.frozen) continue; // buddy is hazard-immune (audit BUDDY-ICE-1)
       if (this.iceSliding.has(player.id)) continue; // Already sliding
       const tile = this.gameState.collisionSystem.getTileAt(player.position.x, player.position.y);
       if (tile !== 'ice') continue;
@@ -1413,7 +1413,7 @@ export class CampaignGame {
   private processDarkRiftTiles(): void {
     // Players
     for (const player of this.gameState.players.values()) {
-      if (!player.alive || player.frozen) continue;
+      if (!player.alive || player.isBuddy || player.frozen) continue; // buddy is hazard-immune (audit BUDDY-DARKRIFT-1)
       const tile = this.gameState.collisionSystem.getTileAt(player.position.x, player.position.y);
       if (tile !== 'dark_rift') continue;
 

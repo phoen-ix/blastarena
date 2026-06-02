@@ -137,6 +137,41 @@ describe('Bot AI sandbox security', () => {
     });
   });
 
+  // ── Sandbox escape: constructor walk ───────────────────────────────
+
+  describe('sandbox escape: constructor walk', () => {
+    it('source scan blocks literal .constructor access', async () => {
+      const source = `export class AI { generateInput() { return ({} as any).constructor.constructor('return process')(); } }`;
+      const result = await compileBotAI(source);
+      expect(result.success).toBe(false);
+      expect(result.errors[0]).toMatch(/constructor access/);
+    });
+
+    it('runtime sandbox blocks module.constructor.constructor escape', () => {
+      // module/exports are created INSIDE the context, so the constructor chain resolves to the
+      // context realm where code generation is disabled — host `process` must not be reachable.
+      const code = `
+        let leaked;
+        try { leaked = module.constructor.constructor('return process')(); }
+        catch (e) { leaked = 'blocked'; }
+        module.exports.val = leaked === 'blocked' ? 'blocked' : typeof leaked;
+      `;
+      const mod = loadBotAIInSandbox(code);
+      expect(mod.val).toBe('blocked');
+    });
+
+    it('runtime sandbox does not leak process.env via exports.constructor', () => {
+      const code = `
+        let env;
+        try { env = exports.constructor.constructor('return process')().env; }
+        catch (e) { env = undefined; }
+        module.exports.val = typeof env;
+      `;
+      const mod = loadBotAIInSandbox(code);
+      expect(mod.val).toBe('undefined');
+    });
+  });
+
   // ── esbuild import blocking ────────────────────────────────────────
 
   describe('esbuild: import blocking plugin', () => {

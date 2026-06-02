@@ -50,6 +50,64 @@ describe('Party Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     store.clear();
+
+    // Faithfully emulate the create/leave/kick Lua scripts against the in-memory store so the
+    // existing behavioural assertions keep exercising real semantics now that these operations
+    // are atomic (audit REDIS-RACE-1/3/4). Individual tests may still override eval per-call.
+    mockRedis.eval.mockImplementation((...callArgs: unknown[]) => {
+      const script = callArgs[0] as string;
+      const numKeys = callArgs[1] as number;
+      const keys = callArgs.slice(2, 2 + numKeys) as string[];
+      const argv = callArgs.slice(2 + numKeys) as string[];
+
+      if (script.includes('Already in a party')) {
+        // CREATE_PARTY_LUA: keys=[partyKey, playerKey], argv=[partyJson, partyId, ttl]
+        if (store.has(keys[1])) return Promise.reject(new Error('Already in a party'));
+        store.set(keys[0], argv[0]);
+        store.set(keys[1], argv[1]);
+        return Promise.resolve('OK');
+      }
+
+      if (script.includes("return 'left'")) {
+        // LEAVE_PARTY_LUA: keys=[partyKey, playerKey], argv=[userId, ttl, playerPrefix]
+        store.delete(keys[1]);
+        const data = store.get(keys[0]);
+        if (!data) return Promise.resolve('disbanded');
+        const party = JSON.parse(data);
+        const userId = Number(argv[0]);
+        const playerPrefix = argv[2];
+        const newMembers = party.members.filter((m: { userId: number }) => m.userId !== userId);
+        if (newMembers.length === 0 || party.leaderId === userId) {
+          store.delete(keys[0]);
+          for (const m of party.members) store.delete(playerPrefix + m.userId);
+          return Promise.resolve('disbanded');
+        }
+        party.members = newMembers;
+        store.set(keys[0], JSON.stringify(party));
+        return Promise.resolve('left');
+      }
+
+      if (script.includes('can kick members')) {
+        // KICK_FROM_PARTY_LUA: keys=[partyKey, targetPlayerKey], argv=[leaderId, targetId, ttl]
+        const data = store.get(keys[0]);
+        if (!data) return Promise.reject(new Error('Party not found'));
+        const party = JSON.parse(data);
+        const leaderId = Number(argv[0]);
+        const targetId = Number(argv[1]);
+        if (party.leaderId !== leaderId)
+          return Promise.reject(new Error('Only the party leader can kick members'));
+        if (targetId === leaderId) return Promise.reject(new Error('Cannot kick yourself'));
+        if (!party.members.some((m: { userId: number }) => m.userId === targetId))
+          return Promise.reject(new Error('User is not in the party'));
+        party.members = party.members.filter((m: { userId: number }) => m.userId !== targetId);
+        store.delete(keys[1]);
+        store.set(keys[0], JSON.stringify(party));
+        return Promise.resolve(JSON.stringify(party));
+      }
+
+      // JOIN_PARTY_LUA and others are stubbed per-test via mockResolvedValue.
+      return Promise.resolve(undefined);
+    });
   });
 
   describe('createParty', () => {
@@ -73,7 +131,12 @@ describe('Party Service', () => {
 
   describe('getParty', () => {
     it('should return parsed party', async () => {
-      const party = { id: 'p1', leaderId: 1, members: [{ userId: 1, username: 'alice' }], createdAt: '2026-01-01' };
+      const party = {
+        id: 'p1',
+        leaderId: 1,
+        members: [{ userId: 1, username: 'alice' }],
+        createdAt: '2026-01-01',
+      };
       store.set('party:p1', JSON.stringify(party));
 
       const result = await partyService.getParty('p1');
@@ -129,9 +192,7 @@ describe('Party Service', () => {
     it('should throw when Lua script fails', async () => {
       mockRedis.eval.mockResolvedValue(null);
 
-      await expect(partyService.joinParty('p1', 2, 'bob')).rejects.toThrow(
-        'Failed to join party',
-      );
+      await expect(partyService.joinParty('p1', 2, 'bob')).rejects.toThrow('Failed to join party');
     });
   });
 

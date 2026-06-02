@@ -51,6 +51,8 @@ type SocketRateLimiter = ReturnType<typeof createSocketRateLimiter>;
 export function createRateLimiters() {
   // Per-socket limiters
   const inputLimiter = createSocketRateLimiter(30); // game:input — 30/sec (game is 20 tps)
+  const campaignInputLimiter = createSocketRateLimiter(30); // campaign:input — 30/sec
+  const openWorldInputLimiter = createSocketRateLimiter(30); // openworld:input — 30/sec
   const createLimiter = createSocketRateLimiter(2); // room:create — 2/sec
   const joinLimiter = createSocketRateLimiter(5); // room:join — 5/sec
   const lobbyActionLimiter = createSocketRateLimiter(5); // room:ready, setTeam, setBotTeam — 5/sec
@@ -63,6 +65,8 @@ export function createRateLimiters() {
 
   const perSocketLimiters: SocketRateLimiter[] = [
     inputLimiter,
+    campaignInputLimiter,
+    openWorldInputLimiter,
     createLimiter,
     joinLimiter,
     lobbyActionLimiter,
@@ -93,6 +97,8 @@ export function createRateLimiters() {
 
   return {
     inputLimiter: inputLimiter.isAllowed,
+    campaignInputLimiter: campaignInputLimiter.isAllowed,
+    openWorldInputLimiter: openWorldInputLimiter.isAllowed,
     createLimiter: createLimiter.isAllowed,
     joinLimiter: joinLimiter.isAllowed,
     ipInputLimiter: ipInputLimiter.isAllowed,

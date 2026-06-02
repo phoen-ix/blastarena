@@ -174,4 +174,59 @@ describe('validateCustomMap', () => {
     expect(errors).toContain('Map height must be an odd number');
     expect(errors.length).toBeGreaterThanOrEqual(4);
   });
+
+  describe('spawnPoints validation (audit MAP-SPAWN-1)', () => {
+    // makeValidMap places spawn tiles at (x=1,y=1) and (x=3,y=1)
+    const validSpawns = [
+      { x: 1, y: 1 },
+      { x: 3, y: 1 },
+    ];
+
+    it('accepts spawnPoints that match the spawn tiles', () => {
+      const errors = validateCustomMap(makeValidMap(9, 9), 9, 9, validSpawns);
+      expect(errors).toEqual([]);
+    });
+
+    it('rejects a spawnPoints count that does not match the spawn tiles', () => {
+      const errors = validateCustomMap(makeValidMap(9, 9), 9, 9, [{ x: 1, y: 1 }]);
+      expect(errors.some((e) => e.includes('does not match the number'))).toBe(true);
+    });
+
+    it('rejects out-of-bounds spawn points', () => {
+      const errors = validateCustomMap(makeValidMap(9, 9), 9, 9, [
+        { x: 1, y: 1 },
+        { x: 99, y: 1 },
+      ]);
+      expect(errors.some((e) => e.includes('out of bounds'))).toBe(true);
+    });
+
+    it("rejects spawn points not on a 'spawn' tile", () => {
+      const errors = validateCustomMap(makeValidMap(9, 9), 9, 9, [
+        { x: 1, y: 1 },
+        { x: 5, y: 5 },
+      ]);
+      expect(errors.some((e) => e.includes("is not on a 'spawn' tile"))).toBe(true);
+    });
+
+    it('skips spawnPoints validation when not provided (back-compat)', () => {
+      expect(validateCustomMap(makeValidMap(9, 9), 9, 9)).toEqual([]);
+    });
+  });
+
+  describe('switch/gate pairing (audit MAP-VALIDATION-SWITCH-ONLY)', () => {
+    it('rejects a switch with no matching gate', () => {
+      const tiles = makeValidMap(9, 9);
+      tiles[2][2] = 'switch_red';
+      const errors = validateCustomMap(tiles, 9, 9);
+      expect(errors).toContain('Switch (red) exists but no matching gate found');
+    });
+
+    it('accepts a switch with a matching gate', () => {
+      const tiles = makeValidMap(9, 9);
+      tiles[2][2] = 'switch_red';
+      tiles[2][4] = 'gate_red';
+      const errors = validateCustomMap(tiles, 9, 9);
+      expect(errors).toEqual([]);
+    });
+  });
 });

@@ -889,12 +889,14 @@ describe('POST /admin/settings/email_settings/test', () => {
     });
   });
 
-  it('includes error message detail in response', async () => {
+  it('masks raw error detail in response (logs it server-side instead)', async () => {
+    // SMTP/server details must not be echoed back to the client. (audit ERR-002)
     mockSendTestEmail.mockRejectedValue(new Error('Connection refused'));
     const req = mockReq({ body: { to: 'test@example.com' } });
     const res = mockRes();
     await handler(req, res, jest.fn());
-    expect((res._json as any).error).toContain('Connection refused');
+    expect((res._json as any).error).toBe('Failed to send test email');
+    expect((res._json as any).error).not.toContain('Connection refused');
   });
 
   it('has adminOnlyMiddleware in route stack', () => {
@@ -1496,8 +1498,9 @@ describe('POST /admin/announcements/toast', () => {
     expect(mockSendToast).toHaveBeenCalledWith(42, 'Test toast');
   });
 
-  it('does not have adminOnlyMiddleware (accessible to staff)', () => {
-    expect(hasAdminOnly('post', '/admin/announcements/toast')).toBe(false);
+  it('has adminOnlyMiddleware (broadcast is admin-only)', () => {
+    // Broadcasting toasts to all users is admin-only, matching the banner endpoint. (audit AUTHZ-1)
+    expect(hasAdminOnly('post', '/admin/announcements/toast')).toBe(true);
   });
 
   it('passes error to next() on failure', async () => {
@@ -2416,7 +2419,7 @@ describe('Middleware presence', () => {
       { method: 'get', path: '/admin/matches' },
       { method: 'get', path: '/admin/matches/:id' },
       { method: 'get', path: '/admin/rooms' },
-      { method: 'post', path: '/admin/announcements/toast' },
+      // NOTE: /admin/announcements/toast is now admin-only (audit AUTHZ-1) — asserted above.
       { method: 'get', path: '/admin/replays' },
       { method: 'get', path: '/admin/replays/:matchId' },
     ];

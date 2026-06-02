@@ -105,7 +105,7 @@ After all disconnect grace periods resolve, if no human players remain alive, ga
 ## Docker
 
 ### Commands
-- **Production**: `docker compose up --build -d` — only Nginx exposes a port (`APP_EXTERNAL_PORT`, default 8080)
+- **Production**: `docker compose up --build -d` — Nginx binds to `127.0.0.1:8280` (loopback only) and is fronted by a host-level reverse proxy (TLS termination + forwarding). It is intentionally not exposed on all interfaces, so it must be reached via that proxy (or an SSH/port forward to `127.0.0.1:8280`).
 - **Development**: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build` — hot reload, DB/Redis ports exposed
 
 ### Services

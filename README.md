@@ -16,7 +16,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 docker compose up --build -d
 ```
 
-Open `http://localhost:8080` (or your configured `APP_EXTERNAL_PORT`). See `.env.example` for all configuration options.
+In production, Nginx binds to `127.0.0.1:8280` (loopback only) and is expected to sit behind a host-level reverse proxy that terminates TLS and forwards traffic to it. For local/dev use, open the app on the proxied port (or forward `127.0.0.1:8280`). See `.env.example` for all configuration options.
 
 ## Game Modes
 

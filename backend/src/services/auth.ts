@@ -150,10 +150,11 @@ export async function register(
 
   const passwordHash = await hashPassword(password);
   const verifyToken = generateToken();
+  const verifyExpires = new Date(Date.now() + EMAIL_VERIFY_TTL_MS);
 
   const result = await execute(
-    `INSERT INTO users (username, email_hash, email_hint, password_hash, email_verify_token, language) VALUES (?, ?, ?, ?, ?, ?)`,
-    [username, emailHash, emailHint, passwordHash, hashToken(verifyToken), language],
+    `INSERT INTO users (username, email_hash, email_hint, password_hash, email_verify_token, email_verify_expires, language) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [username, emailHash, emailHint, passwordHash, hashToken(verifyToken), verifyExpires, language],
   );
 
   // Create user_stats row
@@ -369,16 +370,21 @@ export async function logout(refreshTokenValue: string): Promise<void> {
 
 export async function verifyEmail(token: string): Promise<void> {
   const tokenHash = hashToken(token);
+  // Reject expired tokens. Rows predating the email_verify_expires column have NULL expiry and are
+  // still accepted (legacy grace); all tokens issued after this change carry a 24h expiry. (audit EMAIL-001)
   const result = await execute(
-    'UPDATE users SET email_verified = TRUE, email_verify_token = NULL, verification_resend_count = 0 WHERE email_verify_token = ?',
+    `UPDATE users SET email_verified = TRUE, email_verify_token = NULL, email_verify_expires = NULL, verification_resend_count = 0
+     WHERE email_verify_token = ? AND (email_verify_expires IS NULL OR email_verify_expires > NOW())`,
     [tokenHash],
   );
   if (result.affectedRows === 0) {
-    throw new AppError('Invalid verification token', 400, 'INVALID_TOKEN');
+    throw new AppError('Invalid or expired verification token', 400, 'INVALID_TOKEN');
   }
 }
 
 const MAX_VERIFICATION_RESENDS = 3;
+/** Email-verification tokens expire after this window. (audit EMAIL-001) */
+const EMAIL_VERIFY_TTL_MS = 24 * 60 * 60 * 1000;
 
 export async function resendVerificationEmail(
   userId: number,
@@ -407,9 +413,10 @@ export async function resendVerificationEmail(
   }
 
   const newToken = generateToken();
+  const verifyExpires = new Date(Date.now() + EMAIL_VERIFY_TTL_MS);
   await execute(
-    'UPDATE users SET email_verify_token = ?, verification_resend_count = verification_resend_count + 1 WHERE id = ?',
-    [hashToken(newToken), userId],
+    'UPDATE users SET email_verify_token = ?, email_verify_expires = ?, verification_resend_count = verification_resend_count + 1 WHERE id = ?',
+    [hashToken(newToken), verifyExpires, userId],
   );
 
   await sendVerificationEmail(normalizedEmail, newToken, user.language || 'en');

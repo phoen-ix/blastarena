@@ -130,7 +130,11 @@ router.post(
   },
 );
 
-router.post('/auth/logout', authMiddleware, async (req, res, next) => {
+// No authMiddleware: logout must revoke the refresh token even when the access token has
+// expired. It acts solely on the httpOnly refresh-token cookie (which is sameSite=strict, so it
+// is not sent on cross-site requests — CSRF-safe). Without this, an expired access token left the
+// refresh token live in the DB after a "logout". (audit AUTH-1)
+router.post('/auth/logout', async (req, res, next) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
     if (refreshToken) {

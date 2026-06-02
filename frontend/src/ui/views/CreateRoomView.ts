@@ -11,6 +11,7 @@ import {
 import game from '../../main';
 import { renderMapPreview } from '../../utils/mapPreview';
 import { getCustomMapTiles } from '../../utils/mapPreviewCache';
+import { escapeHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 export class CreateRoomView implements ILobbyView {
@@ -623,18 +624,18 @@ export class CreateRoomView implements ILobbyView {
     if (this.myMaps.length > 0) {
       html += `<optgroup label="${t('ui:createRoom.myMaps')}">`;
       for (const m of this.myMaps) {
-        html += `<option value="${m.id}">${m.name} (${m.mapWidth}x${m.mapHeight}, ${m.spawnCount} spawns)</option>`;
+        html += `<option value="${m.id}">${escapeHtml(m.name)} (${m.mapWidth}x${m.mapHeight}, ${m.spawnCount} spawns)</option>`;
       }
       html += '</optgroup>';
     }
     if (communityMaps.length > 0) {
       html += `<optgroup label="${t('ui:createRoom.communityMaps')}">`;
       for (const m of communityMaps) {
-        const by = m.creatorUsername ? ` by ${m.creatorUsername}` : '';
+        const by = m.creatorUsername ? ` by ${escapeHtml(m.creatorUsername)}` : '';
         const rating = m.avgRating
           ? ` ${'★'.repeat(Math.round(m.avgRating))}${'☆'.repeat(5 - Math.round(m.avgRating))}`
           : '';
-        html += `<option value="${m.id}">${m.name}${by}${rating} (${m.mapWidth}x${m.mapHeight}, ${m.spawnCount} spawns)</option>`;
+        html += `<option value="${m.id}">${escapeHtml(m.name)}${by}${rating} (${m.mapWidth}x${m.mapHeight}, ${m.spawnCount} spawns)</option>`;
       }
       html += '</optgroup>';
     }

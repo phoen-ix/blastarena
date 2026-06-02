@@ -263,7 +263,9 @@ router.get('/user/confirm-email/:token', async (req, res, next) => {
 // ── TOTP Two-Factor Authentication ──────────────────────────────────
 
 const totpConfirmSchema = z.object({
-  code: z.string().length(6),
+  // Accept a 6-digit TOTP code or a 9-char backup code (xxxx-xxxx). length(6) previously rejected
+  // backup codes, which confirmSetup now also accepts. (audit TOTP-1)
+  code: z.string().min(6).max(10),
 });
 
 const totpDisableSchema = z.object({

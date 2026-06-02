@@ -41,6 +41,8 @@ import * as customMapsService from './services/custom-maps';
 import { z } from 'zod';
 import {
   validateSocket,
+  isValidPlayerInput,
+  clientError,
   rematchVoteSchema,
   setBotTeamSchema,
   setTeamSchema,
@@ -168,8 +170,13 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
   setRegistry(roomManager, io);
   const {
     inputLimiter,
+    campaignInputLimiter,
+    openWorldInputLimiter,
     createLimiter,
     joinLimiter,
+    ipInputLimiter,
+    ipCreateLimiter,
+    ipJoinLimiter,
     lobbyActionLimiter,
     adminActionLimiter,
     removeSocket,
@@ -276,6 +283,15 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       { userId: socket.data.userId, username: socket.data.username, guest: socket.data.isGuest },
       'Socket connected',
     );
+    // Real client IP for per-IP rate limiting (nginx forwards X-Real-IP / X-Forwarded-For for
+    // /socket.io/). Falls back to the direct address, then socket.id, so limits still apply when
+    // unproxied (dev/tests). Used to stop one IP bypassing per-socket limits via many sockets. (audit SOCKET-RATE-1)
+    const xff = socket.handshake.headers['x-forwarded-for'];
+    const clientIp =
+      (socket.handshake.headers['x-real-ip'] as string | undefined) ||
+      (typeof xff === 'string' ? xff.split(',')[0].trim() : undefined) ||
+      socket.handshake.address ||
+      socket.id;
     const currentUser: PublicUser = {
       id: socket.data.userId,
       username: socket.data.username,
@@ -343,7 +359,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Room creation
     socket.on('room:create', async (data, callback) => {
-      if (!createLimiter(socket.id)) return;
+      if (!createLimiter(socket.id) || !ipCreateLimiter(clientIp)) return;
       try {
         const parsed = createRoomRequestSchema.safeParse(data);
         if (!parsed.success) {
@@ -382,13 +398,13 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           }
         }
       } catch (err: unknown) {
-        callback({ success: false, error: getErrorMessage(err) });
+        callback({ success: false, error: clientError(err) });
       }
     });
 
     // Join room
     socket.on('room:join', async (data, callback) => {
-      if (!joinLimiter(socket.id)) return;
+      if (!joinLimiter(socket.id) || !ipJoinLimiter(clientIp)) return;
       if (typeof data.code !== 'string' || data.code.length === 0 || data.code.length > 20) {
         return callback({ success: false, error: 'Invalid room code' });
       }
@@ -412,7 +428,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           }
         }
       } catch (err: unknown) {
-        callback({ success: false, error: getErrorMessage(err) });
+        callback({ success: false, error: clientError(err) });
       }
     });
 
@@ -482,7 +498,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           ready: parsed.ready,
         });
       } catch (err: unknown) {
-        socket.emit('error', { message: getErrorMessage(err) });
+        socket.emit('error', { message: clientError(err) });
       }
     });
 
@@ -533,7 +549,8 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           const mapData = await customMapsService.getMap(startedRoom.config.customMapId);
           if (!mapData) {
             socket.emit('error', { message: 'Custom map not found' });
-            await lobbyService.updateRoomStatus(roomCode, 'waiting');
+            // CAS: only revert if still in 'countdown' (this start attempt's transition). (audit REDIS-RACE-2)
+            await lobbyService.updateRoomStatus(roomCode, 'waiting', 'countdown');
             return;
           }
           customMap = {
@@ -572,7 +589,8 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       } catch (err) {
         logger.error({ err, roomCode }, 'Failed to start game');
         io.to(`room:${roomCode}`).emit('error', { message: 'Failed to start game' });
-        await lobbyService.updateRoomStatus(roomCode, 'waiting');
+        // CAS: only revert if still in 'countdown' (this start attempt's transition). (audit REDIS-RACE-2)
+        await lobbyService.updateRoomStatus(roomCode, 'waiting', 'countdown');
       }
     });
 
@@ -708,7 +726,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         );
         io.to(`room:${roomCode}`).emit('room:state', updatedRoom);
       } catch (err: unknown) {
-        socket.emit('error', { message: getErrorMessage(err) });
+        socket.emit('error', { message: clientError(err) });
       }
     });
 
@@ -730,37 +748,17 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         );
         io.to(`room:${roomCode}`).emit('room:state', updatedRoom);
       } catch (err: unknown) {
-        socket.emit('error', { message: getErrorMessage(err) });
+        socket.emit('error', { message: clientError(err) });
       }
     });
 
     // Game input — hot path, avoid Redis lookup per input
     // Cache the room code on socket data when game starts; cleared on disconnect/leave
     socket.on('game:input', (input) => {
-      if (!inputLimiter(socket.id)) return;
+      if (!inputLimiter(socket.id) || !ipInputLimiter(clientIp)) return;
 
       // Runtime validation — TypeScript types are compile-time only
-      if (
-        typeof input !== 'object' ||
-        input === null ||
-        typeof input.seq !== 'number' ||
-        !Number.isFinite(input.seq) ||
-        input.seq < 0 ||
-        typeof input.tick !== 'number' ||
-        !Number.isFinite(input.tick) ||
-        input.tick < 0 ||
-        (input.direction !== null &&
-          input.direction !== 'up' &&
-          input.direction !== 'down' &&
-          input.direction !== 'left' &&
-          input.direction !== 'right') ||
-        (input.action !== null &&
-          input.action !== 'bomb' &&
-          input.action !== 'detonate' &&
-          input.action !== 'throw')
-      ) {
-        return;
-      }
+      if (!isValidPlayerInput(input)) return;
 
       const roomCode = requireRoom(socket);
       if (!roomCode) return;
@@ -848,6 +846,16 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         return callback({ success: false, error: 'Invalid position' });
       }
 
+      // Only eliminated players (spectators) may use spectator actions — check before consuming a
+      // rate-limit slot, matching game:spectatorChat. (audit SOCKET-SPECTATOR-1)
+      const gameRoom = roomManager.getRoom(roomCode);
+      if (gameRoom && gameRoom.isPlayerAlive(socket.data.userId)) {
+        return callback({
+          success: false,
+          error: 'Only eliminated players can use spectator actions',
+        });
+      }
+
       // Rate limit
       if (!spectatorActionLimiter.isAllowed(socket.id)) {
         return callback({ success: false, error: 'Too many actions' });
@@ -859,7 +867,6 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         return callback({ success: false, error: 'Spectator actions are globally disabled' });
       }
 
-      const gameRoom = roomManager.getRoom(roomCode);
       if (!gameRoom) {
         return callback({ success: false, error: 'Game not found' });
       }
@@ -1500,12 +1507,13 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         );
       } catch (err) {
         logger.error({ err }, 'Campaign start error');
-        callback({ success: false, error: getErrorMessage(err) });
+        callback({ success: false, error: clientError(err) });
       }
     });
 
     // Campaign: player input
     socket.on('campaign:input', (input) => {
+      if (!campaignInputLimiter(socket.id)) return; // audit RATE-1
       const sessionId = socket.data.activeCampaignSession;
       if (!sessionId) return;
       // For local co-op, playerId is specified in the input payload
@@ -1600,6 +1608,9 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     });
 
     socket.on('openworld:input', (input) => {
+      // Rate-limit + validate to match game:input — this path is guest-accessible. (audit RATE-2, OWRLD-1)
+      if (!openWorldInputLimiter(socket.id)) return;
+      if (!isValidPlayerInput(input)) return;
       if (socket.data.inOpenWorld) {
         openWorldManager.handleInput(socket.id, input);
       }
@@ -1609,94 +1620,103 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     socket.on('disconnect', async () => {
       logger.info({ userId: socket.data.userId }, 'Socket disconnected');
 
-      // Open world cleanup
-      if (socket.data.inOpenWorld) {
-        openWorldManager.handleLeave(socket.id);
-        socket.data.inOpenWorld = false;
-      }
+      // Wrap the whole handler: its awaits (party disconnect, room lookup/leave) could otherwise
+      // reject as an unhandled rejection on this critical path. (audit ERR-004)
+      try {
+        // Open world cleanup
+        if (socket.data.inOpenWorld) {
+          openWorldManager.handleLeave(socket.id);
+          socket.data.inOpenWorld = false;
+        }
 
-      // Guest connections skip room/lobby/friend cleanup
-      if (socket.data.isGuest) {
+        // Guest connections skip room/lobby/friend cleanup
+        if (socket.data.isGuest) {
+          removeSocket(socket.id);
+          return;
+        }
+
         removeSocket(socket.id);
-        return;
-      }
+        cleanupFriendLimiters(socket.id);
+        cleanupPartyLimiters(socket.id);
+        cleanupLobbyLimiters(socket.id);
+        cleanupDMLimiters(socket.id);
+        emoteLastUsed.delete(socket.data.userId);
+        spectatorChatLimiter.remove(socket.id);
+        spectatorActionLimiter.remove(socket.id);
+        socket.data.activeRoomCode = undefined;
 
-      removeSocket(socket.id);
-      cleanupFriendLimiters(socket.id);
-      cleanupPartyLimiters(socket.id);
-      cleanupLobbyLimiters(socket.id);
-      cleanupDMLimiters(socket.id);
-      emoteLastUsed.delete(socket.data.userId);
-      spectatorChatLimiter.remove(socket.id);
-      spectatorActionLimiter.remove(socket.id);
-      socket.data.activeRoomCode = undefined;
+        // Clean up rematch votes for the disconnecting player
+        for (const [code, voteState] of rematchVotes) {
+          if (voteState.votes.has(socket.data.userId)) {
+            voteState.votes.delete(socket.data.userId);
+            voteState.humanPlayerIds.delete(socket.data.userId);
+            if (voteState.humanPlayerIds.size === 0) {
+              clearTimeout(voteState.timeout);
+              rematchVotes.delete(code);
+            } else {
+              const threshold = Math.floor(voteState.humanPlayerIds.size / 2) + 1;
+              const votesArray = [...voteState.votes.entries()].map(([userId, v]) => ({
+                userId,
+                username: v.username,
+                vote: v.vote,
+              }));
+              io.to(`room:${code}`).emit('rematch:update', {
+                votes: votesArray,
+                threshold,
+                totalPlayers: voteState.humanPlayerIds.size,
+              });
+            }
+          }
+        }
 
-      // Clean up rematch votes for the disconnecting player
-      for (const [code, voteState] of rematchVotes) {
-        if (voteState.votes.has(socket.data.userId)) {
-          voteState.votes.delete(socket.data.userId);
-          voteState.humanPlayerIds.delete(socket.data.userId);
-          if (voteState.humanPlayerIds.size === 0) {
-            clearTimeout(voteState.timeout);
-            rematchVotes.delete(code);
+        // Remove presence and notify friends offline
+        presenceService.removePresence(socket.data.userId).catch((err) => {
+          logger.warn({ err: getErrorMessage(err) }, 'Presence update failed');
+        });
+        notifyFriendsOffline(io, socket.data.userId);
+
+        // Handle party disconnect (leave/disband)
+        await handlePartyDisconnect(socket, io);
+
+        // Clean up campaign session
+        if (socket.data.activeCampaignSession) {
+          const campaignManager = getCampaignGameManager();
+          const game = campaignManager.getSession(socket.data.activeCampaignSession);
+
+          if (game && game.coopMode) {
+            // Co-op: remove this player, notify partner, keep game alive
+            campaignManager.removePlayer(socket.data.activeCampaignSession, socket.data.userId);
+            const campaignRoom = `campaign:${game.userIds[0]}`;
+            io.to(campaignRoom).emit('campaign:partnerLeft', { reason: 'disconnected' });
           } else {
-            const threshold = Math.floor(voteState.humanPlayerIds.size / 2) + 1;
-            const votesArray = [...voteState.votes.entries()].map(([userId, v]) => ({
-              userId,
-              username: v.username,
-              vote: v.vote,
-            }));
-            io.to(`room:${code}`).emit('rematch:update', {
-              votes: votesArray,
-              threshold,
-              totalPlayers: voteState.humanPlayerIds.size,
-            });
+            campaignManager.endSession(socket.data.activeCampaignSession);
+          }
+          socket.data.activeCampaignSession = undefined;
+        }
+
+        const roomCode =
+          socket.data.activeRoomCode || (await lobbyService.getPlayerRoom(socket.data.userId));
+        if (roomCode) {
+          const gameRoom = roomManager.getRoom(roomCode);
+          if (gameRoom && gameRoom.isRunning()) {
+            // Game is running — start grace period, do NOT remove from room yet
+            // Player stays in lobby room list so they can reconnect
+            gameRoom.handlePlayerDisconnect(socket.data.userId);
+          } else {
+            // No active game — leave room normally
+            const room = await lobbyService.leaveRoom(roomCode, socket.data.userId);
+            if (room) {
+              io.to(`room:${roomCode}`).emit('room:playerLeft', socket.data.userId);
+              io.to(`room:${roomCode}`).emit('room:state', room);
+            }
+            broadcastRoomList();
           }
         }
-      }
-
-      // Remove presence and notify friends offline
-      presenceService.removePresence(socket.data.userId).catch((err) => {
-        logger.warn({ err: getErrorMessage(err) }, 'Presence update failed');
-      });
-      notifyFriendsOffline(io, socket.data.userId);
-
-      // Handle party disconnect (leave/disband)
-      await handlePartyDisconnect(socket, io);
-
-      // Clean up campaign session
-      if (socket.data.activeCampaignSession) {
-        const campaignManager = getCampaignGameManager();
-        const game = campaignManager.getSession(socket.data.activeCampaignSession);
-
-        if (game && game.coopMode) {
-          // Co-op: remove this player, notify partner, keep game alive
-          campaignManager.removePlayer(socket.data.activeCampaignSession, socket.data.userId);
-          const campaignRoom = `campaign:${game.userIds[0]}`;
-          io.to(campaignRoom).emit('campaign:partnerLeft', { reason: 'disconnected' });
-        } else {
-          campaignManager.endSession(socket.data.activeCampaignSession);
-        }
-        socket.data.activeCampaignSession = undefined;
-      }
-
-      const roomCode =
-        socket.data.activeRoomCode || (await lobbyService.getPlayerRoom(socket.data.userId));
-      if (roomCode) {
-        const gameRoom = roomManager.getRoom(roomCode);
-        if (gameRoom && gameRoom.isRunning()) {
-          // Game is running — start grace period, do NOT remove from room yet
-          // Player stays in lobby room list so they can reconnect
-          gameRoom.handlePlayerDisconnect(socket.data.userId);
-        } else {
-          // No active game — leave room normally
-          const room = await lobbyService.leaveRoom(roomCode, socket.data.userId);
-          if (room) {
-            io.to(`room:${roomCode}`).emit('room:playerLeft', socket.data.userId);
-            io.to(`room:${roomCode}`).emit('room:state', room);
-          }
-          broadcastRoomList();
-        }
+      } catch (err) {
+        logger.error(
+          { err: getErrorMessage(err), userId: socket.data.userId },
+          'Disconnect handler error',
+        );
       }
     });
   });

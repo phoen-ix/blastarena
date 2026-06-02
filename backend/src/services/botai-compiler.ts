@@ -48,6 +48,13 @@ const DANGEROUS_GLOBAL_PATTERNS: { pattern: RegExp; label: string }[] = [
   { pattern: /Object\.setPrototypeOf/g, label: 'Object.setPrototypeOf' },
   { pattern: /Reflect\./g, label: 'Reflect access' },
   { pattern: /new\s+Proxy\s*\(/g, label: 'Proxy constructor' },
+  // Defense-in-depth against the `obj.constructor.constructor('return process')()` sandbox
+  // escape. NOTE: this blocks the literal forms only — computed access (`obj['cons'+'tructor']`)
+  // can still bypass it, which is why the real boundary is NOT exposing host objects into the
+  // context (see loadBotAIInSandbox). Submission is admin-only.
+  { pattern: /\.constructor\b/g, label: 'constructor access' },
+  { pattern: /['"`]constructor['"`]/g, label: 'computed constructor access' },
+  { pattern: /\.prototype\b/g, label: 'prototype access' },
 ];
 
 const blockImportsPlugin: esbuild.Plugin = {
@@ -68,7 +75,6 @@ export interface CompileResult {
 }
 
 export function loadBotAIInSandbox(code: string): Record<string, unknown> {
-  const moduleObj = { exports: {} as Record<string, unknown> };
   const frozenConsole = Object.freeze({
     log: () => {},
     warn: () => {},
@@ -77,19 +83,25 @@ export function loadBotAIInSandbox(code: string): Record<string, unknown> {
     debug: () => {},
   });
 
-  const sandbox = {
-    module: moduleObj,
-    exports: moduleObj.exports,
-    console: frozenConsole,
-  };
+  // SECURITY: never place host objects (module/exports) into the context. A host-object
+  // reference lets sandboxed code walk `hostObj.constructor.constructor` to the host realm's
+  // Function constructor and escape the sandbox — `codeGeneration:{strings:false}` only disables
+  // code generation in *this* context, not in the host realm reached via the constructor chain.
+  // Creating module/exports INSIDE the context makes their prototype chain resolve to the context
+  // realm, where code generation is disabled, so the constructor-walk escape is blocked.
+  const context = vm.createContext(
+    { console: frozenConsole },
+    { codeGeneration: { strings: false, wasm: false } },
+  );
 
-  const context = vm.createContext(sandbox, {
-    codeGeneration: { strings: false, wasm: false },
-  });
+  // esbuild emits CommonJS that assigns to `module.exports` / `exports`; provide those as
+  // context-local bindings via an IIFE wrapper and return whatever the module exported.
+  const wrapped = `(function () { 'use strict'; const module = { exports: {} }; const exports = module.exports;\n${code}\n;\nreturn module.exports; })()`;
+  const result = vm.runInContext(wrapped, context, { timeout: VM_TIMEOUT_MS }) as
+    | Record<string, unknown>
+    | undefined;
 
-  vm.runInContext(code, context, { timeout: VM_TIMEOUT_MS });
-
-  return moduleObj.exports;
+  return result ?? {};
 }
 
 /**

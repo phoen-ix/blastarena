@@ -472,6 +472,33 @@ export class GameRoom {
           );
         }
 
+        // Elo calculation MUST read user_stats before total_matches is incremented below, so the
+        // K-factor uses the pre-match match count (K=32 for <30 games). (audit ELO-1)
+        // Results are emitted later, after stats are updated (so cumulative achievements see the new totals).
+        let eloResults: import('@blast-arena/shared').EloResult[] = [];
+        if (matchStatus !== 'aborted') {
+          try {
+            const eloPlayers = [...this.gameState.players.values()]
+              .filter((p) => !p.isBot)
+              .map((p) => ({
+                userId: p.id,
+                placement: p.placement ?? 999,
+                team: p.team,
+                isWinner:
+                  p.id === state.winnerId ||
+                  (state.winnerTeam !== null && p.team === state.winnerTeam),
+              }));
+
+            eloResults = await eloService.processMatchElo(
+              this.room.config.gameMode,
+              eloPlayers,
+              this.matchId!,
+            );
+          } catch (eloErr) {
+            logger.error({ err: eloErr }, 'Failed to process Elo');
+          }
+        }
+
         // Update user_stats (skip bots)
         for (const player of this.gameState.players.values()) {
           if (player.isBot) continue;
@@ -502,31 +529,11 @@ export class GameRoom {
           );
         }
 
-        // Elo calculation (skip aborted matches)
+        // Emit Elo results (computed above, before the stats increment) and evaluate achievements
+        // (which read the now-incremented cumulative stats).
         if (matchStatus !== 'aborted') {
-          try {
-            const eloPlayers = [...this.gameState.players.values()]
-              .filter((p) => !p.isBot)
-              .map((p) => ({
-                userId: p.id,
-                placement: p.placement ?? 999,
-                team: p.team,
-                isWinner:
-                  p.id === state.winnerId ||
-                  (state.winnerTeam !== null && p.team === state.winnerTeam),
-              }));
-
-            const eloResults = await eloService.processMatchElo(
-              this.room.config.gameMode,
-              eloPlayers,
-              this.matchId!,
-            );
-
-            if (eloResults.length > 0) {
-              this.io.to(`room:${this.code}`).emit('game:eloUpdate', eloResults);
-            }
-          } catch (eloErr) {
-            logger.error({ err: eloErr }, 'Failed to process Elo');
+          if (eloResults.length > 0) {
+            this.io.to(`room:${this.code}`).emit('game:eloUpdate', eloResults);
           }
 
           // Achievement evaluation for each human player

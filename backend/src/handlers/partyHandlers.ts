@@ -5,13 +5,17 @@ import {
   InterServerEvents,
   SocketData,
   PARTY_CHAT_MAX_LENGTH,
-  getErrorMessage,
 } from '@blast-arena/shared';
 import * as partyService from '../services/party';
 import * as friendsService from '../services/friends';
 import * as settingsService from '../services/settings';
 import { createSocketRateLimiter } from '../utils/socketRateLimit';
-import { validateSocket, userIdSchema, inviteIdSchema } from '../utils/socketValidation';
+import {
+  validateSocket,
+  userIdSchema,
+  inviteIdSchema,
+  clientError,
+} from '../utils/socketValidation';
 import { logger } from '../utils/logger';
 
 type TypedServer = Server<
@@ -42,7 +46,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
       socket.join(`party:${party.id}`);
       callback({ success: true, party });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 
@@ -87,7 +91,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
       callback({ success: true });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 
@@ -113,7 +117,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
       callback({ success: true, party });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 
@@ -152,7 +156,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
       callback({ success: true });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 
@@ -184,7 +188,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
       callback({ success: true });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 
@@ -247,7 +251,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
       callback({ success: true });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 
@@ -267,7 +271,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
       // Client will handle the actual room join via room:join
       callback({ success: true });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 

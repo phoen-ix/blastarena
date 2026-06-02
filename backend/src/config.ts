@@ -74,6 +74,15 @@ export function loadConfig(): Config {
   }
 
   if (!result.data.TOTP_ENCRYPTION_KEY) {
+    if (result.data.NODE_ENV === 'production') {
+      // Fail fast in production: a missing key silently disables 2FA for everyone, including
+      // users who already enabled it (they would be locked out). (audit TOTP-OPTIONAL-ENCRYPTION-1)
+      console.error(
+        'Invalid configuration: TOTP_ENCRYPTION_KEY must be set in production (>=32 chars). ' +
+          'Two-factor authentication cannot function without it.',
+      );
+      process.exit(1);
+    }
     console.warn('Warning: TOTP_ENCRYPTION_KEY not set — two-factor authentication is disabled');
   }
 

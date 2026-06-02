@@ -32,7 +32,12 @@ const ALLOWED_CUSTOM_MAP_TILES: Set<string> = new Set([
   'crumbling',
 ]);
 
-export function validateCustomMap(tiles: TileType[][], width: number, height: number): string[] {
+export function validateCustomMap(
+  tiles: TileType[][],
+  width: number,
+  height: number,
+  spawnPoints?: { x: number; y: number }[],
+): string[] {
   const errors: string[] = [];
 
   // Dimensions must be odd and within range
@@ -65,6 +70,7 @@ export function validateCustomMap(tiles: TileType[][], width: number, height: nu
   let spawnCount = 0;
   let hasTeleA = false;
   let hasTeleB = false;
+  const spawnTiles = new Set<string>();
   const switchColors = new Set<string>();
   const gateColors = new Set<string>();
 
@@ -77,7 +83,10 @@ export function validateCustomMap(tiles: TileType[][], width: number, height: nu
         continue;
       }
 
-      if (tile === 'spawn') spawnCount++;
+      if (tile === 'spawn') {
+        spawnCount++;
+        spawnTiles.add(`${x},${y}`);
+      }
       if (tile === 'teleporter_a') hasTeleA = true;
       if (tile === 'teleporter_b') hasTeleB = true;
       const sc = getSwitchColor(tile);
@@ -109,10 +118,38 @@ export function validateCustomMap(tiles: TileType[][], width: number, height: nu
     errors.push('Teleporter B exists but no Teleporter A found');
   }
 
-  // Gate-switch pairing: gates need at least one switch of the same color
+  // Gate-switch pairing: gates need at least one switch of the same color, and vice versa —
+  // an orphaned switch with no gate is a meaningless (and confusing) map. (audit MAP-VALIDATION-SWITCH-ONLY)
   for (const color of gateColors) {
     if (!switchColors.has(color)) {
       errors.push(`Gate (${color}) exists but no matching switch found`);
+    }
+  }
+  for (const color of switchColors) {
+    if (!gateColors.has(color)) {
+      errors.push(`Switch (${color}) exists but no matching gate found`);
+    }
+  }
+
+  // Spawn points must line up with the actual 'spawn' tiles in the grid: one per tile, in-bounds,
+  // and on a real spawn tile. Otherwise players spawn at undefined/out-of-bounds positions. (audit MAP-SPAWN-1)
+  if (spawnPoints) {
+    if (spawnPoints.length !== spawnCount) {
+      errors.push(
+        `spawnPoints count (${spawnPoints.length}) does not match the number of 'spawn' tiles (${spawnCount})`,
+      );
+    }
+    const seen = new Set<string>();
+    for (const sp of spawnPoints) {
+      const key = `${sp.x},${sp.y}`;
+      if (sp.x < 0 || sp.x >= width || sp.y < 0 || sp.y >= height) {
+        errors.push(`Spawn point (${sp.x}, ${sp.y}) is out of bounds`);
+      } else if (!spawnTiles.has(key)) {
+        errors.push(`Spawn point (${sp.x}, ${sp.y}) is not on a 'spawn' tile`);
+      } else if (seen.has(key)) {
+        errors.push(`Duplicate spawn point at (${sp.x}, ${sp.y})`);
+      }
+      seen.add(key);
     }
   }
 

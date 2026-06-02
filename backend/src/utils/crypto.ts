@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import { AppError } from '../middleware/errorHandler';
 
 const SALT_ROUNDS = 12;
 
@@ -33,14 +34,20 @@ export function encryptTotpSecret(secret: string, keyHex: string): string {
 }
 
 export function decryptTotpSecret(encrypted: string, keyHex: string): string {
-  const [ivHex, authTagHex, ciphertextHex] = encrypted.split(':');
-  const key = Buffer.from(keyHex, 'hex');
-  const iv = Buffer.from(ivHex, 'hex');
-  const authTag = Buffer.from(authTagHex, 'hex');
-  const ciphertext = Buffer.from(ciphertextHex, 'hex');
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(authTag);
-  return decipher.update(ciphertext) + decipher.final('utf8');
+  // Wrap so a tampered/corrupt secret or auth-tag failure surfaces as a clean error instead of an
+  // unhandled native crypto exception (which otherwise yields an opaque 500). (audit TOTP-3)
+  try {
+    const [ivHex, authTagHex, ciphertextHex] = encrypted.split(':');
+    const key = Buffer.from(keyHex, 'hex');
+    const iv = Buffer.from(ivHex, 'hex');
+    const authTag = Buffer.from(authTagHex, 'hex');
+    const ciphertext = Buffer.from(ciphertextHex, 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(authTag);
+    return decipher.update(ciphertext, undefined, 'utf8') + decipher.final('utf8');
+  } catch {
+    throw new AppError('Failed to decrypt 2FA secret', 500, 'TOTP_DECRYPT_FAILED');
+  }
 }
 
 export function generateBackupCodes(count: number = 10): string[] {

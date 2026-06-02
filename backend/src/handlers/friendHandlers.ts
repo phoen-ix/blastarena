@@ -4,15 +4,25 @@ import {
   ServerToClientEvents,
   InterServerEvents,
   SocketData,
-  getErrorMessage,
 } from '@blast-arena/shared';
 import * as friendsService from '../services/friends';
 import * as presenceService from '../services/presence';
 import { createSocketRateLimiter } from '../utils/socketRateLimit';
+import { clientError } from '../utils/socketValidation';
 import { logger } from '../utils/logger';
 
-type TypedServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
-type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
+type TypedServer = Server<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>;
+type TypedSocket = Socket<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>;
 
 const friendRequestLimiter = createSocketRateLimiter(3);
 const friendActionLimiter = createSocketRateLimiter(5);
@@ -36,7 +46,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
         outgoing: pending.outgoing,
       });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 
@@ -59,7 +69,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
 
       callback({ success: true });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 
@@ -84,7 +94,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
 
       callback({ success: true });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 
@@ -95,7 +105,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
       await friendsService.declineFriendRequest(userId, data.fromUserId);
       callback({ success: true });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 
@@ -106,7 +116,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
       await friendsService.cancelFriendRequest(userId, data.toUserId);
       callback({ success: true });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 
@@ -121,7 +131,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
 
       callback({ success: true });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 
@@ -136,7 +146,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
 
       callback({ success: true });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 
@@ -147,7 +157,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
       await friendsService.unblockUser(userId, data.userId);
       callback({ success: true });
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 }

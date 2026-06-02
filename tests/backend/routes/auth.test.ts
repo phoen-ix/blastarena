@@ -540,11 +540,14 @@ describe('Middleware presence', () => {
     }
   });
 
-  it('authMiddleware is on the logout route', () => {
+  it('authMiddleware is NOT on the logout route (works with expired access token)', () => {
+    // Logout must revoke the refresh token even when the access token has expired, so it acts
+    // only on the httpOnly refresh-token cookie and does not require authMiddleware. (audit AUTH-1)
     const logoutStack = getRouteStack('post', '/auth/logout');
-    // authMiddleware should be one of the handlers before the final route handler
-    const middlewareFns = logoutStack.slice(0, -1).map((entry) => entry.handle);
-    expect(middlewareFns).toContain(mockAuthMiddleware);
+    const middlewareFns = logoutStack.map((entry) => entry.handle);
+    expect(middlewareFns).not.toContain(mockAuthMiddleware);
+    // Only the handler remains on the route.
+    expect(logoutStack.length).toBe(1);
   });
 
   it('validate middleware is applied to register, login, forgot-password, reset-password', () => {

@@ -62,6 +62,15 @@ async function main(): Promise<void> {
 
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
+
+  // Last-resort safety nets: log unhandled async failures instead of letting them crash the
+  // process (or be silently swallowed). Individual handlers still do their own error handling. (audit ERR-004)
+  process.on('unhandledRejection', (reason) => {
+    logger.error({ err: reason }, 'Unhandled promise rejection');
+  });
+  process.on('uncaughtException', (err) => {
+    logger.fatal({ err }, 'Uncaught exception');
+  });
 }
 
 main().catch((err) => {

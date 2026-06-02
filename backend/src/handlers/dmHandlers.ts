@@ -10,7 +10,7 @@ import {
 import * as settingsService from '../services/settings';
 import * as messageService from '../services/messages';
 import { createSocketRateLimiter } from '../utils/socketRateLimit';
-import { validateSocket, dmReadSchema } from '../utils/socketValidation';
+import { validateSocket, dmReadSchema, clientError } from '../utils/socketValidation';
 import { logger } from '../utils/logger';
 
 type TypedServer = Server<
@@ -57,7 +57,7 @@ export function setupDMHandlers(socket: TypedSocket, io: TypedServer): void {
       // Real-time delivery to recipient
       io.to(`user:${data.toUserId}`).emit('dm:receive', msg);
     } catch (err) {
-      callback({ success: false, error: getErrorMessage(err) });
+      callback({ success: false, error: clientError(err) });
     }
   });
 

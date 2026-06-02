@@ -68,9 +68,10 @@ export async function beginSetup(userId: number, username: string): Promise<Totp
 export async function confirmSetup(userId: number, code: string): Promise<void> {
   const key = getEncryptionKey();
 
-  const rows = await query<UserRow[]>('SELECT totp_secret, totp_enabled FROM users WHERE id = ?', [
-    userId,
-  ]);
+  const rows = await query<UserRow[]>(
+    'SELECT totp_secret, totp_enabled, totp_backup_codes FROM users WHERE id = ?',
+    [userId],
+  );
   if (rows.length === 0) {
     throw new AppError('User not found', 404, 'NOT_FOUND');
   }
@@ -81,16 +82,15 @@ export async function confirmSetup(userId: number, code: string): Promise<void> 
     throw new AppError('No 2FA setup in progress', 400, 'NO_TOTP_SETUP');
   }
 
-  const secret = decryptTotpSecret(rows[0].totp_secret, key);
-  const totp = new OTPAuth.TOTP({
-    secret: OTPAuth.Secret.fromBase32(secret),
-    algorithm: 'SHA1',
-    digits: 6,
-    period: 30,
-  });
-
-  const delta = totp.validate({ token: code, window: 1 });
-  if (delta === null) {
+  // Accept either a TOTP code or one of the just-issued backup codes. (audit TOTP-1)
+  const verified = await verifyCodeInternal(
+    rows[0].totp_secret,
+    rows[0].totp_backup_codes,
+    key,
+    code,
+    userId,
+  );
+  if (!verified) {
     throw new AppError('Invalid verification code', 400, 'INVALID_TOTP_CODE');
   }
 
@@ -177,12 +177,19 @@ async function verifyCodeInternal(
   for (let i = 0; i < hashedCodes.length; i++) {
     const match = await comparePassword(normalizedCode, hashedCodes[i]);
     if (match) {
-      // Remove used backup code
+      // Remove used backup code, then persist with an atomic compare-and-swap: the UPDATE only
+      // applies if the stored value still equals what we read. Two concurrent requests using the
+      // same code cannot both succeed — the slower one sees affectedRows=0 and is rejected.
+      // (audit TOTP-2)
       hashedCodes.splice(i, 1);
-      await execute('UPDATE users SET totp_backup_codes = ? WHERE id = ?', [
-        JSON.stringify(hashedCodes),
-        userId,
-      ]);
+      const result = await execute(
+        'UPDATE users SET totp_backup_codes = ? WHERE id = ? AND totp_backup_codes = ?',
+        [JSON.stringify(hashedCodes), userId, backupCodesJson],
+      );
+      if (result.affectedRows === 0) {
+        // Concurrent modification consumed a code first — treat this attempt as invalid.
+        return false;
+      }
       return true;
     }
   }

@@ -277,7 +277,7 @@ describe('Custom Maps Routes', () => {
       const res = mockRes();
       await handler(req, res, jest.fn());
 
-      expect(mockValidateCustomMap).toHaveBeenCalledWith([['empty']], 11, 11);
+      expect(mockValidateCustomMap).toHaveBeenCalledWith([['empty']], 11, 11, [{ x: 1, y: 1 }]);
       expect(mockCreateMap).toHaveBeenCalledWith(
         {
           name: 'New Map',

@@ -92,13 +92,27 @@ export async function getAppliedMigrations(): Promise<string[]> {
 }
 
 /**
+ * Migrations whose down script cannot restore the data they dropped. Rolling these back is
+ * permanently destructive, so it is refused unless the caller explicitly opts in with `force`.
+ *
+ * 030 drops the plaintext email columns after data has been migrated to one-way HMAC hashes
+ * (email_hash). The down migration only re-adds empty columns — the original emails are
+ * unrecoverable. See audit finding DMIG-1.
+ */
+const IRREVERSIBLE_MIGRATIONS = new Set<string>(['030_finalize_email_hashing.sql']);
+
+/**
  * Roll back the last N applied migrations by executing their corresponding
  * down SQL files and removing them from the _migrations tracking table.
  *
  * @param steps - Number of migrations to roll back (default: 1)
+ * @param options.force - Allow rolling back migrations marked irreversible (data loss). Default false.
  * @returns Array of rolled-back migration file names
  */
-export async function rollbackMigration(steps: number = 1): Promise<string[]> {
+export async function rollbackMigration(
+  steps: number = 1,
+  options: { force?: boolean } = {},
+): Promise<string[]> {
   const pool = getPool();
 
   // Ensure the tracking table exists
@@ -113,12 +127,27 @@ export async function rollbackMigration(steps: number = 1): Promise<string[]> {
   // Fetch the last N applied migrations in reverse order
   const [rows] = await pool.execute<any[]>(
     'SELECT name FROM _migrations ORDER BY name DESC LIMIT ?',
-    [steps]
+    [steps],
   );
 
   if (rows.length === 0) {
     logger.info('No migrations to roll back');
     return [];
+  }
+
+  // Refuse to roll back irreversible (data-destroying) migrations unless explicitly forced.
+  if (!options.force) {
+    const irreversible = rows
+      .map((r: any) => r.name as string)
+      .filter((name) => IRREVERSIBLE_MIGRATIONS.has(name));
+    if (irreversible.length > 0) {
+      throw new Error(
+        `Refusing to roll back irreversible migration(s): ${irreversible.join(', ')}. ` +
+          `These permanently destroy data (e.g. plaintext emails dropped after hashing) and ` +
+          `cannot be restored by their down script. Re-run with { force: true } only if you ` +
+          `accept the data loss.`,
+      );
+    }
   }
 
   const migrationsDir = getMigrationsDir();
@@ -133,7 +162,7 @@ export async function rollbackMigration(steps: number = 1): Promise<string[]> {
 
     if (!fs.existsSync(downFilePath)) {
       throw new Error(
-        `Down migration file not found for ${migrationName}: expected ${downFilePath}`
+        `Down migration file not found for ${migrationName}: expected ${downFilePath}`,
       );
     }
 

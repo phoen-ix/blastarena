@@ -11,7 +11,7 @@ import {
 import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 import { renderMapPreview } from '../../utils/mapPreview';
 import { getCustomMapTiles } from '../../utils/mapPreviewCache';
-import { trapFocus } from '../../utils/html';
+import { trapFocus, escapeHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 export interface CreateRoomModalDeps {
@@ -80,7 +80,7 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
           <label for="room-custom-map">${t('ui:createRoom.map')}</label>
           <select id="room-custom-map">
             <option value="">${t('ui:createRoom.randomGenerated')}</option>
-            ${deps.customMaps.map((m) => `<option value="${m.id}">${t('ui:createRoom.mapOptionLabel', { name: m.name, width: m.mapWidth, height: m.mapHeight, spawns: m.spawnCount })}</option>`).join('')}
+            ${deps.customMaps.map((m) => `<option value="${m.id}">${t('ui:createRoom.mapOptionLabel', { name: escapeHtml(m.name), width: m.mapWidth, height: m.mapHeight, spawns: m.spawnCount })}</option>`).join('')}
           </select>
           <div id="room-map-preview" style="margin-top:6px;display:none;"></div>
         </div>`
