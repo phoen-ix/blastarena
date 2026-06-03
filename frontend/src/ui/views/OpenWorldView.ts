@@ -3,7 +3,7 @@ import { OpenWorldScoreEntry } from '@blast-arena/shared';
 import { API_URL } from '../../config';
 import { escapeHtml } from '../../utils/html';
 import { t } from '../../i18n';
-import game from '../../main';
+import { game } from '../../main';
 
 interface OpenWorldStatus {
   enabled: boolean;

@@ -15,7 +15,7 @@ import {
 } from '@blast-arena/shared';
 import { escapeHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
-import game from '../../main';
+import { game } from '../../main';
 import { t } from '../../i18n';
 
 type ViewMode = 'list' | 'detail';

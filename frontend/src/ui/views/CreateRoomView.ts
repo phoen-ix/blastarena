@@ -8,7 +8,7 @@ import {
   BotAIEntry,
   CustomMapSummary,
 } from '@blast-arena/shared';
-import game from '../../main';
+import { game } from '../../main';
 import { renderMapPreview } from '../../utils/mapPreview';
 import { getCustomMapTiles } from '../../utils/mapPreviewCache';
 import { escapeHtml } from '../../utils/html';

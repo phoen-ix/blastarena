@@ -27,7 +27,7 @@ import {
 import { escapeHtml, escapeAttr } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { EnemyTextureGenerator } from '../../game/EnemyTextureGenerator';
-import game from '../../main';
+import { game } from '../../main';
 
 type ViewMode = 'worlds' | 'enemies' | 'replays';
 

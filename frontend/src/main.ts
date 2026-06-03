@@ -72,4 +72,7 @@ async function boot(): Promise<Phaser.Game> {
 
 boot();
 
-export default game!;
+// Named export of the `let` so importers get a LIVE binding to the instance assigned inside the
+// async boot(). A `export default game` would snapshot `undefined` (boot() runs after this line),
+// which is why non-scene modules (e.g. OpenWorldView) previously saw `game` as undefined.
+export { game };

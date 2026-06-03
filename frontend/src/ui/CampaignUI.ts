@@ -18,7 +18,7 @@ import { LocalCoopP2Identity } from '../game/LocalCoopInput';
 import { renderMapPreview } from '../utils/mapPreview';
 import { getCampaignLevelTiles } from '../utils/mapPreviewCache';
 import { t } from '../i18n';
-import game from '../main';
+import { game } from '../main';
 
 interface CampaignLevel {
   id: number;

@@ -3,7 +3,7 @@ import { NotificationUI } from '../NotificationUI';
 import { escapeHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { GameState, ReplayData } from '@blast-arena/shared';
-import game from '../../main';
+import { game } from '../../main';
 import { t } from '../../i18n';
 
 export class MatchesTab {

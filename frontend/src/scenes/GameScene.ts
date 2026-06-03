@@ -662,8 +662,15 @@ export class GameScene extends Phaser.Scene {
       };
       this.socketClient.on('openworld:roundStart', this.openWorldRoundStartHandler);
 
-      // Handle AFK kick — return to lobby
+      // Handle AFK kick — return to lobby (or back to the landing if this is a background arena
+      // rendered behind the menu, so an idle guest on the landing isn't dropped into the lobby).
       this.openWorldAfkKickHandler = () => {
+        if (this.registry.get('openWorldBackground')) {
+          this.registry.remove('openWorldBackground');
+          this.scene.stop('HUDScene');
+          this.scene.stop(); // stop self; MenuScene stays up over the (now empty) canvas
+          return;
+        }
         this.registry.remove('currentRoom');
         this.scene.stop('HUDScene');
         this.scene.start('LobbyScene');

@@ -267,7 +267,7 @@ export class LobbyUI {
       const createMapBtn = this.container.querySelector('#create-map-btn');
       if (createMapBtn) {
         createMapBtn.addEventListener('click', async () => {
-          const game = (await import('../main')).default;
+          const game = (await import('../main')).game;
           game.registry.set('editorMode', 'custom_map');
           game.registry.set('customMapId', null);
           const lobbyScene = game.scene.getScene('LobbyScene');

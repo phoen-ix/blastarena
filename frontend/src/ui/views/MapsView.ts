@@ -3,7 +3,7 @@ import { ApiClient } from '../../network/ApiClient';
 import { CustomMapSummary } from '@blast-arena/shared';
 import { escapeHtml } from '../../utils/html';
 import { t } from '../../i18n';
-import game from '../../main';
+import { game } from '../../main';
 
 export class MapsView implements ILobbyView {
   readonly viewId = 'maps';

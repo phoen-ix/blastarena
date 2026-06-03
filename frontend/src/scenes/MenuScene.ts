@@ -7,12 +7,23 @@ import { NotificationUI } from '../ui/NotificationUI';
 import { themeManager } from '../themes/ThemeManager';
 import { API_URL } from '../config';
 import { t } from '../i18n';
+import type { GameState } from '@blast-arena/shared';
 
 interface OpenWorldStatus {
   enabled: boolean;
   playerCount: number;
   maxPlayers: number;
   guestAccess: boolean;
+}
+
+/** Callback payload from the `openworld:join` socket ack. */
+interface OpenWorldJoinResponse {
+  success: boolean;
+  playerId?: number;
+  username?: string;
+  isGuest?: boolean;
+  state?: GameState;
+  error?: string;
 }
 
 export class MenuScene extends Phaser.Scene {
@@ -22,12 +33,24 @@ export class MenuScene extends Phaser.Scene {
   private authUI!: AuthUI;
   private landingContainer: HTMLElement | null = null;
   private connectingText: Phaser.GameObjects.Text | null = null;
+  // Open-world arena rendered live behind the landing menu.
+  private bgArenaStarted = false; // GameScene launched & live
+  private bgJoinInFlight = false; // openworld:join emitted, awaiting ack
+  private pendingReveal = false; // "Play as Guest" clicked before the join completed
+  private bgConnectHandler: (() => void) | null = null;
 
   constructor() {
     super({ key: 'MenuScene' });
   }
 
   create(): void {
+    // Phaser reuses scene instances — reset all session state at the top of create().
+    this.bgArenaStarted = false;
+    this.bgJoinInFlight = false;
+    this.pendingReveal = false;
+    this.bgConnectHandler = null;
+    this.events.once('shutdown', this.shutdown, this);
+
     this.notifications = new NotificationUI();
     this.authManager = new AuthManager();
     this.socketClient = new SocketClient(this.authManager);
@@ -114,6 +137,12 @@ export class MenuScene extends Phaser.Scene {
     const showGuest = owStatus?.enabled && owStatus?.guestAccess;
     const playerCount = owStatus?.playerCount ?? 0;
 
+    // Render the live open-world arena behind the menu (auto-join a guest) when open world + guest
+    // access are enabled. The DOM menu buttons stay overlaid on top of the game canvas.
+    if (showGuest) {
+      this.startBackgroundArena();
+    }
+
     this.landingContainer = document.createElement('div');
     this.landingContainer.className = 'menu-landing';
     this.landingContainer.innerHTML = `
@@ -143,11 +172,13 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.landingContainer.querySelector('#menu-login-btn')!.addEventListener('click', () => {
+      this.leaveBackgroundArena();
       this.hideLanding();
       this.showAuth();
     });
 
     this.landingContainer.querySelector('#menu-register-btn')!.addEventListener('click', () => {
+      this.leaveBackgroundArena();
       this.hideLanding();
       this.showAuth();
     });
@@ -161,10 +192,100 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private onGuestPlay(): void {
+    if (this.bgArenaStarted && this.scene.isActive('GameScene')) {
+      // The arena is already live + interactive behind the menu — just reveal it.
+      this.revealArena();
+      return;
+    }
+    if (this.bgJoinInFlight) {
+      // Join still in flight — reveal as soon as the ack arrives.
+      this.pendingReveal = true;
+      return;
+    }
+    // No background arena (open world disabled, or join failed) — use the standard lobby flow.
+    this.enterGuestViaLobby();
+  }
+
+  /** Connect as a guest and auto-join the open world to render the arena behind the landing menu. */
+  private startBackgroundArena(): void {
+    if (this.bgArenaStarted || this.bgJoinInFlight) return;
+    this.socketClient.connectAsGuest();
+    if (this.socketClient.isConnected()) {
+      this.joinBackgroundWorld();
+    } else {
+      const socket = this.socketClient.getSocket();
+      if (!socket) return;
+      // Emit the join once the socket actually connects (connectAsGuest is async).
+      this.bgConnectHandler = () => this.joinBackgroundWorld();
+      socket.once('connect', this.bgConnectHandler);
+    }
+  }
+
+  private joinBackgroundWorld(): void {
+    if (this.bgArenaStarted || this.bgJoinInFlight) return;
+    const socket = this.socketClient.getSocket();
+    if (!socket) return;
+    this.bgJoinInFlight = true;
+    socket.emit('openworld:join', {}, (response: OpenWorldJoinResponse) => {
+      this.bgJoinInFlight = false;
+      if (response?.success && response.state) {
+        if (response.isGuest && response.playerId && response.username) {
+          this.authManager.setGuestIdentity(response.playerId, response.username);
+        }
+        this.registry.set('initialGameState', response.state);
+        this.registry.set('openWorldMode', true);
+        this.registry.set('openWorldPlayerId', response.playerId);
+        // Mark this as a background arena so GameScene's AFK-kick handler returns to the landing
+        // (instead of dropping into the lobby) if the idle guest is kicked while on the menu.
+        this.registry.set('openWorldBackground', true);
+        // Launch the arena as a live background and keep this menu (title) on top. The DOM landing
+        // buttons in #ui-overlay already sit above the game canvas. HUD is launched later, on reveal.
+        this.scene.launch('GameScene');
+        this.scene.bringToTop('MenuScene');
+        this.bgArenaStarted = true;
+        if (this.pendingReveal) this.revealArena();
+      } else if (this.pendingReveal) {
+        // Join failed but the user already asked to play — fall back to the lobby flow.
+        this.pendingReveal = false;
+        this.enterGuestViaLobby();
+      }
+    });
+  }
+
+  /** Reveal the already-running background arena: drop the menu, show the HUD, take control. */
+  private revealArena(): void {
+    // No longer a background arena — restore normal foreground AFK behavior (kick → lobby).
+    this.registry.remove('openWorldBackground');
+    this.hideLanding();
+    this.scene.launch('HUDScene');
+    this.scene.stop('MenuScene');
+  }
+
+  /** Fallback guest entry when no background arena is running (open world disabled / join failed). */
+  private enterGuestViaLobby(): void {
     this.hideLanding();
     this.socketClient.connectAsGuest();
     this.registry.set('guestOpenWorld', true);
     this.scene.start('LobbyScene');
+  }
+
+  /** Tear down the background arena + guest session before showing the auth screen. */
+  private leaveBackgroundArena(): void {
+    if (this.bgArenaStarted) {
+      this.scene.stop('GameScene');
+      if (this.scene.isActive('HUDScene')) this.scene.stop('HUDScene');
+    }
+    if (this.bgConnectHandler) {
+      this.socketClient.getSocket()?.off('connect', this.bgConnectHandler);
+      this.bgConnectHandler = null;
+    }
+    this.bgArenaStarted = false;
+    this.bgJoinInFlight = false;
+    this.pendingReveal = false;
+    this.registry.remove('openWorldBackground');
+    // Drop the idle guest socket + identity; the server removes the guest player on disconnect.
+    this.socketClient.disconnect();
+    this.authManager.clearGuest();
   }
 
   private showAuth(): void {
@@ -191,5 +312,18 @@ export class MenuScene extends Phaser.Scene {
       this.scene.start('LobbyScene');
     });
     ui.show();
+  }
+
+  /**
+   * Phaser does not auto-call shutdown — registered via `events.once('shutdown')` in create().
+   * Cleans up the landing DOM + any pending connect listener. Does NOT disconnect the socket: when
+   * we transition into the revealed arena, GameScene keeps using the same (guest) socket.
+   */
+  private shutdown(): void {
+    this.hideLanding();
+    if (this.bgConnectHandler) {
+      this.socketClient.getSocket()?.off('connect', this.bgConnectHandler);
+      this.bgConnectHandler = null;
+    }
   }
 }
