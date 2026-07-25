@@ -7,13 +7,14 @@ A multiplayer online grid-based explosive arena game built with Phaser.js and No
 ```bash
 # Clone and configure
 cp .env.example .env
-# Edit .env — at minimum set JWT_SECRET and DB_PASSWORD
+# Edit .env — production requires DB_PASSWORD, DB_ROOT_PASSWORD, JWT_SECRET,
+# EMAIL_PEPPER, and TOTP_ENCRYPTION_KEY (each >=32 chars; e.g. openssl rand -hex 32)
+
+# Production (default)
+docker compose up --build -d
 
 # Development (hot reload)
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
-
-# Production
-docker compose up --build -d
 ```
 
 In production, Nginx binds to `127.0.0.1:8280` (loopback only) and is expected to sit behind a host-level reverse proxy that terminates TLS and forwards traffic to it. For local/dev use, open the app on the proxied port (or forward `127.0.0.1:8280`). See `.env.example` for all configuration options.

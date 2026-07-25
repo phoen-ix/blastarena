@@ -6,9 +6,15 @@ Multiplayer online grid-based explosive arena game.
 - Monorepo with npm workspaces: `shared/`, `backend/`, `frontend/`
 - Docker Compose for orchestration (MariaDB, Redis, Node.js backend, Nginx)
 
-## Development
+## Running
+Production is the canonical run mode for this deployment (plain `docker compose up` = prod; nginx on `127.0.0.1:8280` behind a host-level TLS proxy).
 ```bash
-cp .env.example .env
+cp .env.example .env  # prod requires DB passwords, JWT_SECRET, EMAIL_PEPPER, TOTP_ENCRYPTION_KEY (>=32 chars each)
+
+# Production (default)
+docker compose up --build -d
+
+# Development (hot reload)
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
