@@ -140,6 +140,16 @@ export class GameScene extends Phaser.Scene {
     | ((data: { roundNumber: number; state: GameState }) => void)
     | null = null;
   private openWorldAfkKickHandler: (() => void) | null = null;
+  private openWorldInfoHandler:
+    | ((data: {
+        playerCount: number;
+        maxPlayers: number;
+        roundTimeRemaining: number;
+        roundNumber: number;
+        leaderboard: OpenWorldScoreEntry[];
+      }) => void)
+    | null = null;
+  private openWorldScoreHandler: ((entry: OpenWorldScoreEntry) => void) | null = null;
 
   // Campaign pause
   private paused: boolean = false;
@@ -235,6 +245,14 @@ export class GameScene extends Phaser.Scene {
     if (this.openWorldAfkKickHandler) {
       this.socketClient.off('openworld:afkKick', this.openWorldAfkKickHandler);
       this.openWorldAfkKickHandler = null;
+    }
+    if (this.openWorldInfoHandler) {
+      this.socketClient.off('openworld:info', this.openWorldInfoHandler);
+      this.openWorldInfoHandler = null;
+    }
+    if (this.openWorldScoreHandler) {
+      this.socketClient.off('openworld:scoreUpdate', this.openWorldScoreHandler);
+      this.openWorldScoreHandler = null;
     }
 
     // Detect open world mode
@@ -675,6 +693,19 @@ export class GameScene extends Phaser.Scene {
         this.events.emit('openWorldRoundStart', data);
       };
       this.socketClient.on('openworld:roundStart', this.openWorldRoundStartHandler);
+
+      // Scoreboard feed for the HUD. Cached in the registry because HUDScene can mount later
+      // than this scene (the landing's background arena only shows its HUD once revealed).
+      this.openWorldInfoHandler = (data) => {
+        this.registry.set('openWorldInfo', data);
+        this.events.emit('openWorldInfo', data);
+      };
+      this.socketClient.on('openworld:info', this.openWorldInfoHandler);
+
+      this.openWorldScoreHandler = (entry) => {
+        this.events.emit('openWorldScoreUpdate', entry);
+      };
+      this.socketClient.on('openworld:scoreUpdate', this.openWorldScoreHandler);
 
       // Handle AFK kick — return to lobby (or back to the landing if this is a background arena
       // rendered behind the menu, so an idle guest on the landing isn't dropped into the lobby).
@@ -1785,6 +1816,14 @@ export class GameScene extends Phaser.Scene {
       this.socketClient.off('openworld:afkKick', this.openWorldAfkKickHandler);
       this.openWorldAfkKickHandler = null;
     }
+    if (this.openWorldInfoHandler) {
+      this.socketClient.off('openworld:info', this.openWorldInfoHandler);
+      this.openWorldInfoHandler = null;
+    }
+    if (this.openWorldScoreHandler) {
+      this.socketClient.off('openworld:scoreUpdate', this.openWorldScoreHandler);
+      this.openWorldScoreHandler = null;
+    }
     this.socketClient.off('sim:state');
     this.socketClient.off('sim:gameTransition');
     this.socketClient.off('sim:completed');
@@ -1813,6 +1852,8 @@ export class GameScene extends Phaser.Scene {
     this.localCoopMode = false;
     this.buddyMode = false;
     this.openWorldMode = false;
+    // Cached scoreboard snapshot must not seed a later session's HUD
+    this.registry.remove('openWorldInfo');
     this.localCoopInput?.destroy();
     this.localCoopInput = null;
     this.localP2Id = 0;

@@ -622,5 +622,25 @@
     "toggleLog": "Prze\u0142\u0105cz panel log\u00f3w",
     "gameLog": "Log gry",
     "clickToSeek": "Kliknij, aby przewin\u0105\u0107"
+  },
+  "openWorld": {
+    "title": "Otwarty świat",
+    "playerCount": "{{current}}/{{max}} graczy",
+    "roundTimer": "Runda kończy się za {{time}}",
+    "roundNumber": "Runda {{number}}",
+    "leaderboard": "Ranking",
+    "joinButton": "Dołącz do świata",
+    "leaveButton": "Opuść świat",
+    "joining": "Dołączanie...",
+    "kills": "Zabójstwa",
+    "deaths": "Śmierci",
+    "score": "Punkty",
+    "noPlayers": "Brak graczy",
+    "disabled": "Otwarty świat jest offline",
+    "full": "Otwarty świat jest pełny",
+    "respawning": "Odrodzenie za {{seconds}}s...",
+    "roundEnd": "Koniec rundy",
+    "roundStart": "Nowa runda",
+    "nextRound": "Następna runda za {{seconds}}s"
   }
 }

@@ -160,6 +160,14 @@ On disconnect, the server:
 |-------|---------|-------------|------------|
 | `rematch:vote` | `{ vote: boolean }` + callback | Vote for or against a rematch after game ends. Only human players (id > 0) can vote. 30-second timeout. If >50% vote yes, room resets to waiting and `rematch:triggered` is broadcast | -- |
 
+### Open World Events
+
+| Event | Payload | Description | Rate Limit |
+|-------|---------|-------------|------------|
+| `openworld:join` | `{ username?: string }` + callback | Join the persistent world. Callback returns `{ success, playerId, username, isGuest, state, error }`. Guests are assigned a negative id from `OPENWORLD_GUEST_ID_START` and a generated name. Re-joining with a known userId re-binds the existing player to the new socket. On success the socket joins the `openworld` room and an `openworld:info` snapshot is broadcast | -- |
+| `openworld:leave` | _(none)_ | Leave the world. Flushes pending stats for registered users and broadcasts `openworld:playerLeft` + `openworld:info` | -- |
+| `openworld:input` | `PlayerInput` | Movement/bomb input. Guest-accessible, so it is validated like `game:input` and ignored during the between-round freeze | 30/s (openWorldInput) |
+
 ## Server-to-Client Events
 
 ### Room Events
@@ -269,6 +277,21 @@ On disconnect, the server:
 | `rematch:update` | `{ votes: { userId, username, vote }[], threshold: number, totalPlayers: number }` | `room:{code}` | Updated rematch vote tally. `threshold` is `floor(totalPlayers / 2) + 1` |
 | `rematch:triggered` | _(none)_ | `room:{code}` | Rematch threshold met -- room is resetting to waiting state |
 
+### Open World Events
+
+All open world events are scoped to the `openworld` room, which a socket enters via `openworld:join`. Discrete game events (`game:explosion`, `game:bombThrown`, `game:powerupCollected`, `game:playerDied`) are emitted to the same room so the shared HUD/effect code works unchanged.
+
+| Event | Payload | Scope | Description |
+|-------|---------|-------|-------------|
+| `openworld:state` | `GameState` | `openworld` | World state every tick (20 ticks/sec), including during the between-round freeze |
+| `openworld:playerJoined` | `{ id: number, username: string, isGuest: boolean }` | `openworld` | Someone entered the world |
+| `openworld:playerLeft` | `{ id: number, username: string }` | `openworld` | Someone left, disconnected or was AFK-kicked |
+| `openworld:info` | `{ playerCount, maxPlayers, roundTimeRemaining, roundNumber, leaderboard: OpenWorldScoreEntry[] }` | `openworld` | Round + scoreboard snapshot. `leaderboard` is the FULL standings sorted by score (clients rank by array index). Sent every `OPENWORLD_INFO_BROADCAST_TICKS` (5s) and immediately after a join, a leave and a round start |
+| `openworld:scoreUpdate` | `OpenWorldScoreEntry` (`{ playerId, username, kills, deaths, score, isGuest }`) | `openworld` | One player's score changed. Emitted for both killer (+2) and victim (-1, floored at 0) on every death so the HUD board moves without waiting for the next snapshot |
+| `openworld:roundEnd` | `{ roundNumber: number, leaderboard: OpenWorldScoreEntry[], nextRoundIn: number }` | `openworld` | Round timer expired. Final standings; the world freezes for `OPENWORLD_ROUND_FREEZE_TICKS` before regenerating |
+| `openworld:roundStart` | `{ roundNumber: number, state: GameState }` | `openworld` | New round with a regenerated map and reset scores |
+| `openworld:afkKick` | _(none)_ | target socket | Player was removed for inactivity (`open_world_afk_timeout`, 0 disables) |
+
 ### Error Events
 
 | Event | Payload | Scope | Description |
@@ -298,6 +321,7 @@ On disconnect, the server:
 | dmChatLimiter | `dm:send` | 5/s | DM throttle |
 | spectatorChatLimiter | `game:spectatorChat` | 3/s | Spectator chat throttle (per-socket instance) |
 | campaignStartLimiter | `campaign:start` | 1/s | Prevent rapid campaign restarts |
+| openWorldInputLimiter | `openworld:input` | 30/s | Same headroom as `game:input`; this path is guest-accessible |
 
 ### Per-IP Limits
 

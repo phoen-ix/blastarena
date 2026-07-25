@@ -622,5 +622,25 @@
     "toggleLog": "Protokoll umschalten",
     "gameLog": "Spielprotokoll",
     "clickToSeek": "Klicken zum Spulen"
+  },
+  "openWorld": {
+    "title": "Offene Welt",
+    "playerCount": "{{current}}/{{max}} Spieler",
+    "roundTimer": "Runde endet in {{time}}",
+    "roundNumber": "Runde {{number}}",
+    "leaderboard": "Rangliste",
+    "joinButton": "Welt betreten",
+    "leaveButton": "Welt verlassen",
+    "joining": "Trete bei...",
+    "kills": "Kills",
+    "deaths": "Tode",
+    "score": "Punkte",
+    "noPlayers": "Noch keine Spieler",
+    "disabled": "Offene Welt ist derzeit offline",
+    "full": "Offene Welt ist voll",
+    "respawning": "Wiedereinstieg in {{seconds}}s...",
+    "roundEnd": "Runde vorbei",
+    "roundStart": "Neue Runde startet",
+    "nextRound": "Nächste Runde in {{seconds}}s"
   }
 }

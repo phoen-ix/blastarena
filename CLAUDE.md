@@ -108,7 +108,8 @@ Persistent bomb arena as default landing experience. Players auto-join on page l
 - **Guest auth bar**: HUDScene mounts a bottom-center Login/Register bar for open-world guests (`.hud-auth-bar`). Auth form opens OVER the live game (`GameScene.setInputBlocked`, registry `authOverlayOpen`); closable via ✕/Escape. Teardown only on successful login → fresh MenuScene auto-login → lobby → auto-rejoin as account
 - **Landing docks on first input**: the arena is interactive behind the landing — first game key/gamepad press calls `MenuScene.dockLanding()` (`.menu-landing--docked`): title fades, buttons slide into a compact bottom bar. Gated on a live arena; Play-as-Guest handoff to the HUD bar is seamless (`authBarNoAnim` registry flag)
 - **Constants**: `shared/src/constants/openworld.ts`. Settings in `server_settings` (keys prefixed `open_world_`)
-- **WIP**: HUD round timer/leaderboard
+- **HUD scoreboard**: open world hides `.hud-players` and mounts `.hud-ow-board` (rank/name/K-D/score, own row pinned when below the cut-off) plus a `.hud-round` chip under the timer. Fed by `openworld:info` (authoritative full standings — replace, don't merge) and `openworld:scoreUpdate` (per-kill delta), both registered on the socket by HUDScene with handler refs removed in `shutdown()`. Round transitions come via GameScene's `openWorldRoundEnd`/`openWorldRoundStart` Phaser events → `.hud-ow-roundend` overlay with next-round countdown
+- **Leaderboard data**: `OpenWorldManager.getLeaderboard()` returns FULL standings (clients rank by array index — truncating would fake positions). Pushed on join (from `socket.ts`, after `socket.join('openworld')`), on leave, on round start, and every `OPENWORLD_INFO_BROADCAST_TICKS`. The lobby `OpenWorldView` is outside the socket room, so it polls `/admin/settings/open_world/status` (which carries the same `leaderboard`) every 10s
 
 ## Game Reference
 

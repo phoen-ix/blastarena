@@ -622,5 +622,25 @@
     "toggleLog": "Vis/skjul logpanel",
     "gameLog": "Spillog",
     "clickToSeek": "Klik for at s\u00f8ge"
+  },
+  "openWorld": {
+    "title": "Åben verden",
+    "playerCount": "{{current}}/{{max}} spillere",
+    "roundTimer": "Runden slutter om {{time}}",
+    "roundNumber": "Runde {{number}}",
+    "leaderboard": "Rangliste",
+    "joinButton": "Gå ind i verdenen",
+    "leaveButton": "Forlad verdenen",
+    "joining": "Forbinder...",
+    "kills": "Drab",
+    "deaths": "Dødsfald",
+    "score": "Score",
+    "noPlayers": "Ingen spillere endnu",
+    "disabled": "Åben verden er offline lige nu",
+    "full": "Åben verden er fuld",
+    "respawning": "Genopstår om {{seconds}}s...",
+    "roundEnd": "Runden er slut",
+    "roundStart": "Ny runde starter",
+    "nextRound": "Næste runde om {{seconds}}s"
   }
 }

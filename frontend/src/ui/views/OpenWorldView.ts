@@ -12,6 +12,7 @@ interface OpenWorldStatus {
   roundTimeRemaining: number;
   roundNumber: number;
   guestAccess: boolean;
+  leaderboard?: OpenWorldScoreEntry[];
 }
 
 interface OpenWorldInfo {
@@ -19,6 +20,7 @@ interface OpenWorldInfo {
   maxPlayers: number;
   roundTimeRemaining: number;
   roundNumber: number;
+  leaderboard: OpenWorldScoreEntry[];
 }
 
 /** Callback payload from the `openworld:join` socket ack. */
@@ -29,6 +31,7 @@ interface OpenWorldJoinResponse {
   isGuest?: boolean;
   state?: GameState;
   error?: string;
+  info?: { roundNumber: number; leaderboard: OpenWorldScoreEntry[] };
 }
 
 export class OpenWorldView implements ILobbyView {
@@ -43,7 +46,6 @@ export class OpenWorldView implements ILobbyView {
   private deps: ViewDeps;
   private container: HTMLElement | null = null;
   private infoHandler: ((data: OpenWorldInfo) => void) | null = null;
-  private scoreHandler: ((data: OpenWorldScoreEntry) => void) | null = null;
   private roundEndHandler:
     | ((data: {
         roundNumber: number;
@@ -126,7 +128,24 @@ export class OpenWorldView implements ILobbyView {
             ${t('ui:openWorld.joinButton')}
           </button>
         </div>
+        <div class="panel-content" style="padding:1rem; margin-top:1rem;">
+          <div class="panel-header" style="padding:0 0 0.5rem;">${t('ui:openWorld.leaderboard')}</div>
+          <table class="data-table" id="ow-board">
+            <thead>
+              <tr>
+                <th style="width:2rem;">${t('ui:leaderboard.hashSymbol')}</th>
+                <th style="text-align:left;">${t('ui:leaderboard.player')}</th>
+                <th>${t('ui:openWorld.kills')}</th>
+                <th>${t('ui:openWorld.deaths')}</th>
+                <th>${t('ui:openWorld.score')}</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>`;
+
+    this.renderLeaderboard(status.leaderboard ?? []);
 
     this.container.querySelector('#ow-join-btn')?.addEventListener('click', () => {
       const btn = this.container?.querySelector('#ow-join-btn') as HTMLButtonElement;
@@ -136,6 +155,29 @@ export class OpenWorldView implements ILobbyView {
       }
       this.joinWorld();
     });
+  }
+
+  /** Top standings of the running round (top 10 of the server's full list). */
+  private renderLeaderboard(entries: OpenWorldScoreEntry[]): void {
+    const body = this.container?.querySelector('#ow-board tbody');
+    if (!body) return;
+    if (entries.length === 0) {
+      body.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">
+        ${t('ui:openWorld.noPlayers')}</td></tr>`;
+      return;
+    }
+    body.innerHTML = entries
+      .slice(0, 10)
+      .map(
+        (e, i) => `<tr>
+          <td>${i + 1}</td>
+          <td style="text-align:left;">${escapeHtml(e.username)}</td>
+          <td>${e.kills}</td>
+          <td>${e.deaths}</td>
+          <td>${e.score}</td>
+        </tr>`,
+      )
+      .join('');
   }
 
   private formatTime(seconds: number): string {
@@ -170,6 +212,8 @@ export class OpenWorldView implements ILobbyView {
         game.registry.set('initialGameState', response.state);
         game.registry.set('openWorldMode', true);
         game.registry.set('openWorldPlayerId', response.playerId);
+        // Seeds the HUD scoreboard before the first periodic `openworld:info` arrives
+        if (response.info) game.registry.set('openWorldInfo', response.info);
 
         // Remove all lobby DOM from the overlay so it doesn't cover the game canvas
         const uiOverlay = document.getElementById('ui-overlay');
@@ -223,6 +267,7 @@ export class OpenWorldView implements ILobbyView {
       if (roundEl) {
         roundEl.textContent = t('ui:openWorld.roundNumber', { number: data.roundNumber });
       }
+      this.renderLeaderboard(data.leaderboard);
     };
     this.deps.socketClient.on('openworld:info', this.infoHandler);
 
@@ -239,6 +284,7 @@ export class OpenWorldView implements ILobbyView {
 
   private startTimerCountdown(): void {
     this.stopTimerCountdown();
+    let ticks = 0;
     this.timerInterval = setInterval(() => {
       this.roundTimeRemaining = Math.max(0, this.roundTimeRemaining - 1);
       const timerEl = this.container?.querySelector('#ow-timer');
@@ -247,7 +293,36 @@ export class OpenWorldView implements ILobbyView {
           time: this.formatTime(this.roundTimeRemaining),
         });
       }
+      // `openworld:info` only reaches sockets inside the world room, and this view is shown
+      // after leaving it — re-poll the public status endpoint to keep counts and standings live.
+      if (++ticks % 10 === 0) void this.refreshStatus();
     }, 1000);
+  }
+
+  private async refreshStatus(): Promise<void> {
+    // Only meaningful once the lobby markup is up (skipped while an auto-join is in flight)
+    if (!this.container?.querySelector('#ow-board')) return;
+    try {
+      const res = await fetch(`${API_URL}/admin/settings/open_world/status`);
+      if (!res.ok) return;
+      const status: OpenWorldStatus = await res.json();
+      if (!this.container) return; // view destroyed while the request was in flight
+      this.roundTimeRemaining = status.roundTimeRemaining;
+      const playersEl = this.container.querySelector('#ow-players');
+      if (playersEl) {
+        playersEl.textContent = t('ui:openWorld.playerCount', {
+          current: status.playerCount,
+          max: status.maxPlayers,
+        });
+      }
+      const roundEl = this.container.querySelector('#ow-round');
+      if (roundEl) {
+        roundEl.textContent = t('ui:openWorld.roundNumber', { number: status.roundNumber });
+      }
+      this.renderLeaderboard(status.leaderboard ?? []);
+    } catch {
+      // Transient failure — the next poll retries
+    }
   }
 
   private stopTimerCountdown(): void {
@@ -262,10 +337,6 @@ export class OpenWorldView implements ILobbyView {
     if (this.infoHandler) {
       this.deps.socketClient.off('openworld:info', this.infoHandler);
       this.infoHandler = null;
-    }
-    if (this.scoreHandler) {
-      this.deps.socketClient.off('openworld:scoreUpdate', this.scoreHandler);
-      this.scoreHandler = null;
     }
     if (this.roundEndHandler) {
       this.deps.socketClient.off('openworld:roundEnd', this.roundEndHandler);

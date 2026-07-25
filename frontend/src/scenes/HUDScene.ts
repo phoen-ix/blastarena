@@ -5,6 +5,7 @@ import {
   CampaignGameState,
   TileType,
   KillCause,
+  OpenWorldScoreEntry,
 } from '@blast-arena/shared';
 import { escapeHtml } from '../utils/html';
 import { SpectatorChat } from '../game/SpectatorChat';
@@ -68,6 +69,34 @@ export class HUDScene extends Phaser.Scene {
   private authBarEl: HTMLElement | null = null;
   private authUI: AuthUI | null = null;
 
+  // Open world: round counter + live leaderboard + end-of-round scoreboard
+  private openWorldMode: boolean = false;
+  private owBoardEl: HTMLElement | null = null;
+  private owRowsEl: HTMLElement | null = null;
+  private owRoundEl: HTMLElement | null = null;
+  private owRoundNumber: number = 0;
+  private owScores: Map<number, OpenWorldScoreEntry> = new Map();
+  private owRoundEndEl: HTMLElement | null = null;
+  private owNextRoundTimer: ReturnType<typeof setInterval> | null = null;
+  private owInfoHandler:
+    | ((data: {
+        playerCount: number;
+        maxPlayers: number;
+        roundTimeRemaining: number;
+        roundNumber: number;
+        leaderboard: OpenWorldScoreEntry[];
+      }) => void)
+    | null = null;
+  private owScoreHandler: ((entry: OpenWorldScoreEntry) => void) | null = null;
+  private owRoundEndHandler:
+    | ((data: {
+        roundNumber: number;
+        leaderboard: OpenWorldScoreEntry[];
+        nextRoundIn: number;
+      }) => void)
+    | null = null;
+  private owRoundStartHandler: ((data: { roundNumber: number }) => void) | null = null;
+
   // Minimap
   private minimapContainer: HTMLElement | null = null;
   private minimapCanvas: HTMLCanvasElement | null = null;
@@ -92,6 +121,10 @@ export class HUDScene extends Phaser.Scene {
     this.killFeedEl?.remove();
     this.authBarEl?.remove();
     this.authBarEl = null;
+    this.teardownOpenWorldHud();
+    this.owScores.clear();
+    this.owRoundNumber = 0;
+    this.openWorldMode = false;
 
     this.events.once('shutdown', this.shutdown, this);
 
@@ -131,7 +164,10 @@ export class HUDScene extends Phaser.Scene {
     this.hudContainer.className = 'hud-container';
     this.hudContainer.innerHTML = `
       <div class="hud-top">
-        <div class="hud-timer" id="hud-timer">${noTimeLimit ? '0:00' : '3:00'}</div>
+        <div class="hud-top-left">
+          <div class="hud-timer" id="hud-timer">${noTimeLimit ? '0:00' : '3:00'}</div>
+          <div class="hud-round" id="hud-round" style="display:none;"></div>
+        </div>
       </div>
       <div class="hud-spectator-banner" id="hud-spectator" style="display:none;">
         ${t('ui:hud.spectator')}
@@ -178,6 +214,15 @@ export class HUDScene extends Phaser.Scene {
     const gameSceneRef = this.scene.get('GameScene') as GameScene | null;
     if (gameSceneRef?.isOpenWorld && authManager.isGuest) {
       this.mountAuthBar();
+    }
+
+    // Open world: a flat list of up to 32 players is unreadable, so it gives way to a live
+    // leaderboard, and the persistent round counter joins the round timer.
+    this.openWorldMode = !!gameSceneRef?.isOpenWorld;
+    if (this.openWorldMode) {
+      this.playerListEl.style.display = 'none';
+      this.mountOpenWorldBoard(overlay);
+      this.bindOpenWorldEvents(gameSceneRef);
     }
 
     // Spectate click handler
@@ -506,8 +551,8 @@ export class HUDScene extends Phaser.Scene {
       }
     }
 
-    // Player list
-    const playersEl = document.getElementById('hud-players');
+    // Player list (open world renders the leaderboard instead)
+    const playersEl = this.openWorldMode ? null : document.getElementById('hud-players');
     if (playersEl) {
       const isTeamMode = state.players.some((p) => p.team !== null && p.team !== undefined);
       const sorted = [...state.players].sort((a, b) => {
@@ -776,6 +821,218 @@ export class HUDScene extends Phaser.Scene {
     }
   }
 
+  // ---------------- Open world HUD ----------------
+
+  /** Live scoreboard docked where the player list sits in a normal match. */
+  private mountOpenWorldBoard(overlay: HTMLElement | null): void {
+    this.owRoundEl = document.getElementById('hud-round');
+    this.owBoardEl = document.createElement('div');
+    this.owBoardEl.className = 'hud-ow-board';
+    this.owBoardEl.innerHTML = `
+      <div class="hud-ow-title">${t('ui:openWorld.leaderboard')}</div>
+      <div class="hud-ow-rows"></div>
+    `;
+    this.owRowsEl = this.owBoardEl.querySelector('.hud-ow-rows');
+    overlay?.appendChild(this.owBoardEl);
+    this.renderOpenWorldBoard();
+  }
+
+  /** All open-world socket listeners live on GameScene; the HUD only consumes its Phaser events. */
+  private bindOpenWorldEvents(gameScene: GameScene | null): void {
+    this.owRoundEndHandler = (data) => this.showRoundEndOverlay(data);
+    gameScene?.events.on('openWorldRoundEnd', this.owRoundEndHandler);
+
+    this.owRoundStartHandler = (data) => {
+      this.owRoundNumber = data.roundNumber;
+      // Server resets every score for the new round; the fresh board arrives with the next info
+      this.owScores.clear();
+      this.updateRoundChip();
+      this.renderOpenWorldBoard();
+      this.hideRoundEndOverlay();
+    };
+    gameScene?.events.on('openWorldRoundStart', this.owRoundStartHandler);
+
+    this.owInfoHandler = (data) => {
+      this.owRoundNumber = data.roundNumber;
+      this.updateRoundChip();
+      // Authoritative full standings — replace rather than merge, so players who left the world
+      // (or dropped in score) don't linger on the board
+      this.owScores.clear();
+      for (const entry of data.leaderboard) {
+        this.owScores.set(entry.playerId, entry);
+      }
+      this.renderOpenWorldBoard();
+    };
+    gameScene?.events.on('openWorldInfo', this.owInfoHandler);
+
+    // Kills move the board immediately instead of waiting for the next 5s snapshot
+    this.owScoreHandler = (entry) => {
+      this.owScores.set(entry.playerId, entry);
+      this.renderOpenWorldBoard();
+    };
+    gameScene?.events.on('openWorldScoreUpdate', this.owScoreHandler);
+
+    // Seed from the last snapshot GameScene saw (or the one carried in the join ack), so the
+    // board isn't blank until the next 5s broadcast — the HUD can mount long after the arena.
+    const seed = this.registry.get('openWorldInfo') as
+      | { roundNumber: number; leaderboard: OpenWorldScoreEntry[] }
+      | undefined;
+    if (seed) {
+      this.owRoundNumber = seed.roundNumber;
+      this.updateRoundChip();
+      for (const entry of seed.leaderboard) {
+        this.owScores.set(entry.playerId, entry);
+      }
+      this.renderOpenWorldBoard();
+    }
+  }
+
+  private updateRoundChip(): void {
+    if (!this.owRoundEl) return;
+    if (this.owRoundNumber <= 0) {
+      this.owRoundEl.style.display = 'none';
+      return;
+    }
+    this.owRoundEl.style.display = '';
+    this.owRoundEl.textContent = t('ui:openWorld.roundNumber', { number: this.owRoundNumber });
+  }
+
+  private sortedOpenWorldScores(): OpenWorldScoreEntry[] {
+    return [...this.owScores.values()].sort(
+      (a, b) => b.score - a.score || b.kills - a.kills || a.deaths - b.deaths,
+    );
+  }
+
+  private openWorldRowHtml(entry: OpenWorldScoreEntry, rank: number): string {
+    const self = entry.playerId === this.localPlayerId ? ' self' : '';
+    return `<div class="hud-ow-row${self}">
+      <span class="hud-ow-rank">${rank}</span>
+      <span class="hud-ow-name">${escapeHtml(entry.username)}</span>
+      <span class="hud-ow-kd">${entry.kills}/${entry.deaths}</span>
+      <span class="hud-ow-score">${entry.score}</span>
+    </div>`;
+  }
+
+  /** Top slots plus the local player's own row when they rank below the visible cut-off. */
+  private renderOpenWorldBoard(): void {
+    if (!this.owRowsEl) return;
+    const entries = this.sortedOpenWorldScores();
+    if (entries.length === 0) {
+      this.owRowsEl.innerHTML = `<div class="hud-ow-empty">${t('ui:openWorld.noPlayers')}</div>`;
+      return;
+    }
+
+    const visible = 8;
+    const rows = entries.slice(0, visible).map((e, i) => this.openWorldRowHtml(e, i + 1));
+    const myRank = entries.findIndex((e) => e.playerId === this.localPlayerId);
+    if (myRank >= visible) {
+      rows.push('<div class="hud-ow-gap">···</div>');
+      rows.push(this.openWorldRowHtml(entries[myRank], myRank + 1));
+    }
+    this.owRowsEl.innerHTML = rows.join('');
+  }
+
+  private showRoundEndOverlay(data: {
+    roundNumber: number;
+    leaderboard: OpenWorldScoreEntry[];
+    nextRoundIn: number;
+  }): void {
+    this.hideRoundEndOverlay();
+    this.owRoundNumber = data.roundNumber;
+    this.updateRoundChip();
+
+    // Final standings also seed the live board, so it matches the overlay behind it
+    this.owScores.clear();
+    for (const entry of data.leaderboard) {
+      this.owScores.set(entry.playerId, entry);
+    }
+    this.renderOpenWorldBoard();
+
+    const rows = data.leaderboard
+      .slice(0, 10)
+      .map(
+        (e, i) => `<tr class="${e.playerId === this.localPlayerId ? 'self' : ''}">
+          <td class="hud-ow-rank">${i + 1}</td>
+          <td>${escapeHtml(e.username)}</td>
+          <td>${e.kills}</td>
+          <td>${e.deaths}</td>
+          <td class="hud-ow-score">${e.score}</td>
+        </tr>`,
+      )
+      .join('');
+
+    this.owRoundEndEl = document.createElement('div');
+    this.owRoundEndEl.className = 'hud-ow-roundend';
+    this.owRoundEndEl.innerHTML = `
+      <div class="hud-ow-roundend-title">${t('ui:openWorld.roundEnd')}</div>
+      <div class="hud-ow-roundend-sub">${t('ui:openWorld.roundNumber', { number: data.roundNumber })}</div>
+      <table class="hud-ow-roundend-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th></th>
+            <th>${t('ui:openWorld.kills')}</th>
+            <th>${t('ui:openWorld.deaths')}</th>
+            <th>${t('ui:openWorld.score')}</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="hud-ow-roundend-next"></div>
+    `;
+    document.getElementById('ui-overlay')?.appendChild(this.owRoundEndEl);
+
+    const nextEl = this.owRoundEndEl.querySelector('.hud-ow-roundend-next') as HTMLElement;
+    let seconds = Math.max(0, Math.round(data.nextRoundIn));
+    nextEl.textContent = t('ui:openWorld.nextRound', { seconds });
+    this.owNextRoundTimer = setInterval(() => {
+      seconds--;
+      if (seconds > 0) {
+        nextEl.textContent = t('ui:openWorld.nextRound', { seconds });
+      } else if (seconds > -10) {
+        // Countdown finished — wait for the server's roundStart to clear the overlay
+        nextEl.textContent = t('ui:openWorld.roundStart');
+      } else {
+        // roundStart never arrived (world disabled mid-freeze): don't leave a stuck overlay
+        this.hideRoundEndOverlay();
+      }
+    }, 1000);
+  }
+
+  private hideRoundEndOverlay(): void {
+    if (this.owNextRoundTimer) {
+      clearInterval(this.owNextRoundTimer);
+      this.owNextRoundTimer = null;
+    }
+    this.owRoundEndEl?.remove();
+    this.owRoundEndEl = null;
+  }
+
+  private teardownOpenWorldHud(): void {
+    this.hideRoundEndOverlay();
+    const gameScene = this.scene.get('GameScene');
+    if (this.owRoundEndHandler) {
+      gameScene?.events.off('openWorldRoundEnd', this.owRoundEndHandler);
+      this.owRoundEndHandler = null;
+    }
+    if (this.owRoundStartHandler) {
+      gameScene?.events.off('openWorldRoundStart', this.owRoundStartHandler);
+      this.owRoundStartHandler = null;
+    }
+    if (this.owInfoHandler) {
+      gameScene?.events.off('openWorldInfo', this.owInfoHandler);
+      this.owInfoHandler = null;
+    }
+    if (this.owScoreHandler) {
+      gameScene?.events.off('openWorldScoreUpdate', this.owScoreHandler);
+      this.owScoreHandler = null;
+    }
+    this.owBoardEl?.remove();
+    this.owBoardEl = null;
+    this.owRowsEl = null;
+    this.owRoundEl = null;
+  }
+
   private mountSpectatorChat(): void {
     const socketClient = this.registry.get('socketClient');
     const authManager = this.registry.get('authManager');
@@ -923,6 +1180,7 @@ export class HUDScene extends Phaser.Scene {
     this.killFeedEl?.remove();
     this.authBarEl?.remove();
     this.authBarEl = null;
+    this.teardownOpenWorldHud();
     this.minimapContainer?.remove();
     this.minimapContainer = null;
     this.minimapTiles = null;

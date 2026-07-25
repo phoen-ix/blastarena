@@ -622,5 +622,25 @@
     "toggleLog": "Afficher/masquer le journal",
     "gameLog": "Journal de partie",
     "clickToSeek": "Cliquer pour naviguer"
+  },
+  "openWorld": {
+    "title": "Monde ouvert",
+    "playerCount": "{{current}}/{{max}} joueurs",
+    "roundTimer": "Fin de manche dans {{time}}",
+    "roundNumber": "Manche {{number}}",
+    "leaderboard": "Classement",
+    "joinButton": "Rejoindre le monde",
+    "leaveButton": "Quitter le monde",
+    "joining": "Connexion...",
+    "kills": "Frags",
+    "deaths": "Morts",
+    "score": "Score",
+    "noPlayers": "Aucun joueur pour le moment",
+    "disabled": "Le monde ouvert est hors ligne",
+    "full": "Le monde ouvert est plein",
+    "respawning": "Réapparition dans {{seconds}}s...",
+    "roundEnd": "Manche terminée",
+    "roundStart": "Nouvelle manche",
+    "nextRound": "Prochaine manche dans {{seconds}}s"
   }
 }

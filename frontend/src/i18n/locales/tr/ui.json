@@ -622,5 +622,25 @@
     "toggleLog": "Kayit panelini ac/kapat",
     "gameLog": "Oyun Kaydi",
     "clickToSeek": "Atlamak icin tiklayin"
+  },
+  "openWorld": {
+    "title": "Acik Dunya",
+    "playerCount": "{{current}}/{{max}} oyuncu",
+    "roundTimer": "Tur {{time}} icinde bitiyor",
+    "roundNumber": "Tur {{number}}",
+    "leaderboard": "Skor Tablosu",
+    "joinButton": "Dunyaya Katil",
+    "leaveButton": "Dunyadan Ayril",
+    "joining": "Katiliniyor...",
+    "kills": "Oldurmeler",
+    "deaths": "Olumler",
+    "score": "Skor",
+    "noPlayers": "Henuz oyuncu yok",
+    "disabled": "Acik Dunya su anda kapali",
+    "full": "Acik Dunya dolu",
+    "respawning": "{{seconds}}s icinde yeniden doguyor...",
+    "roundEnd": "Tur Bitti",
+    "roundStart": "Yeni Tur Basliyor",
+    "nextRound": "Sonraki tur {{seconds}}s icinde"
   }
 }

@@ -622,5 +622,25 @@
     "toggleLog": "Växla loggpanel",
     "gameLog": "Spellogg",
     "clickToSeek": "Klicka för att söka"
+  },
+  "openWorld": {
+    "title": "Öppen värld",
+    "playerCount": "{{current}}/{{max}} spelare",
+    "roundTimer": "Rundan slutar om {{time}}",
+    "roundNumber": "Runda {{number}}",
+    "leaderboard": "Topplista",
+    "joinButton": "Gå med i världen",
+    "leaveButton": "Lämna världen",
+    "joining": "Ansluter...",
+    "kills": "Kills",
+    "deaths": "Dödsfall",
+    "score": "Poäng",
+    "noPlayers": "Inga spelare än",
+    "disabled": "Öppen värld är offline just nu",
+    "full": "Öppen värld är full",
+    "respawning": "Återuppstår om {{seconds}}s...",
+    "roundEnd": "Rundan slut",
+    "roundStart": "Ny runda startar",
+    "nextRound": "Nästa runda om {{seconds}}s"
   }
 }

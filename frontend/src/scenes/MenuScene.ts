@@ -7,7 +7,7 @@ import { NotificationUI } from '../ui/NotificationUI';
 import { themeManager } from '../themes/ThemeManager';
 import { API_URL } from '../config';
 import { t } from '../i18n';
-import type { GameState } from '@blast-arena/shared';
+import type { GameState, OpenWorldScoreEntry } from '@blast-arena/shared';
 
 interface OpenWorldStatus {
   enabled: boolean;
@@ -24,6 +24,7 @@ interface OpenWorldJoinResponse {
   isGuest?: boolean;
   state?: GameState;
   error?: string;
+  info?: { roundNumber: number; leaderboard: OpenWorldScoreEntry[] };
 }
 
 export class MenuScene extends Phaser.Scene {
@@ -298,6 +299,8 @@ export class MenuScene extends Phaser.Scene {
         this.registry.set('initialGameState', response.state);
         this.registry.set('openWorldMode', true);
         this.registry.set('openWorldPlayerId', response.playerId);
+        // Seeds the HUD scoreboard on reveal (refreshed by GameScene's `openworld:info` cache)
+        if (response.info) this.registry.set('openWorldInfo', response.info);
         // Mark this as a background arena so GameScene's AFK-kick handler returns to the landing
         // (instead of dropping into the lobby) if the idle guest is kicked while on the menu.
         this.registry.set('openWorldBackground', true);

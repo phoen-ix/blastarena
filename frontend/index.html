@@ -370,6 +370,36 @@
     [data-theme="frost"] .hud-spectator-banner,
     [data-theme="blossom"] .hud-spectator-banner,
     [data-theme="dune"] .hud-spectator-banner { background: rgba(255, 255, 255, 0.85) !important; color: var(--text) !important; }
+    [data-theme="daylight"] .hud-ow-board,
+    [data-theme="sakura"] .hud-ow-board,
+    [data-theme="sand"] .hud-ow-board,
+    [data-theme="frost"] .hud-ow-board,
+    [data-theme="blossom"] .hud-ow-board,
+    [data-theme="dune"] .hud-ow-board,
+    [data-theme="daylight"] .hud-round,
+    [data-theme="sakura"] .hud-round,
+    [data-theme="sand"] .hud-round,
+    [data-theme="frost"] .hud-round,
+    [data-theme="blossom"] .hud-round,
+    [data-theme="dune"] .hud-round,
+    [data-theme="daylight"] .hud-ow-roundend,
+    [data-theme="sakura"] .hud-ow-roundend,
+    [data-theme="sand"] .hud-ow-roundend,
+    [data-theme="frost"] .hud-ow-roundend,
+    [data-theme="blossom"] .hud-ow-roundend,
+    [data-theme="dune"] .hud-ow-roundend { background: rgba(255, 255, 255, 0.88) !important; color: var(--text) !important; }
+    [data-theme="daylight"] .hud-ow-row.self,
+    [data-theme="sakura"] .hud-ow-row.self,
+    [data-theme="sand"] .hud-ow-row.self,
+    [data-theme="frost"] .hud-ow-row.self,
+    [data-theme="blossom"] .hud-ow-row.self,
+    [data-theme="dune"] .hud-ow-row.self,
+    [data-theme="daylight"] .hud-ow-roundend-table tr.self,
+    [data-theme="sakura"] .hud-ow-roundend-table tr.self,
+    [data-theme="sand"] .hud-ow-roundend-table tr.self,
+    [data-theme="frost"] .hud-ow-roundend-table tr.self,
+    [data-theme="blossom"] .hud-ow-roundend-table tr.self,
+    [data-theme="dune"] .hud-ow-roundend-table tr.self { background: rgba(0, 0, 0, 0.07) !important; }
     [data-theme="daylight"] .hud-auth-bar,
     [data-theme="sakura"] .hud-auth-bar,
     [data-theme="sand"] .hud-auth-bar,
@@ -1708,6 +1738,194 @@
     .hud-minimap canvas {
       display: block;
       border-radius: 2px;
+    }
+
+    /* ---- Open world: round counter, live leaderboard, end-of-round standings ---- */
+    .hud-top-left {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .hud-round {
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--primary);
+      background: rgba(8, 8, 16, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: var(--radius-sm);
+      padding: 2px 8px;
+      backdrop-filter: blur(4px);
+    }
+
+    .hud-ow-board {
+      position: absolute;
+      top: 12px;
+      right: 20px;
+      width: 236px;
+      max-width: 40vw;
+      background: rgba(8, 8, 16, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: var(--radius);
+      backdrop-filter: blur(6px);
+      color: #fff;
+      font-family: var(--font-body);
+      font-size: 12px;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .hud-ow-title {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--primary);
+      padding: 6px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .hud-ow-rows {
+      padding: 4px 0;
+    }
+
+    .hud-ow-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 10px;
+    }
+
+    .hud-ow-row.self {
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: inset 2px 0 0 var(--primary);
+    }
+
+    .hud-ow-rank {
+      width: 16px;
+      text-align: right;
+      opacity: 0.6;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hud-ow-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .hud-ow-kd {
+      opacity: 0.6;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hud-ow-score {
+      min-width: 26px;
+      text-align: right;
+      font-weight: 700;
+      color: var(--primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hud-ow-gap,
+    .hud-ow-empty {
+      padding: 2px 10px;
+      text-align: center;
+      opacity: 0.45;
+    }
+
+    .hud-ow-roundend {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      min-width: 340px;
+      padding: 20px 24px;
+      background: rgba(8, 8, 16, 0.88);
+      border: 1px solid var(--primary);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--primary-glow);
+      backdrop-filter: blur(8px);
+      color: #fff;
+      font-family: var(--font-body);
+      text-align: center;
+      pointer-events: none;
+      z-index: 210;
+    }
+
+    .hud-ow-roundend-title {
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+
+    .hud-ow-roundend-sub {
+      font-size: 13px;
+      opacity: 0.7;
+      margin-bottom: 12px;
+    }
+
+    .hud-ow-roundend-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .hud-ow-roundend-table th {
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      opacity: 0.5;
+    }
+
+    .hud-ow-roundend-table td {
+      padding: 3px 6px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hud-ow-roundend-table td:nth-child(2) {
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: left;
+    }
+
+    .hud-ow-roundend-table tr.self {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .hud-ow-roundend-next {
+      margin-top: 14px;
+      font-family: var(--font-display);
+      font-size: 13px;
+      letter-spacing: 1px;
+      color: var(--primary);
+    }
+
+    /* Narrow windows: shrink the board so it doesn't eat the play area */
+    @media (max-width: 860px) {
+      .hud-ow-board {
+        width: 176px;
+        font-size: 11px;
+      }
+
+      .hud-ow-roundend {
+        min-width: 0;
+        width: 90vw;
+        padding: 16px;
+      }
     }
 
     /* Compact login/register bar for open-world guests — the landing CTAs dock here

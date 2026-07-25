@@ -194,8 +194,6 @@ Documentation served via backend API from `docs/` directory (bind-mounted in dev
 
 ## Open World Mode (WIP)
 
-> Developed on the `feature/open-world` branch. Not yet merged to master.
-
 Persistent bomb arena that serves as the default landing experience. Players auto-join on page load — no room creation needed. Supports guest access for unauthenticated players (no account required to play).
 
 - **Toroidal map**: Wrapping 51x41 grid with no border walls. Players, bombs, and explosions wrap seamlessly across edges — the world feels infinite in every direction
@@ -207,7 +205,8 @@ Persistent bomb arena that serves as the default landing experience. Players aut
 - **Explosion performance**: Audio batching (same-frame explosions → single louder sound), particle budget (graceful degradation with 20/40 emitter caps), screen shake coalescing, wrapped distance for accurate audio/shake near map edges
 - **AFK timeout**: Idle players are automatically kicked after 60 seconds of inactivity (default). Admin-configurable (0-600s, 0 disables). Registered users keep earned XP on kick
 - **Admin controls**: Server settings for enabling/disabling, round duration, map configuration, and AFK timeout. Settings prefixed `open_world_` in the admin dashboard. All settings hot-reloadable
-- **WIP items**: HUD round timer and leaderboard
+- **HUD round counter + leaderboard**: The round timer carries a round counter, and the player list is replaced by a live scoreboard (rank, name, kills/deaths, score) that highlights your own row — and keeps showing it even when you rank below the visible cut-off. Kills move the board instantly; a full snapshot re-syncs every 5 seconds
+- **End-of-round standings**: When a round ends, the final top 10 is shown over the frozen arena with a countdown to the next round
 
 ## Internationalization
 

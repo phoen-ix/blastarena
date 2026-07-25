@@ -184,6 +184,8 @@ export interface ClientToServerEvents {
       isGuest?: boolean;
       state?: GameState;
       error?: string;
+      /** Round + scoreboard snapshot, so the HUD isn't blank until the next `openworld:info` */
+      info?: { roundNumber: number; leaderboard: OpenWorldScoreEntry[] };
     }) => void,
   ) => void;
   'openworld:leave': () => void;
@@ -347,6 +349,7 @@ export interface ServerToClientEvents {
     maxPlayers: number;
     roundTimeRemaining: number;
     roundNumber: number;
+    leaderboard: OpenWorldScoreEntry[];
   }) => void;
   'openworld:afkKick': () => void;
 

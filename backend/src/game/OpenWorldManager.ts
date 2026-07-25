@@ -55,6 +55,15 @@ interface PendingStats {
   xp: number;
 }
 
+const toScoreEntry = (p: OpenWorldPlayer): OpenWorldScoreEntry => ({
+  playerId: p.userId,
+  username: p.username,
+  kills: p.kills,
+  deaths: p.deaths,
+  score: p.score,
+  isGuest: p.isGuest,
+});
+
 const ADJECTIVES = [
   'Swift',
   'Brave',
@@ -229,10 +238,15 @@ class OpenWorldManager {
             if (!killer.isGuest && killer.userId > 0) {
               this.queueStatUpdate(killer.userId, 'kill');
             }
+            // Live HUD leaderboard update between the periodic info broadcasts
+            this.io.to('openworld').emit('openworld:scoreUpdate', toScoreEntry(killer));
           }
         }
-        if (victim && !victim.isGuest && victim.userId > 0) {
-          this.queueStatUpdate(victim.userId, 'death');
+        if (victim) {
+          this.io.to('openworld').emit('openworld:scoreUpdate', toScoreEntry(victim));
+          if (!victim.isGuest && victim.userId > 0) {
+            this.queueStatUpdate(victim.userId, 'death');
+          }
         }
       }
     }
@@ -341,6 +355,8 @@ class OpenWorldManager {
         roundNumber: this.roundNumber,
         state: fullState,
       });
+      // Scores were reset for the new round — push the cleared board straight away
+      this.broadcastInfo();
     }
 
     logger.info({ roundNumber: this.roundNumber }, 'Open world new round started');
@@ -447,6 +463,8 @@ class OpenWorldManager {
       id: userId,
       username: playerData.username,
     });
+    // Player count + leaderboard changed — refresh both without waiting for the periodic tick
+    this.broadcastInfo();
   }
 
   handleInput(socketId: string, input: PlayerInput): void {
@@ -525,6 +543,7 @@ class OpenWorldManager {
     roundTimeRemaining: number;
     roundNumber: number;
     guestAccess: boolean;
+    leaderboard: OpenWorldScoreEntry[];
   } {
     const timeElapsed = this.gameState ? this.gameState.tick / TICK_RATE : 0;
     const roundTime = this.settings?.roundTime ?? OPENWORLD_DEFAULT_ROUND_TIME;
@@ -535,21 +554,20 @@ class OpenWorldManager {
       roundTimeRemaining: Math.max(0, roundTime - timeElapsed),
       roundNumber: this.roundNumber,
       guestAccess: this.settings?.guestAccess ?? true,
+      // The lobby view isn't in the 'openworld' socket room, so its standings come from here
+      leaderboard: this.getLeaderboard(),
     };
   }
 
+  /**
+   * Full standings, highest score first. Not truncated: clients rank by array index, so a
+   * partial list would make every row below the cut-off show a made-up position (and would drop
+   * the local player's own row once they fall out of the top slots). Bounded by max players.
+   */
   getLeaderboard(): OpenWorldScoreEntry[] {
     return Array.from(this.players.values())
       .sort((a, b) => b.score - a.score || b.kills - a.kills)
-      .slice(0, 10)
-      .map((p) => ({
-        playerId: p.userId,
-        username: p.username,
-        kills: p.kills,
-        deaths: p.deaths,
-        score: p.score,
-        isGuest: p.isGuest,
-      }));
+      .map(toScoreEntry);
   }
 
   isEnabled(): boolean {
@@ -600,7 +618,12 @@ class OpenWorldManager {
     this.gameState?.gameLogger?.logGameOver(null, []);
   }
 
-  private broadcastInfo(): void {
+  /**
+   * Round/player/leaderboard snapshot for the in-game HUD and the lobby view. Sent every
+   * OPENWORLD_INFO_BROADCAST_TICKS and immediately after joins, leaves and round transitions so
+   * a fresh client doesn't sit with an empty scoreboard until the next periodic tick.
+   */
+  broadcastInfo(): void {
     if (!this.io || !this.settings) return;
     const timeElapsed = this.gameState ? this.gameState.tick / TICK_RATE : 0;
     this.io.to('openworld').emit('openworld:info', {
@@ -608,6 +631,7 @@ class OpenWorldManager {
       maxPlayers: this.settings.maxPlayers,
       roundTimeRemaining: Math.max(0, this.settings.roundTime - timeElapsed),
       roundNumber: this.roundNumber,
+      leaderboard: this.getLeaderboard(),
     });
   }
 

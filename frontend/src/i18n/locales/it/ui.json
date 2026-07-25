@@ -622,5 +622,25 @@
     "toggleLog": "Mostra/nascondi pannello log",
     "gameLog": "Log partita",
     "clickToSeek": "Clicca per cercare"
+  },
+  "openWorld": {
+    "title": "Mondo aperto",
+    "playerCount": "{{current}}/{{max}} giocatori",
+    "roundTimer": "Il round finisce tra {{time}}",
+    "roundNumber": "Round {{number}}",
+    "leaderboard": "Classifica",
+    "joinButton": "Entra nel mondo",
+    "leaveButton": "Esci dal mondo",
+    "joining": "Accesso in corso...",
+    "kills": "Uccisioni",
+    "deaths": "Morti",
+    "score": "Punti",
+    "noPlayers": "Ancora nessun giocatore",
+    "disabled": "Il mondo aperto è offline",
+    "full": "Il mondo aperto è pieno",
+    "respawning": "Rinascita tra {{seconds}}s...",
+    "roundEnd": "Round finito",
+    "roundStart": "Nuovo round in arrivo",
+    "nextRound": "Prossimo round tra {{seconds}}s"
   }
 }

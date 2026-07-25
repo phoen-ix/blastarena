@@ -622,5 +622,25 @@
     "toggleLog": "Logpaneel wisselen",
     "gameLog": "Spellog",
     "clickToSeek": "Klik om te zoeken"
+  },
+  "openWorld": {
+    "title": "Open wereld",
+    "playerCount": "{{current}}/{{max}} spelers",
+    "roundTimer": "Ronde eindigt over {{time}}",
+    "roundNumber": "Ronde {{number}}",
+    "leaderboard": "Ranglijst",
+    "joinButton": "Wereld betreden",
+    "leaveButton": "Wereld verlaten",
+    "joining": "Verbinden...",
+    "kills": "Kills",
+    "deaths": "Deaths",
+    "score": "Score",
+    "noPlayers": "Nog geen spelers",
+    "disabled": "Open wereld is momenteel offline",
+    "full": "Open wereld is vol",
+    "respawning": "Respawnen over {{seconds}}s...",
+    "roundEnd": "Ronde voorbij",
+    "roundStart": "Nieuwe ronde start",
+    "nextRound": "Volgende ronde over {{seconds}}s"
   }
 }

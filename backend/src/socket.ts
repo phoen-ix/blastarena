@@ -1600,7 +1600,20 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         isGuest: isGuest || undefined,
         state: result.state,
         error: result.error,
+        // Carried in the ack because the client's scenes (and their listeners) only come up a
+        // frame later — a broadcast sent right now can land before anyone is listening.
+        info: result.success
+          ? {
+              roundNumber: openWorldManager.getStatus().roundNumber,
+              leaderboard: openWorldManager.getLeaderboard(),
+            }
+          : undefined,
       });
+
+      // Everyone already in the world sees the new player count + board right away
+      if (result.success) {
+        openWorldManager.broadcastInfo();
+      }
     });
 
     socket.on('openworld:leave', () => {
