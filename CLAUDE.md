@@ -106,6 +106,7 @@ Persistent bomb arena as default landing experience. Players auto-join on page l
 - **Backend**: `OpenWorldManager` singleton. Round cycle with configurable duration, freeze period, map regeneration
 - **AFK timeout**: Configurable inactivity kick (default 60s, 0 = disabled). Hot-reloadable admin setting
 - **Guest auth bar**: HUDScene mounts a bottom-center Login/Register bar for open-world guests (`.hud-auth-bar`). Auth form opens OVER the live game (`GameScene.setInputBlocked`, registry `authOverlayOpen`); closable via ✕/Escape. Teardown only on successful login → fresh MenuScene auto-login → lobby → auto-rejoin as account
+- **Landing docks on first input**: the arena is interactive behind the landing — first game key/gamepad press calls `MenuScene.dockLanding()` (`.menu-landing--docked`): title fades, buttons slide into a compact bottom bar. Gated on a live arena; Play-as-Guest handoff to the HUD bar is seamless (`authBarNoAnim` registry flag)
 - **Constants**: `shared/src/constants/openworld.ts`. Settings in `server_settings` (keys prefixed `open_world_`)
 - **WIP**: HUD round timer/leaderboard
 
