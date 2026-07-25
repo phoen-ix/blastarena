@@ -80,6 +80,7 @@ services:
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@example.com}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-BlastArena}
       EMAIL_PEPPER: ${EMAIL_PEPPER:?EMAIL_PEPPER is required}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
       APP_URL: ${APP_URL:-http://localhost:8080}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       GAME_TICK_RATE: ${GAME_TICK_RATE:-20}
