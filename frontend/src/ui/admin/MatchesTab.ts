@@ -6,6 +6,62 @@ import { GameState, ReplayData } from '@blast-arena/shared';
 import { game } from '../../main';
 import { t } from '../../i18n';
 
+/** Row returned by GET /admin/matches (snake_case DB columns, dates serialized as strings). */
+interface AdminMatchListItem {
+  id: number;
+  room_code: string;
+  game_mode: string;
+  player_count: number;
+  status: string;
+  duration: number | null;
+  winner_username: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+interface AdminMatchListResponse {
+  matches: AdminMatchListItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/**
+ * Player entry in GET /admin/matches/:id — either a DB match_players row (userId/username)
+ * or a replay placement (id/name in older replays), hence all fields optional.
+ */
+interface AdminMatchDetailPlayer {
+  id?: number;
+  userId?: number;
+  username?: string;
+  name?: string;
+  isBot?: boolean;
+  placement?: number | null;
+  kills?: number;
+  selfKills?: number;
+  team?: number | null;
+  alive?: boolean;
+}
+
+/** Response of GET /admin/matches/:id (camelCase, dates serialized as strings). */
+interface AdminMatchDetail {
+  id: number;
+  roomCode: string;
+  gameMode: string;
+  mapSeed: number;
+  mapWidth: number;
+  mapHeight: number;
+  maxPlayers: number;
+  status: string;
+  duration: number | null;
+  winnerId: number | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  hasReplay: boolean;
+  allPlayers: AdminMatchDetailPlayer[] | null;
+  players: AdminMatchDetailPlayer[];
+}
+
 export class MatchesTab {
   private container: HTMLElement | null = null;
   private notifications: NotificationUI;
@@ -33,7 +89,9 @@ export class MatchesTab {
     if (!this.container) return;
 
     try {
-      const result = await ApiClient.get<any>(`/admin/matches?page=${this.page}&limit=20`);
+      const result = await ApiClient.get<AdminMatchListResponse>(
+        `/admin/matches?page=${this.page}&limit=20`,
+      );
       const totalPages = Math.ceil(result.total / result.limit);
 
       const colCount = this.isAdmin ? 9 : 8;
@@ -62,7 +120,7 @@ export class MatchesTab {
           <tbody>
             ${result.matches
               .map(
-                (m: any) => `
+                (m: AdminMatchListItem) => `
               <tr style="cursor:pointer;" data-match-id="${m.id}">
                 <td>${m.id}</td>
                 <td>${escapeHtml(m.room_code)}</td>
@@ -147,14 +205,14 @@ export class MatchesTab {
 
   private async showMatchDetail(matchId: number): Promise<void> {
     try {
-      const match = await ApiClient.get<any>(`/admin/matches/${matchId}`);
+      const match = await ApiClient.get<AdminMatchDetail>(`/admin/matches/${matchId}`);
 
       // Use replay placements (includes bots) if available, otherwise DB players
       const useReplayPlayers = match.allPlayers && match.allPlayers.length > 0;
-      const playerList = useReplayPlayers ? match.allPlayers : match.players;
+      const playerList = useReplayPlayers ? match.allPlayers! : match.players;
 
       const playerRows = playerList
-        .map((p: any) => {
+        .map((p: AdminMatchDetailPlayer) => {
           // Replay placements use different field names than DB players
           const name = p.username ?? p.name ?? '?';
           const isBot = p.isBot ?? false;
@@ -287,7 +345,7 @@ export class MatchesTab {
     }
   }
 
-  private statusBadgeClass(m: any): string {
+  private statusBadgeClass(m: AdminMatchListItem): string {
     if (m.status === 'finished') return 'active';
     if (m.status === 'aborted') return 'deactivated';
     // playing/countdown without a finished_at is likely abandoned
@@ -295,7 +353,7 @@ export class MatchesTab {
     return 'user';
   }
 
-  private statusLabel(m: any): string {
+  private statusLabel(m: AdminMatchListItem): string {
     if ((m.status === 'playing' || m.status === 'countdown') && !m.finished_at)
       return t('admin:matches.statusAbandoned');
     return m.status;

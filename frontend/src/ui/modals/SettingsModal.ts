@@ -36,7 +36,7 @@ export function showSettingsModal(): void {
     if (!target || target.type !== 'checkbox') return;
     const key = target.name as keyof VisualSettings;
     const current = getSettings();
-    (current as any)[key] = target.checked;
+    current[key] = target.checked;
     saveSettings(current);
   });
 

@@ -12,13 +12,21 @@ export interface AccountModalDeps {
   onUpdate: () => void;
 }
 
+/** Subset of the GET/PUT /user/profile response used by this modal. */
+interface AccountProfile {
+  username: string;
+  emailHint: string;
+  emailVerified: boolean;
+  pendingEmailHint: string | null;
+}
+
 export async function showAccountModal(deps: AccountModalDeps): Promise<void> {
   const { authManager, notifications, onUpdate } = deps;
 
   // Fetch current profile
-  let profile: any;
+  let profile: AccountProfile;
   try {
-    profile = await ApiClient.get('/user/profile');
+    profile = await ApiClient.get<AccountProfile>('/user/profile');
   } catch (err: unknown) {
     notifications.error(t('settings.loadProfileFailed', { error: getErrorMessage(err) }));
     return;
@@ -108,7 +116,7 @@ export async function showAccountModal(deps: AccountModalDeps): Promise<void> {
       return;
     }
 
-    const updates: any = {};
+    const updates: { username?: string } = {};
     if (newUsername !== profile.username) updates.username = newUsername;
 
     if (Object.keys(updates).length === 0) {
@@ -117,7 +125,7 @@ export async function showAccountModal(deps: AccountModalDeps): Promise<void> {
     }
 
     try {
-      const updated: any = await ApiClient.put('/user/profile', updates);
+      const updated = await ApiClient.put<AccountProfile>('/user/profile', updates);
       profile = updated;
       authManager.updateUser({
         username: updated.username,
@@ -141,7 +149,9 @@ export async function showAccountModal(deps: AccountModalDeps): Promise<void> {
     }
 
     try {
-      const result: any = await ApiClient.post('/user/email', { email: newEmail });
+      const result = await ApiClient.post<{ message: string }>('/user/email', {
+        email: newEmail,
+      });
       statusEl.innerHTML = `<span style="color:var(--success);">${escapeHtml(result.message)}</span>`;
       // Clear the input
       (modal.querySelector('#acct-new-email') as HTMLInputElement).value = '';
@@ -173,7 +183,10 @@ export async function showAccountModal(deps: AccountModalDeps): Promise<void> {
     }
 
     try {
-      const result: any = await ApiClient.post('/user/password', { currentPassword, newPassword });
+      const result = await ApiClient.post<{ message: string }>('/user/password', {
+        currentPassword,
+        newPassword,
+      });
       statusEl.innerHTML = `<span style="color:var(--success);">${escapeHtml(result.message)}</span>`;
       (modal.querySelector('#acct-current-password') as HTMLInputElement).value = '';
       (modal.querySelector('#acct-new-password') as HTMLInputElement).value = '';

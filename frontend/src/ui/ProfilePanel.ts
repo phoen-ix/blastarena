@@ -128,8 +128,8 @@ export class ProfilePanel {
   }
 
   private renderRank(p: PublicProfile): string {
-    const level = (p.stats as any).level ?? 1;
-    const totalXp = (p.stats as any).totalXp ?? 0;
+    const level = p.stats.level ?? 1;
+    const totalXp = p.stats.totalXp ?? 0;
     // Calculate XP progress — level N requires N*100 XP to advance
     const xpForLevel = ((level * (level - 1)) / 2) * 100;
     const xpToNext = level * 100;

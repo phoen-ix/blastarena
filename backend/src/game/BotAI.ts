@@ -390,7 +390,7 @@ export class BotAI implements IBotAI {
       this.huntWithoutProgressTicks = 0;
     }
 
-    const logDecision = (decision: string, details?: any) => {
+    const logDecision = (decision: string, details?: Record<string, unknown>) => {
       logger?.logBotDecision(player.id, player.username, decision, { pos, ...details });
     };
 

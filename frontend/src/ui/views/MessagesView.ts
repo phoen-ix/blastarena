@@ -26,13 +26,18 @@ export class MessagesView implements ILobbyView {
   private dmReadHandler: (data: { fromUserId: number; readAt: string }) => void;
   private settingsChangedHandler: (data: { key: string; value?: unknown }) => void;
 
-  constructor(deps: ViewDeps, options?: Record<string, any>) {
+  constructor(deps: ViewDeps, options?: Record<string, unknown>) {
     this.deps = deps;
     const user = deps.authManager.getUser();
     this.userId = user?.id ?? 0;
     this.userRole = user?.role ?? 'user';
 
-    if (options?.userId && options?.username) {
+    if (
+      typeof options?.userId === 'number' &&
+      options.userId &&
+      typeof options.username === 'string' &&
+      options.username
+    ) {
       this.initialTarget = { userId: options.userId, username: options.username };
     }
 

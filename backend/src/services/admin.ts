@@ -1,6 +1,6 @@
 import { query, execute } from '../db/connection';
 import { AppError } from '../middleware/errorHandler';
-import { UserRole, RoomListItem } from '@blast-arena/shared';
+import { UserRole, RoomListItem, ReplayData } from '@blast-arena/shared';
 import { getRoomManager, getIO } from '../game/registry';
 import { hashPassword, hashEmail, generateEmailHint } from '../utils/crypto';
 import { getConfig } from '../config';
@@ -345,7 +345,7 @@ export async function getMatchDetail(matchId: number) {
   const replayExists = hasReplay(match.id);
 
   // If replay exists, use its placements (includes bots + more stats)
-  let allPlayers: any[] | null = null;
+  let allPlayers: ReplayData['gameOver']['placements'] | null = null;
   if (replayExists) {
     allPlayers = await getReplayPlacements(match.id);
   }

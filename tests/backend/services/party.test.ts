@@ -369,7 +369,7 @@ describe('Party Service', () => {
       store.set('invite:2:inv1', JSON.stringify(inviteData));
 
       const result = await partyService.getInvite(2, 'inv1');
-      expect(result.type).toBe('party');
+      expect(result?.type).toBe('party');
     });
 
     it('should return null for expired/missing invite', async () => {

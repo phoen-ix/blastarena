@@ -16,10 +16,10 @@ export class ProfileView implements ILobbyView {
   private userId: number;
   private isOwnProfile: boolean;
 
-  constructor(deps: ViewDeps, options?: Record<string, any>) {
+  constructor(deps: ViewDeps, options?: Record<string, unknown>) {
     this.deps = deps;
     const user = deps.authManager.getUser();
-    this.userId = options?.userId ?? user?.id ?? 0;
+    this.userId = typeof options?.userId === 'number' ? options.userId : (user?.id ?? 0);
     this.isOwnProfile = this.userId === (user?.id ?? 0);
   }
 
@@ -82,8 +82,8 @@ export class ProfileView implements ILobbyView {
       year: 'numeric',
       month: 'short',
     });
-    const level = (p.stats as any).level ?? 1;
-    const totalXp = (p.stats as any).totalXp ?? 0;
+    const level = p.stats.level ?? 1;
+    const totalXp = p.stats.totalXp ?? 0;
     const xpForLevel = ((level * (level - 1)) / 2) * 100;
     const xpToNext = level * 100;
     const xpProgress = totalXp - xpForLevel;

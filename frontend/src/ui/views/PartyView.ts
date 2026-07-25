@@ -1,6 +1,7 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
 import { Party, PartyChatMessage, ChatMode, Friend } from '@blast-arena/shared';
+import type { ServerToClientEvents } from '@blast-arena/shared';
 import { PartyBar } from '../PartyBar';
 import { escapeHtml } from '../../utils/html';
 import { t } from '../../i18n';
@@ -30,10 +31,10 @@ export class PartyView implements ILobbyView {
   private currentUserRole: string;
 
   // Socket handlers
-  private partyStateHandler: any;
-  private partyDisbandedHandler: any;
-  private partyChatHandler: any;
-  private settingsChangedHandler: any;
+  private partyStateHandler!: ServerToClientEvents['party:state'];
+  private partyDisbandedHandler!: ServerToClientEvents['party:disbanded'];
+  private partyChatHandler!: ServerToClientEvents['party:chat'];
+  private settingsChangedHandler!: ServerToClientEvents['admin:settingsChanged'];
 
   constructor(deps: ViewDeps, partyBar: PartyBar) {
     this.deps = deps;

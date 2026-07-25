@@ -5,6 +5,7 @@ import {
   POWERUP_DEFINITIONS,
   Room,
   GameDefaults,
+  GameMode,
   BotAIEntry,
   CustomMapSummary,
 } from '@blast-arena/shared';
@@ -502,7 +503,8 @@ export class CreateRoomView implements ILobbyView {
     if (!this.container) return;
 
     const name = (this.container.querySelector('#cr-name') as HTMLInputElement).value.trim();
-    const gameMode = (this.container.querySelector('#cr-mode') as HTMLSelectElement).value as any;
+    const gameMode = (this.container.querySelector('#cr-mode') as HTMLSelectElement)
+      .value as GameMode;
     const maxPlayers = parseInt(
       (this.container.querySelector('#cr-max-players') as HTMLSelectElement).value,
     );
@@ -529,7 +531,7 @@ export class CreateRoomView implements ILobbyView {
     const customMapId = customMapValue ? parseInt(customMapValue, 10) : undefined;
 
     const enabledPowerUps: PowerUpType[] = [];
-    this.container.querySelectorAll('.powerup-check:checked').forEach((cb: any) => {
+    this.container.querySelectorAll<HTMLInputElement>('.powerup-check:checked').forEach((cb) => {
       enabledPowerUps.push(cb.value as PowerUpType);
     });
 
@@ -605,7 +607,7 @@ export class CreateRoomView implements ILobbyView {
           customMapId,
         },
       },
-      (response: any) => {
+      (response) => {
         if (response.success && response.room) {
           this.deps.notifications.success(t('ui:createRoom.roomCreated'));
           this.onRoomCreated(response.room);

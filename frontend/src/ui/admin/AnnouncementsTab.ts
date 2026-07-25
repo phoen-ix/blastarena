@@ -4,6 +4,14 @@ import { UserRole, getErrorMessage } from '@blast-arena/shared';
 import { escapeHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
+/** Active banner row returned by GET /admin/announcements/banner (null when no banner). */
+interface ActiveBanner {
+  id: number;
+  message: string;
+  admin_username: string;
+  created_at: string;
+}
+
 export class AnnouncementsTab {
   private container: HTMLElement | null = null;
   private notifications: NotificationUI;
@@ -30,9 +38,9 @@ export class AnnouncementsTab {
     const isAdmin = this.role === 'admin';
 
     // Fetch current banner
-    let currentBanner: any = null;
+    let currentBanner: ActiveBanner | null = null;
     try {
-      currentBanner = await ApiClient.get<any>('/admin/announcements/banner');
+      currentBanner = await ApiClient.get<ActiveBanner | null>('/admin/announcements/banner');
     } catch {
       // No banner or not available
     }

@@ -7,6 +7,7 @@ import {
   GameDefaults,
   BotAIEntry,
   CustomMapSummary,
+  GameMode,
 } from '@blast-arena/shared';
 import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 import { renderMapPreview } from '../../utils/mapPreview';
@@ -340,7 +341,7 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
   modal.querySelector('#modal-cancel')!.addEventListener('click', closeModal);
   modal.querySelector('#modal-create')!.addEventListener('click', () => {
     const name = (modal.querySelector('#room-name') as HTMLInputElement).value.trim();
-    const gameMode = (modal.querySelector('#room-mode') as HTMLSelectElement).value as any;
+    const gameMode = (modal.querySelector('#room-mode') as HTMLSelectElement).value as GameMode;
     const maxPlayers = parseInt(maxPlayersSelect.value);
     const roundTime = parseInt(
       (modal.querySelector('#room-round-time') as HTMLSelectElement).value,
@@ -356,7 +357,7 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
       .value as 'easy' | 'normal' | 'hard';
 
     const enabledPowerUps: PowerUpType[] = [];
-    modal.querySelectorAll('.powerup-check:checked').forEach((cb: any) => {
+    modal.querySelectorAll<HTMLInputElement>('.powerup-check:checked').forEach((cb) => {
       enabledPowerUps.push(cb.value as PowerUpType);
     });
 
@@ -420,7 +421,7 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
           customMapId,
         },
       },
-      (response: any) => {
+      (response) => {
         if (response.success && response.room) {
           closeModal();
           notifications.success(t('ui:createRoom.roomCreated'));

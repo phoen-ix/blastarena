@@ -1,7 +1,7 @@
 import { ApiClient } from '../../network/ApiClient';
 import { SocketClient } from '../../network/SocketClient';
 import { NotificationUI } from '../NotificationUI';
-import { UserRole } from '@blast-arena/shared';
+import { RoomListItem, UserRole } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
@@ -44,7 +44,7 @@ export class RoomsTab {
     const isAdmin = this.role === 'admin';
 
     try {
-      const rooms = await ApiClient.get<any[]>('/admin/rooms');
+      const rooms = await ApiClient.get<RoomListItem[]>('/admin/rooms');
       if (!this.container) return;
 
       this.container.innerHTML = `
@@ -62,7 +62,7 @@ export class RoomsTab {
           <tbody>
             ${rooms
               .map(
-                (r: any) => `
+                (r: RoomListItem) => `
               <tr>
                 <td style="font-family:monospace;">${escapeHtml(r.code)}</td>
                 <td>${escapeHtml(r.name)}</td>
@@ -144,15 +144,15 @@ export class RoomsTab {
 
   private async showKickModal(code: string): Promise<void> {
     // Fetch room details to get player list
-    let rooms: any[];
+    let rooms: RoomListItem[];
     try {
-      rooms = await ApiClient.get<any[]>('/admin/rooms');
+      rooms = await ApiClient.get<RoomListItem[]>('/admin/rooms');
     } catch {
       this.notifications.error(t('admin:rooms.fetchRoomFailed'));
       return;
     }
 
-    const room = rooms.find((r: any) => r.code === code);
+    const room = rooms.find((r: RoomListItem) => r.code === code);
     if (!room) {
       this.notifications.error(t('admin:rooms.roomNotFound'));
       return;

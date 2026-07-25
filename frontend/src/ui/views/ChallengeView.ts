@@ -1,6 +1,6 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
-import { ActiveChallengeInfo, ChallengeScore, TileType, GameMode } from '@blast-arena/shared';
+import { ActiveChallengeInfo, ChallengeScore, TileType, GameMode, Room } from '@blast-arena/shared';
 import { renderMapPreview } from '../../utils/mapPreview';
 import { escapeHtml } from '../../utils/html';
 import { t } from '../../i18n';
@@ -130,7 +130,7 @@ export class ChallengeView implements ILobbyView {
             customMapId: challenge.customMapId,
           },
         },
-        (response: any) => {
+        (response: { success: boolean; room?: Room; error?: string }) => {
           if (response.success && response.room) {
             window.dispatchEvent(new CustomEvent('navigate-to-room', { detail: response.room }));
           } else {

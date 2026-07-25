@@ -12,6 +12,14 @@ import { escapeHtml, escapeAttr } from '../../utils/html';
 import { showCreateRoomModal } from '../modals/CreateRoomModal';
 import { t } from '../../i18n';
 
+/** Active banner row returned by GET /admin/announcements/banner (null when no banner). */
+interface ActiveBanner {
+  id: number;
+  message: string;
+  admin_username: string;
+  created_at: string;
+}
+
 export class RoomsView implements ILobbyView {
   readonly viewId = 'rooms';
   get title() {
@@ -121,19 +129,23 @@ export class RoomsView implements ILobbyView {
   }
 
   private async joinRoom(code: string): Promise<void> {
-    this.deps.socketClient.emit('room:join', { code }, (response: any) => {
-      if (response.success && response.room) {
-        this.deps.notifications.success(t('ui:rooms.joined', { name: response.room.name }));
-        this.onJoinRoom(response.room);
-      } else {
-        this.deps.notifications.error(response.error || t('ui:rooms.joinFailed'));
-      }
-    });
+    this.deps.socketClient.emit(
+      'room:join',
+      { code },
+      (response: { success: boolean; room?: Room; error?: string }) => {
+        if (response.success && response.room) {
+          this.deps.notifications.success(t('ui:rooms.joined', { name: response.room.name }));
+          this.onJoinRoom(response.room);
+        } else {
+          this.deps.notifications.error(response.error || t('ui:rooms.joinFailed'));
+        }
+      },
+    );
   }
 
   private async loadBanner(): Promise<void> {
     try {
-      const banner = await ApiClient.get<any>('/admin/announcements/banner');
+      const banner = await ApiClient.get<ActiveBanner | null>('/admin/announcements/banner');
       const area = this.container?.querySelector('#lobby-banner-area');
       if (area && banner && banner.message) {
         area.innerHTML = `

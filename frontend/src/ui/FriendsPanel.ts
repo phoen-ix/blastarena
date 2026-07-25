@@ -1,6 +1,7 @@
 import { SocketClient } from '../network/SocketClient';
 import { NotificationUI } from './NotificationUI';
 import { Friend, FriendRequest, ActivityStatus } from '@blast-arena/shared';
+import type { ServerToClientEvents } from '@blast-arena/shared';
 import { escapeHtml } from '../utils/html';
 import { t } from '../i18n';
 
@@ -18,11 +19,11 @@ export class FriendsPanel {
   private searchResults: { id: number; username: string }[] = [];
 
   // Socket handler references for cleanup
-  private friendUpdateHandler: any;
-  private friendRequestHandler: any;
-  private friendRemovedHandler: any;
-  private friendOnlineHandler: any;
-  private friendOfflineHandler: any;
+  private friendUpdateHandler!: ServerToClientEvents['friend:update'];
+  private friendRequestHandler!: ServerToClientEvents['friend:requestReceived'];
+  private friendRemovedHandler!: ServerToClientEvents['friend:removed'];
+  private friendOnlineHandler!: ServerToClientEvents['friend:online'];
+  private friendOfflineHandler!: ServerToClientEvents['friend:offline'];
 
   constructor(
     socketClient: SocketClient,

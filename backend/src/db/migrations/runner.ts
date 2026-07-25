@@ -1,7 +1,13 @@
 import fs from 'fs';
 import path from 'path';
+import type { RowDataPacket } from 'mysql2';
 import { getPool } from '../connection';
 import { logger } from '../../utils/logger';
+
+/** Row shape returned by `SELECT name FROM _migrations` queries */
+interface MigrationRow extends RowDataPacket {
+  name: string;
+}
 
 /** Resolve to source directory since SQL files aren't compiled */
 function getMigrationsDir(): string {
@@ -32,8 +38,10 @@ export async function runMigrations(): Promise<void> {
   `);
 
   // Get already-executed migrations
-  const [executed] = await pool.execute<any[]>('SELECT name FROM _migrations ORDER BY name');
-  const executedNames = new Set(executed.map((r: any) => r.name));
+  const [executed] = await pool.execute<MigrationRow[]>(
+    'SELECT name FROM _migrations ORDER BY name',
+  );
+  const executedNames = new Set(executed.map((r) => r.name));
 
   // Find migration files
   const migrationsDir = getMigrationsDir();
@@ -87,8 +95,8 @@ export async function getAppliedMigrations(): Promise<string[]> {
     )
   `);
 
-  const [rows] = await pool.execute<any[]>('SELECT name FROM _migrations ORDER BY name');
-  return rows.map((r: any) => r.name);
+  const [rows] = await pool.execute<MigrationRow[]>('SELECT name FROM _migrations ORDER BY name');
+  return rows.map((r) => r.name);
 }
 
 /**
@@ -125,7 +133,7 @@ export async function rollbackMigration(
   `);
 
   // Fetch the last N applied migrations in reverse order
-  const [rows] = await pool.execute<any[]>(
+  const [rows] = await pool.execute<MigrationRow[]>(
     'SELECT name FROM _migrations ORDER BY name DESC LIMIT ?',
     [steps],
   );
@@ -138,7 +146,7 @@ export async function rollbackMigration(
   // Refuse to roll back irreversible (data-destroying) migrations unless explicitly forced.
   if (!options.force) {
     const irreversible = rows
-      .map((r: any) => r.name as string)
+      .map((r) => r.name)
       .filter((name) => IRREVERSIBLE_MIGRATIONS.has(name));
     if (irreversible.length > 0) {
       throw new Error(

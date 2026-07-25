@@ -1,5 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import {
+  ActivityStatus,
   ClientToServerEvents,
   ServerToClientEvents,
   InterServerEvents,
@@ -166,14 +167,14 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
 export async function notifyFriendsOnline(
   io: TypedServer,
   userId: number,
-  activity: string,
+  activity: ActivityStatus,
 ): Promise<void> {
   try {
     const friendIds = await friendsService.getFriendIds(userId);
     for (const friendId of friendIds) {
       io.to(`user:${friendId}`).emit('friend:online', {
         userId,
-        activity: activity as any,
+        activity,
       });
     }
   } catch (err) {

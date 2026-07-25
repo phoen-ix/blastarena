@@ -39,7 +39,14 @@ function rowToMap(row: CustomMapRow): CustomMap {
   };
 }
 
-function rowToSummary(row: CustomMapRow): CustomMapSummary {
+/** CustomMapRow optionally joined with rating aggregates (see listPublishedMaps).
+ * mysql2 returns DECIMAL aggregates (AVG) as strings by default. */
+interface CustomMapSummaryRow extends CustomMapRow {
+  avg_rating?: string | number | null;
+  rating_count?: number;
+}
+
+function rowToSummary(row: CustomMapSummaryRow): CustomMapSummary {
   const spawnPoints = safeJsonParse<Position[]>(row.spawn_points, []);
   return {
     id: row.id,
@@ -51,8 +58,8 @@ function rowToSummary(row: CustomMapRow): CustomMapSummary {
     createdBy: row.created_by,
     creatorUsername: row.creator_username,
     playCount: row.play_count,
-    avgRating: (row as any).avg_rating ? parseFloat((row as any).avg_rating) : null,
-    ratingCount: (row as any).rating_count ?? 0,
+    avgRating: row.avg_rating ? parseFloat(String(row.avg_rating)) : null,
+    ratingCount: row.rating_count ?? 0,
   };
 }
 

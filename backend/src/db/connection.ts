@@ -46,16 +46,24 @@ export function getPool(): mysql.Pool {
   return pool;
 }
 
+/**
+ * Statement parameter values accepted by mysql2's execute(), derived from the driver
+ * signature (mysql2 does not re-export its ExecuteValues type). Callers pass `unknown[]`
+ * at this boundary; the single assertion below converts to the driver type, and mysql2
+ * validates the actual values at runtime.
+ */
+type SqlParams = Parameters<mysql.Pool['execute']>[1];
+
 export async function query<T extends mysql.RowDataPacket[]>(
   sql: string,
-  params?: any[],
+  params?: unknown[],
 ): Promise<T> {
-  const [rows] = await getPool().execute<T>(sql, params);
+  const [rows] = await getPool().execute<T>(sql, params as SqlParams);
   return rows;
 }
 
-export async function execute(sql: string, params?: any[]): Promise<mysql.ResultSetHeader> {
-  const [result] = await getPool().execute<mysql.ResultSetHeader>(sql, params);
+export async function execute(sql: string, params?: unknown[]): Promise<mysql.ResultSetHeader> {
+  const [result] = await getPool().execute<mysql.ResultSetHeader>(sql, params as SqlParams);
   return result;
 }
 

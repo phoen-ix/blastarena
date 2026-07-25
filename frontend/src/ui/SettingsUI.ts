@@ -11,7 +11,7 @@ import {
   THEME_NAMES,
   BuddySettings,
 } from '@blast-arena/shared';
-import type { ThemeId } from '@blast-arena/shared';
+import type { ThemeId, UserRole } from '@blast-arena/shared';
 import { getSettings, saveSettings, VisualSettings } from '../game/Settings';
 import { i18n, t } from '../i18n';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
@@ -24,6 +24,35 @@ import { audioManager } from '../game/AudioManager';
 interface Tab {
   id: string;
   label: string;
+}
+
+/** Response shape of GET/PUT /user/profile (backend userService.getUserProfile). */
+interface UserProfileResponse {
+  id: number;
+  username: string;
+  emailHint: string;
+  role: UserRole;
+  emailVerified: boolean;
+  twoFactorEnabled: boolean;
+  pendingEmailHint: string | null;
+  createdAt: string;
+  stats: {
+    totalMatches: number;
+    totalWins: number;
+    totalKills: number;
+    totalDeaths: number;
+    totalBombs: number;
+    totalPowerups: number;
+    totalPlaytime: number;
+    winStreak: number;
+    bestWinStreak: number;
+    eloRating: number;
+    peakElo: number;
+    totalXp: number;
+    level: number;
+  };
+  isProfilePublic: boolean;
+  acceptFriendRequests: boolean;
 }
 
 export class SettingsUI {
@@ -162,9 +191,9 @@ export class SettingsUI {
   private async renderAccountTab(): Promise<void> {
     if (!this.contentEl) return;
 
-    let profile: any;
+    let profile: UserProfileResponse;
     try {
-      profile = await ApiClient.get('/user/profile');
+      profile = await ApiClient.get<UserProfileResponse>('/user/profile');
     } catch (err: unknown) {
       this.contentEl.innerHTML = `<div class="error-banner">${t('settings.loadProfileFailed', { error: escapeHtml(getErrorMessage(err)) })}</div>`;
       return;
@@ -270,7 +299,7 @@ export class SettingsUI {
         return;
       }
 
-      const updates: any = {};
+      const updates: { username?: string } = {};
       if (newUsername !== profile.username) updates.username = newUsername;
 
       if (Object.keys(updates).length === 0) {
@@ -279,7 +308,7 @@ export class SettingsUI {
       }
 
       try {
-        const updated: any = await ApiClient.put('/user/profile', updates);
+        const updated = await ApiClient.put<UserProfileResponse>('/user/profile', updates);
         profile = updated;
         this.authManager.updateUser({ username: updated.username });
         statusEl.innerHTML = `<span class="text-success">${t('settings.account.profileUpdated')}</span>`;
@@ -301,7 +330,9 @@ export class SettingsUI {
       }
 
       try {
-        const result: any = await ApiClient.post('/user/email', { email: newEmail });
+        const result = await ApiClient.post<{ message: string }>('/user/email', {
+          email: newEmail,
+        });
         statusEl.innerHTML = `<span class="text-success">${escapeHtml(result.message)}</span>`;
         (this.contentEl!.querySelector('#acct-new-email') as HTMLInputElement).value = '';
       } catch (err: unknown) {
@@ -335,7 +366,7 @@ export class SettingsUI {
       }
 
       try {
-        const result: any = await ApiClient.post('/user/password', {
+        const result = await ApiClient.post<{ message: string }>('/user/password', {
           currentPassword,
           newPassword,
         });
@@ -821,7 +852,7 @@ export class SettingsUI {
       const key = target.name as keyof VisualSettings;
       if (!(key in getSettings())) return;
       const current = getSettings();
-      (current as any)[key] = target.checked;
+      current[key] = target.checked;
       if (target.hasAttribute('role') && target.getAttribute('role') === 'switch') {
         target.setAttribute('aria-checked', String(target.checked));
       }
@@ -932,9 +963,9 @@ export class SettingsUI {
   private async renderPrivacyTab(): Promise<void> {
     if (!this.contentEl) return;
 
-    let profile: any;
+    let profile: UserProfileResponse;
     try {
-      profile = await ApiClient.get('/user/profile');
+      profile = await ApiClient.get<UserProfileResponse>('/user/profile');
     } catch (err: unknown) {
       this.contentEl.innerHTML = `<div class="error-banner">${t('settings.loadProfileFailed', { error: escapeHtml(getErrorMessage(err)) })}</div>`;
       return;

@@ -8,6 +8,8 @@ import {
   Room,
   CampaignGameState,
   CampaignLevelSummary,
+  EnemyTypeEntry,
+  ServerToClientEvents,
 } from '@blast-arena/shared';
 import { themeManager } from '../themes/ThemeManager';
 import { LocalCoopP2Identity } from '../game/LocalCoopInput';
@@ -16,6 +18,20 @@ import { audioManager } from '../game/AudioManager';
 import { AuthManager } from '../network/AuthManager';
 
 const DEADZONE = 0.3;
+
+/** Single placement row from the server's `game:over` payload. */
+type GameOverPlacement = Parameters<ServerToClientEvents['game:over']>[0]['placements'][number];
+
+/** Registry `gameOverData` shape set by GameScene for campaign results. */
+interface CampaignGameOverData {
+  campaignResult: boolean;
+  success: boolean;
+  levelId: number;
+  timeSeconds?: number;
+  stars?: number;
+  nextLevelId?: number | null;
+  reason?: string;
+}
 
 export class GameOverScene extends Phaser.Scene {
   private selectedIndex = 0;
@@ -140,7 +156,9 @@ export class GameOverScene extends Phaser.Scene {
     const authManager: AuthManager = this.registry.get('authManager');
     const localUserId = authManager?.getUser()?.id;
     if (data?.placements && localUserId) {
-      const localIdx = data.placements.findIndex((p: any) => p.userId === localUserId);
+      const localIdx = data.placements.findIndex(
+        (p: GameOverPlacement) => p.userId === localUserId,
+      );
       if (localIdx === 0) audioManager.victory();
       else audioManager.defeat();
     }
@@ -177,7 +195,9 @@ export class GameOverScene extends Phaser.Scene {
     }
 
     // Determine if solo (only human player, rest are bots)
-    const humanCount = data?.placements ? data.placements.filter((p: any) => !p.isBot).length : 2;
+    const humanCount = data?.placements
+      ? data.placements.filter((p: GameOverPlacement) => !p.isBot).length
+      : 2;
     const isSolo = humanCount <= 1;
 
     let actionBtn: Phaser.GameObjects.Text;
@@ -269,7 +289,7 @@ export class GameOverScene extends Phaser.Scene {
     this.underline = this.add.graphics();
 
     if (data?.placements) {
-      const list: any[] = data.placements;
+      const list: GameOverPlacement[] = data.placements;
       const count = list.length;
       const startY = 140;
       const endY = height - 70;
@@ -302,7 +322,7 @@ export class GameOverScene extends Phaser.Scene {
       this.add.text(colElo, 115, t('ui:gameOver.elo'), hs).setOrigin(0.5);
       this.add.text(colXp, 115, t('ui:gameOver.xp'), hs).setOrigin(0.5);
 
-      list.forEach((p: any, i: number) => {
+      list.forEach((p, i) => {
         const y = startY + i * spacing;
         const medalColor =
           i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : '#707080';
@@ -345,8 +365,8 @@ export class GameOverScene extends Phaser.Scene {
   private createCampaignGameOver(
     width: number,
     height: number,
-    data: any,
-    socketClient: any,
+    data: CampaignGameOverData,
+    socketClient: SocketClient,
   ): void {
     const colors = themeManager.getCanvasColors();
     const success = data.success;
@@ -406,7 +426,8 @@ export class GameOverScene extends Phaser.Scene {
         nextBtn.on('pointerover', () => nextBtn.setColor(colors.successHoverHex));
         nextBtn.on('pointerout', () => nextBtn.setColor(colors.successHex));
         nextBtn.on('pointerdown', () => {
-          this.startCampaignLevel(data.nextLevelId, socketClient);
+          // Guarded by the surrounding `if (data.nextLevelId)` check
+          this.startCampaignLevel(data.nextLevelId!, socketClient);
         });
         this.buttons.push(nextBtn);
         this.baseColors.push(colors.successHex);
@@ -537,7 +558,7 @@ export class GameOverScene extends Phaser.Scene {
     const isBuddyMode = !!this.registry.get('buddyMode');
 
     // Fetch enemy types, then emit campaign:start and transition directly to GameScene
-    ApiClient.get<any>('/campaign/enemy-types')
+    ApiClient.get<{ enemyTypes: EnemyTypeEntry[] }>('/campaign/enemy-types')
       .then((enemyTypesResp) => {
         const gameStartHandler = (data: {
           state: CampaignGameState;

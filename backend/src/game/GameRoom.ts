@@ -29,6 +29,7 @@ type TypedServer = Server<
 >;
 import { GameStateManager, GameConfig } from './GameState';
 import { GameLoop } from './GameLoop';
+import type { RowDataPacket } from 'mysql2';
 import { execute, query } from '../db/connection';
 import { logger } from '../utils/logger';
 import { GameLogger } from '../utils/gameLogger';
@@ -42,6 +43,12 @@ import * as challengesService from '../services/challenges';
 
 const DISCONNECT_GRACE_TICKS = 200; // 10 seconds at 20 tps
 const BOT_ONLY_TICK_RATE = 100; // 5x speed when only bots remain
+
+/** Row shape for the post-game `SELECT total_xp, level FROM user_stats` query */
+interface UserStatsXpRow extends RowDataPacket {
+  total_xp: number;
+  level: number;
+}
 
 export class GameRoom {
   public readonly code: string;
@@ -575,7 +582,7 @@ export class GameRoom {
           for (const p of placements) {
             if (p.isBot || p.userId < 0) continue;
 
-            const [statsRow] = await query<any[]>(
+            const [statsRow] = await query<UserStatsXpRow[]>(
               'SELECT total_xp, level FROM user_stats WHERE user_id = ?',
               [p.userId],
             );

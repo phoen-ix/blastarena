@@ -1,7 +1,14 @@
 import { SocketClient } from '../network/SocketClient';
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
-import { Party, PartyChatMessage, PartyInvite, ChatMode, UserRole } from '@blast-arena/shared';
+import {
+  Party,
+  PartyChatMessage,
+  PartyInvite,
+  ChatMode,
+  UserRole,
+  ServerToClientEvents,
+} from '@blast-arena/shared';
 import { escapeHtml } from '../utils/html';
 import { t } from '../i18n';
 
@@ -20,14 +27,14 @@ export class PartyBar {
   // Invite handler for room/party invites
   private onJoinRoom: ((roomCode: string) => void) | null = null;
 
-  // Socket handler refs
-  private partyStateHandler: any;
-  private partyDisbandedHandler: any;
-  private partyChatHandler: any;
-  private partyInviteHandler: any;
-  private partyJoinRoomHandler: any;
-  private roomInviteHandler: any;
-  private settingsChangedHandler: any;
+  // Socket handler refs (assigned in setupSocketListeners, called from the constructor)
+  private partyStateHandler!: ServerToClientEvents['party:state'];
+  private partyDisbandedHandler!: ServerToClientEvents['party:disbanded'];
+  private partyChatHandler!: ServerToClientEvents['party:chat'];
+  private partyInviteHandler!: ServerToClientEvents['party:invite'];
+  private partyJoinRoomHandler!: ServerToClientEvents['party:joinRoom'];
+  private roomInviteHandler!: ServerToClientEvents['invite:room'];
+  private settingsChangedHandler!: ServerToClientEvents['admin:settingsChanged'];
 
   constructor(
     socketClient: SocketClient,

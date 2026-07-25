@@ -2,6 +2,7 @@ import { SocketClient } from '../network/SocketClient';
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
 import { LobbyChatMessage, ChatMode, UserRole, LOBBY_CHAT_MAX_LENGTH } from '@blast-arena/shared';
+import type { ServerToClientEvents } from '@blast-arena/shared';
 import { escapeHtml } from '../utils/html';
 import { getSettings } from '../game/Settings';
 import { t } from '../i18n';
@@ -19,8 +20,8 @@ export class LobbyChatPanel {
   private inputEl: HTMLInputElement | null = null;
 
   // Socket handler refs
-  private lobbyChatHandler: any;
-  private settingsChangedHandler: any;
+  private lobbyChatHandler!: ServerToClientEvents['lobby:chat'];
+  private settingsChangedHandler!: ServerToClientEvents['admin:settingsChanged'];
 
   constructor(
     socketClient: SocketClient,

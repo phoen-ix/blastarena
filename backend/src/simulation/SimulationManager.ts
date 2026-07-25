@@ -2,7 +2,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as zlib from 'zlib';
 import { promisify } from 'util';
-import { SimulationConfig, SimulationBatchStatus, ReplayData } from '@blast-arena/shared';
+import {
+  SimulationConfig,
+  SimulationBatchStatus,
+  SimulationGameResult,
+  ReplayData,
+} from '@blast-arena/shared';
 import { SimulationRunner } from './SimulationRunner';
 import { getIO } from '../game/registry';
 import { logger } from '../utils/logger';
@@ -213,7 +218,9 @@ export class SimulationManager {
     return { batches: history.slice((page - 1) * limit, page * limit), total: history.length };
   }
 
-  getBatchResults(batchId: string): { results: any[]; summary: any } | null {
+  getBatchResults(
+    batchId: string,
+  ): { results: SimulationGameResult[]; summary: SimulationBatchStatus } | null {
     // Check in-memory first
     const runner = this.runners.get(batchId);
     if (runner) {
@@ -397,7 +404,7 @@ export class SimulationManager {
       runner.on('progress', (status: SimulationBatchStatus) => {
         io.to('sim:admin').emit('sim:progress', status);
       });
-      runner.on('gameResult', (gameResult: any) => {
+      runner.on('gameResult', (gameResult: SimulationGameResult) => {
         io.to('sim:admin').emit('sim:gameResult', { batchId, result: gameResult });
       });
       runner.on('completed', (status: SimulationBatchStatus) => {

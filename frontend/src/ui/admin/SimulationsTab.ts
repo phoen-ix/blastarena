@@ -11,6 +11,8 @@ import {
   PowerUpType,
   POWERUP_DEFINITIONS,
   GAME_MODES,
+  GameMode,
+  LogVerbosity,
   BotAIEntry,
 } from '@blast-arena/shared';
 import { escapeHtml } from '../../utils/html';
@@ -367,9 +369,10 @@ export class SimulationsTab {
     this.detailBatchId = batchId;
 
     try {
-      const data = await ApiClient.get<{ results: SimulationGameResult[]; summary: any }>(
-        `/admin/simulations/${batchId}`,
-      );
+      const data = await ApiClient.get<{
+        results: SimulationGameResult[];
+        summary: SimulationBatchStatus;
+      }>(`/admin/simulations/${batchId}`);
       this.detailResults = data.results || [];
 
       const status: SimulationBatchStatus =
@@ -860,16 +863,17 @@ export class SimulationsTab {
         | 'realtime';
 
       const config: SimulationConfig = {
-        gameMode: (modal.querySelector('#sim-mode') as HTMLSelectElement).value as any,
+        gameMode: (modal.querySelector('#sim-mode') as HTMLSelectElement).value as GameMode,
         botCount: parseInt((modal.querySelector('#sim-bot-count') as HTMLSelectElement).value),
-        botDifficulty: (modal.querySelector('#sim-difficulty') as HTMLSelectElement).value as any,
+        botDifficulty: (modal.querySelector('#sim-difficulty') as HTMLSelectElement)
+          .value as SimulationConfig['botDifficulty'],
         mapWidth: mapSize,
         mapHeight: mapSize,
         roundTime: parseInt((modal.querySelector('#sim-round-time') as HTMLSelectElement).value),
         wallDensity: parseFloat(
           (modal.querySelector('#sim-wall-density') as HTMLSelectElement).value,
         ),
-        enabledPowerUps: enabledPowerUps as any[],
+        enabledPowerUps: enabledPowerUps as PowerUpType[],
         powerUpDropRate: parseFloat(
           (modal.querySelector('#sim-powerup-rate') as HTMLSelectElement).value,
         ),
@@ -885,7 +889,8 @@ export class SimulationsTab {
           ),
         ),
         speed,
-        logVerbosity: (modal.querySelector('#sim-verbosity') as HTMLSelectElement).value as any,
+        logVerbosity: (modal.querySelector('#sim-verbosity') as HTMLSelectElement)
+          .value as LogVerbosity,
         recordReplays: (modal.querySelector('#sim-record-replays') as HTMLInputElement).checked,
         botAiId:
           (modal.querySelector('#sim-bot-ai') as HTMLSelectElement | null)?.value || undefined,

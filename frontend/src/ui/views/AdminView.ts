@@ -10,13 +10,14 @@ export class AdminView implements ILobbyView {
 
   private panel: AdminUI;
 
-  constructor(deps: ViewDeps, options?: Record<string, any>) {
+  constructor(deps: ViewDeps, options?: Record<string, unknown>) {
+    const initialTab = typeof options?.initialTab === 'string' ? options.initialTab : undefined;
     this.panel = new AdminUI(
       deps.socketClient,
       deps.authManager,
       deps.notifications,
       () => {},
-      options?.initialTab,
+      initialTab,
     );
   }
 

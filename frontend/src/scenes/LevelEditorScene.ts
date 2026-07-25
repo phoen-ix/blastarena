@@ -67,6 +67,17 @@ interface PlacedPowerUp {
   sprite?: Phaser.GameObjects.Sprite;
 }
 
+/** Snapshot produced by serializeState() and consumed by undo/redo via restoreState(). */
+interface EditorUndoState {
+  mapWidth: number;
+  mapHeight: number;
+  tiles: TileType[][];
+  enemies: { enemyTypeId: number; x: number; y: number }[];
+  powerups: { type: string; x: number; y: number; hidden: boolean }[];
+  coveredTiles?: { x: number; y: number; type: TileType }[];
+  puzzleSwitchVariants?: [string, SwitchVariant][];
+}
+
 export class LevelEditorScene extends Phaser.Scene {
   private levelId: number | null = null;
   private level: CampaignLevel | null = null;
@@ -605,7 +616,13 @@ export class LevelEditorScene extends Phaser.Scene {
     // Zoom with scroll wheel
     this.input.on(
       'wheel',
-      (_pointer: any, _gameObjects: any, _dx: number, _dy: number, dz: number) => {
+      (
+        _pointer: Phaser.Input.Pointer,
+        _gameObjects: Phaser.GameObjects.GameObject[],
+        _dx: number,
+        _dy: number,
+        dz: number,
+      ) => {
         const newZoom = Phaser.Math.Clamp(cam.zoom - dz * 0.001, 0.25, 3);
         cam.setZoom(newZoom);
       },
@@ -1109,7 +1126,7 @@ export class LevelEditorScene extends Phaser.Scene {
     this.isDirty = this.serializeState() !== this.savedState;
   }
 
-  private restoreState(state: any): void {
+  private restoreState(state: EditorUndoState): void {
     const dimensionsChanged =
       state.mapWidth !== this.mapWidth || state.mapHeight !== this.mapHeight;
     this.mapWidth = state.mapWidth ?? this.mapWidth;

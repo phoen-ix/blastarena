@@ -3,6 +3,25 @@ import { NotificationUI } from '../NotificationUI';
 import { escapeHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
+/** Admin action log row as returned by GET /admin/actions (snake_case DB columns). */
+interface AdminActionEntry {
+  id: number;
+  admin_id: number;
+  admin_username: string;
+  action: string;
+  target_type: string;
+  target_id: number;
+  details: string | null;
+  created_at: string;
+}
+
+interface AdminActionsResponse {
+  actions: AdminActionEntry[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export class LogsTab {
   private container: HTMLElement | null = null;
   private notifications: NotificationUI;
@@ -33,7 +52,7 @@ export class LogsTab {
       const params = new URLSearchParams({ page: String(this.page), limit: '20' });
       if (this.actionFilter) params.set('action', this.actionFilter);
 
-      const result = await ApiClient.get<any>(`/admin/actions?${params}`);
+      const result = await ApiClient.get<AdminActionsResponse>(`/admin/actions?${params}`);
       const totalPages = Math.ceil(result.total / result.limit);
 
       this.container.innerHTML = `
@@ -64,7 +83,7 @@ export class LogsTab {
           <tbody>
             ${result.actions
               .map(
-                (a: any, i: number) => `
+                (a: AdminActionEntry, i: number) => `
               <tr class="log-row" data-log-index="${i}" style="cursor:pointer;">
                 <td>${new Date(a.created_at).toLocaleString()}</td>
                 <td>${escapeHtml(a.admin_username)}</td>

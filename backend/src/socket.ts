@@ -16,6 +16,8 @@ import {
   PublicUser,
   CampaignGameState,
   UserRole,
+  SimulationBatchStatus,
+  SimulationGameResult,
   getErrorMessage,
   EMOTES,
   EMOTE_COOLDOWN_MS,
@@ -1037,11 +1039,13 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         const runner = mgr.getBatch(result.batchId)!;
 
         // Forward events to the requesting admin socket
-        runner.on('progress', (status: any) => socket.emit('sim:progress', status));
-        runner.on('gameResult', (gameResult: any) =>
+        runner.on('progress', (status: SimulationBatchStatus) =>
+          socket.emit('sim:progress', status),
+        );
+        runner.on('gameResult', (gameResult: SimulationGameResult) =>
           socket.emit('sim:gameResult', { batchId: result.batchId, result: gameResult }),
         );
-        runner.on('completed', (status: any) =>
+        runner.on('completed', (status: SimulationBatchStatus) =>
           socket.emit('sim:completed', { batchId: result.batchId, status }),
         );
 

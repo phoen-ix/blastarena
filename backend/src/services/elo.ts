@@ -1,4 +1,4 @@
-import { query, execute, withTransaction } from '../db/connection';
+import { query, withTransaction } from '../db/connection';
 import { EloResult } from '@blast-arena/shared';
 import { SeasonRow } from '../db/types';
 import { RowDataPacket } from 'mysql2';
@@ -73,7 +73,12 @@ export function calculateTeamElo(
     const expected = calculateExpectedScore(avgWinnerElo, avgLoserElo);
     const delta = Math.round(K * (1 - expected));
     const newElo = Math.max(0, player.currentElo + delta);
-    results.push({ userId: player.userId, oldElo: player.currentElo, newElo, delta: newElo - player.currentElo });
+    results.push({
+      userId: player.userId,
+      oldElo: player.currentElo,
+      newElo,
+      delta: newElo - player.currentElo,
+    });
   }
 
   for (const player of losers) {
@@ -81,16 +86,19 @@ export function calculateTeamElo(
     const expected = calculateExpectedScore(avgLoserElo, avgWinnerElo);
     const delta = Math.round(K * (0 - expected));
     const newElo = Math.max(0, player.currentElo + delta);
-    results.push({ userId: player.userId, oldElo: player.currentElo, newElo, delta: newElo - player.currentElo });
+    results.push({
+      userId: player.userId,
+      oldElo: player.currentElo,
+      newElo,
+      delta: newElo - player.currentElo,
+    });
   }
 
   return results;
 }
 
 async function getActiveSeason(): Promise<SeasonRow | null> {
-  const rows = await query<SeasonRow[]>(
-    'SELECT * FROM seasons WHERE is_active = TRUE LIMIT 1',
-  );
+  const rows = await query<SeasonRow[]>('SELECT * FROM seasons WHERE is_active = TRUE LIMIT 1');
   return rows.length > 0 ? rows[0] : null;
 }
 
@@ -150,7 +158,9 @@ export async function processMatchElo(
     userIds,
   );
 
-  const eloMap = new Map(eloRows.map((r) => [r.user_id, { elo: r.elo_rating ?? 1000, matches: r.matches_played ?? 0 }]));
+  const eloMap = new Map(
+    eloRows.map((r) => [r.user_id, { elo: r.elo_rating ?? 1000, matches: r.matches_played ?? 0 }]),
+  );
 
   const season = await getActiveSeason();
   let results: EloResult[];
@@ -178,7 +188,12 @@ export async function processMatchElo(
     // FFA-style modes: pairwise comparison
     const ffaPlayers = humanPlayers.map((p) => {
       const data = eloMap.get(p.userId) ?? { elo: 1000, matches: 0 };
-      return { userId: p.userId, placement: p.placement, currentElo: data.elo, matchesPlayed: data.matches };
+      return {
+        userId: p.userId,
+        placement: p.placement,
+        currentElo: data.elo,
+        matchesPlayed: data.matches,
+      };
     });
 
     results = calculateFfaElo(ffaPlayers);

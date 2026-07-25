@@ -1,7 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { LogVerbosity } from '@blast-arena/shared';
+import { LogVerbosity, Position } from '@blast-arena/shared';
 import type { ReplayRecorder } from './replayRecorder';
+import type { Player } from '../game/Player';
+import type { Bomb } from '../game/Bomb';
+import type { Explosion } from '../game/Explosion';
 
 const LOG_DIR = process.env.GAME_LOG_DIR || '/app/gamelogs';
 
@@ -46,13 +49,13 @@ export class GameLogger {
     return tick % 5 === 0;
   }
 
-  log(event: string, data: any): void {
+  log(event: string, data: Record<string, unknown>): void {
     const entry = { t: Date.now(), event, ...data };
     this.stream.write(JSON.stringify(entry) + '\n');
   }
 
-  logTick(tick: number, players: any[], bombs: any[], explosions: any[]): void {
-    const tickData: any = {
+  logTick(tick: number, players: Player[], bombs: Bomb[], explosions: Explosion[]): void {
+    const tickData = {
       t: Date.now(),
       event: 'tick',
       tick,
@@ -87,7 +90,12 @@ export class GameLogger {
     this.stream.write(JSON.stringify(tickData) + '\n');
   }
 
-  logBotDecision(botId: number, botName: string, decision: string, details?: any): void {
+  logBotDecision(
+    botId: number,
+    botName: string,
+    decision: string,
+    details?: Record<string, unknown>,
+  ): void {
     this.stream.write(
       JSON.stringify({
         t: Date.now(),
@@ -137,7 +145,7 @@ export class GameLogger {
     event: 'place' | 'detonate',
     ownerId: number,
     ownerName: string,
-    pos: any,
+    pos: Position,
     fireRange?: number,
   ): void {
     this.stream.write(
@@ -279,7 +287,7 @@ export class GameLogger {
     this.replayRecorder?.addLogEntry('player_disconnect_kill', { playerId, playerName });
   }
 
-  logGameOver(winnerId: number | null, placements: any[]): void {
+  logGameOver(winnerId: number | null, placements: Record<string, unknown>[]): void {
     this.log('game_over', { winnerId, placements });
     this.stream.end();
   }

@@ -4,6 +4,7 @@ import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
 import { NotificationUI } from '../NotificationUI';
 import {
+  AdminStats,
   GameDefaults,
   SimulationDefaults,
   EmailSettings,
@@ -734,8 +735,9 @@ export class DashboardTab {
       try {
         await ApiClient.post('/admin/settings/email_settings/test', { to: addr });
         this.notifications.success(t('admin:dashboard.testEmailSent', { address: addr }));
-      } catch (err: any) {
-        const msg = err?.error || err?.message || t('admin:dashboard.failedSendTestEmail');
+      } catch (err) {
+        const apiErr = err as { error?: string; message?: string } | null;
+        const msg = apiErr?.error || apiErr?.message || t('admin:dashboard.failedSendTestEmail');
         this.notifications.error(msg);
       }
     });
@@ -1109,7 +1111,7 @@ export class DashboardTab {
   private async loadStats(): Promise<void> {
     if (!this.container) return;
     try {
-      const stats = await ApiClient.get<any>('/admin/stats');
+      const stats = await ApiClient.get<AdminStats>('/admin/stats');
 
       // Remove existing stats if re-rendering
       this.container.querySelector('.admin-stats')?.remove();

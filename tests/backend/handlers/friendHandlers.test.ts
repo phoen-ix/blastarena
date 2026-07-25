@@ -300,7 +300,7 @@ describe('friendHandlers', () => {
     it('emits friend:online to all friend rooms', async () => {
       mockGetFriendIds.mockResolvedValue([2, 3, 4]);
 
-      await notifyFriendsOnline(io, 1, 'lobby');
+      await notifyFriendsOnline(io, 1, 'in_lobby');
 
       expect(mockGetFriendIds).toHaveBeenCalledWith(1);
       expect(io.to).toHaveBeenCalledWith('user:2');
@@ -310,14 +310,14 @@ describe('friendHandlers', () => {
       expect(io._toEmit).toHaveBeenCalledTimes(3);
       expect(io._toEmit).toHaveBeenCalledWith('friend:online', {
         userId: 1,
-        activity: 'lobby',
+        activity: 'in_lobby',
       });
     });
 
     it('handles error gracefully without throwing', async () => {
       mockGetFriendIds.mockRejectedValue(new Error('Redis down'));
 
-      await expect(notifyFriendsOnline(io, 1, 'lobby')).resolves.toBeUndefined();
+      await expect(notifyFriendsOnline(io, 1, 'in_lobby')).resolves.toBeUndefined();
     });
   });
 

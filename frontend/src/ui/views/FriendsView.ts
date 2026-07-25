@@ -21,12 +21,16 @@ export class FriendsView implements ILobbyView {
   private blocked: { userId: number; username: string }[] = [];
   private searchResults: { id: number; username: string }[] = [];
 
-  // Socket handler references
-  private friendUpdateHandler: any;
-  private friendRequestHandler: any;
-  private friendRemovedHandler: any;
-  private friendOnlineHandler: any;
-  private friendOfflineHandler: any;
+  // Socket handler references (assigned in setupSocketListeners, called from constructor)
+  private friendUpdateHandler!: (data: {
+    friends: Friend[];
+    incoming: FriendRequest[];
+    outgoing: FriendRequest[];
+  }) => void;
+  private friendRequestHandler!: (data: FriendRequest) => void;
+  private friendRemovedHandler!: (data: { userId: number }) => void;
+  private friendOnlineHandler!: (data: { userId: number; activity: ActivityStatus }) => void;
+  private friendOfflineHandler!: (data: { userId: number }) => void;
 
   constructor(deps: ViewDeps, onMessageFriend: (userId: number, username: string) => void) {
     this.deps = deps;

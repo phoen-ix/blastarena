@@ -28,7 +28,7 @@ export class LobbyUI {
   private activeViewId = 'rooms';
   private roomsView: RoomsView | null = null;
   private initialView: string | null = null;
-  private initialViewOptions: Record<string, any> | null = null;
+  private initialViewOptions: Record<string, unknown> | null = null;
 
   constructor(
     socketClient: SocketClient,
@@ -51,7 +51,7 @@ export class LobbyUI {
     this.partyBar.setJoinRoomCallback((roomCode) => this.joinRoom(roomCode));
   }
 
-  show(initialView?: string, viewOptions?: Record<string, any>): void {
+  show(initialView?: string, viewOptions?: Record<string, unknown>): void {
     this.initialView = initialView || null;
     this.initialViewOptions = viewOptions || null;
 
@@ -94,7 +94,7 @@ export class LobbyUI {
     this.loadSidebarBadges();
   }
 
-  showView(viewId: string, options?: Record<string, any>): void {
+  showView(viewId: string, options?: Record<string, unknown>): void {
     this.navigateTo(viewId, options);
   }
 
@@ -124,7 +124,7 @@ export class LobbyUI {
     this.lobbyChatPanel.destroy();
   }
 
-  private async navigateTo(viewId: string, options?: Record<string, any>): Promise<void> {
+  private async navigateTo(viewId: string, options?: Record<string, unknown>): Promise<void> {
     // Destroy current view
     if (this.activeView) {
       this.activeView.destroy();
@@ -167,7 +167,7 @@ export class LobbyUI {
     this.updateGamepadContext();
   }
 
-  private async createView(viewId: string, options?: Record<string, any>): Promise<ILobbyView> {
+  private async createView(viewId: string, options?: Record<string, unknown>): Promise<ILobbyView> {
     const deps: ViewDeps = {
       socketClient: this.socketClient,
       authManager: this.authManager,
@@ -506,15 +506,19 @@ export class LobbyUI {
   }
 
   private async joinRoom(code: string): Promise<void> {
-    this.socketClient.emit('room:join', { code }, (response: any) => {
-      if (response.success && response.room) {
-        this.notifications.success(t('ui:rooms.joined', { name: response.room.name }));
-        this.hide();
-        this.onJoinRoom(response.room);
-      } else {
-        this.notifications.error(response.error || t('ui:rooms.joinFailed'));
-      }
-    });
+    this.socketClient.emit(
+      'room:join',
+      { code },
+      (response: { success: boolean; room?: Room; error?: string }) => {
+        if (response.success && response.room) {
+          this.notifications.success(t('ui:rooms.joined', { name: response.room.name }));
+          this.hide();
+          this.onJoinRoom(response.room);
+        } else {
+          this.notifications.error(response.error || t('ui:rooms.joinFailed'));
+        }
+      },
+    );
   }
 
   private loadSidebarBadges(): void {

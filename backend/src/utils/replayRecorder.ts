@@ -18,6 +18,16 @@ import { logger } from './logger';
 
 const REPLAY_DIR = process.env.REPLAY_DIR || '/app/replays';
 
+/**
+ * Placement entries differ by game type (multiplayer, campaign, simulation, open world),
+ * so the recorder accepts any JSON-serializable placement objects.
+ */
+type ReplayGameOverData = Omit<ReplayData['gameOver'], 'placements'> & {
+  placements: Record<string, unknown>[];
+};
+
+type RecordedReplayData = Omit<ReplayData, 'gameOver'> & { gameOver: ReplayGameOverData };
+
 interface TickEvents {
   explosions: { cells: { x: number; y: number }[]; ownerId: number }[];
   playerDied: { playerId: number; killerId: number | null }[];
@@ -159,15 +169,7 @@ export class ReplayRecorder {
     });
   }
 
-  finalize(
-    gameOverData: {
-      winnerId: number | null;
-      winnerTeam: number | null;
-      reason: string;
-      placements: any[];
-    },
-    options?: { saveDir?: string },
-  ): void {
+  finalize(gameOverData: ReplayGameOverData, options?: { saveDir?: string }): void {
     const saveDir = options?.saveDir;
 
     if (!saveDir && this.matchId === 0 && !this.sessionId) {
@@ -178,7 +180,7 @@ export class ReplayRecorder {
       return;
     }
 
-    const replayData: ReplayData = {
+    const replayData: RecordedReplayData = {
       version: 1,
       matchId: this.matchId,
       sessionId: this.sessionId,

@@ -1,6 +1,6 @@
 import { CampaignWorld, CampaignLevel, CampaignLevelSummary } from '@blast-arena/shared';
 import { query, execute } from '../db/connection';
-import { CampaignWorldRow, CampaignLevelRow, CountRow } from '../db/types';
+import { CampaignWorldRow, CampaignLevelRow, CampaignProgressRow, CountRow } from '../db/types';
 
 function worldRowToEntry(row: CampaignWorldRow): CampaignWorld {
   return {
@@ -196,7 +196,7 @@ export async function listLevelsWithProgress(
   const levelIds = summaries.map((s) => s.id);
   if (levelIds.length > 0) {
     const placeholders = levelIds.map(() => '?').join(',');
-    const progressRows = await query<any[]>(
+    const progressRows = await query<CampaignProgressRow[]>(
       `SELECT * FROM campaign_progress WHERE user_id = ? AND level_id IN (${placeholders})`,
       [userId, ...levelIds],
     );

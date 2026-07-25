@@ -22,7 +22,10 @@ function toAchievement(row: AchievementRow): Achievement {
     icon: row.icon,
     category: row.category,
     conditionType: row.condition_type as AchievementConditionType,
-    conditionConfig: typeof row.condition_config === 'string' ? JSON.parse(row.condition_config) : row.condition_config,
+    conditionConfig:
+      typeof row.condition_config === 'string'
+        ? JSON.parse(row.condition_config)
+        : row.condition_config,
     rewardType: row.reward_type as AchievementRewardType,
     rewardId: row.reward_id,
     isActive: row.is_active,
@@ -91,16 +94,46 @@ export async function updateAchievement(
   const sets: string[] = [];
   const params: unknown[] = [];
 
-  if (data.name !== undefined) { sets.push('name = ?'); params.push(data.name); }
-  if (data.description !== undefined) { sets.push('description = ?'); params.push(data.description); }
-  if (data.icon !== undefined) { sets.push('icon = ?'); params.push(data.icon); }
-  if (data.category !== undefined) { sets.push('category = ?'); params.push(data.category); }
-  if (data.conditionType !== undefined) { sets.push('condition_type = ?'); params.push(data.conditionType); }
-  if (data.conditionConfig !== undefined) { sets.push('condition_config = ?'); params.push(JSON.stringify(data.conditionConfig)); }
-  if (data.rewardType !== undefined) { sets.push('reward_type = ?'); params.push(data.rewardType); }
-  if (data.rewardId !== undefined) { sets.push('reward_id = ?'); params.push(data.rewardId); }
-  if (data.isActive !== undefined) { sets.push('is_active = ?'); params.push(data.isActive); }
-  if (data.sortOrder !== undefined) { sets.push('sort_order = ?'); params.push(data.sortOrder); }
+  if (data.name !== undefined) {
+    sets.push('name = ?');
+    params.push(data.name);
+  }
+  if (data.description !== undefined) {
+    sets.push('description = ?');
+    params.push(data.description);
+  }
+  if (data.icon !== undefined) {
+    sets.push('icon = ?');
+    params.push(data.icon);
+  }
+  if (data.category !== undefined) {
+    sets.push('category = ?');
+    params.push(data.category);
+  }
+  if (data.conditionType !== undefined) {
+    sets.push('condition_type = ?');
+    params.push(data.conditionType);
+  }
+  if (data.conditionConfig !== undefined) {
+    sets.push('condition_config = ?');
+    params.push(JSON.stringify(data.conditionConfig));
+  }
+  if (data.rewardType !== undefined) {
+    sets.push('reward_type = ?');
+    params.push(data.rewardType);
+  }
+  if (data.rewardId !== undefined) {
+    sets.push('reward_id = ?');
+    params.push(data.rewardId);
+  }
+  if (data.isActive !== undefined) {
+    sets.push('is_active = ?');
+    params.push(data.isActive);
+  }
+  if (data.sortOrder !== undefined) {
+    sets.push('sort_order = ?');
+    params.push(data.sortOrder);
+  }
 
   if (sets.length === 0) return;
   params.push(id);
@@ -119,7 +152,11 @@ export async function getUserAchievements(userId: number): Promise<UserAchieveme
   return rows.map((r) => ({
     achievementId: r.achievement_id,
     unlockedAt: r.unlocked_at ? r.unlocked_at.toISOString() : null,
-    progress: r.progress ? (typeof r.progress === 'string' ? JSON.parse(r.progress) : r.progress) : null,
+    progress: r.progress
+      ? typeof r.progress === 'string'
+        ? JSON.parse(r.progress)
+        : r.progress
+      : null,
   }));
 }
 
@@ -142,7 +179,10 @@ export async function getUserAchievementsPublic(userId: number): Promise<UserAch
       icon: r.icon!,
       category: r.category!,
       conditionType: r.condition_type as AchievementConditionType,
-      conditionConfig: typeof r.condition_config === 'string' ? JSON.parse(r.condition_config!) : r.condition_config,
+      conditionConfig:
+        typeof r.condition_config === 'string'
+          ? JSON.parse(r.condition_config!)
+          : r.condition_config,
       rewardType: r.reward_type as AchievementRewardType,
       rewardId: r.reward_id ?? null,
       isActive: r.is_active!,
@@ -164,18 +204,12 @@ interface StatsRow extends RowDataPacket {
   best_win_streak: number;
 }
 
-async function checkCumulative(
-  userId: number,
-  config: Record<string, unknown>,
-): Promise<boolean> {
+async function checkCumulative(userId: number, config: Record<string, unknown>): Promise<boolean> {
   const stat = config.stat as string;
   const threshold = config.threshold as number;
   if (!stat || threshold === undefined) return false;
 
-  const [row] = await query<StatsRow[]>(
-    'SELECT * FROM user_stats WHERE user_id = ?',
-    [userId],
-  );
+  const [row] = await query<StatsRow[]>('SELECT * FROM user_stats WHERE user_id = ?', [userId]);
   if (!row) return false;
 
   const statMap: Record<string, number> = {
@@ -193,10 +227,7 @@ async function checkCumulative(
   return (statMap[stat] ?? 0) >= threshold;
 }
 
-function checkPerGame(
-  gameData: GameAchievementData,
-  config: Record<string, unknown>,
-): boolean {
+function checkPerGame(gameData: GameAchievementData, config: Record<string, unknown>): boolean {
   const stat = config.stat as string;
   const operator = (config.operator as string) ?? '>=';
   const threshold = config.threshold as number;
@@ -219,12 +250,18 @@ function checkPerGame(
   const numValue = typeof value === 'boolean' ? (value ? 1 : 0) : value;
 
   switch (operator) {
-    case '>=': return numValue >= threshold;
-    case '<=': return numValue <= threshold;
-    case '==': return numValue === threshold;
-    case '>': return numValue > threshold;
-    case '<': return numValue < threshold;
-    default: return numValue >= threshold;
+    case '>=':
+      return numValue >= threshold;
+    case '<=':
+      return numValue <= threshold;
+    case '==':
+      return numValue === threshold;
+    case '>':
+      return numValue > threshold;
+    case '<':
+      return numValue < threshold;
+    default:
+      return numValue >= threshold;
   }
 }
 
@@ -262,7 +299,9 @@ async function checkModeSpecific(
   }
 
   if (stat === 'kills') {
-    interface SumRow extends RowDataPacket { total: number; }
+    interface SumRow extends RowDataPacket {
+      total: number;
+    }
     const [row] = await query<SumRow[]>(
       `SELECT COALESCE(SUM(mp.kills), 0) as total FROM matches m
        JOIN match_players mp ON mp.match_id = m.id
@@ -275,15 +314,14 @@ async function checkModeSpecific(
   return false;
 }
 
-async function checkCampaign(
-  userId: number,
-  config: Record<string, unknown>,
-): Promise<boolean> {
+async function checkCampaign(userId: number, config: Record<string, unknown>): Promise<boolean> {
   const subType = config.subType as string;
   const threshold = config.threshold as number;
 
   if (subType === 'total_stars') {
-    interface StarRow extends RowDataPacket { total_stars: number; }
+    interface StarRow extends RowDataPacket {
+      total_stars: number;
+    }
     const [row] = await query<StarRow[]>(
       'SELECT total_stars FROM campaign_user_state WHERE user_id = ?',
       [userId],
@@ -292,7 +330,9 @@ async function checkCampaign(
   }
 
   if (subType === 'levels_completed') {
-    interface LevelRow extends RowDataPacket { total_levels_completed: number; }
+    interface LevelRow extends RowDataPacket {
+      total_levels_completed: number;
+    }
     const [row] = await query<LevelRow[]>(
       'SELECT total_levels_completed FROM campaign_user_state WHERE user_id = ?',
       [userId],
@@ -376,8 +416,8 @@ export async function evaluateAfterGame(
 export async function evaluateAfterCampaign(
   userId: number,
   totalStars: number,
-  levelId: number,
-  worldId: number,
+  _levelId: number,
+  _worldId: number,
 ): Promise<AchievementUnlockEvent> {
   // Fetch active campaign achievements NOT yet unlocked
   const achievements = await query<AchievementRow[]>(
@@ -428,13 +468,25 @@ export async function getAchievementProgress(userId: number): Promise<Achievemen
 
   // Fetch user stats once
   interface ProgressStatsRow extends RowDataPacket {
-    [key: string]: any;
+    total_matches: number;
+    total_wins: number;
+    total_kills: number;
+    total_deaths: number;
+    total_bombs: number;
+    total_powerups: number;
+    total_playtime: number;
+    win_streak: number;
+    best_win_streak: number;
+    elo_rating: number;
+    peak_elo: number;
+    total_xp: number;
+    level: number;
   }
-  const statsRows = await query<ProgressStatsRow[]>(
-    'SELECT * FROM user_stats WHERE user_id = ?',
-    [userId],
-  );
-  const stats = statsRows[0] || {};
+  const statsRows = await query<ProgressStatsRow[]>('SELECT * FROM user_stats WHERE user_id = ?', [
+    userId,
+  ]);
+  // Numeric stat lookup by column name (achievement configs reference numeric columns only)
+  const stats: Record<string, number | undefined> = statsRows[0] || {};
 
   // Batch fetch per_game bests
   interface BestRow extends RowDataPacket {
@@ -452,7 +504,7 @@ export async function getAchievementProgress(userId: number): Promise<Achievemen
      FROM match_players WHERE user_id = ?`,
     [userId],
   );
-  const bests = bestRows[0] || {};
+  const bests: Partial<BestRow> = bestRows[0] || {};
 
   const results: AchievementProgress[] = [];
 
@@ -473,7 +525,14 @@ export async function getAchievementProgress(userId: number): Promise<Achievemen
         }
         case 'per_game': {
           const stat = config.stat as string;
-          const colMap: Record<string, string> = {
+          type BestColumn =
+            | 'best_kills'
+            | 'best_deaths'
+            | 'best_bombs_placed'
+            | 'best_powerups_collected'
+            | 'best_survived_seconds'
+            | 'best_placement';
+          const colMap: Record<string, BestColumn> = {
             kills: 'best_kills',
             deaths: 'best_deaths',
             bombs_placed: 'best_bombs_placed',
@@ -486,7 +545,7 @@ export async function getAchievementProgress(userId: number): Promise<Achievemen
           };
           const col = colMap[stat];
           if (col) {
-            current = (bests as any)[col] ?? 0;
+            current = bests[col] ?? 0;
           }
           // For is_winner, convert placement to boolean-like
           if (stat === 'is_winner') {

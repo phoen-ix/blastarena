@@ -5,6 +5,29 @@ import { escapeHtml, escapeAttr } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
 
+/** Row returned by GET /admin/users (snake_case DB columns, dates serialized as strings). */
+interface AdminUserRow {
+  id: number;
+  username: string;
+  email_hint: string;
+  role: UserRole;
+  email_verified: boolean;
+  totp_enabled: boolean;
+  is_deactivated: boolean;
+  deactivated_at: string | null;
+  last_login: string | null;
+  created_at: string;
+  total_matches: number;
+  total_wins: number;
+}
+
+interface AdminUserListResponse {
+  users: AdminUserRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export class UsersTab {
   private container: HTMLElement | null = null;
   private notifications: NotificationUI;
@@ -78,7 +101,7 @@ export class UsersTab {
       const params = new URLSearchParams({ page: String(this.page), limit: '20' });
       if (this.search) params.set('search', this.search);
 
-      const result = await ApiClient.get<any>(`/admin/users?${params}`);
+      const result = await ApiClient.get<AdminUserListResponse>(`/admin/users?${params}`);
       const isAdmin = this.role === 'admin';
 
       tableEl.innerHTML = `
@@ -100,7 +123,7 @@ export class UsersTab {
           <tbody>
             ${result.users
               .map(
-                (u: any) => `
+                (u: AdminUserRow) => `
               <tr>
                 <td>${escapeHtml(u.username)}</td>
                 <td>${escapeHtml(u.email_hint)}</td>
@@ -428,7 +451,7 @@ export class UsersTab {
         errorEl.style.display = 'none';
 
         try {
-          const body: any = { type: selectedType };
+          const body: { type: typeof selectedType; days?: number } = { type: selectedType };
           if (needsDaysNow) body.days = days;
           const result = await ApiClient.post<{ count: number }>(
             '/admin/users/cleanup/preview',
@@ -463,7 +486,7 @@ export class UsersTab {
           const days = daysInput ? parseInt(daysInput.value) : undefined;
 
           try {
-            const body: any = { type: selectedType };
+            const body: { type: typeof selectedType; days?: number } = { type: selectedType };
             if (selectedType !== 'deactivated') body.days = days;
             const result = await ApiClient.post<{ deleted: number }>(
               '/admin/users/cleanup/execute',
@@ -561,7 +584,7 @@ export class UsersTab {
     }
   }
 
-  private statusBadge(u: any): string {
+  private statusBadge(u: AdminUserRow): string {
     if (u.is_deactivated)
       return `<span class="badge badge-deactivated">${t('admin:users.statusDeactivated')}</span>`;
     return `<span class="badge badge-active">${t('admin:users.statusActive')}</span>`;

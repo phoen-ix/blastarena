@@ -1,5 +1,5 @@
 import { getRedis } from '../db/redis';
-import { Party, MAX_PARTY_SIZE } from '@blast-arena/shared';
+import { Party, PartyInvite, MAX_PARTY_SIZE } from '@blast-arena/shared';
 import { v4 as uuidv4 } from 'uuid';
 
 const PARTY_TTL = 3600; // 1 hour
@@ -283,7 +283,13 @@ export async function createInvite(
   return inviteId;
 }
 
-export async function getInvite(recipientId: number, inviteId: string): Promise<any | null> {
+/** Invite payload as stored in Redis by sendInvite(); party invites always carry a partyId. */
+type StoredInvite = PartyInvite & ({ type: 'party'; partyId: string } | { type: 'room' });
+
+export async function getInvite(
+  recipientId: number,
+  inviteId: string,
+): Promise<StoredInvite | null> {
   const redis = getRedis();
   const raw = await redis.get(`${INVITE_PREFIX}${recipientId}:${inviteId}`);
   if (!raw) return null;

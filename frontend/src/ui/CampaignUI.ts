@@ -11,7 +11,7 @@ import {
   CampaignLevelSummary,
   CAMPAIGN_THEME_PALETTES,
 } from '@blast-arena/shared';
-import type { CampaignWorldTheme } from '@blast-arena/shared';
+import type { CampaignWorldTheme, EnemyTypeEntry } from '@blast-arena/shared';
 import { showLocalCoopModal } from './modals/LocalCoopModal';
 import { showBuddyModal, BuddyLaunchConfig } from './modals/BuddyModal';
 import { LocalCoopP2Identity } from '../game/LocalCoopInput';
@@ -781,7 +781,9 @@ export class CampaignUI {
       this.notifications.info(t('campaign:loadingLevel'));
 
       // Fetch enemy types for texture generation
-      const enemyTypesResp = await ApiClient.get<any>('/campaign/enemy-types');
+      const enemyTypesResp = await ApiClient.get<{ enemyTypes: EnemyTypeEntry[] }>(
+        '/campaign/enemy-types',
+      );
 
       // Listen for the server's initial state before transitioning
       const gameStartHandler = (data: {

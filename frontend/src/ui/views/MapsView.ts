@@ -1,6 +1,6 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
-import { CustomMapSummary } from '@blast-arena/shared';
+import { CustomMapSummary, Position, TileType } from '@blast-arena/shared';
 import { escapeHtml } from '../../utils/html';
 import { t } from '../../i18n';
 import { game } from '../../main';
@@ -141,8 +141,8 @@ export class MapsView implements ILobbyView {
       // Need to load the full map to update it
       const resp = await ApiClient.get<{
         map: {
-          tiles: any;
-          spawnPoints: any;
+          tiles: TileType[][];
+          spawnPoints: Position[];
           name: string;
           description: string;
           mapWidth: number;
