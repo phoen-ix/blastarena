@@ -62,7 +62,12 @@
   },
   "menu": {
     "tagline": "Multiplayer explosiv strid",
-    "connecting": "Ansluter..."
+    "connecting": "Ansluter...",
+    "playAsGuest": "Spela som gäst",
+    "login": "Logga in",
+    "register": "Registrera",
+    "onlinePlayers": "{{count}} online",
+    "guestUnavailable": "Gäståtkomst är för närvarande inaktiverad"
   },
   "settings": {
     "title": "Inställningar",

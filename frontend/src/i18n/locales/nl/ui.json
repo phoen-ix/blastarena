@@ -62,7 +62,12 @@
   },
   "menu": {
     "tagline": "Multiplayer explosief gevecht",
-    "connecting": "Verbinden..."
+    "connecting": "Verbinden...",
+    "playAsGuest": "Speel als gast",
+    "login": "Inloggen",
+    "register": "Registreren",
+    "onlinePlayers": "{{count}} online",
+    "guestUnavailable": "Gasttoegang is momenteel uitgeschakeld"
   },
   "settings": {
     "title": "Instellingen",

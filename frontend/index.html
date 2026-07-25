@@ -370,6 +370,12 @@
     [data-theme="frost"] .hud-spectator-banner,
     [data-theme="blossom"] .hud-spectator-banner,
     [data-theme="dune"] .hud-spectator-banner { background: rgba(255, 255, 255, 0.85) !important; color: var(--text) !important; }
+    [data-theme="daylight"] .hud-auth-bar,
+    [data-theme="sakura"] .hud-auth-bar,
+    [data-theme="sand"] .hud-auth-bar,
+    [data-theme="frost"] .hud-auth-bar,
+    [data-theme="blossom"] .hud-auth-bar,
+    [data-theme="dune"] .hud-auth-bar { background: rgba(255, 255, 255, 0.85) !important; border-color: rgba(0, 0, 0, 0.15) !important; }
 
     /* Reset & Base */
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1635,6 +1641,64 @@
     .hud-minimap canvas {
       display: block;
       border-radius: 2px;
+    }
+
+    /* Compact login/register bar for open-world guests — the landing CTAs dock here
+       so the play area stays clear while authentication remains one click away */
+    .hud-auth-bar {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      background: rgba(8, 8, 16, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: var(--radius-lg);
+      backdrop-filter: blur(6px);
+      z-index: 50;
+      animation: authBarDock 400ms ease;
+    }
+
+    .hud-auth-bar .btn {
+      white-space: nowrap;
+    }
+
+    .hud-auth-brand {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 1px;
+      color: var(--primary);
+      margin-right: 4px;
+    }
+
+    .hud-auth-brand span {
+      color: var(--text);
+    }
+
+    @keyframes authBarDock {
+      from {
+        transform: translate(-50%, -120px);
+        opacity: 0;
+      }
+      to {
+        transform: translate(-50%, 0);
+        opacity: 1;
+      }
+    }
+
+    /* Below ~860px the centered bar would cover the bottom-left stats bar (and the
+       minimap on very narrow windows): drop the brand text and lift the bar above them */
+    @media (max-width: 860px) {
+      .hud-auth-bar {
+        bottom: 60px;
+      }
+      .hud-auth-brand {
+        display: none;
+      }
     }
 
     .hud-death-banner {

@@ -1,5 +1,5 @@
 import { ILobbyView, ViewDeps } from './types';
-import { OpenWorldScoreEntry } from '@blast-arena/shared';
+import { GameState, OpenWorldScoreEntry } from '@blast-arena/shared';
 import { API_URL } from '../../config';
 import { escapeHtml } from '../../utils/html';
 import { t } from '../../i18n';
@@ -19,6 +19,16 @@ interface OpenWorldInfo {
   maxPlayers: number;
   roundTimeRemaining: number;
   roundNumber: number;
+}
+
+/** Callback payload from the `openworld:join` socket ack. */
+interface OpenWorldJoinResponse {
+  success: boolean;
+  playerId?: number;
+  username?: string;
+  isGuest?: boolean;
+  state?: GameState;
+  error?: string;
 }
 
 export class OpenWorldView implements ILobbyView {
@@ -147,10 +157,12 @@ export class OpenWorldView implements ILobbyView {
       return;
     }
 
-    socket.emit('openworld:join', {}, (response: any) => {
+    socket.emit('openworld:join', {}, (response: OpenWorldJoinResponse) => {
       if (response.success && response.state) {
-        // Set guest identity if needed
-        if (this.deps.authManager.isGuest && response.playerId && response.username) {
+        // Set guest identity if needed — gate on the server's isGuest (like MenuScene's
+        // joinBackgroundWorld), not on authManager.isGuest: on a guest's first successful
+        // join via this path the local flag is still false.
+        if (response.isGuest && response.playerId && response.username) {
           this.deps.authManager.setGuestIdentity(response.playerId, response.username);
         }
 

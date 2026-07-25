@@ -33,10 +33,12 @@ export class MenuScene extends Phaser.Scene {
   private authUI!: AuthUI;
   private landingContainer: HTMLElement | null = null;
   private connectingText: Phaser.GameObjects.Text | null = null;
+  private titleTexts: Phaser.GameObjects.Text[] = [];
   // Open-world arena rendered live behind the landing menu.
   private bgArenaStarted = false; // GameScene launched & live
   private bgJoinInFlight = false; // openworld:join emitted, awaiting ack
   private pendingReveal = false; // "Play as Guest" clicked before the join completed
+  private revealed = false; // revealArena() ran — guards double-reveal during the fade-out
   private bgConnectHandler: (() => void) | null = null;
 
   constructor() {
@@ -48,7 +50,9 @@ export class MenuScene extends Phaser.Scene {
     this.bgArenaStarted = false;
     this.bgJoinInFlight = false;
     this.pendingReveal = false;
+    this.revealed = false;
     this.bgConnectHandler = null;
+    this.titleTexts = [];
     this.events.once('shutdown', this.shutdown, this);
 
     this.notifications = new NotificationUI();
@@ -82,13 +86,14 @@ export class MenuScene extends Phaser.Scene {
     blastText.setPosition(width / 2 - totalWidth / 2, height / 2 - 60 - blastText.height / 2);
     arenaText.setPosition(blastText.x + blastText.width, blastText.y);
 
-    this.add
+    const taglineText = this.add
       .text(width / 2, height / 2, t('ui:menu.tagline'), {
         fontSize: '16px',
         color: colors.textDimHex,
         fontFamily: 'DM Sans, sans-serif',
       })
       .setOrigin(0.5);
+    this.titleTexts = [blastText, arenaText, taglineText];
 
     // Shown only during the brief auto-login check; removed once we know whether to authenticate
     // or fall back to the landing page (otherwise it lingers behind the landing buttons).
@@ -105,6 +110,20 @@ export class MenuScene extends Phaser.Scene {
     if (params.get('emailVerified') === 'true') {
       window.history.replaceState({}, '', window.location.pathname);
       this.notifications.success(t('auth:verification.verified'));
+    }
+
+    // A guest left the open world via the in-game auth bar — go straight to the auth form
+    // (the canvas title stays as the backdrop, same as the landing login/register path).
+    const pendingAuthMode = this.registry.get('menuAuthMode') as 'login' | 'register' | undefined;
+    if (pendingAuthMode) {
+      this.registry.remove('menuAuthMode');
+      // An AFK kick racing the auth-bar click can start LobbyScene in the same op-queue
+      // batch; stop it so it doesn't run (and wipe #ui-overlay) underneath the auth form.
+      if (this.scene.isActive('LobbyScene')) this.scene.stop('LobbyScene');
+      this.connectingText?.destroy();
+      this.connectingText = null;
+      this.showAuth(pendingAuthMode);
+      return;
     }
 
     // Try auto-login first
@@ -180,7 +199,7 @@ export class MenuScene extends Phaser.Scene {
     this.landingContainer.querySelector('#menu-register-btn')!.addEventListener('click', () => {
       this.leaveBackgroundArena();
       this.hideLanding();
-      this.showAuth();
+      this.showAuth('register');
     });
   }
 
@@ -252,13 +271,22 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  /** Reveal the already-running background arena: drop the menu, show the HUD, take control. */
+  /** Reveal the already-running background arena: dock the menu UI, show the HUD, take control. */
   private revealArena(): void {
+    if (this.revealed) return;
+    this.revealed = true;
     // No longer a background arena — restore normal foreground AFK behavior (kick → lobby).
     this.registry.remove('openWorldBackground');
     this.hideLanding();
+    // HUDScene mounts the compact bottom auth bar for guests (see HUDScene.mountAuthBar).
     this.scene.launch('HUDScene');
-    this.scene.stop('MenuScene');
+    // Fade the canvas title/tagline out of the play area, then stop the scene.
+    this.tweens.add({
+      targets: this.titleTexts,
+      alpha: 0,
+      duration: 250,
+      onComplete: () => this.scene.stop('MenuScene'),
+    });
   }
 
   /** Fallback guest entry when no background arena is running (open world disabled / join failed). */
@@ -288,11 +316,11 @@ export class MenuScene extends Phaser.Scene {
     this.authManager.clearGuest();
   }
 
-  private showAuth(): void {
+  private showAuth(initialMode: 'login' | 'register' = 'login'): void {
     this.authUI = new AuthUI(this.authManager, this.notifications, () => {
       this.onAuthenticated();
     });
-    this.authUI.show();
+    this.authUI.show(initialMode);
   }
 
   private onAuthenticated(): void {
@@ -321,6 +349,7 @@ export class MenuScene extends Phaser.Scene {
    */
   private shutdown(): void {
     this.hideLanding();
+    this.authUI?.hide();
     if (this.bgConnectHandler) {
       this.socketClient.getSocket()?.off('connect', this.bgConnectHandler);
       this.bgConnectHandler = null;

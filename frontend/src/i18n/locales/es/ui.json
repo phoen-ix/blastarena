@@ -62,7 +62,12 @@
   },
   "menu": {
     "tagline": "Combate Explosivo Multijugador",
-    "connecting": "Conectando..."
+    "connecting": "Conectando...",
+    "playAsGuest": "Jugar como invitado",
+    "login": "Iniciar sesión",
+    "register": "Registrarse",
+    "onlinePlayers": "{{count}} en línea",
+    "guestUnavailable": "El acceso de invitados está desactivado actualmente"
   },
   "settings": {
     "title": "Configuración",

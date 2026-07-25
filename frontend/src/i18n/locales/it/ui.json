@@ -62,7 +62,12 @@
   },
   "menu": {
     "tagline": "Combattimento esplosivo multiplayer",
-    "connecting": "Connessione in corso..."
+    "connecting": "Connessione in corso...",
+    "playAsGuest": "Gioca come ospite",
+    "login": "Accedi",
+    "register": "Registrati",
+    "onlinePlayers": "{{count}} online",
+    "guestUnavailable": "L'accesso ospite è attualmente disabilitato"
   },
   "settings": {
     "title": "Impostazioni",

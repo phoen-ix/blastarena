@@ -62,7 +62,12 @@
   },
   "menu": {
     "tagline": "Wieloosobowa walka eksplozjami",
-    "connecting": "\u0141\u0105czenie..."
+    "connecting": "\u0141\u0105czenie...",
+    "playAsGuest": "Graj jako gość",
+    "login": "Zaloguj się",
+    "register": "Zarejestruj się",
+    "onlinePlayers": "{{count}} online",
+    "guestUnavailable": "Dostęp dla gości jest obecnie wyłączony"
   },
   "settings": {
     "title": "Ustawienia",

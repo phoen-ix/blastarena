@@ -62,7 +62,12 @@
   },
   "menu": {
     "tagline": "Multiplayer eksplosiv kamp",
-    "connecting": "Forbinder..."
+    "connecting": "Forbinder...",
+    "playAsGuest": "Spil som gæst",
+    "login": "Log ind",
+    "register": "Registrer",
+    "onlinePlayers": "{{count}} online",
+    "guestUnavailable": "Gæsteadgang er i øjeblikket deaktiveret"
   },
   "settings": {
     "title": "Indstillinger",

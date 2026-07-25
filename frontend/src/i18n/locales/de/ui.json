@@ -62,7 +62,12 @@
   },
   "menu": {
     "tagline": "Multiplayer-Sprengstoff-Action",
-    "connecting": "Verbindung wird hergestellt..."
+    "connecting": "Verbindung wird hergestellt...",
+    "playAsGuest": "Als Gast spielen",
+    "login": "Anmelden",
+    "register": "Registrieren",
+    "onlinePlayers": "{{count}} online",
+    "guestUnavailable": "Gastzugang ist derzeit deaktiviert"
   },
   "settings": {
     "title": "Einstellungen",

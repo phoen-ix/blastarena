@@ -12,6 +12,9 @@ import { SpectatorActionBar } from '../game/SpectatorActionBar';
 import { t } from '../i18n';
 import { getSettings } from '../game/Settings';
 import { PLAYER_COLORS } from './BootScene';
+import type { AuthManager } from '../network/AuthManager';
+import type { SocketClient } from '../network/SocketClient';
+import type { GameScene } from './GameScene';
 
 export class HUDScene extends Phaser.Scene {
   private hudContainer!: HTMLElement;
@@ -21,10 +24,7 @@ export class HUDScene extends Phaser.Scene {
   private localPlayerDead: boolean = false;
   private localPlayerId!: number;
   private boundClickHandler: ((e: MouseEvent) => void) | null = null;
-  private socketClient: {
-    on: (event: string, handler: (...args: any[]) => void) => void;
-    off: (event: string, handler: (...args: any[]) => void) => void;
-  } | null = null;
+  private socketClient: SocketClient | null = null;
   private playerDiedHandler:
     | ((data: { playerId: number; killerId: number | null; cause?: KillCause }) => void)
     | null = null;
@@ -62,6 +62,8 @@ export class HUDScene extends Phaser.Scene {
   private spectatorChatMounted: boolean = false;
   public spectatorActionBar: SpectatorActionBar | null = null;
   private spectatorActionBarMounted: boolean = false;
+  // Compact login/register bar for open-world guests (docked bottom-center)
+  private authBarEl: HTMLElement | null = null;
 
   // Minimap
   private minimapContainer: HTMLElement | null = null;
@@ -85,10 +87,12 @@ export class HUDScene extends Phaser.Scene {
     this.statsEl?.remove();
     this.playerListEl?.remove();
     this.killFeedEl?.remove();
+    this.authBarEl?.remove();
+    this.authBarEl = null;
 
     this.events.once('shutdown', this.shutdown, this);
 
-    const authManager = this.registry.get('authManager');
+    const authManager = this.registry.get('authManager') as AuthManager;
     const openWorldPlayerId = this.registry.get('openWorldPlayerId') as number | undefined;
     this.localPlayerId = openWorldPlayerId ?? authManager.getUser()?.id ?? 0;
     this.localPlayerDead = false;
@@ -164,6 +168,13 @@ export class HUDScene extends Phaser.Scene {
       this.minimapContainer = document.createElement('div');
       this.minimapContainer.className = 'hud-minimap';
       overlay?.appendChild(this.minimapContainer);
+    }
+
+    // Open-world guests keep a compact login/register bar docked bottom-center, so the
+    // play area stays clear but authentication remains one click away.
+    const gameSceneRef = this.scene.get('GameScene') as GameScene | null;
+    if (gameSceneRef?.isOpenWorld && authManager.isGuest) {
+      this.mountAuthBar();
     }
 
     // Spectate click handler
@@ -798,6 +809,43 @@ export class HUDScene extends Phaser.Scene {
     }
   }
 
+  /** Docked login/register bar shown to open-world guests while playing. */
+  private mountAuthBar(): void {
+    this.authBarEl = document.createElement('div');
+    this.authBarEl.className = 'hud-auth-bar';
+    this.authBarEl.innerHTML = `
+      <div class="hud-auth-brand"><span>${t('auth:login.title')}</span>${t('auth:login.titleAccent')}</div>
+      <button class="btn btn-secondary btn-sm" id="hud-login-btn">${t('ui:menu.login')}</button>
+      <button class="btn btn-ghost btn-sm" id="hud-register-btn">${t('ui:menu.register')}</button>
+    `;
+    this.authBarEl
+      .querySelector('#hud-login-btn')!
+      .addEventListener('click', () => this.leaveForAuth('login'));
+    this.authBarEl
+      .querySelector('#hud-register-btn')!
+      .addEventListener('click', () => this.leaveForAuth('register'));
+    // Keep keystrokes on the focused bar buttons (Tab + Space/Enter) out of the game input —
+    // otherwise Space drops a bomb instead of activating the button (same pattern as
+    // SpectatorChat's input handler).
+    this.authBarEl.addEventListener('keydown', (e) => e.stopPropagation());
+    document.getElementById('ui-overlay')?.appendChild(this.authBarEl);
+  }
+
+  /**
+   * Leave the open world and return to the menu with the auth form open. Mirrors
+   * MenuScene.leaveBackgroundArena(): scenes stop first, then the guest socket + identity are
+   * dropped (the server removes the guest player on disconnect).
+   */
+  private leaveForAuth(mode: 'login' | 'register'): void {
+    const authManager = this.registry.get('authManager') as AuthManager | undefined;
+    this.scene.stop('GameScene');
+    this.socketClient?.disconnect();
+    authManager?.clearGuest();
+    this.registry.remove('openWorldPlayerId');
+    this.registry.set('menuAuthMode', mode);
+    this.scene.start('MenuScene');
+  }
+
   shutdown(): void {
     if (this.boundClickHandler) {
       this.playerListEl?.removeEventListener('mousedown', this.boundClickHandler);
@@ -831,6 +879,8 @@ export class HUDScene extends Phaser.Scene {
     this.statsEl?.remove();
     this.playerListEl?.remove();
     this.killFeedEl?.remove();
+    this.authBarEl?.remove();
+    this.authBarEl = null;
     this.minimapContainer?.remove();
     this.minimapContainer = null;
     this.minimapTiles = null;

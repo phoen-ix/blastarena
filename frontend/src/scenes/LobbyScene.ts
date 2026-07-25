@@ -10,6 +10,7 @@ import { t } from '../i18n';
 
 export class LobbyScene extends Phaser.Scene {
   private authManager!: AuthManager;
+  private authUnsubscribe: (() => void) | null = null;
   private socketClient!: SocketClient;
   private notifications!: NotificationUI;
   private lobbyUI!: LobbyUI;
@@ -67,8 +68,10 @@ export class LobbyScene extends Phaser.Scene {
       }
     }
 
-    // Listen for auth changes
-    this.authManager.onChange((user) => {
+    // Listen for auth changes. Keep the unsubscribe handle: the callback lives on the shared
+    // AuthManager, so without cleanup a stopped LobbyScene would still react to clearGuest()
+    // (e.g. from HUDScene.leaveForAuth) and queue a competing MenuScene start.
+    this.authUnsubscribe = this.authManager.onChange((user) => {
       if (!user) {
         this.lobbyUI?.hide();
         this.roomUI?.hide();
@@ -189,7 +192,7 @@ export class LobbyScene extends Phaser.Scene {
     this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a2e);
   }
 
-  private showLobby(initialView?: string, viewOptions?: Record<string, any>): void {
+  private showLobby(initialView?: string, viewOptions?: Record<string, unknown>): void {
     this.roomUI?.hide();
     this.roomUI = null;
 
@@ -245,6 +248,8 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   shutdown(): void {
+    this.authUnsubscribe?.();
+    this.authUnsubscribe = null;
     // Clean up socket listener to prevent leaks across scene transitions
     if (this.gameStartHandler) {
       this.socketClient.off('game:start', this.gameStartHandler);

@@ -62,7 +62,12 @@
   },
   "menu": {
     "tagline": "Cok Oyunculu Patlamali Muharebe",
-    "connecting": "Baglaniyor..."
+    "connecting": "Baglaniyor...",
+    "playAsGuest": "Misafir olarak oyna",
+    "login": "Giriş yap",
+    "register": "Kayıt ol",
+    "onlinePlayers": "{{count}} çevrimiçi",
+    "guestUnavailable": "Misafir erişimi şu anda devre dışı"
   },
   "settings": {
     "title": "Ayarlar",

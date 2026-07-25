@@ -62,7 +62,12 @@
   },
   "menu": {
     "tagline": "Eksplosiv flerspillerkamp",
-    "connecting": "Kobler til..."
+    "connecting": "Kobler til...",
+    "playAsGuest": "Spill som gjest",
+    "login": "Logg inn",
+    "register": "Registrer",
+    "onlinePlayers": "{{count}} pålogget",
+    "guestUnavailable": "Gjestetilgang er for øyeblikket deaktivert"
   },
   "settings": {
     "title": "Innstillinger",

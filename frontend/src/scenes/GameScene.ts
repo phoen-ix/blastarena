@@ -10,6 +10,7 @@ import {
   PlayerCosmeticData,
   CampaignWorldTheme,
   OpenWorldScoreEntry,
+  EnemyTypeEntry,
   TILE_SIZE,
   TICK_MS,
 } from '@blast-arena/shared';
@@ -34,6 +35,7 @@ import { EmoteBubbleRenderer } from '../game/EmoteBubble';
 import { EmoteWheel } from '../game/EmoteWheel';
 import { generateThemedTileTextures, generateHazardTileTextures } from '../utils/campaignThemes';
 import { trapFocus } from '../utils/html';
+import type { HUDScene } from './HUDScene';
 import { MapEventRenderer } from '../game/MapEventRenderer';
 import {
   LocalCoopInput,
@@ -113,6 +115,11 @@ export class GameScene extends Phaser.Scene {
 
   // Open world mode
   private openWorldMode: boolean = false;
+
+  /** Whether this scene runs the persistent open-world arena (read by HUDScene). */
+  get isOpenWorld(): boolean {
+    return this.openWorldMode;
+  }
   private openWorldRoundEndHandler:
     | ((data: {
         roundNumber: number;
@@ -270,10 +277,8 @@ export class GameScene extends Phaser.Scene {
       if (tileX < 0 || tileY < 0) return;
 
       // Get the SpectatorActionBar from HUDScene and execute
-      const hudScene = this.scene.get('HUDScene') as any;
-      if (hudScene?.spectatorActionBar) {
-        hudScene.spectatorActionBar.executeAction(tileX, tileY);
-      }
+      const hudScene = this.scene.get('HUDScene') as HUDScene | null;
+      hudScene?.spectatorActionBar?.executeAction(tileX, tileY);
       this.spectatorTargeting = null;
       this.input.setDefaultCursor('default');
     };
@@ -1670,7 +1675,7 @@ export class GameScene extends Phaser.Scene {
     const isLocalCoopMode = !!this.registry.get('localCoopMode');
     const isBuddyMode = !!this.registry.get('buddyMode');
 
-    ApiClient.get<{ enemyTypes: any[] }>('/campaign/enemy-types')
+    ApiClient.get<{ enemyTypes: EnemyTypeEntry[] }>('/campaign/enemy-types')
       .then((enemyTypesResp) => {
         const gameStartHandler = (data: {
           state: CampaignGameState;

@@ -36,16 +36,27 @@ export class AuthUI {
         imprint: boolean;
         displayGithub: boolean;
       }>('/admin/settings/public');
+      // Only re-render when something actually changed — render() rebuilds the form via
+      // innerHTML and would silently wipe anything the user already typed.
+      const changed =
+        resp.registrationEnabled !== this.registrationEnabled ||
+        resp.imprint !== this.displayImprint ||
+        resp.displayGithub !== this.displayGithub;
       this.registrationEnabled = resp.registrationEnabled;
       this.displayImprint = resp.imprint;
       this.displayGithub = resp.displayGithub;
-      this.render();
+      if (changed) this.render();
     } catch {
       // defaults
     }
   }
 
-  show(): void {
+  show(mode?: 'login' | 'register'): void {
+    if (mode && mode !== this.mode) {
+      // render() falls back to login when registration is disabled.
+      this.mode = mode;
+      this.render();
+    }
     const uiOverlay = document.getElementById('ui-overlay');
     if (uiOverlay && !uiOverlay.contains(this.overlay)) {
       uiOverlay.appendChild(this.overlay);
