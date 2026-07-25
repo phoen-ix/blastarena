@@ -375,7 +375,13 @@
     [data-theme="sand"] .hud-auth-bar,
     [data-theme="frost"] .hud-auth-bar,
     [data-theme="blossom"] .hud-auth-bar,
-    [data-theme="dune"] .hud-auth-bar { background: rgba(255, 255, 255, 0.85) !important; border-color: rgba(0, 0, 0, 0.15) !important; }
+    [data-theme="dune"] .hud-auth-bar,
+    [data-theme="daylight"] .menu-landing--docked .menu-landing-buttons,
+    [data-theme="sakura"] .menu-landing--docked .menu-landing-buttons,
+    [data-theme="sand"] .menu-landing--docked .menu-landing-buttons,
+    [data-theme="frost"] .menu-landing--docked .menu-landing-buttons,
+    [data-theme="blossom"] .menu-landing--docked .menu-landing-buttons,
+    [data-theme="dune"] .menu-landing--docked .menu-landing-buttons { background: rgba(255, 255, 255, 0.85) !important; border-color: rgba(0, 0, 0, 0.15) !important; }
 
     /* Reset & Base */
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -469,14 +475,24 @@
       z-index: 100;
     }
 
-    /* Menu Landing Page */
+    /* Menu Landing Page. Anchored at the docked position; the un-docked state lifts it via
+       transform so the dock (on first game input) can animate — bottom % -> px cannot. */
     .menu-landing {
       position: absolute;
-      bottom: 15%;
+      bottom: 12px;
       left: 50%;
-      transform: translateX(-50%);
+      transform: translate(-50%, calc(-15vh + 12px));
       z-index: 50;
       text-align: center;
+    }
+
+    /* Transition lives on the docked class only: the undocked transform uses vh, and a
+       transitioned vh value would visibly ease on every window resize */
+    .menu-landing--docked {
+      transform: translate(-50%, 0);
+      transition:
+        transform 450ms ease,
+        bottom 450ms ease;
     }
 
     .menu-landing-buttons {
@@ -485,6 +501,36 @@
       align-items: center;
       gap: 12px;
       min-width: 220px;
+    }
+
+    .menu-landing-brand {
+      display: none;
+    }
+
+    .menu-landing--docked .menu-landing-buttons {
+      flex-direction: row;
+      gap: 10px;
+      min-width: 0;
+      padding: 8px 14px;
+      background: rgba(8, 8, 16, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: var(--radius-lg);
+      backdrop-filter: blur(6px);
+    }
+
+    .menu-landing--docked .menu-landing-buttons .btn {
+      width: auto;
+      white-space: nowrap;
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+
+    .menu-landing--docked .menu-player-count {
+      display: none;
+    }
+
+    .menu-landing--docked .menu-landing-brand {
+      display: block;
     }
 
     .menu-landing-buttons .btn {
@@ -1685,9 +1731,17 @@
 
     .hud-auth-bar .btn {
       white-space: nowrap;
+      padding: 8px 16px;
+      font-size: 14px;
     }
 
-    .hud-auth-brand {
+    /* Seamless takeover from an already-docked landing bar */
+    .hud-auth-bar--instant {
+      animation: none;
+    }
+
+    .hud-auth-brand,
+    .menu-landing--docked .menu-landing-brand {
       font-family: var(--font-display);
       font-weight: 700;
       font-size: 15px;
@@ -1696,7 +1750,8 @@
       margin-right: 4px;
     }
 
-    .hud-auth-brand span {
+    .hud-auth-brand span,
+    .menu-landing-brand span {
       color: var(--text);
     }
 
@@ -1712,12 +1767,15 @@
     }
 
     /* Below ~860px the centered bar would cover the bottom-left stats bar (and the
-       minimap on very narrow windows): drop the brand text and lift the bar above them */
+       minimap on very narrow windows): drop the brand text and lift the bar above them.
+       The docked landing bar matches so the Play-as-Guest handoff doesn't jump. */
     @media (max-width: 860px) {
-      .hud-auth-bar {
+      .hud-auth-bar,
+      .menu-landing--docked {
         bottom: 60px;
       }
-      .hud-auth-brand {
+      .hud-auth-brand,
+      .menu-landing--docked .menu-landing-brand {
         display: none;
       }
     }

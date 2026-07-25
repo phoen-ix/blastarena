@@ -818,9 +818,14 @@ export class HUDScene extends Phaser.Scene {
     this.authBarEl.className = 'hud-auth-bar';
     this.authBarEl.innerHTML = `
       <div class="hud-auth-brand"><span>${t('auth:login.title')}</span>${t('auth:login.titleAccent')}</div>
-      <button class="btn btn-secondary btn-sm" id="hud-login-btn">${t('ui:menu.login')}</button>
-      <button class="btn btn-ghost btn-sm" id="hud-register-btn">${t('ui:menu.register')}</button>
+      <button class="btn btn-secondary" id="hud-login-btn">${t('ui:menu.login')}</button>
+      <button class="btn btn-ghost" id="hud-register-btn">${t('ui:menu.register')}</button>
     `;
+    // Seamless takeover from an already-docked landing bar: same spot, no fly-in replay.
+    if (this.registry.get('authBarNoAnim')) {
+      this.registry.remove('authBarNoAnim');
+      this.authBarEl.classList.add('hud-auth-bar--instant');
+    }
     this.authBarEl
       .querySelector('#hud-login-btn')!
       .addEventListener('click', () => this.openAuthOverlay('login'));

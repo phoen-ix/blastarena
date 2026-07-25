@@ -39,6 +39,8 @@ export class MenuScene extends Phaser.Scene {
   private bgJoinInFlight = false; // openworld:join emitted, awaiting ack
   private pendingReveal = false; // "Play as Guest" clicked before the join completed
   private revealed = false; // revealArena() ran — guards double-reveal during the fade-out
+  private landingDocked = false; // first game input docked the landing UI to the bottom
+  private playInputHandler: ((e: KeyboardEvent) => void) | null = null;
   private bgConnectHandler: (() => void) | null = null;
 
   constructor() {
@@ -51,6 +53,8 @@ export class MenuScene extends Phaser.Scene {
     this.bgJoinInFlight = false;
     this.pendingReveal = false;
     this.revealed = false;
+    this.landingDocked = false;
+    this.playInputHandler = null;
     this.bgConnectHandler = null;
     this.titleTexts = [];
     this.events.once('shutdown', this.shutdown, this);
@@ -156,6 +160,7 @@ export class MenuScene extends Phaser.Scene {
     this.landingContainer.className = 'menu-landing';
     this.landingContainer.innerHTML = `
       <div class="menu-landing-buttons">
+        <div class="menu-landing-brand"><span>${t('auth:login.title')}</span>${t('auth:login.titleAccent')}</div>
         ${
           showGuest
             ? `<button class="btn btn-primary btn-lg" id="menu-guest-btn">
@@ -191,9 +196,58 @@ export class MenuScene extends Phaser.Scene {
       this.hideLanding();
       this.showAuth('register');
     });
+
+    // The background arena is live and interactive behind the landing — a visitor is playing
+    // the moment they press a movement key. Dock the landing UI to the bottom on first game
+    // input so the play area is clear while login/registration stays one click away.
+    if (showGuest) {
+      const playKeys = new Set([
+        'KeyW',
+        'KeyA',
+        'KeyS',
+        'KeyD',
+        'ArrowUp',
+        'ArrowDown',
+        'ArrowLeft',
+        'ArrowRight',
+        'Space',
+        'KeyE',
+        'KeyQ',
+      ]);
+      this.playInputHandler = (e: KeyboardEvent) => {
+        if (playKeys.has(e.code)) this.dockLanding();
+      };
+      window.addEventListener('keydown', this.playInputHandler);
+      // 'on' (not 'once'): a press while the arena is dead is ignored by dockLanding's
+      // liveness guard and must not consume the only gamepad trigger. Cleared by the
+      // scene's gamepad plugin on shutdown.
+      this.input.gamepad?.on('down', () => this.dockLanding());
+    }
+  }
+
+  /** First game input on the landing: move the title + buttons out of the play area. */
+  private dockLanding(): void {
+    if (this.landingDocked || !this.landingContainer) return;
+    // Only dock when there is a live arena to play in — after an AFK kick of the background
+    // guest or a failed join, collapsing the menu over a dead canvas reads as a broken page.
+    // The listener stays armed for the join-in-flight case.
+    if (!this.bgArenaStarted || !this.scene.isActive('GameScene')) return;
+    this.landingDocked = true;
+    this.removePlayInputListener();
+    this.landingContainer.classList.add('menu-landing--docked');
+    // The canvas title/tagline hand off to the compact brand inside the docked bar.
+    this.tweens.add({ targets: this.titleTexts, alpha: 0, duration: 300 });
+  }
+
+  private removePlayInputListener(): void {
+    if (this.playInputHandler) {
+      window.removeEventListener('keydown', this.playInputHandler);
+      this.playInputHandler = null;
+    }
   }
 
   private hideLanding(): void {
+    this.removePlayInputListener();
     if (this.landingContainer) {
       this.landingContainer.remove();
       this.landingContainer = null;
@@ -267,6 +321,8 @@ export class MenuScene extends Phaser.Scene {
     this.revealed = true;
     // No longer a background arena — restore normal foreground AFK behavior (kick → lobby).
     this.registry.remove('openWorldBackground');
+    // If the landing already docked, HUD's auth bar takes over in place — skip its fly-in.
+    if (this.landingDocked) this.registry.set('authBarNoAnim', true);
     this.hideLanding();
     // HUDScene mounts the compact bottom auth bar for guests (see HUDScene.mountAuthBar).
     this.scene.launch('HUDScene');
