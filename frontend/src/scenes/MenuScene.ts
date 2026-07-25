@@ -112,19 +112,9 @@ export class MenuScene extends Phaser.Scene {
       this.notifications.success(t('auth:verification.verified'));
     }
 
-    // A guest left the open world via the in-game auth bar — go straight to the auth form
-    // (the canvas title stays as the backdrop, same as the landing login/register path).
-    const pendingAuthMode = this.registry.get('menuAuthMode') as 'login' | 'register' | undefined;
-    if (pendingAuthMode) {
-      this.registry.remove('menuAuthMode');
-      // An AFK kick racing the auth-bar click can start LobbyScene in the same op-queue
-      // batch; stop it so it doesn't run (and wipe #ui-overlay) underneath the auth form.
-      if (this.scene.isActive('LobbyScene')) this.scene.stop('LobbyScene');
-      this.connectingText?.destroy();
-      this.connectingText = null;
-      this.showAuth(pendingAuthMode);
-      return;
-    }
+    // Stale-flag hygiene: the in-game auth overlay flag must not survive into a fresh menu
+    // (e.g. if the guest was AFK-kicked with the form open and we land back here).
+    this.registry.remove('authOverlayOpen');
 
     // Try auto-login first
     this.authManager.tryAutoLogin().then((success) => {

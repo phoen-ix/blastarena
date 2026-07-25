@@ -11,6 +11,8 @@ export class AuthUI {
   private notifications: NotificationUI;
   private mode: 'login' | 'register' | 'forgot' | 'totp' = 'login';
   private onAuthenticated: () => void;
+  private onClose: (() => void) | null;
+  private escHandler: ((e: KeyboardEvent) => void) | null = null;
   private registrationEnabled: boolean = true;
   private displayImprint: boolean = false;
   private displayGithub: boolean = false;
@@ -19,10 +21,12 @@ export class AuthUI {
     authManager: AuthManager,
     notifications: NotificationUI,
     onAuthenticated: () => void,
+    onClose?: () => void,
   ) {
     this.authManager = authManager;
     this.notifications = notifications;
     this.onAuthenticated = onAuthenticated;
+    this.onClose = onClose ?? null;
     this.overlay = document.createElement('div');
     this.overlay.className = 'auth-overlay';
     this.loadPublicSettings();
@@ -61,11 +65,31 @@ export class AuthUI {
     if (uiOverlay && !uiOverlay.contains(this.overlay)) {
       uiOverlay.appendChild(this.overlay);
     }
+    if (this.onClose && !this.escHandler) {
+      // Capture phase so Escape closes the form before GameScene's window handler sees it.
+      this.escHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          this.close();
+        }
+      };
+      document.addEventListener('keydown', this.escHandler, true);
+    }
   }
 
   hide(): void {
+    if (this.escHandler) {
+      document.removeEventListener('keydown', this.escHandler, true);
+      this.escHandler = null;
+    }
     UIGamepadNavigator.getInstance().popContext('auth');
     this.overlay.remove();
+  }
+
+  /** Dismiss the form without authenticating (only available when an onClose is provided). */
+  private close(): void {
+    this.hide();
+    this.onClose?.();
   }
 
   private pushGamepadContext(): void {
@@ -108,6 +132,21 @@ export class AuthUI {
         this.renderTotpVerification();
         break;
     }
+    this.injectCloseButton();
+  }
+
+  /** When dismissable (opened over a running game), add a ✕ to the form. */
+  private injectCloseButton(): void {
+    if (!this.onClose) return;
+    const form = this.overlay.querySelector('.auth-form');
+    if (!form) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'auth-close';
+    btn.setAttribute('aria-label', t('common:actions.close'));
+    btn.innerHTML = '&times;';
+    btn.addEventListener('click', () => this.close());
+    form.appendChild(btn);
   }
 
   private renderLogin(): void {

@@ -105,6 +105,7 @@ Persistent bomb arena as default landing experience. Players auto-join on page l
 - **Guest access**: Unauthenticated players via `SocketClient.connectAsGuest()`. Guest IDs start at `OPENWORLD_GUEST_ID_START` (-3000)
 - **Backend**: `OpenWorldManager` singleton. Round cycle with configurable duration, freeze period, map regeneration
 - **AFK timeout**: Configurable inactivity kick (default 60s, 0 = disabled). Hot-reloadable admin setting
+- **Guest auth bar**: HUDScene mounts a bottom-center Login/Register bar for open-world guests (`.hud-auth-bar`). Auth form opens OVER the live game (`GameScene.setInputBlocked`, registry `authOverlayOpen`); closable via ✕/Escape. Teardown only on successful login → fresh MenuScene auto-login → lobby → auto-rejoin as account
 - **Constants**: `shared/src/constants/openworld.ts`. Settings in `server_settings` (keys prefixed `open_world_`)
 - **WIP**: HUD round timer/leaderboard
 

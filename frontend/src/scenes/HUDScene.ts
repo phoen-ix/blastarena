@@ -12,6 +12,8 @@ import { SpectatorActionBar } from '../game/SpectatorActionBar';
 import { t } from '../i18n';
 import { getSettings } from '../game/Settings';
 import { PLAYER_COLORS } from './BootScene';
+import { AuthUI } from '../ui/AuthUI';
+import type { NotificationUI } from '../ui/NotificationUI';
 import type { AuthManager } from '../network/AuthManager';
 import type { SocketClient } from '../network/SocketClient';
 import type { GameScene } from './GameScene';
@@ -64,6 +66,7 @@ export class HUDScene extends Phaser.Scene {
   private spectatorActionBarMounted: boolean = false;
   // Compact login/register bar for open-world guests (docked bottom-center)
   private authBarEl: HTMLElement | null = null;
+  private authUI: AuthUI | null = null;
 
   // Minimap
   private minimapContainer: HTMLElement | null = null;
@@ -820,10 +823,10 @@ export class HUDScene extends Phaser.Scene {
     `;
     this.authBarEl
       .querySelector('#hud-login-btn')!
-      .addEventListener('click', () => this.leaveForAuth('login'));
+      .addEventListener('click', () => this.openAuthOverlay('login'));
     this.authBarEl
       .querySelector('#hud-register-btn')!
-      .addEventListener('click', () => this.leaveForAuth('register'));
+      .addEventListener('click', () => this.openAuthOverlay('register'));
     // Keep keystrokes on the focused bar buttons (Tab + Space/Enter) out of the game input —
     // otherwise Space drops a bomb instead of activating the button (same pattern as
     // SpectatorChat's input handler).
@@ -832,18 +835,52 @@ export class HUDScene extends Phaser.Scene {
   }
 
   /**
-   * Leave the open world and return to the menu with the auth form open. Mirrors
-   * MenuScene.leaveBackgroundArena(): scenes stop first, then the guest socket + identity are
-   * dropped (the server removes the guest player on disconnect).
+   * Open the auth form OVER the running game: the arena stays live behind the overlay and the
+   * guest keeps their session unless login actually succeeds. Game input is blocked while the
+   * form is open so keystrokes reach the form.
    */
-  private leaveForAuth(mode: 'login' | 'register'): void {
-    const authManager = this.registry.get('authManager') as AuthManager | undefined;
-    this.scene.stop('GameScene');
-    this.socketClient?.disconnect();
-    authManager?.clearGuest();
+  private openAuthOverlay(mode: 'login' | 'register'): void {
+    if (this.registry.get('authOverlayOpen')) return;
+    const authManager = this.registry.get('authManager') as AuthManager;
+    const notifications = this.registry.get('notifications') as NotificationUI;
+    this.registry.set('authOverlayOpen', true);
+    (this.scene.get('GameScene') as GameScene | null)?.setInputBlocked(true);
+    this.authUI = new AuthUI(
+      authManager,
+      notifications,
+      () => this.onAuthSuccess(),
+      () => this.onAuthClose(),
+    );
+    this.authUI.show(mode);
+  }
+
+  /**
+   * Login succeeded: drop the guest session (server removes the guest player on disconnect)
+   * and restart MenuScene — its auto-login picks up the new refresh cookie and routes through
+   * the normal verification/lobby flow, which auto-joins the open world as the account.
+   * Uses game.scene (manager-level) because an AFK kick may have stopped this scene while the
+   * form was open.
+   */
+  private onAuthSuccess(): void {
+    this.registry.remove('authOverlayOpen');
+    this.authUI = null;
+    if (this.game.scene.isActive('GameScene')) this.game.scene.stop('GameScene');
+    if (this.game.scene.isActive('HUDScene')) this.game.scene.stop('HUDScene');
+    (this.registry.get('socketClient') as SocketClient | undefined)?.disconnect();
     this.registry.remove('openWorldPlayerId');
-    this.registry.set('menuAuthMode', mode);
-    this.scene.start('MenuScene');
+    this.game.scene.start('MenuScene');
+  }
+
+  /** Form dismissed without logging in: resume play, or return to the landing if AFK-kicked. */
+  private onAuthClose(): void {
+    this.registry.remove('authOverlayOpen');
+    this.authUI = null;
+    if (!this.game.scene.isActive('GameScene')) {
+      // AFK kick ended the run while the form was open — the arena is gone.
+      this.game.scene.start('MenuScene');
+      return;
+    }
+    (this.scene.get('GameScene') as GameScene | null)?.setInputBlocked(false);
   }
 
   shutdown(): void {

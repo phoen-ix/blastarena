@@ -520,6 +520,27 @@
       animation: modalIn 0.3s ease;
     }
 
+    .auth-close {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text-dim);
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .auth-close:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
     .auth-form h2 {
       text-align: center;
       margin-bottom: 28px;

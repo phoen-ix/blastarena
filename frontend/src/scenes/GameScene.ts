@@ -120,6 +120,15 @@ export class GameScene extends Phaser.Scene {
   get isOpenWorld(): boolean {
     return this.openWorldMode;
   }
+
+  /**
+   * Block/unblock game input while a DOM overlay (e.g. the guest auth form) is open on top of
+   * the running game — keystrokes must reach the form, not move the player.
+   */
+  setInputBlocked(blocked: boolean): void {
+    this.paused = blocked;
+    if (this.input.keyboard) this.input.keyboard.enabled = !blocked;
+  }
   private openWorldRoundEndHandler:
     | ((data: {
         roundNumber: number;
@@ -674,6 +683,14 @@ export class GameScene extends Phaser.Scene {
           this.registry.remove('openWorldBackground');
           this.scene.stop('HUDScene');
           this.scene.stop(); // stop self; MenuScene stays up over the (now empty) canvas
+          return;
+        }
+        if (this.registry.get('authOverlayOpen')) {
+          // Guest is typing in the auth form over the game — don't start LobbyScene
+          // (it wipes #ui-overlay and would destroy the form). Just stop the scenes;
+          // AuthUI's close/success callbacks route back to MenuScene.
+          this.scene.stop('HUDScene');
+          this.scene.stop();
           return;
         }
         this.registry.remove('currentRoom');
