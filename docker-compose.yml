@@ -117,8 +117,9 @@ services:
         max-file: "5"
     # Note: the data/gamelogs bind mount has no Docker-level rotation — the json-file limits
     # above only cover stdout/stderr. GameLogger bounds it itself: tick logging is gated on
-    # room activity (GAME_LOG_IDLE_WINDOW_TICKS), and the directory is pruned by age then by
-    # total size (GAME_LOG_MAX_AGE_DAYS, GAME_LOG_MAX_TOTAL_MB).
+    # room activity (GAME_LOG_IDLE_WINDOW_TICKS), and empty-room logs are pruned by age then by
+    # total size (GAME_LOG_MAX_AGE_DAYS, GAME_LOG_MAX_TOTAL_MB). Logs that recorded real
+    # gameplay are never pruned automatically.
 
   nginx:
     build:

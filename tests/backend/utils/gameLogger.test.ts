@@ -204,40 +204,40 @@ describe('GameLogger', () => {
     });
 
     it('deletes logs past the age limit and keeps newer ones', async () => {
-      seedLog(tmpDir, 'old.jsonl', 5 * DAY_MS, 1024);
-      seedLog(tmpDir, 'recent.jsonl', 2 * HOUR_MS, 1024);
+      seedLog(tmpDir, 'old_open_world_0p.jsonl', 5 * DAY_MS, 1024);
+      seedLog(tmpDir, 'recent_open_world_0p.jsonl', 2 * HOUR_MS, 1024);
 
       const GL = await loadWith({ GAME_LOG_MAX_AGE_DAYS: '1', GAME_LOG_MAX_TOTAL_MB: '4096' });
       await GL.pruneOldLogs(tmpDir);
 
-      expect(fs.existsSync(path.join(tmpDir, 'old.jsonl'))).toBe(false);
-      expect(fs.existsSync(path.join(tmpDir, 'recent.jsonl'))).toBe(true);
+      expect(fs.existsSync(path.join(tmpDir, 'old_open_world_0p.jsonl'))).toBe(false);
+      expect(fs.existsSync(path.join(tmpDir, 'recent_open_world_0p.jsonl'))).toBe(true);
     });
 
     it('never deletes a file modified inside the prune interval, however small the limits', async () => {
-      seedLog(tmpDir, 'active.jsonl', 0, 1024); // an open stream looks like this
-      seedLog(tmpDir, 'stale.jsonl', 5 * DAY_MS, 1024);
+      seedLog(tmpDir, 'active_open_world_0p.jsonl', 0, 1024); // an open stream looks like this
+      seedLog(tmpDir, 'stale_open_world_0p.jsonl', 5 * DAY_MS, 1024);
 
       const GL = await loadWith({ GAME_LOG_MAX_AGE_DAYS: '0', GAME_LOG_MAX_TOTAL_MB: '0' });
       await GL.pruneOldLogs(tmpDir);
 
-      expect(fs.existsSync(path.join(tmpDir, 'active.jsonl'))).toBe(true);
-      expect(fs.existsSync(path.join(tmpDir, 'stale.jsonl'))).toBe(false);
+      expect(fs.existsSync(path.join(tmpDir, 'active_open_world_0p.jsonl'))).toBe(true);
+      expect(fs.existsSync(path.join(tmpDir, 'stale_open_world_0p.jsonl'))).toBe(false);
     });
 
     it('trims oldest-first until the directory is under the size limit', async () => {
       const MB = 1024 * 1024;
-      seedLog(tmpDir, 'a-oldest.jsonl', 4 * HOUR_MS, MB);
-      seedLog(tmpDir, 'b-middle.jsonl', 3 * HOUR_MS, MB);
-      seedLog(tmpDir, 'c-newest.jsonl', 2 * HOUR_MS, MB);
+      seedLog(tmpDir, 'a-oldest_open_world_0p.jsonl', 4 * HOUR_MS, MB);
+      seedLog(tmpDir, 'b-middle_open_world_0p.jsonl', 3 * HOUR_MS, MB);
+      seedLog(tmpDir, 'c-newest_open_world_0p.jsonl', 2 * HOUR_MS, MB);
 
       // 3 MB present, 2 MB allowed, age limit far away -> only the oldest should go.
       const GL = await loadWith({ GAME_LOG_MAX_AGE_DAYS: '3650', GAME_LOG_MAX_TOTAL_MB: '2' });
       await GL.pruneOldLogs(tmpDir);
 
-      expect(fs.existsSync(path.join(tmpDir, 'a-oldest.jsonl'))).toBe(false);
-      expect(fs.existsSync(path.join(tmpDir, 'b-middle.jsonl'))).toBe(true);
-      expect(fs.existsSync(path.join(tmpDir, 'c-newest.jsonl'))).toBe(true);
+      expect(fs.existsSync(path.join(tmpDir, 'a-oldest_open_world_0p.jsonl'))).toBe(false);
+      expect(fs.existsSync(path.join(tmpDir, 'b-middle_open_world_0p.jsonl'))).toBe(true);
+      expect(fs.existsSync(path.join(tmpDir, 'c-newest_open_world_0p.jsonl'))).toBe(true);
     });
 
     it('ignores files that are not .jsonl', async () => {
@@ -250,18 +250,83 @@ describe('GameLogger', () => {
     });
 
     it('is throttled to once per interval', async () => {
-      seedLog(tmpDir, 'stale.jsonl', 5 * DAY_MS, 1024);
+      seedLog(tmpDir, 'stale_open_world_0p.jsonl', 5 * DAY_MS, 1024);
 
       const GL = await loadWith({ GAME_LOG_MAX_AGE_DAYS: '0', GAME_LOG_MAX_TOTAL_MB: '0' });
       GL.lastPruneAt = Date.now(); // pretend a prune just ran
       await GL.pruneOldLogs(tmpDir);
 
-      expect(fs.existsSync(path.join(tmpDir, 'stale.jsonl'))).toBe(true);
+      expect(fs.existsSync(path.join(tmpDir, 'stale_open_world_0p.jsonl'))).toBe(true);
     });
 
     it('does not throw when the directory is missing', async () => {
       const GL = await loadWith({ GAME_LOG_MAX_AGE_DAYS: '1', GAME_LOG_MAX_TOTAL_MB: '1' });
       await expect(GL.pruneOldLogs(path.join(tmpDir, 'nope'))).resolves.toBeUndefined();
+    });
+
+    it('never deletes a log that recorded real players, however old or large', async () => {
+      seedLog(tmpDir, 'ancient_ffa_4p.jsonl', 400 * DAY_MS, 4 * 1024 * 1024);
+      seedLog(tmpDir, 'ancient_open_world_1p.jsonl', 400 * DAY_MS, 4 * 1024 * 1024);
+      seedLog(tmpDir, 'ancient_open_world_0p.jsonl', 400 * DAY_MS, 4 * 1024 * 1024);
+
+      const GL = await loadWith({ GAME_LOG_MAX_AGE_DAYS: '0', GAME_LOG_MAX_TOTAL_MB: '0' });
+      await GL.pruneOldLogs(tmpDir);
+
+      expect(fs.existsSync(path.join(tmpDir, 'ancient_ffa_4p.jsonl'))).toBe(true);
+      expect(fs.existsSync(path.join(tmpDir, 'ancient_open_world_1p.jsonl'))).toBe(true);
+      // Only the empty-room log is disposable.
+      expect(fs.existsSync(path.join(tmpDir, 'ancient_open_world_0p.jsonl'))).toBe(false);
+    });
+
+    it('counts only empty-room logs toward the size limit', async () => {
+      const MB = 1024 * 1024;
+      seedLog(tmpDir, 'big_ffa_2p.jsonl', 4 * HOUR_MS, 10 * MB); // protected, not counted
+      seedLog(tmpDir, 'small_open_world_0p.jsonl', 3 * HOUR_MS, MB);
+
+      const GL = await loadWith({ GAME_LOG_MAX_AGE_DAYS: '3650', GAME_LOG_MAX_TOTAL_MB: '5' });
+      await GL.pruneOldLogs(tmpDir);
+
+      expect(fs.existsSync(path.join(tmpDir, 'big_ffa_2p.jsonl'))).toBe(true);
+      // 1 MB of prunable data is under the 5 MB budget, so it survives too.
+      expect(fs.existsSync(path.join(tmpDir, 'small_open_world_0p.jsonl'))).toBe(true);
+    });
+  });
+
+  describe('filename finalisation', () => {
+    const filenames = (dir: string): string[] => fs.readdirSync(dir).filter((f) => f.endsWith('.jsonl'));
+
+    it('rewrites the trailing count to the peak player count on close', async () => {
+      const gl = new GameLogger('openworld_r1', 'open_world', 0, { logDir: tmpDir });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(filenames(tmpDir)[0]).toMatch(/_0p\.jsonl$/);
+
+      gl.logTick(1, [player(1), player(2), player(3)], [], []);
+      gl.logTick(2, [player(1)], [], []);
+      gl.close();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Peak was 3, even though the room opened empty and ended with one player.
+      expect(filenames(tmpDir)).toHaveLength(1);
+      expect(filenames(tmpDir)[0]).toMatch(/_3p\.jsonl$/);
+    });
+
+    it('leaves the name alone for a room that really stayed empty', async () => {
+      const gl = new GameLogger('openworld_r2', 'open_world', 0, { logDir: tmpDir });
+      gl.logTick(1, [], [], []);
+      gl.close();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(filenames(tmpDir)[0]).toMatch(/_0p\.jsonl$/);
+    });
+
+    it('is safe to close twice', async () => {
+      const gl = new GameLogger('room', 'ffa', 2, { logDir: tmpDir });
+      gl.logTick(1, [player(1), player(2)], [], []);
+      gl.close();
+      expect(() => gl.close()).not.toThrow();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(filenames(tmpDir)).toHaveLength(1);
     });
   });
 });

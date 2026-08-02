@@ -15,10 +15,17 @@ const LOG_DIR = process.env.GAME_LOG_DIR || '/app/gamelogs';
 // Mirrors OpenWorldManager.ACTIVITY_RECORD_WINDOW, which already gates the replay recorder.
 const IDLE_LOG_WINDOW_TICKS = Number(process.env.GAME_LOG_IDLE_WINDOW_TICKS ?? 60); // 3s @ 20Hz
 
-// Retention bounds for the log directory as a whole.
-const MAX_TOTAL_MB = Number(process.env.GAME_LOG_MAX_TOTAL_MB ?? 2048);
-const MAX_AGE_DAYS = Number(process.env.GAME_LOG_MAX_AGE_DAYS ?? 30);
+// Retention bounds. Deliberately generous: this is a safety net against unbounded growth, not an
+// archiving policy. Automatic pruning only ever touches logs where nobody played (see
+// EMPTY_ROOM_LOG_RE) — a log with real gameplay in it is never deleted on our own initiative.
+const MAX_TOTAL_MB = Number(process.env.GAME_LOG_MAX_TOTAL_MB ?? 20480);
+const MAX_AGE_DAYS = Number(process.env.GAME_LOG_MAX_AGE_DAYS ?? 365);
 const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+
+// Only "0 peak players" logs are prunable. The trailing count is rewritten on close to reflect the
+// peak seen during the round, so this suffix means "nobody ever played", not merely "the room was
+// empty when it opened" — persistent open-world rooms always open empty and fill up later.
+const EMPTY_ROOM_LOG_RE = /_0p\.jsonl$/;
 
 export interface GameLoggerOptions {
   logDir?: string;
@@ -32,6 +39,9 @@ export class GameLogger {
   private filename: string;
   private verbosity: LogVerbosity;
   private lastActivityTick = 0;
+  private logDir: string;
+  private peakPlayerCount: number;
+  private closed = false;
   private static lastPruneAt = 0;
   public replayRecorder: ReplayRecorder | null = null;
 
@@ -43,8 +53,10 @@ export class GameLogger {
   ) {
     this.roomCode = roomCode;
     this.verbosity = options?.verbosity ?? 'normal';
+    this.peakPlayerCount = playerCount;
 
     const logDir = options?.logDir ?? LOG_DIR;
+    this.logDir = logDir;
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
     this.filename = options?.filename ?? `${ts}_${roomCode}_${gameMode}_${playerCount}p.jsonl`;
 
@@ -78,6 +90,8 @@ export class GameLogger {
 
       for (const name of names) {
         if (!name.endsWith('.jsonl')) continue;
+        // Never auto-delete a log that had players in it. Only empty rooms are disposable.
+        if (!EMPTY_ROOM_LOG_RE.test(name)) continue;
         const file = path.join(logDir, name);
         try {
           const st = await fsp.stat(file);
@@ -138,6 +152,11 @@ export class GameLogger {
   }
 
   logTick(tick: number, players: Player[], bombs: Bomb[], explosions: Explosion[]): void {
+    // Rooms can fill up after opening empty, so the peak drives the filename we settle on.
+    if (players.length > this.peakPlayerCount) {
+      this.peakPlayerCount = players.length;
+    }
+
     // Persistent rooms keep ticking when empty. Record during activity and for a short window
     // after, then fall silent until something happens again.
     const active = players.length > 0 || bombs.length > 0 || explosions.length > 0;
@@ -381,10 +400,32 @@ export class GameLogger {
 
   logGameOver(winnerId: number | null, placements: Record<string, unknown>[]): void {
     this.log('game_over', { winnerId, placements });
-    this.stream.end();
+    this.close();
   }
 
   close(): void {
-    this.stream.end();
+    if (this.closed) return;
+    this.closed = true;
+    this.stream.end(() => this.finalizeFilename());
+  }
+
+  /**
+   * The filename records the player count at room creation, but persistent rooms open empty and
+   * fill up later. Rewrite the trailing count to the peak actually observed, so that `_0p` really
+   * does mean "nobody ever played" — which is the guarantee pruneOldLogs relies on.
+   */
+  private finalizeFilename(): void {
+    const target = this.filename.replace(/_(\d+)p\.jsonl$/, `_${this.peakPlayerCount}p.jsonl`);
+    if (target === this.filename) return;
+
+    const from = path.join(this.logDir, this.filename);
+    const to = path.join(this.logDir, target);
+    fs.rename(from, to, (err) => {
+      if (err) {
+        logger.warn({ err, from: this.filename, to: target }, 'Could not finalize game log name');
+        return;
+      }
+      this.filename = target;
+    });
   }
 }
