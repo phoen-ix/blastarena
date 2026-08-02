@@ -1,12 +1,24 @@
 import * as fs from 'fs';
+import * as fsp from 'fs/promises';
 import * as path from 'path';
 import { LogVerbosity, Position } from '@blast-arena/shared';
+import { logger } from './logger';
 import type { ReplayRecorder } from './replayRecorder';
 import type { Player } from '../game/Player';
 import type { Bomb } from '../game/Bomb';
 import type { Explosion } from '../game/Explosion';
 
 const LOG_DIR = process.env.GAME_LOG_DIR || '/app/gamelogs';
+
+// Persistent rooms (open world) keep ticking with nobody in them. Without a gate they write a
+// full tick stream 24/7 — historically 92% of this directory was telemetry for empty rooms.
+// Mirrors OpenWorldManager.ACTIVITY_RECORD_WINDOW, which already gates the replay recorder.
+const IDLE_LOG_WINDOW_TICKS = Number(process.env.GAME_LOG_IDLE_WINDOW_TICKS ?? 60); // 3s @ 20Hz
+
+// Retention bounds for the log directory as a whole.
+const MAX_TOTAL_MB = Number(process.env.GAME_LOG_MAX_TOTAL_MB ?? 2048);
+const MAX_AGE_DAYS = Number(process.env.GAME_LOG_MAX_AGE_DAYS ?? 30);
+const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 
 export interface GameLoggerOptions {
   logDir?: string;
@@ -19,6 +31,8 @@ export class GameLogger {
   private roomCode: string;
   private filename: string;
   private verbosity: LogVerbosity;
+  private lastActivityTick = 0;
+  private static lastPruneAt = 0;
   public replayRecorder: ReplayRecorder | null = null;
 
   constructor(
@@ -41,6 +55,75 @@ export class GameLogger {
     this.stream = fs.createWriteStream(path.join(logDir, this.filename), { flags: 'a' });
 
     this.log('game_init', { roomCode, gameMode, playerCount, verbosity: this.verbosity });
+
+    // Never block room creation on housekeeping.
+    setImmediate(() => void GameLogger.pruneOldLogs(logDir));
+  }
+
+  /**
+   * Bound the log directory by age, then by total size (oldest first).
+   *
+   * Throttled to once per PRUNE_INTERVAL_MS per process, and never touches a file modified within
+   * that same interval — which is what keeps every currently-open stream, including this room's
+   * own file, safe from deletion.
+   */
+  private static async pruneOldLogs(logDir: string): Promise<void> {
+    const now = Date.now();
+    if (now - GameLogger.lastPruneAt < PRUNE_INTERVAL_MS) return;
+    GameLogger.lastPruneAt = now;
+
+    try {
+      const names = await fsp.readdir(logDir);
+      const entries: { file: string; mtimeMs: number; size: number }[] = [];
+
+      for (const name of names) {
+        if (!name.endsWith('.jsonl')) continue;
+        const file = path.join(logDir, name);
+        try {
+          const st = await fsp.stat(file);
+          if (!st.isFile()) continue;
+          // Anything touched recently may still be an open stream.
+          if (now - st.mtimeMs < PRUNE_INTERVAL_MS) continue;
+          entries.push({ file, mtimeMs: st.mtimeMs, size: st.size });
+        } catch {
+          // Raced with another prune or a rotation; skip it.
+        }
+      }
+
+      entries.sort((a, b) => a.mtimeMs - b.mtimeMs); // oldest first
+
+      let total = entries.reduce((sum, e) => sum + e.size, 0);
+      const maxTotalBytes = MAX_TOTAL_MB * 1024 * 1024;
+      const maxAgeMs = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+
+      let removed = 0;
+      let freed = 0;
+
+      for (const entry of entries) {
+        const tooOld = now - entry.mtimeMs > maxAgeMs;
+        const overSize = total > maxTotalBytes;
+        if (!tooOld && !overSize) break; // sorted oldest-first, so nothing later qualifies on age
+
+        try {
+          await fsp.unlink(entry.file);
+          total -= entry.size;
+          freed += entry.size;
+          removed++;
+        } catch {
+          // Already gone; keep going.
+        }
+      }
+
+      if (removed > 0) {
+        logger.info(
+          { removed, freedMB: Math.round(freed / 1024 / 1024), logDir },
+          'Pruned old game logs',
+        );
+      }
+    } catch (err) {
+      // Housekeeping must never take a game down.
+      logger.warn({ err, logDir }, 'Game log pruning failed');
+    }
   }
 
   shouldLogTick(tick: number): boolean {
@@ -55,6 +138,15 @@ export class GameLogger {
   }
 
   logTick(tick: number, players: Player[], bombs: Bomb[], explosions: Explosion[]): void {
+    // Persistent rooms keep ticking when empty. Record during activity and for a short window
+    // after, then fall silent until something happens again.
+    const active = players.length > 0 || bombs.length > 0 || explosions.length > 0;
+    if (active) {
+      this.lastActivityTick = tick;
+    } else if (tick - this.lastActivityTick > IDLE_LOG_WINDOW_TICKS) {
+      return;
+    }
+
     const tickData = {
       t: Date.now(),
       event: 'tick',

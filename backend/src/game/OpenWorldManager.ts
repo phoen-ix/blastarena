@@ -187,7 +187,10 @@ class OpenWorldManager {
       `openworld_r${this.roundNumber}`,
       'open_world',
       this.players.size,
-      { verbosity: 'full' },
+      // Open world runs continuously, so 'full' (every tick) is far too much. Movement, powerup
+      // and explosion detail still reach replayRecorder unconditionally, so replays keep full
+      // fidelity regardless of this setting.
+      { verbosity: 'normal' },
     );
     gameLogger.replayRecorder = this.replayRecorder;
     this.gameState.gameLogger = gameLogger;
