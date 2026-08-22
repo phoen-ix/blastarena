@@ -71,3 +71,35 @@ export function generateEmailHint(email: string): string {
   const maskedDomain = parts.map((p) => p[0] + '***').join('.') + '.' + tld;
   return maskedLocal + '@' + maskedDomain;
 }
+
+/**
+ * A log-safe view of an error that may have come from the mail transport.
+ *
+ * pino's default `err` serializer copies every enumerable own property of an Error. Nodemailer's
+ * SMTP errors carry `response` (the raw server line, typically
+ * `550 5.1.1 <someone@example.com> User unknown`), `rejected`, `rejectedErrors` and
+ * `envelope.to` — so `logger.error({ err }, 'Failed to send email')` wrote recipient addresses
+ * into the log even though no call site ever passed one.
+ *
+ * That matters here more than it would elsewhere: this app hashes addresses with EMAIL_PEPPER
+ * precisely so it never stores them, keeping only `email_hash` + `email_hint`. And two of the
+ * affected call sites fire *only* on the email-already-registered path, whose whole purpose is to
+ * be indistinguishable from a fresh registration — an SMTP hiccup there is an enumeration oracle.
+ *
+ * Returns a plain object rather than an Error so pino's serializer has nothing to expand.
+ * (audit EMAIL-LOG-1)
+ */
+export function scrubEmailError(err: unknown): { name?: string; code?: string; message: string } {
+  const maskAddresses = (text: string): string =>
+    text.replace(/[^\s<>@,;]+@[^\s<>@,;]+/g, (address) => generateEmailHint(address));
+
+  if (err instanceof Error) {
+    const e = err as Error & { code?: unknown };
+    return {
+      name: err.name,
+      ...(typeof e.code === 'string' ? { code: e.code } : {}),
+      message: maskAddresses(err.message).slice(0, 300),
+    };
+  }
+  return { message: maskAddresses(String(err)).slice(0, 300) };
+}

@@ -32,8 +32,8 @@ import {
   THEME_IDS,
   OPENWORLD_MAX_PLAYERS_CAP,
 } from '@blast-arena/shared';
-import { getErrorMessage } from '@blast-arena/shared';
 import multer from 'multer';
+import { scrubEmailError } from '../utils/crypto';
 
 const router = Router();
 
@@ -942,7 +942,7 @@ router.post(
     } catch (err) {
       // Log the detailed SMTP error server-side; return a generic message so SMTP/server details
       // are not echoed back to the client. (audit ERR-002)
-      logger.error({ err: getErrorMessage(err) }, 'Test email send failed');
+      logger.error({ err: scrubEmailError(err) }, 'Test email send failed');
       res.status(400).json({ error: 'Failed to send test email' });
     }
   },

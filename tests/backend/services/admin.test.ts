@@ -17,6 +17,11 @@ jest.mock('../../../backend/src/utils/crypto', () => ({
   hashPassword: mockHashPassword,
   hashEmail: mockHashEmail,
   generateEmailHint: mockGenerateEmailHint,
+  // Real implementation on purpose: these tests assert that error logs do NOT contain
+  // an address, and a stub returning undefined would pass while leaking. (audit EMAIL-LOG-1)
+  scrubEmailError: jest.requireActual<typeof import('../../../backend/src/utils/crypto')>(
+    '../../../backend/src/utils/crypto',
+  ).scrubEmailError,
 }));
 
 jest.mock('../../../backend/src/config', () => ({

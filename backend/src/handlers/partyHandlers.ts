@@ -53,7 +53,10 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Invite to party
   socket.on('party:invite', async (data, callback) => {
-    if (!inviteLimiter.isAllowed(socket.id)) return;
+    // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
+    // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
+    if (!inviteLimiter.isAllowed(socket.id))
+      return callback({ success: false, error: 'Rate limited' });
     const parsed = validateSocket(userIdSchema, data, callback);
     if (!parsed) return;
     try {
@@ -236,7 +239,10 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Room invite (invite friend to current room)
   socket.on('invite:room', async (data, callback) => {
-    if (!inviteLimiter.isAllowed(socket.id)) return;
+    // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
+    // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
+    if (!inviteLimiter.isAllowed(socket.id))
+      return callback({ success: false, error: 'Rate limited' });
     try {
       const roomCode = socket.data.activeRoomCode;
       if (!roomCode) return callback({ success: false, error: 'Not in a room' });

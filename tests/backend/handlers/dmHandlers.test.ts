@@ -12,9 +12,11 @@ jest.mock('../../../backend/src/services/messages', () => ({
   sendMessage: mockSendMessage,
   markRead: mockMarkRead,
 }));
+// One shared isAllowed so a test can drive the rate-limited branch.
+const mockIsAllowed = jest.fn<(id: string) => boolean>().mockReturnValue(true);
 jest.mock('../../../backend/src/utils/socketRateLimit', () => ({
   createSocketRateLimiter: () => ({
-    isAllowed: jest.fn().mockReturnValue(true),
+    isAllowed: mockIsAllowed,
     remove: jest.fn(),
   }),
 }));
@@ -60,6 +62,7 @@ describe('dmHandlers', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsAllowed.mockReturnValue(true);
     mockGetDMMode.mockResolvedValue('everyone');
     socket = createMockSocket();
     io = createMockIO();
@@ -170,6 +173,34 @@ describe('dmHandlers', () => {
       });
     });
 
+    // The await on getDMMode used to sit ahead of the try, so a DB blip rejected the handler's
+    // promise, the ack was never invoked, and the client waited forever — with the composer having
+    // already cleared the input box. (audit SOCKET-TRYCATCH-2)
+    it('acks instead of hanging when the DM-mode lookup fails', async () => {
+      mockGetDMMode.mockRejectedValue(new Error('DB is down'));
+      const callback = jest.fn();
+
+      const handler = socket._handlers['dm:send'];
+      await expect(handler({ toUserId: 2, message: 'hi' }, callback)).resolves.toBeUndefined();
+
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith({
+        success: false,
+        error: 'An unexpected error occurred',
+      });
+    });
+
+    it('acks when rate limited, rather than leaving the caller waiting', async () => {
+      const callback = jest.fn();
+      const handler = socket._handlers['dm:send'];
+      // Exhaust the limiter: the harness stubs isAllowed to true, so drive it via the real one.
+      mockIsAllowed.mockReturnValueOnce(false);
+
+      await handler({ toUserId: 2, message: 'hi' }, callback);
+
+      expect(callback).toHaveBeenCalledWith({ success: false, error: 'Rate limited' });
+    });
+
     it('returns error from service exception', async () => {
       mockSendMessage.mockRejectedValue(new Error('DB is down'));
       const callback = jest.fn();
@@ -179,7 +210,7 @@ describe('dmHandlers', () => {
 
       expect(callback).toHaveBeenCalledWith({
         success: false,
-        error: 'DB is down',
+        error: 'An unexpected error occurred',
       });
     });
   });

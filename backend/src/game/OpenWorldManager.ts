@@ -568,9 +568,14 @@ class OpenWorldManager {
    * the local player's own row once they fall out of the top slots). Bounded by max players.
    */
   getLeaderboard(): OpenWorldScoreEntry[] {
-    return Array.from(this.players.values())
-      .sort((a, b) => b.score - a.score || b.kills - a.kills)
-      .map(toScoreEntry);
+    return (
+      Array.from(this.players.values())
+        // userId last: at round start everyone is 0/0, so without it the whole board is Map
+        // insertion order and displayed ranks reshuffle whenever anyone joins or leaves — with
+        // nobody having scored. (audit PAGINATION-TOTAL-ORDER-1)
+        .sort((a, b) => b.score - a.score || b.kills - a.kills || a.userId - b.userId)
+        .map(toScoreEntry)
+    );
   }
 
   isEnabled(): boolean {

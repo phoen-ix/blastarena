@@ -3,6 +3,7 @@ import { getConfig } from '../config';
 import { logger } from '../utils/logger';
 import { getEmailSettings } from './settings';
 import { getFixedT } from '../i18n';
+import { generateEmailHint, scrubEmailError } from '../utils/crypto';
 
 let transporter: nodemailer.Transporter | null = null;
 
@@ -62,9 +63,17 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
   const emailConfig = await getResolvedEmailConfig();
   const transport = await getTransporter();
 
+  // Log the masked hint, never the address. The DB deliberately stores only `email_hash` +
+  // `email_hint` (HMAC-SHA256 with EMAIL_PEPPER), so writing the plaintext recipient to stdout on
+  // every send put back exactly what the schema goes out of its way not to keep — and the Docker
+  // json-file driver retains 500 MB of it. (audit EMAIL-LOG-1)
+  const recipient = generateEmailHint(to);
+
   if (!transport) {
-    logger.info({ to, subject }, 'Email (SMTP not configured, logging only)');
-    logger.debug({ html }, 'Email body');
+    logger.info({ to: recipient, subject }, 'Email (SMTP not configured, logging only)');
+    // Deliberately not logging the rendered body: it contains the verification / password-reset
+    // URL, and therefore a live token. Harmless at LOG_LEVEL=info, but one env var away from not.
+    logger.debug({ length: html.length }, 'Email body suppressed');
     return;
   }
 
@@ -75,9 +84,9 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
       subject,
       html,
     });
-    logger.info({ to, subject }, 'Email sent');
+    logger.info({ to: recipient, subject }, 'Email sent');
   } catch (err) {
-    logger.error({ err, to, subject }, 'Failed to send email');
+    logger.error({ err: scrubEmailError(err), to: recipient, subject }, 'Failed to send email');
     throw err;
   }
 }

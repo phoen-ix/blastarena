@@ -1,12 +1,8 @@
 import { query, execute } from '../db/connection';
-import {
-  Cosmetic,
-  CosmeticType,
-  EquippedCosmetics,
-  PlayerCosmeticData,
-} from '@blast-arena/shared';
+import { Cosmetic, CosmeticType, EquippedCosmetics, PlayerCosmeticData } from '@blast-arena/shared';
 import { CosmeticRow, UserCosmeticRow, UserEquippedCosmeticsRow, CountRow } from '../db/types';
 import { RowDataPacket } from 'mysql2';
+import { AppError } from '../middleware/errorHandler';
 
 function toCosmetic(row: CosmeticRow): Cosmetic {
   return {
@@ -81,14 +77,38 @@ export async function updateCosmetic(
   const sets: string[] = [];
   const params: unknown[] = [];
 
-  if (data.name !== undefined) { sets.push('name = ?'); params.push(data.name); }
-  if (data.type !== undefined) { sets.push('type = ?'); params.push(data.type); }
-  if (data.config !== undefined) { sets.push('config = ?'); params.push(JSON.stringify(data.config)); }
-  if (data.rarity !== undefined) { sets.push('rarity = ?'); params.push(data.rarity); }
-  if (data.unlockType !== undefined) { sets.push('unlock_type = ?'); params.push(data.unlockType); }
-  if (data.unlockRequirement !== undefined) { sets.push('unlock_requirement = ?'); params.push(data.unlockRequirement ? JSON.stringify(data.unlockRequirement) : null); }
-  if (data.isActive !== undefined) { sets.push('is_active = ?'); params.push(data.isActive); }
-  if (data.sortOrder !== undefined) { sets.push('sort_order = ?'); params.push(data.sortOrder); }
+  if (data.name !== undefined) {
+    sets.push('name = ?');
+    params.push(data.name);
+  }
+  if (data.type !== undefined) {
+    sets.push('type = ?');
+    params.push(data.type);
+  }
+  if (data.config !== undefined) {
+    sets.push('config = ?');
+    params.push(JSON.stringify(data.config));
+  }
+  if (data.rarity !== undefined) {
+    sets.push('rarity = ?');
+    params.push(data.rarity);
+  }
+  if (data.unlockType !== undefined) {
+    sets.push('unlock_type = ?');
+    params.push(data.unlockType);
+  }
+  if (data.unlockRequirement !== undefined) {
+    sets.push('unlock_requirement = ?');
+    params.push(data.unlockRequirement ? JSON.stringify(data.unlockRequirement) : null);
+  }
+  if (data.isActive !== undefined) {
+    sets.push('is_active = ?');
+    params.push(data.isActive);
+  }
+  if (data.sortOrder !== undefined) {
+    sets.push('sort_order = ?');
+    params.push(data.sortOrder);
+  }
 
   if (sets.length === 0) return;
   params.push(id);
@@ -127,10 +147,10 @@ export async function getUserCosmetics(userId: number): Promise<Cosmetic[]> {
 }
 
 export async function unlockCosmetic(userId: number, cosmeticId: number): Promise<void> {
-  await execute(
-    'INSERT IGNORE INTO user_cosmetics (user_id, cosmetic_id) VALUES (?, ?)',
-    [userId, cosmeticId],
-  );
+  await execute('INSERT IGNORE INTO user_cosmetics (user_id, cosmetic_id) VALUES (?, ?)', [
+    userId,
+    cosmeticId,
+  ]);
 }
 
 export async function getEquippedCosmetics(userId: number): Promise<EquippedCosmetics> {
@@ -163,13 +183,13 @@ export async function equipCosmetic(
       [userId, cosmeticId],
     );
     if (owned.total === 0) {
-      throw new Error('You do not own this cosmetic');
+      throw new AppError('You do not own this cosmetic', 403, 'COSMETIC_NOT_OWNED');
     }
 
     // Verify cosmetic type matches slot
     const cosmetic = await getCosmeticById(cosmeticId);
     if (!cosmetic || cosmetic.type !== slot) {
-      throw new Error('Cosmetic type does not match slot');
+      throw new AppError('Cosmetic type does not match slot', 400, 'COSMETIC_SLOT_MISMATCH');
     }
   }
 
@@ -224,19 +244,23 @@ export async function getPlayerCosmeticsForGame(
     const data: PlayerCosmeticData = {};
 
     if (row.color_config) {
-      const colorConf = typeof row.color_config === 'string' ? JSON.parse(row.color_config) : row.color_config;
+      const colorConf =
+        typeof row.color_config === 'string' ? JSON.parse(row.color_config) : row.color_config;
       if (colorConf.hex !== undefined) {
-        data.colorHex = typeof colorConf.hex === 'string' ? parseInt(colorConf.hex, 16) : colorConf.hex;
+        data.colorHex =
+          typeof colorConf.hex === 'string' ? parseInt(colorConf.hex, 16) : colorConf.hex;
       }
     }
 
     if (row.eyes_config) {
-      const eyesConf = typeof row.eyes_config === 'string' ? JSON.parse(row.eyes_config) : row.eyes_config;
+      const eyesConf =
+        typeof row.eyes_config === 'string' ? JSON.parse(row.eyes_config) : row.eyes_config;
       if (eyesConf.style) data.eyeStyle = eyesConf.style;
     }
 
     if (row.trail_config) {
-      const trailConf = typeof row.trail_config === 'string' ? JSON.parse(row.trail_config) : row.trail_config;
+      const trailConf =
+        typeof row.trail_config === 'string' ? JSON.parse(row.trail_config) : row.trail_config;
       if (trailConf.particleKey) {
         data.trailConfig = {
           particleKey: trailConf.particleKey,
@@ -247,7 +271,10 @@ export async function getPlayerCosmeticsForGame(
     }
 
     if (row.bomb_skin_config) {
-      const bombConf = typeof row.bomb_skin_config === 'string' ? JSON.parse(row.bomb_skin_config) : row.bomb_skin_config;
+      const bombConf =
+        typeof row.bomb_skin_config === 'string'
+          ? JSON.parse(row.bomb_skin_config)
+          : row.bomb_skin_config;
       if (bombConf.baseColor !== undefined) {
         data.bombSkinConfig = {
           baseColor: bombConf.baseColor,
@@ -299,7 +326,10 @@ export async function checkLevelMilestoneUnlocks(userId: number, level: number):
   return unlocked;
 }
 
-export async function checkCampaignStarUnlocks(userId: number, totalStars: number): Promise<number[]> {
+export async function checkCampaignStarUnlocks(
+  userId: number,
+  totalStars: number,
+): Promise<number[]> {
   interface UnlockableRow extends RowDataPacket {
     id: number;
     unlock_requirement: string;
@@ -315,7 +345,10 @@ export async function checkCampaignStarUnlocks(userId: number, totalStars: numbe
   const unlockedIds: number[] = [];
 
   for (const row of rows) {
-    const req = typeof row.unlock_requirement === 'string' ? JSON.parse(row.unlock_requirement) : row.unlock_requirement;
+    const req =
+      typeof row.unlock_requirement === 'string'
+        ? JSON.parse(row.unlock_requirement)
+        : row.unlock_requirement;
     if (req?.totalStars !== undefined && totalStars >= req.totalStars) {
       await unlockCosmetic(userId, row.id);
       unlockedIds.push(row.id);

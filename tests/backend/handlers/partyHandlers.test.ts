@@ -121,7 +121,7 @@ describe('partyHandlers', () => {
 
       expect(callback).toHaveBeenCalledWith({
         success: false,
-        error: 'Redis error',
+        error: 'An unexpected error occurred',
       });
     });
   });

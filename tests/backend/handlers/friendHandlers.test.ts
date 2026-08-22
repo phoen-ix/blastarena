@@ -44,6 +44,7 @@ import {
   notifyFriendsOffline,
   cleanupFriendLimiters,
 } from '../../../backend/src/handlers/friendHandlers';
+import { AppError } from '../../../backend/src/middleware/errorHandler';
 
 function createMockSocket(overrides: Record<string, any> = {}) {
   const handlers: Record<string, Function> = {};
@@ -113,7 +114,11 @@ describe('friendHandlers', () => {
       });
     });
 
-    it('returns error on service failure', async () => {
+    it('masks an internal failure instead of forwarding it', async () => {
+      // clientError is an allow-list now: only an AppError reaches the client. A bare Error is by
+      // construction an internal failure — previously its message went straight to the socket,
+      // which leaked ioredis Lua SHAs and 'Database pool not initialized'.
+      // (audit CLIENT-ERROR-ALLOWLIST-1)
       mockGetFriends.mockRejectedValue(new Error('DB error'));
       const callback = jest.fn();
 
@@ -122,7 +127,7 @@ describe('friendHandlers', () => {
 
       expect(callback).toHaveBeenCalledWith({
         success: false,
-        error: 'DB error',
+        error: 'An unexpected error occurred',
       });
     });
   });
@@ -161,8 +166,12 @@ describe('friendHandlers', () => {
       expect(mockSendFriendRequest).not.toHaveBeenCalled();
     });
 
-    it('returns error on service failure', async () => {
-      mockSendFriendRequest.mockRejectedValue(new Error('User not found'));
+    it('forwards a validation message the service wrote for the user', async () => {
+      // The other half of the allow-list: friends.ts throws AppError for every message meant to be
+      // read, so those still reach the client unchanged. (audit CLIENT-ERROR-ALLOWLIST-1)
+      mockSendFriendRequest.mockRejectedValue(
+        new AppError('User not found', 404, 'USER_NOT_FOUND'),
+      );
       const callback = jest.fn();
 
       const handler = socket._handlers['friend:request'];

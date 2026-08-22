@@ -2,6 +2,7 @@ import { query, execute } from '../db/connection';
 import { DirectMessageRow, CountRow } from '../db/types';
 import { DirectMessage, DMConversation, DM_MAX_LENGTH } from '@blast-arena/shared';
 import * as friendsService from './friends';
+import { AppError } from '../middleware/errorHandler';
 
 export async function sendMessage(
   senderId: number,
@@ -9,17 +10,17 @@ export async function sendMessage(
   message: string,
 ): Promise<DirectMessage> {
   if (senderId === recipientId) {
-    throw new Error('Cannot message yourself');
+    throw new AppError('Cannot message yourself', 400, 'INVALID_RECIPIENT');
   }
 
   const friends = await friendsService.areFriends(senderId, recipientId);
-  if (!friends) throw new Error('Can only message friends');
+  if (!friends) throw new AppError('Can only message friends', 403, 'NOT_FRIENDS');
 
   const blocked = await friendsService.isBlocked(senderId, recipientId);
-  if (blocked) throw new Error('Cannot message this user');
+  if (blocked) throw new AppError('Cannot message this user', 403, 'BLOCKED');
 
   const trimmed = message.trim().substring(0, DM_MAX_LENGTH);
-  if (!trimmed) throw new Error('Message cannot be empty');
+  if (!trimmed) throw new AppError('Message cannot be empty', 400, 'EMPTY_MESSAGE');
 
   const result = await execute(
     'INSERT INTO direct_messages (sender_id, recipient_id, message) VALUES (?, ?, ?)',
@@ -53,7 +54,7 @@ export async function getConversation(
      JOIN users u ON u.id = dm.sender_id
      WHERE (dm.sender_id = ? AND dm.recipient_id = ?)
         OR (dm.sender_id = ? AND dm.recipient_id = ?)
-     ORDER BY dm.created_at DESC
+     ORDER BY dm.created_at DESC, dm.id DESC
      LIMIT ? OFFSET ?`,
     [userId, otherUserId, otherUserId, userId, limit, offset],
   );
@@ -74,7 +75,9 @@ export async function getConversation(
 
 export async function getConversationList(userId: number): Promise<DMConversation[]> {
   // Get the latest message for each conversation partner + unread count
-  const rows = await query<(DirectMessageRow & { other_id: number; other_username: string; unread_count: number })[]>(
+  const rows = await query<
+    (DirectMessageRow & { other_id: number; other_username: string; unread_count: number })[]
+  >(
     `SELECT
        sub.other_id,
        sub.other_username,

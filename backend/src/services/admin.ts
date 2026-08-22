@@ -79,7 +79,10 @@ export async function listUsers(page: number = 1, limit: number = 20, search?: s
     }
   }
 
-  sql += ' ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
+  // Tiebreak on the primary key: ORDER BY on a non-unique column is not a total order, so
+  // tied rows may resequence per LIMIT/OFFSET window and pages then overlap and gap.
+  // (audit PAGINATION-TOTAL-ORDER-1)
+  sql += ' ORDER BY u.created_at DESC, u.id DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
   const rows = await query<AdminUserRow[]>(sql, params);
@@ -309,7 +312,7 @@ export async function getMatchHistory(page: number = 1, limit: number = 20) {
      FROM matches m
      LEFT JOIN users u ON u.id = m.winner_id
      LEFT JOIN (SELECT match_id, COUNT(*) as player_count FROM match_players GROUP BY match_id) pc ON pc.match_id = m.id
-     ORDER BY m.created_at DESC
+     ORDER BY m.created_at DESC, m.id DESC
      LIMIT ? OFFSET ?`,
     [limit, offset],
   );
@@ -394,7 +397,10 @@ export async function getAdminActions(page: number = 1, limit: number = 20, acti
     params.push(action);
   }
 
-  sql += ' ORDER BY a.created_at DESC LIMIT ? OFFSET ?';
+  // Tiebreak on the primary key: ORDER BY on a non-unique column is not a total order, so
+  // tied rows may resequence per LIMIT/OFFSET window and pages then overlap and gap.
+  // (audit PAGINATION-TOTAL-ORDER-1)
+  sql += ' ORDER BY a.created_at DESC, a.id DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
   const rows = await query<AdminActionRow[]>(sql, params);
@@ -490,7 +496,7 @@ export async function getActiveBanner() {
      FROM announcements a
      JOIN users u ON u.id = a.admin_id
      WHERE a.is_active = TRUE AND a.type = 'banner'
-     ORDER BY a.created_at DESC LIMIT 1`,
+     ORDER BY a.created_at DESC, a.id DESC LIMIT 1`,
   );
   return rows.length > 0 ? rows[0] : null;
 }

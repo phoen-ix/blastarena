@@ -11,7 +11,13 @@ jest.mock('bcrypt', () => ({
 }));
 
 import bcrypt from 'bcrypt';
-import { hashPassword, comparePassword, generateToken, hashToken } from '../../../backend/src/utils/crypto';
+import {
+  hashPassword,
+  comparePassword,
+  generateToken,
+  hashToken,
+  scrubEmailError,
+} from '../../../backend/src/utils/crypto';
 
 const mockHash = bcrypt.hash as jest.MockedFunction<typeof bcrypt.hash>;
 const mockCompare = bcrypt.compare as jest.MockedFunction<typeof bcrypt.compare>;
@@ -83,5 +89,60 @@ describe('Crypto Utils', () => {
       const hash2 = hashToken('token-b');
       expect(hash1).not.toBe(hash2);
     });
+  });
+});
+
+describe('scrubEmailError', () => {
+  /**
+   * pino's default `err` serializer copies every enumerable own property of an Error. Nodemailer
+   * attaches `response` (the raw SMTP line, which names the recipient), `rejected` and
+   * `envelope.to` — so `logger.error({ err })` wrote addresses into the log even though no call
+   * site passed one. This app hashes addresses with EMAIL_PEPPER specifically so it never keeps
+   * them. (audit EMAIL-LOG-1)
+   */
+  function nodemailerError() {
+    return Object.assign(new Error('Message failed: 550 5.1.1 <victim@example.com> User unknown'), {
+      code: 'EENVELOPE',
+      response: '550 5.1.1 <victim@example.com> User unknown',
+      responseCode: 550,
+      rejected: ['victim@example.com'],
+      rejectedErrors: [{ recipient: 'victim@example.com' }],
+      envelope: { from: 'noreply@blastarena.at', to: ['victim@example.com'] },
+    });
+  }
+
+  it('drops every nodemailer field that carries an address', () => {
+    const scrubbed = scrubEmailError(nodemailerError());
+    const serialized = JSON.stringify(scrubbed);
+
+    expect(serialized).not.toContain('victim@example.com');
+    expect(serialized).not.toContain('rejected');
+    expect(serialized).not.toContain('envelope');
+    expect(serialized).not.toContain('response');
+  });
+
+  it('masks an address embedded in the message, keeping the diagnosis', () => {
+    const scrubbed = scrubEmailError(nodemailerError());
+
+    expect(scrubbed.message).toContain('550 5.1.1');
+    expect(scrubbed.message).toContain('User unknown');
+    expect(scrubbed.message).toContain('v***@e***.com');
+    expect(scrubbed.message).not.toContain('victim@example.com');
+  });
+
+  it('keeps name and code, which are the useful parts', () => {
+    const scrubbed = scrubEmailError(nodemailerError());
+    expect(scrubbed.name).toBe('Error');
+    expect(scrubbed.code).toBe('EENVELOPE');
+  });
+
+  it('caps the message so a huge SMTP response cannot flood the log', () => {
+    const err = new Error('x'.repeat(10_000));
+    expect(scrubEmailError(err).message.length).toBeLessThanOrEqual(300);
+  });
+
+  it('handles a non-Error without throwing', () => {
+    expect(scrubEmailError('plain string with a@b.com').message).toContain('a***@b***.com');
+    expect(scrubEmailError(undefined).message).toBe('undefined');
   });
 });

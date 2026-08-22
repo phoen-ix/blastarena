@@ -53,6 +53,7 @@ import {
   adminKickSchema,
   adminCloseRoomSchema,
   allowGuestPacket,
+  guestPacketLabel,
 } from './utils/socketValidation';
 import { query } from './db/connection';
 import { UserRow } from './db/types';
@@ -76,6 +77,8 @@ const PRESENCE_HEARTBEAT_MS = 45000;
 // Per-player emote cooldown
 const emoteLastUsed = new Map<number, number>();
 const spectatorChatLimiter = createSocketRateLimiter(3);
+// Caps how often a guest can make us write a rejection log line. (audit GUEST-LOG-FLOOD-1)
+const guestRejectLogLimiter = createSocketRateLimiter(2);
 const spectatorActionLimiter = createSocketRateLimiter(2);
 
 /** Extract active room code from socket, optionally sending error callback */
@@ -169,6 +172,12 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     },
     pingInterval: 25000,
     pingTimeout: 60000,
+    // engine.io defaults this to 1 MB. Every client->server payload in ClientToServerEvents is a
+    // small object — the largest are the MatchConfig on room:create and the config on sim:start —
+    // so 64 KB is still generous, and it cuts the ceiling on how much a single frame can cost us
+    // by 16x. Relevant because permessage-deflate below means a ~1 KB compressed frame can inflate
+    // to the full limit. (audit GUEST-LOG-FLOOD-1)
+    maxHttpBufferSize: 64 * 1024,
     perMessageDeflate: {
       threshold: 256, // Only compress messages larger than 256 bytes
     },
@@ -289,7 +298,61 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     socket.leave(`room:${existingRoom}`);
   }
 
-  io.on('connection', async (socket) => {
+  /**
+   * Restore party membership and resume an in-progress game, for a reconnecting account.
+   *
+   * Deliberately NOT awaited by the connection handler. Both reads hit Redis, and they used to run
+   * inline — with the four setup*Handlers calls sandwiched between them. A single Redis blip
+   * therefore rejected the connection callback partway through, skipping every remaining
+   * `socket.on` registration including `disconnect`. That left a socket that had already joined
+   * `user:<id>` and been marked present, could receive pushes, answered nothing, and on close ran
+   * no presence removal, no leaveRoom and no limiter cleanup — a ghost player in Redis plus a
+   * permanently leaked limiter entry.
+   *
+   * The client could not tell: `connect` had fired, so no reconnect overlay, `isConnected()` was
+   * true, and there are no ack timeouts in the frontend — a sent DM just vanished.
+   *
+   * Restoring state is genuinely optional; failing it degrades to "you are back in the lobby".
+   * Registration is not optional, so it now happens synchronously and this runs afterwards.
+   * (audit SOCKET-CONNECT-ORDER-1)
+   */
+  async function restoreSession(
+    socket: Parameters<Parameters<typeof io.on<'connection'>>[1]>[0],
+  ): Promise<void> {
+    if (socket.data.isGuest) return;
+    try {
+      const existingPartyId = await partyService.getPlayerParty(socket.data.userId);
+      if (existingPartyId) {
+        socket.data.activePartyId = existingPartyId;
+        socket.join(`party:${existingPartyId}`);
+      }
+
+      const existingRoomCode = await lobbyService.getPlayerRoom(socket.data.userId);
+      if (existingRoomCode) {
+        const gameRoom = roomManager.getRoom(existingRoomCode);
+        if (gameRoom && gameRoom.isRunning() && gameRoom.isPlayerDisconnected(socket.data.userId)) {
+          // Rejoin socket room and resume game
+          socket.join(`room:${existingRoomCode}`);
+          socket.data.activeRoomCode = existingRoomCode;
+          gameRoom.handlePlayerReconnect(socket.data.userId);
+          // Send current game state so client can resume
+          const fullState = gameRoom.getFullState();
+          socket.emit('game:start', fullState);
+          logger.info(
+            { userId: socket.data.userId, roomCode: existingRoomCode },
+            'Player reconnected to active game',
+          );
+        }
+      }
+    } catch (err: unknown) {
+      logger.error(
+        { err: getErrorMessage(err), userId: socket.data.userId },
+        'Failed to restore session state',
+      );
+    }
+  }
+
+  io.on('connection', (socket) => {
     logger.info(
       { userId: socket.data.userId, username: socket.data.username, guest: socket.data.isGuest },
       'Socket connected',
@@ -328,10 +391,17 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       // account-only surface. (audit GUEST-SCOPE-1)
       socket.use((packet, next) => {
         if (allowGuestPacket(packet as unknown[])) return next();
-        logger.warn(
-          { event: packet[0], socketId: socket.id },
-          'Guest socket attempted an account-only event; dropped',
-        );
+        // Bounded and rate limited. The packet is rejected here and never reaches a handler, so
+        // none of the per-handler limiters run, and nginx's socket.io zone only counts the HTTP
+        // upgrade — frames on an established WebSocket are invisible to it. That left this the one
+        // unauthenticated, unmetered path in the app that writes to the log.
+        // (audit GUEST-LOG-FLOOD-1)
+        if (guestRejectLogLimiter.isAllowed(socket.id)) {
+          logger.warn(
+            { event: guestPacketLabel(packet[0]), socketId: socket.id },
+            'Guest socket attempted an account-only event; dropped',
+          );
+        }
         // Intentionally does not call next() — the packet never reaches the handler.
       });
     } else {
@@ -354,42 +424,19 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       });
       notifyFriendsOnline(io, socket.data.userId, 'in_lobby');
 
-      // Restore party membership if reconnecting
-      const existingPartyId = await partyService.getPlayerParty(socket.data.userId);
-      if (existingPartyId) {
-        socket.data.activePartyId = existingPartyId;
-        socket.join(`party:${existingPartyId}`);
-      }
-
-      // Setup friend and party handlers
+      // Setup friend and party handlers. Nothing may await ahead of this — see restoreSession.
       setupFriendHandlers(socket, io);
       setupPartyHandlers(socket, io);
       setupLobbyHandlers(socket, io);
       setupDMHandlers(socket, io);
-
-      // Check if player was in an active game (reconnection after disconnect)
-      const existingRoomCode = await lobbyService.getPlayerRoom(socket.data.userId);
-      if (existingRoomCode) {
-        const gameRoom = roomManager.getRoom(existingRoomCode);
-        if (gameRoom && gameRoom.isRunning() && gameRoom.isPlayerDisconnected(socket.data.userId)) {
-          // Rejoin socket room and resume game
-          socket.join(`room:${existingRoomCode}`);
-          socket.data.activeRoomCode = existingRoomCode;
-          gameRoom.handlePlayerReconnect(socket.data.userId);
-          // Send current game state so client can resume
-          const fullState = gameRoom.getFullState();
-          socket.emit('game:start', fullState);
-          logger.info(
-            { userId: socket.data.userId, roomCode: existingRoomCode },
-            'Player reconnected to active game',
-          );
-        }
-      }
     } // end if (!socket.data.isGuest)
 
     // Room creation
     socket.on('room:create', async (data, callback) => {
-      if (!createLimiter(socket.id) || !ipCreateLimiter(clientIp)) return;
+      // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
+      // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
+      if (!createLimiter(socket.id) || !ipCreateLimiter(clientIp))
+        return callback({ success: false, error: 'Rate limited' });
       try {
         const parsed = createRoomRequestSchema.safeParse(data);
         if (!parsed.success) {
@@ -439,7 +486,10 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Join room
     socket.on('room:join', async (data, callback) => {
-      if (!joinLimiter(socket.id) || !ipJoinLimiter(clientIp)) return;
+      // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
+      // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
+      if (!joinLimiter(socket.id) || !ipJoinLimiter(clientIp))
+        return callback({ success: false, error: 'Rate limited' });
       if (typeof data.code !== 'string' || data.code.length === 0 || data.code.length > 20) {
         return callback({ success: false, error: 'Invalid room code' });
       }
@@ -1768,6 +1818,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         emoteLastUsed.delete(socket.data.userId);
         spectatorChatLimiter.remove(socket.id);
         spectatorActionLimiter.remove(socket.id);
+        guestRejectLogLimiter.remove(socket.id);
         // Capture before clearing: the room-cleanup block further down reads this, and clearing it
         // first made its `||` dead, forcing a Redis lookup every disconnect — and if the
         // `player:<id>:room` key had expired during a long session, that lookup returned null and
@@ -1849,6 +1900,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         );
       }
     });
+
+    // Last, and deliberately not awaited: every listener above — including `disconnect` — is now
+    // registered in the same synchronous tick as `connection`, so no Redis failure in here can
+    // leave the socket inert. (audit SOCKET-CONNECT-ORDER-1)
+    void restoreSession(socket);
   });
 
   // Periodic cleanup of finished game rooms

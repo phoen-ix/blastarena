@@ -1,20 +1,40 @@
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
+import { logger } from './logger';
+import { getErrorMessage } from '@blast-arena/shared';
+
+/** Longest message we will hand to a socket client. */
+const MAX_CLIENT_ERROR_LENGTH = 200;
+
+const GENERIC_CLIENT_ERROR = 'An unexpected error occurred';
 
 /**
- * Message safe to send to a socket client. AppError messages and the services' intentional
- * validation messages pass through, but database (mysql) and network/Redis-connection errors —
- * identified by their driver-specific fields — are masked so schema and internal details don't
- * leak over the socket. (audit ERR-003, ERR-001, ERR-005)
+ * Message safe to send to a socket client.
+ *
+ * An allow-list: only an `AppError` — which a service constructs deliberately, for the client to
+ * read — passes through. Everything else is masked.
+ *
+ * This used to be a deny-list, forwarding any `Error` whose shape wasn't recognisably a driver
+ * error (it checked only `sqlState` and `syscall`). That let through, verbatim: ioredis
+ * `ReplyError` messages naming the Lua script SHA, its line number and internal key names;
+ * `MaxRetriesPerRequestError`, which announces that the backing store is Redis and how it is
+ * tuned; `'Database pool not initialized. Call createPool() first.'`; and any `TypeError` from a
+ * bug inside a handler's `try` — free source-level reconnaissance for anyone with a socket.
+ *
+ * Flipping the default is only safe because the services reachable from socket handlers now throw
+ * `AppError` for every message that was meant for a user — messages.ts, friends.ts and party.ts
+ * were converted alongside this change. A bare `Error` reaching here is, by construction, an
+ * internal failure. (audit CLIENT-ERROR-ALLOWLIST-1)
  */
 export function clientError(err: unknown): string {
-  if (err instanceof AppError) return err.message;
-  if (err instanceof Error) {
-    const e = err as { sqlState?: unknown; syscall?: unknown };
-    if (e.sqlState != null || e.syscall != null) return 'An unexpected error occurred';
-    return err.message;
-  }
-  return 'An unexpected error occurred';
+  if (err instanceof AppError) return err.message.slice(0, MAX_CLIENT_ERROR_LENGTH);
+
+  // Log here rather than at the ~28 call sites. Under the old deny-list the real message at least
+  // reached the client, so nothing was silently lost; now that it is masked, dropping it entirely
+  // would trade an information leak for a blind spot. The handlers that call this answer an ack
+  // and do not log, so this is the only place that still holds the original.
+  logger.error({ err: getErrorMessage(err) }, 'Socket handler error (masked for client)');
+  return GENERIC_CLIENT_ERROR;
 }
 
 // Socket event payload schemas — runtime validation for untyped client data
@@ -118,6 +138,33 @@ export const GUEST_ALLOWED_EVENTS: ReadonlySet<string> = new Set([
   'openworld:leave',
   'openworld:input',
 ]);
+
+/**
+ * Longest event name we will put in a log line.
+ *
+ * Socket.io's default `maxHttpBufferSize` is 1 MB and permessage-deflate is enabled, so a client
+ * can send a ~1 KB compressed frame whose event name inflates to ~1 MB — roughly 1000:1
+ * amplification into the log. See `guestPacketLabel`. (audit GUEST-LOG-FLOOD-1)
+ */
+export const MAX_LOGGED_EVENT_NAME = 64;
+
+/**
+ * A bounded, safe label for an event name that came off the wire.
+ *
+ * The guest gate logs the event name of every packet it rejects, and that name is entirely
+ * attacker-chosen: guests are unauthenticated, the gate deliberately does not call `next()` so no
+ * handler-level rate limiter ever runs, and nginx's socket.io zone counts HTTP requests so it sees
+ * only the WebSocket upgrade, never the frames. Unbounded, one connection could churn the whole
+ * 500 MB Docker log retention in seconds — destroying prior log history — while the synchronous
+ * serialisation stalled the event loop that also runs the 20 tick/sec game loop.
+ * (audit GUEST-LOG-FLOOD-1)
+ */
+export function guestPacketLabel(event: unknown): string {
+  if (typeof event !== 'string') return `<${typeof event}>`;
+  return event.length > MAX_LOGGED_EVENT_NAME
+    ? `${event.slice(0, MAX_LOGGED_EVENT_NAME)}…(${event.length})`
+    : event;
+}
 
 /**
  * Decide whether a guest socket's incoming packet may reach its handler.

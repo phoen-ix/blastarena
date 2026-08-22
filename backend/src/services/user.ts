@@ -7,6 +7,7 @@ import {
   hashToken,
   hashEmail,
   generateEmailHint,
+  scrubEmailError,
 } from '../utils/crypto';
 import { getConfig } from '../config';
 import { sendEmailChangeEmail, sendEmailTakenChangeWarning } from './email';
@@ -120,7 +121,7 @@ export async function requestEmailChange(
   );
   if (existing.length > 0) {
     sendEmailTakenChangeWarning(normalizedEmail, existing[0].language || 'en').catch((err) => {
-      logger.error({ err }, 'Failed to send email-taken change warning');
+      logger.error({ err: scrubEmailError(err) }, 'Failed to send email-taken change warning');
     });
     return; // Silently succeed — don't update pending fields, don't reveal conflict
   }
@@ -133,7 +134,7 @@ export async function requestEmailChange(
   if (pendingExisting.length > 0) {
     sendEmailTakenChangeWarning(normalizedEmail, pendingExisting[0].language || 'en').catch(
       (err) => {
-        logger.error({ err }, 'Failed to send email-taken change warning');
+        logger.error({ err: scrubEmailError(err) }, 'Failed to send email-taken change warning');
       },
     );
     return; // Silently succeed
@@ -149,7 +150,7 @@ export async function requestEmailChange(
 
   // Send confirmation to the NEW email address
   sendEmailChangeEmail(normalizedEmail, token, language).catch((err) => {
-    logger.error({ err }, 'Failed to send email change confirmation');
+    logger.error({ err: scrubEmailError(err) }, 'Failed to send email change confirmation');
   });
 }
 
@@ -291,7 +292,7 @@ export async function getMatchHistory(userId: number, page: number = 1, limit: n
      LEFT JOIN users u ON u.id = m.winner_id
      LEFT JOIN (SELECT match_id, COUNT(*) as player_count FROM match_players GROUP BY match_id) pc ON pc.match_id = m.id
      WHERE mp.user_id = ? AND m.status = 'finished'
-     ORDER BY m.finished_at DESC
+     ORDER BY m.finished_at DESC, m.id DESC
      LIMIT ? OFFSET ?`,
     [userId, limit, offset],
   );

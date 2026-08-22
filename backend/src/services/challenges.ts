@@ -8,6 +8,7 @@ import {
   ChallengeLeaderboardResponse,
   ActiveChallengeInfo,
 } from '@blast-arena/shared';
+import { AppError } from '../middleware/errorHandler';
 
 interface ChallengeRow extends RowDataPacket {
   id: number;
@@ -91,7 +92,7 @@ export async function listChallenges(
        FROM map_challenges mc
        JOIN custom_maps cm ON mc.custom_map_id = cm.id
        JOIN users u ON cm.created_by = u.id
-       ORDER BY mc.start_date DESC
+       ORDER BY mc.start_date DESC, mc.id DESC
        LIMIT ? OFFSET ?`,
       [limit, offset],
     ),
@@ -110,7 +111,7 @@ export async function createChallenge(
   createdBy: number,
 ): Promise<MapChallenge> {
   if (new Date(endDate) <= new Date(startDate)) {
-    throw new Error('End date must be after start date');
+    throw new AppError('End date must be after start date', 400, 'INVALID_DATE_RANGE');
   }
   const result = await execute(
     `INSERT INTO map_challenges (title, description, custom_map_id, game_mode, start_date, end_date, created_by)
@@ -197,7 +198,7 @@ export async function getChallengeLeaderboard(
        FROM challenge_scores cs
        JOIN users u ON cs.user_id = u.id
        WHERE cs.challenge_id = ?
-       ORDER BY cs.wins DESC, cs.kills DESC, cs.deaths ASC
+       ORDER BY cs.wins DESC, cs.kills DESC, cs.deaths ASC, cs.id ASC
        LIMIT ? OFFSET ?`,
       [challengeId, limit, offset],
     ),
@@ -254,7 +255,7 @@ export async function getActiveChallengeInfo(): Promise<ActiveChallengeInfo | nu
      FROM challenge_scores cs
      JOIN users u ON cs.user_id = u.id
      WHERE cs.challenge_id = ?
-     ORDER BY cs.wins DESC, cs.kills DESC
+     ORDER BY cs.wins DESC, cs.kills DESC, cs.deaths ASC, cs.id ASC
      LIMIT 5`,
     [challenge.id],
   );

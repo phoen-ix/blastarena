@@ -381,7 +381,7 @@ export async function getNextLevel(currentLevelId: number): Promise<number | nul
 
   const { world_id, sort_order } = currentRows[0];
   const nextRows = await query<CampaignLevelRow[]>(
-    `SELECT id FROM campaign_levels WHERE world_id = ? AND sort_order > ? AND is_published = TRUE ORDER BY sort_order ASC LIMIT 1`,
+    `SELECT id FROM campaign_levels WHERE world_id = ? AND sort_order > ? AND is_published = TRUE ORDER BY sort_order ASC, id ASC LIMIT 1`,
     [world_id, sort_order],
   );
   return nextRows.length > 0 ? nextRows[0].id : null;

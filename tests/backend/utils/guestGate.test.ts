@@ -4,6 +4,8 @@ import path from 'path';
 import {
   allowGuestPacket,
   GUEST_ALLOWED_EVENTS,
+  guestPacketLabel,
+  MAX_LOGGED_EVENT_NAME,
 } from '../../../backend/src/utils/socketValidation';
 
 /**
@@ -76,5 +78,37 @@ describe('guest packet gate', () => {
     );
     expect(registered.size).toBeGreaterThan(0);
     expect([...GUEST_ALLOWED_EVENTS].sort()).toEqual([...registered].sort());
+  });
+});
+
+describe('guestPacketLabel', () => {
+  /**
+   * The gate logs the event name of every packet it rejects, and guests are unauthenticated. The
+   * rejected packet never reaches a handler, so no per-handler limiter runs; nginx's socket.io
+   * zone counts HTTP requests, so it sees only the upgrade and never the frames. Unbounded, one
+   * connection could write the whole Docker log retention away in seconds. (audit GUEST-LOG-FLOOD-1)
+   */
+  it('passes a normal event name through unchanged', () => {
+    expect(guestPacketLabel('openworld:input')).toBe('openworld:input');
+  });
+
+  it('truncates a long name and reports its real length', () => {
+    const label = guestPacketLabel('A'.repeat(1_000_000));
+    expect(label.length).toBeLessThanOrEqual(MAX_LOGGED_EVENT_NAME + 20);
+    expect(label).toContain('(1000000)');
+  });
+
+  it('keeps a name exactly at the cap intact', () => {
+    const exact = 'B'.repeat(MAX_LOGGED_EVENT_NAME);
+    expect(guestPacketLabel(exact)).toBe(exact);
+  });
+
+  it.each([
+    [{ nested: 'object' }, '<object>'],
+    [12345, '<number>'],
+    [undefined, '<undefined>'],
+    [null, '<object>'],
+  ])('describes non-string %p without serialising it', (input, expected) => {
+    expect(guestPacketLabel(input)).toBe(expected);
   });
 });

@@ -7,6 +7,7 @@ import { BotAIRow } from '../db/types';
 import { compileBotAI } from './botai-compiler';
 import { getBotAIRegistry } from './botai-registry';
 import { logger } from '../utils/logger';
+import { AppError } from '../middleware/errorHandler';
 
 const AI_BASE_DIR = path.join(process.cwd(), 'ai');
 const BUILTIN_SOURCE_PATH = path.join(__dirname, '../game/BotAI.ts');
@@ -22,7 +23,8 @@ function rowToEntry(row: BotAIRow): BotAIEntry {
     isBuiltin: !!row.is_builtin,
     isActive: !!row.is_active,
     uploadedBy: row.uploader_username || null,
-    uploadedAt: row.uploaded_at instanceof Date ? row.uploaded_at.toISOString() : String(row.uploaded_at),
+    uploadedAt:
+      row.uploaded_at instanceof Date ? row.uploaded_at.toISOString() : String(row.uploaded_at),
     version: row.version,
     fileSize: row.file_size,
   };
@@ -115,7 +117,7 @@ export async function updateAI(
 ): Promise<void> {
   // Check if exists
   const rows = await query<BotAIRow[]>('SELECT * FROM bot_ais WHERE id = ?', [id]);
-  if (rows.length === 0) throw new Error('AI not found');
+  if (rows.length === 0) throw new AppError('AI not found', 404, 'AI_NOT_FOUND');
 
   const setClauses: string[] = [];
   const params: unknown[] = [];
@@ -144,7 +146,10 @@ export async function updateAI(
       try {
         getBotAIRegistry().loadAI(id);
       } catch (err: unknown) {
-        logger.warn({ aiId: id, error: err instanceof Error ? err.message : String(err) }, 'Failed to load AI on activate');
+        logger.warn(
+          { aiId: id, error: err instanceof Error ? err.message : String(err) },
+          'Failed to load AI on activate',
+        );
       }
     } else {
       getBotAIRegistry().unloadAI(id);
@@ -164,8 +169,8 @@ export async function reuploadAI(
   adminId: number,
 ): Promise<{ success: boolean; errors?: string[] }> {
   const rows = await query<BotAIRow[]>('SELECT * FROM bot_ais WHERE id = ?', [id]);
-  if (rows.length === 0) throw new Error('AI not found');
-  if (rows[0].is_builtin) throw new Error('Cannot re-upload built-in AI');
+  if (rows.length === 0) throw new AppError('AI not found', 404, 'AI_NOT_FOUND');
+  if (rows[0].is_builtin) throw new AppError('Cannot re-upload built-in AI', 400, 'AI_BUILTIN');
 
   const source = fileBuffer.toString('utf-8');
   const result = await compileBotAI(source);
@@ -201,8 +206,8 @@ export async function reuploadAI(
 
 export async function deleteAI(id: string, adminId: number): Promise<void> {
   const rows = await query<BotAIRow[]>('SELECT * FROM bot_ais WHERE id = ?', [id]);
-  if (rows.length === 0) throw new Error('AI not found');
-  if (rows[0].is_builtin) throw new Error('Cannot delete built-in AI');
+  if (rows.length === 0) throw new AppError('AI not found', 404, 'AI_NOT_FOUND');
+  if (rows[0].is_builtin) throw new AppError('Cannot delete built-in AI', 400, 'AI_BUILTIN');
 
   // Unload from registry
   getBotAIRegistry().unloadAI(id);
@@ -224,7 +229,9 @@ export async function deleteAI(id: string, adminId: number): Promise<void> {
   logger.info({ aiId: id, name: rows[0].name }, 'Custom BotAI deleted');
 }
 
-export async function downloadSource(id: string): Promise<{ filename: string; content: Buffer } | null> {
+export async function downloadSource(
+  id: string,
+): Promise<{ filename: string; content: Buffer } | null> {
   const rows = await query<BotAIRow[]>('SELECT * FROM bot_ais WHERE id = ?', [id]);
   if (rows.length === 0) return null;
 

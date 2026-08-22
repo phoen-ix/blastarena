@@ -45,7 +45,12 @@ function compareHistoryEntries(a: SimulationBatchStatus, b: SimulationBatchStatu
   if (a.status === 'queued' && b.status === 'queued') {
     return (a.queuePosition ?? 0) - (b.queuePosition ?? 0);
   }
-  return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
+  const byStart = new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
+  if (byStart !== 0) return byStart;
+  // batchId last: getHistory slices this array for pagination, and two batches started in the same
+  // millisecond would otherwise fall back to filesystem readdir order — which differs between the
+  // separate calls that produce page 1 and page 2. (audit PAGINATION-TOTAL-ORDER-1)
+  return a.batchId < b.batchId ? -1 : a.batchId > b.batchId ? 1 : 0;
 }
 
 export class SimulationManager {

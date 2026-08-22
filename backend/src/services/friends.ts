@@ -3,6 +3,7 @@ import { FriendshipRow, UserBlockRow, CountRow, UserRow } from '../db/types';
 import { Friend, FriendRequest, MAX_FRIENDS, ActivityStatus } from '@blast-arena/shared';
 import { RowDataPacket } from 'mysql2';
 import * as presenceService from './presence';
+import { AppError } from '../middleware/errorHandler';
 
 interface UserSearchRow extends RowDataPacket {
   id: number;
@@ -16,21 +17,21 @@ export async function sendFriendRequest(fromUserId: number, toUsername: string):
     [toUsername],
   );
   if (!targetUser) {
-    throw new Error('User not found');
+    throw new AppError('User not found', 404, 'USER_NOT_FOUND');
   }
   if (targetUser.id === fromUserId) {
-    throw new Error('Cannot send friend request to yourself');
+    throw new AppError('Cannot send friend request to yourself', 400, 'INVALID_TARGET');
   }
 
   // Check if target accepts friend requests
   if (targetUser.accept_friend_requests === false || targetUser.accept_friend_requests === 0) {
-    throw new Error('This user is not accepting friend requests');
+    throw new AppError('This user is not accepting friend requests', 403, 'REQUESTS_DISABLED');
   }
 
   // Check blocks both directions
   const blocked = await isBlockedEither(fromUserId, targetUser.id);
   if (blocked) {
-    throw new Error('Cannot send friend request to this user');
+    throw new AppError('Cannot send friend request to this user', 403, 'BLOCKED');
   }
 
   // Check existing friendship
@@ -39,8 +40,9 @@ export async function sendFriendRequest(fromUserId: number, toUsername: string):
     [fromUserId, targetUser.id],
   );
   if (existing) {
-    if (existing.status === 'accepted') throw new Error('Already friends');
-    throw new Error('Friend request already sent');
+    if (existing.status === 'accepted')
+      throw new AppError('Already friends', 409, 'ALREADY_FRIENDS');
+    throw new AppError('Friend request already sent', 409, 'REQUEST_PENDING');
   }
 
   // Check if they already sent us a request — auto-accept
@@ -59,14 +61,15 @@ export async function sendFriendRequest(fromUserId: number, toUsername: string):
     [fromUserId, 'accepted'],
   );
   if (countRow.total >= MAX_FRIENDS) {
-    throw new Error('Friend list is full');
+    throw new AppError('Friend list is full', 409, 'FRIEND_LIST_FULL');
   }
 
   // Insert pending request
-  await execute(
-    'INSERT INTO friendships (user_id, friend_id, status) VALUES (?, ?, ?)',
-    [fromUserId, targetUser.id, 'pending'],
-  );
+  await execute('INSERT INTO friendships (user_id, friend_id, status) VALUES (?, ?, ?)', [
+    fromUserId,
+    targetUser.id,
+    'pending',
+  ]);
   return targetUser.id;
 }
 
@@ -78,14 +81,15 @@ export async function acceptFriendRequest(userId: number, fromUserId: number): P
       [fromUserId, userId, 'pending'],
     );
     if (rows.length === 0) {
-      throw new Error('No pending friend request found');
+      throw new AppError('No pending friend request found', 404, 'REQUEST_NOT_FOUND');
     }
 
     // Update to accepted
-    await conn.execute(
-      'UPDATE friendships SET status = ? WHERE user_id = ? AND friend_id = ?',
-      ['accepted', fromUserId, userId],
-    );
+    await conn.execute('UPDATE friendships SET status = ? WHERE user_id = ? AND friend_id = ?', [
+      'accepted',
+      fromUserId,
+      userId,
+    ]);
 
     // Insert reciprocal accepted row
     await conn.execute(
@@ -101,7 +105,7 @@ export async function declineFriendRequest(userId: number, fromUserId: number): 
     [fromUserId, userId, 'pending'],
   );
   if (result.affectedRows === 0) {
-    throw new Error('No pending friend request found');
+    throw new AppError('No pending friend request found', 404, 'REQUEST_NOT_FOUND');
   }
 }
 
@@ -111,26 +115,26 @@ export async function cancelFriendRequest(userId: number, toUserId: number): Pro
     [userId, toUserId, 'pending'],
   );
   if (result.affectedRows === 0) {
-    throw new Error('No pending friend request found');
+    throw new AppError('No pending friend request found', 404, 'REQUEST_NOT_FOUND');
   }
 }
 
 export async function removeFriend(userId: number, friendId: number): Promise<void> {
   await withTransaction(async (conn) => {
-    await conn.execute(
-      'DELETE FROM friendships WHERE user_id = ? AND friend_id = ?',
-      [userId, friendId],
-    );
-    await conn.execute(
-      'DELETE FROM friendships WHERE user_id = ? AND friend_id = ?',
-      [friendId, userId],
-    );
+    await conn.execute('DELETE FROM friendships WHERE user_id = ? AND friend_id = ?', [
+      userId,
+      friendId,
+    ]);
+    await conn.execute('DELETE FROM friendships WHERE user_id = ? AND friend_id = ?', [
+      friendId,
+      userId,
+    ]);
   });
 }
 
 export async function blockUser(blockerId: number, blockedId: number): Promise<void> {
   if (blockerId === blockedId) {
-    throw new Error('Cannot block yourself');
+    throw new AppError('Cannot block yourself', 400, 'INVALID_TARGET');
   }
 
   const [targetUser] = await query<UserRow[]>(
@@ -138,7 +142,7 @@ export async function blockUser(blockerId: number, blockedId: number): Promise<v
     [blockedId],
   );
   if (!targetUser) {
-    throw new Error('User not found');
+    throw new AppError('User not found', 404, 'USER_NOT_FOUND');
   }
 
   await withTransaction(async (conn) => {
@@ -148,18 +152,18 @@ export async function blockUser(blockerId: number, blockedId: number): Promise<v
       [blockerId, blockedId, blockedId, blockerId],
     );
     // Insert block
-    await conn.execute(
-      'INSERT IGNORE INTO user_blocks (blocker_id, blocked_id) VALUES (?, ?)',
-      [blockerId, blockedId],
-    );
+    await conn.execute('INSERT IGNORE INTO user_blocks (blocker_id, blocked_id) VALUES (?, ?)', [
+      blockerId,
+      blockedId,
+    ]);
   });
 }
 
 export async function unblockUser(blockerId: number, blockedId: number): Promise<void> {
-  await execute(
-    'DELETE FROM user_blocks WHERE blocker_id = ? AND blocked_id = ?',
-    [blockerId, blockedId],
-  );
+  await execute('DELETE FROM user_blocks WHERE blocker_id = ? AND blocked_id = ?', [
+    blockerId,
+    blockedId,
+  ]);
 }
 
 export async function getFriends(userId: number): Promise<Friend[]> {
@@ -290,6 +294,7 @@ export async function searchUsers(
      WHERE u.username LIKE ? AND u.id != ? AND u.is_deactivated = 0
      AND u.id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)
      AND u.id NOT IN (SELECT blocker_id FROM user_blocks WHERE blocked_id = ?)
+     ORDER BY u.username ASC, u.id ASC
      LIMIT 10`,
     [`${trimmed}%`, excludeUserId, excludeUserId, excludeUserId],
   );

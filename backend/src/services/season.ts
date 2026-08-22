@@ -1,6 +1,7 @@
 import { query, execute, withTransaction } from '../db/connection';
 import { SeasonRow, CountRow } from '../db/types';
 import { Season } from '@blast-arena/shared';
+import { AppError } from '../middleware/errorHandler';
 
 function toSeason(row: SeasonRow): Season {
   return {
@@ -13,19 +14,20 @@ function toSeason(row: SeasonRow): Season {
 }
 
 export async function getActiveSeason(): Promise<Season | null> {
-  const rows = await query<SeasonRow[]>(
-    'SELECT * FROM seasons WHERE is_active = TRUE LIMIT 1',
-  );
+  const rows = await query<SeasonRow[]>('SELECT * FROM seasons WHERE is_active = TRUE LIMIT 1');
   return rows.length > 0 ? toSeason(rows[0]) : null;
 }
 
-export async function getSeasons(page: number = 1, limit: number = 20): Promise<{ seasons: Season[]; total: number }> {
+export async function getSeasons(
+  page: number = 1,
+  limit: number = 20,
+): Promise<{ seasons: Season[]; total: number }> {
   const offset = (page - 1) * limit;
   const [rows, countRows] = await Promise.all([
-    query<SeasonRow[]>(
-      'SELECT * FROM seasons ORDER BY start_date DESC LIMIT ? OFFSET ?',
-      [limit, offset],
-    ),
+    query<SeasonRow[]>('SELECT * FROM seasons ORDER BY start_date DESC, id DESC LIMIT ? OFFSET ?', [
+      limit,
+      offset,
+    ]),
     query<CountRow[]>('SELECT COUNT(*) as total FROM seasons'),
   ]);
   return { seasons: rows.map(toSeason), total: countRows[0].total };
@@ -36,9 +38,13 @@ export async function getSeasonById(id: number): Promise<Season | null> {
   return rows.length > 0 ? toSeason(rows[0]) : null;
 }
 
-export async function createSeason(name: string, startDate: string, endDate: string): Promise<Season> {
+export async function createSeason(
+  name: string,
+  startDate: string,
+  endDate: string,
+): Promise<Season> {
   if (new Date(endDate) <= new Date(startDate)) {
-    throw new Error('End date must be after start date');
+    throw new AppError('End date must be after start date', 400, 'INVALID_DATE_RANGE');
   }
 
   const result = await execute(
@@ -49,13 +55,25 @@ export async function createSeason(name: string, startDate: string, endDate: str
   return { id: result.insertId, name, startDate, endDate, isActive: false };
 }
 
-export async function updateSeason(id: number, updates: { name?: string; startDate?: string; endDate?: string }): Promise<void> {
+export async function updateSeason(
+  id: number,
+  updates: { name?: string; startDate?: string; endDate?: string },
+): Promise<void> {
   const sets: string[] = [];
   const params: unknown[] = [];
 
-  if (updates.name !== undefined) { sets.push('name = ?'); params.push(updates.name); }
-  if (updates.startDate !== undefined) { sets.push('start_date = ?'); params.push(updates.startDate); }
-  if (updates.endDate !== undefined) { sets.push('end_date = ?'); params.push(updates.endDate); }
+  if (updates.name !== undefined) {
+    sets.push('name = ?');
+    params.push(updates.name);
+  }
+  if (updates.startDate !== undefined) {
+    sets.push('start_date = ?');
+    params.push(updates.startDate);
+  }
+  if (updates.endDate !== undefined) {
+    sets.push('end_date = ?');
+    params.push(updates.endDate);
+  }
 
   if (sets.length === 0) return;
   params.push(id);
@@ -95,16 +113,22 @@ export async function endSeason(id: number, resetMode: 'hard' | 'soft'): Promise
     }
 
     // Update peak_elo to not be below new rating
-    await conn.execute(
-      'UPDATE user_stats SET peak_elo = GREATEST(peak_elo, elo_rating)',
-    );
+    await conn.execute('UPDATE user_stats SET peak_elo = GREATEST(peak_elo, elo_rating)');
   });
 }
 
-export async function getUserSeasonHistory(userId: number): Promise<{
-  seasonId: number; seasonName: string; finalElo: number; peakElo: number; matchesPlayed: number;
-}[]> {
-  const rows = await query<(SeasonRow & { elo_rating: number; peak_elo: number; matches_played: number })[]>(
+export async function getUserSeasonHistory(userId: number): Promise<
+  {
+    seasonId: number;
+    seasonName: string;
+    finalElo: number;
+    peakElo: number;
+    matchesPlayed: number;
+  }[]
+> {
+  const rows = await query<
+    (SeasonRow & { elo_rating: number; peak_elo: number; matches_played: number })[]
+  >(
     `SELECT s.id, s.name, se.elo_rating, se.peak_elo, se.matches_played
      FROM season_elo se
      JOIN seasons s ON s.id = se.season_id

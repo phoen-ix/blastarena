@@ -209,6 +209,29 @@ describe('Messages Routes', () => {
       expect(mockGetConversation).toHaveBeenCalledWith(1, 5, 1, 50);
     });
 
+    // Lower bounds. Unclamped, `?page=-5` produced a negative SQL OFFSET and `?limit=-5` a
+    // negative LIMIT — both rejected by the driver, surfacing as an opaque 500 plus an
+    // error-level log for any verified user editing the URL. (audit ADMIN-PAGINATION-1)
+    it.each([
+      ['negative page', { page: '-5' }, 1, 20],
+      ['zero page', { page: '0' }, 1, 20],
+      ['negative limit', { limit: '-5' }, 1, 1],
+      ['zero limit', { limit: '0' }, 1, 20],
+      ['non-numeric page', { page: 'abc' }, 1, 20],
+      ['both negative', { page: '-3', limit: '-9' }, 1, 1],
+    ])('clamps %s', async (_label, query, expectedPage, expectedLimit) => {
+      mockGetConversation.mockResolvedValue({ messages: [], total: 0, page: 1, limit: 20 });
+
+      const handler = getHandler('get', '/messages/:userId');
+      const req = mockReq({ params: { userId: '5' }, query });
+      const res = mockRes();
+      const next = jest.fn();
+      await handler(req, res, next);
+
+      expect(mockGetConversation).toHaveBeenCalledWith(1, 5, expectedPage, expectedLimit);
+      expect(next).not.toHaveBeenCalled();
+    });
+
     it('returns 400 for non-numeric userId', async () => {
       const handler = getHandler('get', '/messages/:userId');
       const req = mockReq({ params: { userId: 'abc' } });

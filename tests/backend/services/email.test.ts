@@ -297,7 +297,7 @@ describe('email service', () => {
       await sendTestEmail('recipient@example.com');
 
       expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.objectContaining({ to: 'recipient@example.com' }),
+        expect.objectContaining({ to: 'r***@e***.com' }),
         expect.stringContaining('SMTP not configured'),
       );
     });
@@ -305,10 +305,13 @@ describe('email service', () => {
     it('logs the email body at debug level', async () => {
       await sendTestEmail('recipient@example.com');
 
+      // The rendered body carries the verification / reset URL, i.e. a live token. Only its
+      // length is logged now. (audit EMAIL-LOG-1)
       expect(mockLogger.debug).toHaveBeenCalledWith(
-        expect.objectContaining({ html: expect.any(String) }),
-        'Email body',
+        expect.objectContaining({ length: expect.any(Number) }),
+        'Email body suppressed',
       );
+      expect(JSON.stringify(mockLogger.debug.mock.calls)).not.toContain('<html');
     });
 
     it('does not throw an error', async () => {
@@ -321,7 +324,7 @@ describe('email service', () => {
       expect(mockSendMail).not.toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'user@example.com',
+          to: 'u***@e***.com',
           subject: 'Verify your BlastArena account',
         }),
         expect.stringContaining('SMTP not configured'),
@@ -334,7 +337,7 @@ describe('email service', () => {
       expect(mockSendMail).not.toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'user@example.com',
+          to: 'u***@e***.com',
           subject: 'Reset your BlastArena password',
         }),
         expect.stringContaining('SMTP not configured'),
@@ -347,7 +350,7 @@ describe('email service', () => {
       expect(mockSendMail).not.toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'new@example.com',
+          to: 'n***@e***.com',
           subject: 'Confirm your new email address — BlastArena',
         }),
         expect.stringContaining('SMTP not configured'),
@@ -428,7 +431,7 @@ describe('email service', () => {
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'user@example.com',
+          to: 'u***@e***.com',
           subject: 'Verify your BlastArena account',
         }),
         'Email sent',
@@ -521,7 +524,7 @@ describe('email service', () => {
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'new@example.com',
+          to: 'n***@e***.com',
           subject: 'Confirm your new email address — BlastArena',
         }),
         'Email sent',
@@ -597,7 +600,7 @@ describe('email service', () => {
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'user@example.com',
+          to: 'u***@e***.com',
           subject: 'Reset your BlastArena password',
         }),
         'Email sent',
@@ -653,7 +656,7 @@ describe('email service', () => {
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'admin@example.com',
+          to: 'a***@e***.com',
           subject: 'BlastArena — Test Email',
         }),
         'Email sent',
@@ -683,10 +686,13 @@ describe('email service', () => {
         // expected
       }
 
+      // The error is scrubbed to a plain object so pino's default `err` serializer has nothing to
+      // expand — nodemailer attaches `response`, `rejected` and `envelope.to`, all of which carry
+      // recipient addresses. (audit EMAIL-LOG-1)
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({
-          err: smtpError,
-          to: 'fail@example.com',
+          err: { name: 'Error', message: 'Auth failed' },
+          to: 'f***@e***.com',
           subject: 'BlastArena — Test Email',
         }),
         'Failed to send email',

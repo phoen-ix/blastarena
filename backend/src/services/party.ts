@@ -1,6 +1,7 @@
 import { getRedis } from '../db/redis';
 import { Party, PartyInvite, MAX_PARTY_SIZE } from '@blast-arena/shared';
 import { v4 as uuidv4 } from 'uuid';
+import { AppError } from '../middleware/errorHandler';
 
 const PARTY_TTL = 3600; // 1 hour
 const PARTY_KEY_PREFIX = 'party:';
@@ -102,7 +103,7 @@ export async function joinParty(partyId: string, userId: number, username: strin
   // Check player not already in a different party
   const existingParty = await redis.get(`${PLAYER_PARTY_PREFIX}${userId}`);
   if (existingParty && existingParty !== partyId) {
-    throw new Error('Already in another party');
+    throw new AppError('Already in another party', 409, 'ALREADY_IN_PARTY');
   }
 
   const result = await redis.eval(
@@ -120,7 +121,7 @@ export async function joinParty(partyId: string, userId: number, username: strin
     return JSON.parse(result) as Party;
   }
 
-  throw new Error('Failed to join party');
+  throw new AppError('Failed to join party', 409, 'PARTY_JOIN_FAILED');
 }
 
 // Atomic leave: remove the member (or disband if leader leaves / party empties) in one call.
@@ -233,7 +234,7 @@ export async function kickFromParty(
   if (typeof result === 'string') {
     return JSON.parse(result) as Party;
   }
-  throw new Error('Failed to kick member');
+  throw new AppError('Failed to kick member', 409, 'PARTY_KICK_FAILED');
 }
 
 export async function disbandParty(partyId: string): Promise<number[]> {

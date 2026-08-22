@@ -8,6 +8,7 @@ import {
   hashToken,
   hashEmail,
   generateEmailHint,
+  scrubEmailError,
 } from '../utils/crypto';
 import {
   sendVerificationEmail,
@@ -25,7 +26,6 @@ import {
 } from '@blast-arena/shared';
 import * as totpService from './totp';
 import { logger } from '../utils/logger';
-import { getErrorMessage } from '@blast-arena/shared';
 import { UserRow, RefreshTokenJoinRow, IdRow, IdWithLanguageRow } from '../db/types';
 import * as cosmeticsService from './cosmetics';
 
@@ -148,7 +148,10 @@ export async function register(
     await hashPassword(password);
     sendEmailTakenRegistrationWarning(normalizedEmail, emailExists[0].language || 'en').catch(
       (err) => {
-        logger.error({ err }, 'Failed to send email-taken registration warning');
+        logger.error(
+          { err: scrubEmailError(err) },
+          'Failed to send email-taken registration warning',
+        );
       },
     );
     return { emailVerificationRequired: true };
@@ -173,7 +176,7 @@ export async function register(
 
   // Send verification email (non-blocking)
   sendVerificationEmail(normalizedEmail, verifyToken, language).catch((err) => {
-    logger.error({ err }, 'Failed to send verification email');
+    logger.error({ err: scrubEmailError(err) }, 'Failed to send verification email');
   });
 
   // No session is issued at registration — the account must verify its email before logging in.
@@ -449,7 +452,7 @@ export async function forgotPassword(email: string): Promise<void> {
   // 500 while an unknown one still returned 200. Either difference is an account-existence oracle,
   // which defeats the deliberate uniform-response design used in register. (audit EMAIL-TIMING-1)
   void sendPasswordResetEmail(email, resetToken, rows[0].language || 'en').catch((err) => {
-    logger.warn({ err: getErrorMessage(err) }, 'Failed to send password reset email');
+    logger.warn({ err: scrubEmailError(err) }, 'Failed to send password reset email');
   });
 }
 

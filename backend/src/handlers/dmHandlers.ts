@@ -32,25 +32,34 @@ export function setupDMHandlers(socket: TypedSocket, io: TypedServer): void {
   const userId = socket.data.userId;
 
   socket.on('dm:send', async (data, callback) => {
-    if (!dmChatLimiter.isAllowed(socket.id)) return;
-
-    const dmMode = await settingsService.getDMMode();
-    if (dmMode === 'disabled')
-      return callback({ success: false, error: 'Direct messages are disabled' });
-    if (dmMode === 'admin_only' && socket.data.role !== 'admin')
-      return callback({ success: false, error: 'Direct messages are restricted' });
-    if (dmMode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator')
-      return callback({ success: false, error: 'Direct messages are restricted' });
-
-    const message =
-      typeof data.message === 'string' ? data.message.trim().substring(0, DM_MAX_LENGTH) : '';
-    if (!message) return callback({ success: false, error: 'Message cannot be empty' });
-
-    if (typeof data.toUserId !== 'number' || data.toUserId <= 0) {
-      return callback({ success: false, error: 'Invalid input' });
+    // Every path below answers the ack. There is no ack timeout anywhere in the frontend, and
+    // MessagesView clears the composer synchronously on send — so a handler that returns without
+    // calling back loses the message silently, with the connection still showing as healthy.
+    // (audit SOCKET-TRYCATCH-2)
+    if (!dmChatLimiter.isAllowed(socket.id)) {
+      return callback({ success: false, error: 'Rate limited' });
     }
 
+    // The try opens here, not below: `getDMMode` reads `server_settings` through a 5s cache, so
+    // the first call after each TTL expiry is a real DB query that can reject. Sitting ahead of
+    // the try, that rejection escaped as an unhandled promise and the ack never fired.
     try {
+      const dmMode = await settingsService.getDMMode();
+      if (dmMode === 'disabled')
+        return callback({ success: false, error: 'Direct messages are disabled' });
+      if (dmMode === 'admin_only' && socket.data.role !== 'admin')
+        return callback({ success: false, error: 'Direct messages are restricted' });
+      if (dmMode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator')
+        return callback({ success: false, error: 'Direct messages are restricted' });
+
+      const message =
+        typeof data.message === 'string' ? data.message.trim().substring(0, DM_MAX_LENGTH) : '';
+      if (!message) return callback({ success: false, error: 'Message cannot be empty' });
+
+      if (typeof data.toUserId !== 'number' || data.toUserId <= 0) {
+        return callback({ success: false, error: 'Invalid input' });
+      }
+
       const msg = await messageService.sendMessage(userId, data.toUserId, message);
       callback({ success: true, message: msg });
 

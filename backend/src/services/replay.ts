@@ -273,7 +273,7 @@ export async function listCampaignReplays(
      JOIN campaign_worlds cw ON cl.world_id = cw.id
      JOIN users u ON cr.user_id = u.id
      ${where}
-     ORDER BY cr.created_at DESC
+     ORDER BY cr.created_at DESC, cr.id DESC
      LIMIT ? OFFSET ?`,
     [...params, limit, offset],
   );

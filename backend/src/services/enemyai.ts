@@ -7,6 +7,7 @@ import { EnemyAIRow } from '../db/types';
 import { compileEnemyAI } from './enemyai-compiler';
 import { getEnemyAIRegistry } from './enemyai-registry';
 import { logger } from '../utils/logger';
+import { AppError } from '../middleware/errorHandler';
 
 const ENEMY_AI_BASE_DIR = path.join(process.cwd(), 'enemy-ai');
 
@@ -162,7 +163,7 @@ export async function updateEnemyAI(
   adminId: number,
 ): Promise<void> {
   const rows = await query<EnemyAIRow[]>('SELECT * FROM enemy_ais WHERE id = ?', [id]);
-  if (rows.length === 0) throw new Error('Enemy AI not found');
+  if (rows.length === 0) throw new AppError('Enemy AI not found', 404, 'AI_NOT_FOUND');
 
   const setClauses: string[] = [];
   const params: unknown[] = [];
@@ -213,7 +214,7 @@ export async function reuploadEnemyAI(
   adminId: number,
 ): Promise<{ success: boolean; errors?: string[] }> {
   const rows = await query<EnemyAIRow[]>('SELECT * FROM enemy_ais WHERE id = ?', [id]);
-  if (rows.length === 0) throw new Error('Enemy AI not found');
+  if (rows.length === 0) throw new AppError('Enemy AI not found', 404, 'AI_NOT_FOUND');
 
   const source = fileBuffer.toString('utf-8');
   const result = await compileEnemyAI(source);
@@ -248,7 +249,7 @@ export async function reuploadEnemyAI(
 
 export async function deleteEnemyAI(id: string, adminId: number): Promise<void> {
   const rows = await query<EnemyAIRow[]>('SELECT * FROM enemy_ais WHERE id = ?', [id]);
-  if (rows.length === 0) throw new Error('Enemy AI not found');
+  if (rows.length === 0) throw new AppError('Enemy AI not found', 404, 'AI_NOT_FOUND');
 
   getEnemyAIRegistry().unloadAI(id);
 

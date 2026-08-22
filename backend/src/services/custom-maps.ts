@@ -2,6 +2,7 @@ import { CustomMap, CustomMapSummary, TileType, Position } from '@blast-arena/sh
 import { query, execute } from '../db/connection';
 import { CustomMapRow, IdRow } from '../db/types';
 import { RowDataPacket } from 'mysql2';
+import { AppError } from '../middleware/errorHandler';
 
 interface RatingAggRow extends RowDataPacket {
   avg_rating: number;
@@ -96,7 +97,7 @@ export async function listPublishedMaps(): Promise<CustomMapSummary[]> {
        FROM map_ratings GROUP BY map_id
      ) r ON r.map_id = m.id
      WHERE m.is_published = TRUE
-     ORDER BY r.avg_rating DESC, m.play_count DESC, m.updated_at DESC
+     ORDER BY r.avg_rating DESC, m.play_count DESC, m.updated_at DESC, m.id DESC
      LIMIT ${PUBLISHED_MAPS_LIMIT}`,
   );
   return rows.map(rowToSummary);
@@ -182,7 +183,11 @@ export async function deleteMap(id: number, userId: number): Promise<boolean> {
     [id],
   );
   if (challengeRows.length > 0) {
-    throw new Error('Cannot delete map: linked to an active or upcoming challenge');
+    throw new AppError(
+      'Cannot delete map: linked to an active or upcoming challenge',
+      409,
+      'MAP_IN_USE',
+    );
   }
 
   const result = await execute('DELETE FROM custom_maps WHERE id = ? AND created_by = ?', [
