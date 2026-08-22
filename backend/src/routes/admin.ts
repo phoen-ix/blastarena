@@ -262,7 +262,7 @@ router.get('/admin/settings/display_github', async (_req, res, next) => {
 });
 
 // All other admin routes require auth + staff role (admin or moderator)
-router.use(authMiddleware, staffMiddleware);
+router.use('/admin', authMiddleware, staffMiddleware);
 
 // --- Settings ---
 

@@ -113,8 +113,8 @@ local user = cjson.decode(ARGV[1])
 table.insert(room.players, { user = user, ready = false, team = cjson.null })
 
 local updated = cjson.encode(room)
-redis.call('SET', KEYS[1], updated, 'EX', ROOM_TTL_SECONDS)
-redis.call('SET', KEYS[2], room.code, 'EX', ROOM_TTL_SECONDS)
+redis.call('SET', KEYS[1], updated, 'EX', ${ROOM_TTL_SECONDS})
+redis.call('SET', KEYS[2], room.code, 'EX', ${ROOM_TTL_SECONDS})
 
 return updated
 `;
