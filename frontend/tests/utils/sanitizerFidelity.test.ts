@@ -1,87 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import ts from 'typescript';
-import { readdirSync, readFileSync, statSync } from 'fs';
-import { join } from 'path';
 import { setHtml, insertHtml } from '../../src/utils/html';
+import { collectHtmlLiterals, hostTagFor, PLACEHOLDER } from '../helpers/htmlLiterals';
 
 /**
  * Every HTML string the frontend builds now goes through DOMPurify (see `setHtml`). Sanitising is
  * only defence in depth if it is *invisible* — the moment it rewrites legitimate markup, someone
  * reverts the sink and the Trusted Types enforcement goes with it.
  *
- * So: parse the source, pull out every literal that looks like HTML, and assert `setHtml` produces
- * the same DOM the plain `innerHTML` assignment it replaced would have. This is what makes the CSP
- * `require-trusted-types-for` safe to leave on. (audit CSP-1)
+ * So: pull every literal that looks like HTML out of the source, and assert `setHtml` produces the
+ * same DOM the plain `innerHTML` assignment it replaced would have. Its companion,
+ * trustedTypesEnforcement.test.ts, proves the insertion never touches a Trusted Types sink.
+ * (audit CSP-1)
  */
-
-function walkFiles(dir: string, out: string[] = []): string[] {
-  for (const entry of readdirSync(dir)) {
-    const p = join(dir, entry);
-    if (statSync(p).isDirectory()) walkFiles(p, out);
-    else if (p.endsWith('.ts')) out.push(p);
-  }
-  return out;
-}
-
-/** Stand-in for a `${...}` interpolation while checking the static shape of a literal. */
-const PLACEHOLDER = 'Xy';
-
-/** Reconstruct a template literal with each `${...}` replaced by a benign token. */
-function literalText(node: ts.Node): string | null {
-  if (ts.isNoSubstitutionTemplateLiteral(node) || ts.isStringLiteral(node)) return node.text;
-  if (ts.isTemplateExpression(node)) {
-    let text = node.head.text;
-    for (const span of node.templateSpans) text += PLACEHOLDER + span.literal.text;
-    return text;
-  }
-  return null;
-}
-
-const LOOKS_LIKE_HTML = /<[a-zA-Z][a-zA-Z0-9-]*[\s/>]/;
-
-/**
- * The element a fragment must be parsed inside for the HTML parser to keep it.
- *
- * `<tr>` only survives in a table, `<td>` only in a row, and so on. The real call sites already
- * satisfy this — they assign to the `<tbody>` they built the rows for — so the check has to as
- * well, or it would compare two equally-mangled results and prove nothing.
- */
-function hostTagFor(html: string): string {
-  const first = html.trimStart().slice(0, 10).toLowerCase();
-  if (first.startsWith('<tr')) return 'tbody';
-  if (first.startsWith('<td') || first.startsWith('<th>') || first.startsWith('<th ')) return 'tr';
-  if (first.startsWith('<tbody') || first.startsWith('<thead') || first.startsWith('<tfoot'))
-    return 'table';
-  if (first.startsWith('<option') || first.startsWith('<optgroup')) return 'select';
-  return 'div';
-}
-
-interface Literal {
-  file: string;
-  line: number;
-  text: string;
-}
-
-function collectHtmlLiterals(): Literal[] {
-  const found: Literal[] = [];
-  for (const file of walkFiles('src')) {
-    const source = readFileSync(file, 'utf8');
-    const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-    const visit = (node: ts.Node) => {
-      const text = literalText(node);
-      if (text !== null && LOOKS_LIKE_HTML.test(text)) {
-        found.push({
-          file,
-          line: sf.getLineAndCharacterOfPosition(node.getStart()).line + 1,
-          text,
-        });
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(sf);
-  }
-  return found;
-}
 
 /**
  * Canonical form of an element's children: tags, sorted attributes and text, whitespace collapsed.
