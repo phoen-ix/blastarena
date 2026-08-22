@@ -46,7 +46,9 @@ export function setupLobbyHandlers(socket: TypedSocket, io: TypedServer): void {
           : '';
       if (!message) return;
 
-      io.emit('lobby:chat', {
+      // Same scoping as room:list — a bare io.emit pushed lobby chat into the tick stream of
+      // every player who was not in the lobby. (audit LOBBY-BROADCAST-1)
+      io.to('lobby').emit('lobby:chat', {
         fromUserId: userId,
         fromUsername: username,
         message,

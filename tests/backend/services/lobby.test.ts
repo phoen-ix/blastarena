@@ -4,7 +4,32 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 type AnyFn = (...args: any[]) => any;
 
 const store = new Map<string, string>();
+// Real set semantics, so the room-index paths are genuinely exercised rather than stubbed.
+// (audit LOBBY-SCAN-1)
+const sets = new Map<string, Set<string>>();
+const setFor = (key: string): Set<string> => {
+  let s = sets.get(key);
+  if (!s) sets.set(key, (s = new Set<string>()));
+  return s;
+};
 const mockRedis = {
+  sadd: jest.fn<AnyFn>((key: string, ...members: string[]) => {
+    const s = setFor(key);
+    let added = 0;
+    for (const m of members)
+      if (!s.has(m)) {
+        s.add(m);
+        added++;
+      }
+    return Promise.resolve(added);
+  }),
+  srem: jest.fn<AnyFn>((key: string, ...members: string[]) => {
+    const s = setFor(key);
+    let removed = 0;
+    for (const m of members) if (s.delete(m)) removed++;
+    return Promise.resolve(removed);
+  }),
+  smembers: jest.fn<AnyFn>((key: string) => Promise.resolve([...setFor(key)])),
   get: jest.fn<AnyFn>((key: string) => Promise.resolve(store.get(key) || null)),
   set: jest.fn<AnyFn>((...args: unknown[]) => {
     store.set(args[0] as string, args[1] as string);
@@ -48,6 +73,7 @@ import {
   listRooms,
   joinRoom,
   leaveRoom,
+  deleteRoom,
   setPlayerReady,
   setPlayerTeam,
 } from '../../../backend/src/services/lobby';
@@ -72,6 +98,7 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
 describe('lobby service', () => {
   beforeEach(() => {
     store.clear();
+    sets.clear();
     jest.clearAllMocks();
     // Re-attach real implementations after clearAllMocks resets them
     mockRedis.get.mockImplementation((key: string) => Promise.resolve(store.get(key) || null));
@@ -117,10 +144,12 @@ describe('lobby service', () => {
         return Promise.resolve(updated);
       }
 
-      // LEAVE: 2 keys (room + player:room), 1 arg (userId)
-      if (numKeys === 2 && script.includes('DELETED')) {
+      // LEAVE: 3 keys (room + player:room + rooms:index), 1 arg (userId).
+      // The index key was added so the SREM happens atomically with the DEL. (audit LOBBY-SCAN-1)
+      if (numKeys === 3 && script.includes('DELETED')) {
         const playerRoomKey = args[1];
-        const userIdStr = args[2];
+        const indexKey = args[2];
+        const userIdStr = args[3];
         if (!data) return Promise.resolve('ERR:NOT_FOUND');
         store.delete(playerRoomKey);
         const room = JSON.parse(data);
@@ -128,6 +157,7 @@ describe('lobby service', () => {
         room.players = room.players.filter((p: any) => p.user.id !== userId);
         if (room.players.length === 0) {
           store.delete(roomKey);
+          setFor(indexKey).delete(room.code);
           return Promise.resolve('DELETED');
         }
         if (room.host.id === userId) {
@@ -245,6 +275,70 @@ describe('lobby service', () => {
 
   // ── listRooms ──────────────────────────────────────────────────────
 
+  // listRooms used to find rooms with `SCAN MATCH room:*` over the whole keyspace — shared with
+  // player:*, invite:*, presence:* and every rate-limit key — on every lobby mutation. It now
+  // reads a set of room codes, which it also has to heal, because room keys expire on a TTL and
+  // nothing reaps them. (audit LOBBY-SCAN-1)
+  describe('room index', () => {
+    it('never scans the keyspace', async () => {
+      await createRoom(makeUser(1, 'alice') as any, 'R', makeConfig() as any);
+      mockRedis.scan.mockClear();
+
+      await listRooms();
+
+      expect(mockRedis.scan).not.toHaveBeenCalled();
+      expect(mockRedis.smembers).toHaveBeenCalledWith('rooms:index');
+    });
+
+    it('indexes a room on creation', async () => {
+      const room = await createRoom(makeUser(1, 'alice') as any, 'R', makeConfig() as any);
+      expect([...setFor('rooms:index')]).toEqual([room.code]);
+    });
+
+    it('de-indexes a room on delete', async () => {
+      const room = await createRoom(makeUser(1, 'alice') as any, 'R', makeConfig() as any);
+      await deleteRoom(room.code);
+      expect([...setFor('rooms:index')]).toEqual([]);
+    });
+
+    it('de-indexes a room when the last player leaves', async () => {
+      const room = await createRoom(makeUser(1, 'alice') as any, 'R', makeConfig() as any);
+      await leaveRoom(room.code, 1);
+      expect([...setFor('rooms:index')]).toEqual([]);
+    });
+
+    it('heals itself when an indexed room key has expired', async () => {
+      const room = await createRoom(makeUser(1, 'alice') as any, 'R', makeConfig() as any);
+      // Simulate the TTL lapsing: the key is gone but the index still names it.
+      store.delete(`room:${room.code}`);
+      expect([...setFor('rooms:index')]).toEqual([room.code]);
+
+      const rooms = await listRooms();
+
+      expect(rooms).toEqual([]);
+      expect([...setFor('rooms:index')]).toEqual([]); // tombstone removed
+    });
+
+    it('keeps live rooms while dropping expired ones', async () => {
+      // uuid.v4 is mocked to a constant, so every createRoom yields the same code — the second
+      // room is seeded by hand to get a distinct one.
+      const alive = await createRoom(makeUser(1, 'alice') as any, 'Alive', makeConfig() as any);
+      setFor('rooms:index').add('DEAD01'); // indexed, but its room key never existed / expired
+
+      const rooms = await listRooms();
+
+      expect(rooms.map((r) => r.name)).toEqual(['Alive']);
+      expect([...setFor('rooms:index')]).toEqual([alive.code]);
+    });
+
+    it('returns nothing, and queries nothing, for an empty index', async () => {
+      mockRedis.mget.mockClear();
+
+      expect(await listRooms()).toEqual([]);
+      expect(mockRedis.mget).not.toHaveBeenCalled();
+    });
+  });
+
   describe('listRooms', () => {
     it('returns rooms with status waiting or playing', async () => {
       const host = makeUser(1, 'alice');
@@ -264,6 +358,9 @@ describe('lobby service', () => {
         createdAt: new Date(),
       };
       store.set('room:PLAY01', JSON.stringify(playingRoom));
+      // listRooms reads the room index, not the keyspace — a hand-seeded room has to be indexed
+      // the way createRoom would. (audit LOBBY-SCAN-1)
+      setFor('rooms:index').add('PLAY01');
 
       const rooms = await listRooms();
 

@@ -7,6 +7,19 @@ import { logger } from '../utils/logger';
 
 const ROOM_TTL_SECONDS = 3600; // 1 hour
 
+/**
+ * Set of live room codes.
+ *
+ * listRooms used to find rooms with `SCAN MATCH room:*` over the entire keyspace — which it shares
+ * with player:*, invite:*, presence:* and every rate-limit key — on every single lobby mutation.
+ *
+ * The index cannot be kept perfectly in step by writes alone: room keys carry a TTL and nothing
+ * reaps them, so a room that simply goes quiet expires without any code path running. listRooms
+ * therefore treats a member whose key has vanished as a tombstone and removes it, which makes the
+ * index self-healing. (audit LOBBY-SCAN-1)
+ */
+const ROOM_INDEX_KEY = 'rooms:index';
+
 function generateRoomCode(): string {
   return uuidv4().substring(0, 6).toUpperCase();
 }
@@ -31,6 +44,7 @@ export async function createRoom(
 
   await redis.set(`room:${code}`, JSON.stringify(room), 'EX', ROOM_TTL_SECONDS);
   await redis.set(`player:${host.id}:room`, code, 'EX', ROOM_TTL_SECONDS);
+  await redis.sadd(ROOM_INDEX_KEY, code);
 
   logger.info({ code, host: host.username }, 'Room created');
   return room;
@@ -46,24 +60,22 @@ export async function getRoom(code: string): Promise<Room | null> {
 export async function listRooms(): Promise<RoomListItem[]> {
   const redis = getRedis();
 
-  // Collect all room keys using non-blocking SCAN instead of O(N) KEYS
-  const keys: string[] = [];
-  let cursor = '0';
-  do {
-    const [nextCursor, batch] = await redis.scan(cursor, 'MATCH', 'room:*', 'COUNT', 100);
-    cursor = nextCursor;
-    keys.push(...batch);
-  } while (cursor !== '0');
+  // Room codes come from the index rather than a keyspace SCAN.
+  const codes = await redis.smembers(ROOM_INDEX_KEY);
+  if (codes.length === 0) return [];
 
-  if (keys.length === 0) return [];
-
-  // Fetch all values in a single MGET round-trip instead of sequential GETs
-  const values = await redis.mget(...keys);
+  const values = await redis.mget(...codes.map((c) => `room:${c}`));
   const rooms: RoomListItem[] = [];
+  const stale: string[] = [];
 
-  for (const data of values) {
-    if (!data) continue;
-
+  for (let i = 0; i < codes.length; i++) {
+    const data = values[i];
+    if (!data) {
+      // The key expired (rooms carry a TTL and nothing reaps them) or was removed without going
+      // through deleteRoom. Drop the tombstone so the index heals itself. (audit LOBBY-SCAN-1)
+      stale.push(codes[i]);
+      continue;
+    }
     const room: Room = JSON.parse(data);
     if (room.status === 'waiting' || room.status === 'playing') {
       rooms.push({
@@ -77,6 +89,10 @@ export async function listRooms(): Promise<RoomListItem[]> {
         customMapName: room.customMapName,
       });
     }
+  }
+
+  if (stale.length > 0) {
+    await redis.srem(ROOM_INDEX_KEY, ...stale);
   }
 
   return rooms;
@@ -172,6 +188,9 @@ end
 
 if #newPlayers == 0 then
   redis.call('DEL', KEYS[1])
+  -- Drop it from the room index atomically with the delete, so a crash between Lua and JS
+  -- cannot orphan the index. (audit LOBBY-SCAN-1)
+  redis.call('SREM', KEYS[3], room.code)
   return 'DELETED'
 end
 
@@ -350,9 +369,10 @@ export async function leaveRoom(code: string, userId: number): Promise<Room | nu
 
   const result = (await redis.eval(
     LEAVE_ROOM_LUA,
-    2,
+    3,
     `room:${code}`,
     `player:${userId}:room`,
+    ROOM_INDEX_KEY,
     String(userId),
   )) as string;
 
@@ -515,4 +535,5 @@ export async function deleteRoom(code: string): Promise<void> {
     }
   }
   await redis.del(`room:${code}`);
+  await redis.srem(ROOM_INDEX_KEY, code);
 }

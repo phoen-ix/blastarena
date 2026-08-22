@@ -20,6 +20,15 @@ import { XpUpdateResult } from '../constants/xp';
 
 // Client -> Server events
 export interface ClientToServerEvents {
+  /**
+   * Join/leave the `lobby` broadcast room.
+   *
+   * room:list and lobby:chat used to go out with a bare `io.emit`, reaching every connected socket
+   * — players mid-match, campaign sessions and open-world guests who never render a room list.
+   * (audit LOBBY-BROADCAST-1)
+   */
+  'lobby:subscribe': () => void;
+  'lobby:unsubscribe': () => void;
   'room:create': (
     data: CreateRoomRequest,
     callback: (response: { success: boolean; room?: Room; error?: string }) => void,

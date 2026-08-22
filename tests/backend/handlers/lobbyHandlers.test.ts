@@ -69,7 +69,9 @@ describe('lobbyHandlers', () => {
       const handler = socket._handlers['lobby:chat'];
       await handler({ message: 'hello world' });
 
-      expect(io.emit).toHaveBeenCalledWith(
+      // Scoped to the lobby room, not a global io.emit. (audit LOBBY-BROADCAST-1)
+      expect(io.to).toHaveBeenCalledWith('lobby');
+      expect(io._toEmit).toHaveBeenCalledWith(
         'lobby:chat',
         expect.objectContaining({
           fromUserId: 1,
@@ -79,7 +81,7 @@ describe('lobbyHandlers', () => {
         }),
       );
       // timestamp should be a number
-      const payload = io.emit.mock.calls[0][1];
+      const payload = io._toEmit.mock.calls[0][1];
       expect(typeof payload.timestamp).toBe('number');
     });
 
@@ -89,7 +91,7 @@ describe('lobbyHandlers', () => {
       const handler = socket._handlers['lobby:chat'];
       await handler({ message: 'hello' });
 
-      expect(io.emit).not.toHaveBeenCalled();
+      expect(io._toEmit).not.toHaveBeenCalled();
     });
 
     it('drops when mode=admin_only and role=user', async () => {
@@ -98,7 +100,7 @@ describe('lobbyHandlers', () => {
       const handler = socket._handlers['lobby:chat'];
       await handler({ message: 'hello' });
 
-      expect(io.emit).not.toHaveBeenCalled();
+      expect(io._toEmit).not.toHaveBeenCalled();
     });
 
     it('drops when mode=staff and role=user', async () => {
@@ -107,7 +109,7 @@ describe('lobbyHandlers', () => {
       const handler = socket._handlers['lobby:chat'];
       await handler({ message: 'hello' });
 
-      expect(io.emit).not.toHaveBeenCalled();
+      expect(io._toEmit).not.toHaveBeenCalled();
     });
 
     it('allows admin when mode=admin_only', async () => {
@@ -119,7 +121,7 @@ describe('lobbyHandlers', () => {
       const handler = socket._handlers['lobby:chat'];
       await handler({ message: 'admin msg' });
 
-      expect(io.emit).toHaveBeenCalledWith(
+      expect(io._toEmit).toHaveBeenCalledWith(
         'lobby:chat',
         expect.objectContaining({ message: 'admin msg', role: 'admin' }),
       );
@@ -134,7 +136,7 @@ describe('lobbyHandlers', () => {
       const handler = socket._handlers['lobby:chat'];
       await handler({ message: 'mod msg' });
 
-      expect(io.emit).toHaveBeenCalledWith(
+      expect(io._toEmit).toHaveBeenCalledWith(
         'lobby:chat',
         expect.objectContaining({ message: 'mod msg', role: 'moderator' }),
       );
@@ -146,7 +148,7 @@ describe('lobbyHandlers', () => {
       const handler = socket._handlers['lobby:chat'];
       await handler({ message: longMessage });
 
-      const payload = io.emit.mock.calls[0][1];
+      const payload = io._toEmit.mock.calls[0][1];
       expect(payload.message).toHaveLength(LOBBY_CHAT_MAX_LENGTH);
     });
 
@@ -154,14 +156,14 @@ describe('lobbyHandlers', () => {
       const handler = socket._handlers['lobby:chat'];
       await handler({ message: '   ' });
 
-      expect(io.emit).not.toHaveBeenCalled();
+      expect(io._toEmit).not.toHaveBeenCalled();
     });
 
     it('drops non-string message', async () => {
       const handler = socket._handlers['lobby:chat'];
       await handler({ message: 123 });
 
-      expect(io.emit).not.toHaveBeenCalled();
+      expect(io._toEmit).not.toHaveBeenCalled();
     });
   });
 

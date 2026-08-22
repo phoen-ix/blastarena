@@ -68,6 +68,8 @@ type TypedServer = Server<
 
 const REMATCH_VOTE_TIMEOUT_MS = 30000;
 const ROOM_CLEANUP_INTERVAL_MS = 30000;
+/** Socket room for clients showing the lobby. (audit LOBBY-BROADCAST-1) */
+const LOBBY_ROOM = 'lobby';
 // Comfortably inside the 120s presence TTL, so a key never lapses between beats.
 const PRESENCE_HEARTBEAT_MS = 45000;
 
@@ -262,7 +264,10 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       roomListDirty = false;
       try {
         const rooms = await lobbyService.listRooms();
-        io.emit('room:list', rooms);
+        // Only sockets sitting in the lobby. This was a bare io.emit, so every player mid-match,
+        // every campaign session and every open-world guest received a room list they never
+        // render. (audit LOBBY-BROADCAST-1)
+        io.to(LOBBY_ROOM).emit('room:list', rooms);
       } catch (err) {
         logger.error({ err }, 'Failed to broadcast room list');
       }
@@ -306,6 +311,15 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       emailVerified: !socket.data.isGuest,
       twoFactorEnabled: false,
     };
+
+    // Lobby subscription — scopes room:list and lobby:chat to clients actually showing the lobby.
+    // (audit LOBBY-BROADCAST-1)
+    socket.on('lobby:subscribe', () => {
+      socket.join(LOBBY_ROOM);
+    });
+    socket.on('lobby:unsubscribe', () => {
+      socket.leave(LOBBY_ROOM);
+    });
 
     // Guest connections only need open world handlers — skip room/lobby/friend setup
     if (socket.data.isGuest) {

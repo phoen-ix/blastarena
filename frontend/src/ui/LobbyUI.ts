@@ -68,6 +68,10 @@ export class LobbyUI {
       }
     };
     this.socketClient.on('room:list', this.roomListHandler);
+    // Opt into the lobby broadcast room. Subscription is per-LobbyUI mount, not per-view: the
+    // listener deliberately stays active while the user moves between friends/party/etc inside
+    // the lobby shell, and they still want live room counts there. (audit LOBBY-BROADCAST-1)
+    this.socketClient.emit('lobby:subscribe');
 
     // Mount persistent UI
     const mainContent = this.container.querySelector('.main-content') as HTMLElement;
@@ -105,6 +109,7 @@ export class LobbyUI {
     if (this.roomListHandler) {
       this.socketClient.off('room:list', this.roomListHandler);
       this.roomListHandler = null;
+      this.socketClient.emit('lobby:unsubscribe');
     }
     if (this.lobbyChatToggleHandler) {
       window.removeEventListener('lobbychat-toggle', this.lobbyChatToggleHandler);
