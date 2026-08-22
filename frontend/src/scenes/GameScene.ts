@@ -116,6 +116,14 @@ export class GameScene extends Phaser.Scene {
   private simTransitionHandler: ((data: { batchId: string }) => void) | null = null;
   private simCompletedHandler: (() => void) | null = null;
 
+  // Campaign and bomb-throw listeners, same reasoning. (audit SOCKET-OFF-REF-1)
+  private bombThrownHandler: ServerToClientEvents['game:bombThrown'] | null = null;
+  private campaignLevelCompleteHandler: ServerToClientEvents['campaign:levelComplete'] | null =
+    null;
+  private campaignGameOverHandler: ServerToClientEvents['campaign:gameOver'] | null = null;
+  private campaignLockedInHandler: ServerToClientEvents['campaign:playerLockedIn'] | null = null;
+  private campaignPartnerLeftHandler: ServerToClientEvents['campaign:partnerLeft'] | null = null;
+
   // Match/open-world listeners, likewise kept as refs so teardown removes only ours.
   // (audit SOCKET-OFF-REF-1)
   // Payload types are derived from the socket event map rather than restated, so they cannot
@@ -226,16 +234,12 @@ export class GameScene extends Phaser.Scene {
 
     // Clean up stale state from previous game
     this.removeGameListeners();
-    this.socketClient.off('game:bombThrown');
+    this.removeCampaignListeners();
     // Remove only OUR campaign:state handler — HUDScene also listens on this event
     if (this.campaignStateHandler) {
       this.socketClient.off('campaign:state', this.campaignStateHandler);
       this.campaignStateHandler = null;
     }
-    this.socketClient.off('campaign:levelComplete');
-    this.socketClient.off('campaign:gameOver');
-    this.socketClient.off('campaign:playerLockedIn');
-    this.socketClient.off('campaign:partnerLeft');
     this.removeSpectatorListeners();
     if (this.emoteKeyHandler) {
       window.removeEventListener('keydown', this.emoteKeyHandler);
@@ -382,9 +386,10 @@ export class GameScene extends Phaser.Scene {
     this.emoteRenderer = new EmoteBubbleRenderer(this);
 
     // Listen for bomb throws to animate arc before state arrives
-    this.socketClient.on('game:bombThrown', (data) => {
+    this.bombThrownHandler = (data) => {
       this.bombRenderer.registerThrow(data.bombId, data.from, data.to);
-    });
+    };
+    this.socketClient.on('game:bombThrown', this.bombThrownHandler);
 
     // Listen for emotes from other players
     this.gameEmoteHandler = (data) => {
@@ -628,7 +633,7 @@ export class GameScene extends Phaser.Scene {
       };
       this.socketClient.on('campaign:state', this.campaignStateHandler);
 
-      this.socketClient.on('campaign:levelComplete', (data) => {
+      this.campaignLevelCompleteHandler = (data) => {
         this.registry.set('gameOverData', {
           campaignResult: true,
           success: true,
@@ -639,9 +644,10 @@ export class GameScene extends Phaser.Scene {
         });
         this.scene.stop('HUDScene');
         this.scene.start('GameOverScene');
-      });
+      };
+      this.socketClient.on('campaign:levelComplete', this.campaignLevelCompleteHandler);
 
-      this.socketClient.on('campaign:gameOver', (data) => {
+      this.campaignGameOverHandler = (data) => {
         this.registry.set('gameOverData', {
           campaignResult: true,
           success: false,
@@ -650,11 +656,12 @@ export class GameScene extends Phaser.Scene {
         });
         this.scene.stop('HUDScene');
         this.scene.start('GameOverScene');
-      });
+      };
+      this.socketClient.on('campaign:gameOver', this.campaignGameOverHandler);
 
       // Co-op specific listeners
       if (this.campaignCoopMode) {
-        this.socketClient.on('campaign:playerLockedIn', (data) => {
+        this.campaignLockedInHandler = (data) => {
           // Visual indicator: pulse the locked player's sprite
           const sprite = this.playerRenderer?.getSprite(data.playerId);
           if (sprite) {
@@ -667,9 +674,10 @@ export class GameScene extends Phaser.Scene {
               repeat: -1,
             });
           }
-        });
+        };
+        this.socketClient.on('campaign:playerLockedIn', this.campaignLockedInHandler);
 
-        this.socketClient.on('campaign:partnerLeft', (data) => {
+        this.campaignPartnerLeftHandler = (data) => {
           const notifications = this.registry.get('notifications');
           if (notifications) {
             const reason =
@@ -678,7 +686,8 @@ export class GameScene extends Phaser.Scene {
                 : t('ui:coop.partnerLeft');
             notifications.info(reason);
           }
-        });
+        };
+        this.socketClient.on('campaign:partnerLeft', this.campaignPartnerLeftHandler);
       }
 
       // Escape key to toggle pause menu
@@ -1870,6 +1879,30 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Remove only this scene's campaign and bomb-throw listeners. (audit SOCKET-OFF-REF-1) */
+  private removeCampaignListeners(): void {
+    if (this.bombThrownHandler) {
+      this.socketClient.off('game:bombThrown', this.bombThrownHandler);
+      this.bombThrownHandler = null;
+    }
+    if (this.campaignLevelCompleteHandler) {
+      this.socketClient.off('campaign:levelComplete', this.campaignLevelCompleteHandler);
+      this.campaignLevelCompleteHandler = null;
+    }
+    if (this.campaignGameOverHandler) {
+      this.socketClient.off('campaign:gameOver', this.campaignGameOverHandler);
+      this.campaignGameOverHandler = null;
+    }
+    if (this.campaignLockedInHandler) {
+      this.socketClient.off('campaign:playerLockedIn', this.campaignLockedInHandler);
+      this.campaignLockedInHandler = null;
+    }
+    if (this.campaignPartnerLeftHandler) {
+      this.socketClient.off('campaign:partnerLeft', this.campaignPartnerLeftHandler);
+      this.campaignPartnerLeftHandler = null;
+    }
+  }
+
   /** Remove only this scene's simulation listeners. (audit SOCKET-OFF-REF-1) */
   private removeSimListeners(): void {
     if (this.simStateHandler) {
@@ -1892,7 +1925,6 @@ export class GameScene extends Phaser.Scene {
       this.onResize = undefined;
     }
     this.removeGameListeners();
-    this.socketClient.off('game:bombThrown');
     if (this.openWorldRoundEndHandler) {
       this.socketClient.off('openworld:roundEnd', this.openWorldRoundEndHandler);
       this.openWorldRoundEndHandler = null;
@@ -1919,10 +1951,7 @@ export class GameScene extends Phaser.Scene {
       this.socketClient.off('campaign:state', this.campaignStateHandler);
       this.campaignStateHandler = null;
     }
-    this.socketClient.off('campaign:levelComplete');
-    this.socketClient.off('campaign:gameOver');
-    this.socketClient.off('campaign:playerLockedIn');
-    this.socketClient.off('campaign:partnerLeft');
+    this.removeCampaignListeners();
     if (this.emoteKeyHandler) {
       window.removeEventListener('keydown', this.emoteKeyHandler);
       this.emoteKeyHandler = null;
