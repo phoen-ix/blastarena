@@ -16,13 +16,100 @@ function getMigrationsDir(): string {
 
 /**
  * Parse a SQL file into individual executable statements.
- * Splits on semicolons, trims whitespace, and filters out empty/comment-only fragments.
+ *
+ * A statement ends at a top-level `;`. Semicolons inside comments, string literals or quoted
+ * identifiers are content, not separators.
+ *
+ * This used to be `sql.split(';')`. Migration 039 carried a semicolon inside a `--` comment, so
+ * the comment was cut in half and the fragment executed as SQL — `ER_PARSE_ERROR`, a failed
+ * migration and a crash-looping backend on deploy. The old implementation also did not do what its
+ * own doc comment claimed: it filtered empty fragments but not comment-only ones, so a trailing
+ * comment after the final `;` would have been sent to the server as a statement.
+ *
+ * Comments are preserved in the returned text rather than stripped, so MySQL's version-gated
+ * executable comments — the `slash-star-bang` form — still reach the server.
+ * (audit MIGRATION-PARSER-1)
  */
-function parseSqlStatements(sql: string): string[] {
-  return sql
-    .split(';')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+export function parseSqlStatements(sql: string): string[] {
+  const statements: string[] = [];
+  let current = '';
+  /** Does the fragment hold anything the server would act on, as opposed to only comments? */
+  let hasExecutable = false;
+  let i = 0;
+
+  const pushCurrent = (): void => {
+    if (hasExecutable) statements.push(current.trim());
+    current = '';
+    hasExecutable = false;
+  };
+
+  while (i < sql.length) {
+    const ch = sql[i];
+    const next = sql[i + 1];
+
+    // Line comment: `#` anywhere, or `--` followed by whitespace or end of input. MySQL requires
+    // that whitespace, so `1--2` is arithmetic rather than a comment.
+    const isDashComment =
+      ch === '-' && next === '-' && (i + 2 >= sql.length || /\s/.test(sql[i + 2]));
+    if (ch === '#' || isDashComment) {
+      const newline = sql.indexOf('\n', i);
+      const stop = newline === -1 ? sql.length : newline;
+      current += sql.slice(i, stop);
+      i = stop;
+      continue;
+    }
+
+    // Block comment. `/*!` is an executable comment — MySQL runs its contents — so it counts as
+    // something the server acts on.
+    if (ch === '/' && next === '*') {
+      const close = sql.indexOf('*/', i + 2);
+      const stop = close === -1 ? sql.length : close + 2;
+      if (sql[i + 2] === '!') hasExecutable = true;
+      current += sql.slice(i, stop);
+      i = stop;
+      continue;
+    }
+
+    // String literal or quoted identifier. Backticks take no backslash escapes; '' and "" and ``
+    // all self-escape by doubling.
+    if (ch === "'" || ch === '"' || ch === '`') {
+      const quote = ch;
+      let j = i + 1;
+      while (j < sql.length) {
+        if (quote !== '`' && sql[j] === '\\') {
+          j += 2;
+          continue;
+        }
+        if (sql[j] === quote) {
+          if (sql[j + 1] === quote) {
+            j += 2;
+            continue;
+          }
+          j += 1;
+          break;
+        }
+        j += 1;
+      }
+      current += sql.slice(i, j);
+      hasExecutable = true;
+      i = j;
+      continue;
+    }
+
+    if (ch === ';') {
+      pushCurrent();
+      i += 1;
+      continue;
+    }
+
+    current += ch;
+    if (!/\s/.test(ch)) hasExecutable = true;
+    i += 1;
+  }
+
+  // Trailing statement with no closing semicolon.
+  pushCurrent();
+  return statements;
 }
 
 export async function runMigrations(): Promise<void> {

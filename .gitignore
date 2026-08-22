@@ -22,9 +22,10 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# IDE
+# IDE / agent tooling
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 
