@@ -178,13 +178,14 @@ router.get('/campaign/worlds', authMiddleware, emailVerifiedMiddleware, async (r
     const userId = req.user!.userId;
     const worlds = await campaignService.listWorldsWithProgress(userId);
 
-    // Nest levels with progress inside each world
-    const worldsWithLevels = await Promise.all(
-      worlds.map(async (w) => {
-        const levels = await campaignService.listLevelsWithProgress(w.id, userId);
-        return { ...w, levels };
-      }),
+    // Nest levels with progress inside each world. One grouped lookup, not one per world:
+    // this was `worlds.map(async w => listLevelsWithProgress(w.id, userId))`, which is itself two
+    // queries, so the menu cost 1 + 2N round-trips. (audit CAMPAIGN-NPLUS1-1)
+    const levelsByWorld = await campaignService.listLevelsWithProgressForWorlds(
+      worlds.map((w) => w.id),
+      userId,
     );
+    const worldsWithLevels = worlds.map((w) => ({ ...w, levels: levelsByWorld.get(w.id) ?? [] }));
 
     res.json({ worlds: worldsWithLevels });
   } catch (err) {

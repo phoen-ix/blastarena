@@ -239,6 +239,7 @@ async function completeLogin(
     userId: publicUser.id,
     username: publicUser.username,
     role: publicUser.role,
+    emailVerified: publicUser.emailVerified,
   });
 
   // Create refresh token
@@ -355,6 +356,7 @@ export async function refreshAccessToken(
     userId: row.user_id,
     username: row.username,
     role: row.role as UserRole,
+    emailVerified: publicUser.emailVerified,
   });
 
   return { auth: { user: publicUser, accessToken }, refreshToken: newRefreshToken };

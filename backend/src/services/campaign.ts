@@ -182,17 +182,43 @@ export async function listLevels(
   return rows.map(levelRowToSummary);
 }
 
-export async function listLevelsWithProgress(
-  worldId: number,
-  userId: number,
-): Promise<CampaignLevelSummary[]> {
-  const rows = await query<CampaignLevelRow[]>(
-    `SELECT * FROM campaign_levels WHERE world_id = ? AND is_published = TRUE ORDER BY sort_order ASC`,
-    [worldId],
-  );
-  const summaries = rows.map(levelRowToSummary);
+/** Columns levelRowToSummary actually reads — see the note in listLevelsWithProgressForWorlds. */
+const LEVEL_SUMMARY_COLUMNS = `id, world_id, name, description, sort_order, map_width, map_height,
+       win_condition, lives, time_limit, par_time, enemy_placements, is_published`;
 
-  // Fetch progress for all levels in one query
+/**
+ * Level summaries with the user's progress, for several worlds at once.
+ *
+ * Two queries total, whatever the world count. GET /campaign/worlds used to call the single-world
+ * function inside a Promise.all over every world — and that function itself issues two queries — so
+ * opening the campaign menu cost 1 + 2N round-trips, 13 for the current world count.
+ *
+ * It also selected `*`, dragging every heavy JSON column (tiles, player_spawns, covered_tiles,
+ * puzzle_config, …) out of MySQL so levelRowToSummary could discard nearly all of it; the only one
+ * it needs is enemy_placements, and only for its length. (audit CAMPAIGN-NPLUS1-1)
+ */
+export async function listLevelsWithProgressForWorlds(
+  worldIds: number[],
+  userId: number,
+): Promise<Map<number, CampaignLevelSummary[]>> {
+  const byWorld = new Map<number, CampaignLevelSummary[]>();
+  for (const id of worldIds) byWorld.set(id, []);
+  if (worldIds.length === 0) return byWorld;
+
+  const worldPlaceholders = worldIds.map(() => '?').join(',');
+  const rows = await query<CampaignLevelRow[]>(
+    `SELECT ${LEVEL_SUMMARY_COLUMNS} FROM campaign_levels
+     WHERE world_id IN (${worldPlaceholders}) AND is_published = TRUE
+     ORDER BY world_id ASC, sort_order ASC`,
+    worldIds,
+  );
+
+  const summaries = rows.map(levelRowToSummary);
+  for (const summary of summaries) {
+    const list = byWorld.get(summary.worldId);
+    if (list) list.push(summary);
+  }
+
   const levelIds = summaries.map((s) => s.id);
   if (levelIds.length > 0) {
     const placeholders = levelIds.map(() => '?').join(',');
@@ -215,7 +241,15 @@ export async function listLevelsWithProgress(
     }
   }
 
-  return summaries;
+  return byWorld;
+}
+
+export async function listLevelsWithProgress(
+  worldId: number,
+  userId: number,
+): Promise<CampaignLevelSummary[]> {
+  const byWorld = await listLevelsWithProgressForWorlds([worldId], userId);
+  return byWorld.get(worldId) ?? [];
 }
 
 export async function getLevel(id: number): Promise<CampaignLevel | null> {

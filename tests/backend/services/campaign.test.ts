@@ -20,6 +20,7 @@ import {
   reorderWorld,
   listLevels,
   listLevelsWithProgress,
+  listLevelsWithProgressForWorlds,
   getLevel,
   createLevel,
   updateLevel,
@@ -453,6 +454,93 @@ describe('Campaign Service', () => {
       const result = await listLevels(1);
 
       expect(result[0].description).toBe('');
+    });
+  });
+
+  // Regression: GET /campaign/worlds called the single-world function once per world inside a
+  // Promise.all, and that function is itself two queries — so the campaign menu cost 1 + 2N
+  // round-trips. It also selected `*`, dragging every heavy JSON column out of MySQL so
+  // levelRowToSummary could discard nearly all of it. (audit CAMPAIGN-NPLUS1-1)
+  describe('listLevelsWithProgressForWorlds', () => {
+    it('uses two queries regardless of how many worlds are asked for', async () => {
+      const rows = [
+        makeLevelRow({ id: 10, world_id: 1 }),
+        makeLevelRow({ id: 20, world_id: 2, name: 'W2 L1' }),
+        makeLevelRow({ id: 30, world_id: 3, name: 'W3 L1' }),
+      ];
+      mockQuery.mockResolvedValueOnce(rows).mockResolvedValueOnce([]);
+
+      await listLevelsWithProgressForWorlds([1, 2, 3], 42);
+
+      expect(mockQuery).toHaveBeenCalledTimes(2);
+    });
+
+    it('groups levels under the world they belong to', async () => {
+      mockQuery
+        .mockResolvedValueOnce([
+          makeLevelRow({ id: 10, world_id: 1 }),
+          makeLevelRow({ id: 11, world_id: 1, sort_order: 1 }),
+          makeLevelRow({ id: 20, world_id: 2 }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const byWorld = await listLevelsWithProgressForWorlds([1, 2], 42);
+
+      expect(byWorld.get(1)?.map((l) => l.id)).toEqual([10, 11]);
+      expect(byWorld.get(2)?.map((l) => l.id)).toEqual([20]);
+    });
+
+    it('returns an empty list for a world with no published levels', async () => {
+      mockQuery
+        .mockResolvedValueOnce([makeLevelRow({ id: 10, world_id: 1 })])
+        .mockResolvedValueOnce([]);
+
+      const byWorld = await listLevelsWithProgressForWorlds([1, 7], 42);
+
+      expect(byWorld.get(7)).toEqual([]);
+    });
+
+    it('does no queries at all for an empty world list', async () => {
+      const byWorld = await listLevelsWithProgressForWorlds([], 42);
+
+      expect(byWorld.size).toBe(0);
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it('attaches progress across worlds in one lookup', async () => {
+      mockQuery
+        .mockResolvedValueOnce([
+          makeLevelRow({ id: 10, world_id: 1 }),
+          makeLevelRow({ id: 20, world_id: 2 }),
+        ])
+        .mockResolvedValueOnce([
+          { level_id: 20, completed: 1, best_time_seconds: 30, stars: 2, attempts: 4 },
+        ]);
+
+      const byWorld = await listLevelsWithProgressForWorlds([1, 2], 42);
+
+      expect(byWorld.get(1)?.[0].progress).toBeUndefined();
+      expect(byWorld.get(2)?.[0].progress).toEqual({
+        levelId: 20,
+        completed: true,
+        bestTimeSeconds: 30,
+        stars: 2,
+        attempts: 4,
+      });
+    });
+
+    it('does not select the heavy JSON columns', async () => {
+      // Exactly one queued result: with no levels there are no ids to look progress up for, so
+      // the second query never runs. An extra mockResolvedValueOnce would survive
+      // jest.clearAllMocks() (which does not drain the once-queue) and corrupt the next test.
+      mockQuery.mockResolvedValueOnce([]);
+
+      await listLevelsWithProgressForWorlds([1], 42);
+
+      const sql = String(mockQuery.mock.calls[0][0]);
+      expect(sql).not.toMatch(/SELECT \*/);
+      expect(sql).not.toContain('tiles');
+      expect(sql).toContain('enemy_placements'); // still needed, for its length
     });
   });
 

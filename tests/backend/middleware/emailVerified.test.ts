@@ -167,4 +167,48 @@ describe('emailVerifiedMiddleware', () => {
       code: 'INTERNAL_ERROR',
     });
   });
+
+  // The flag now normally rides on the access token, so the common path costs no query at all.
+  // Legacy tokens (signed before the claim existed) must still fall back to the database rather
+  // than be treated as unverified. (audit EMAILVERIFIED-CLAIM-1)
+  describe('emailVerified claim', () => {
+    it('passes without touching the database when the claim is true', async () => {
+      mockReq.user = { userId: 1, username: 'a', role: 'user', emailVerified: true };
+
+      await emailVerifiedMiddleware(mockReq, mockRes as any, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it('rejects without touching the database when the claim is false', async () => {
+      mockReq.user = { userId: 1, username: 'a', role: 'user', emailVerified: false };
+
+      await emailVerifiedMiddleware(mockReq, mockRes as any, mockNext);
+
+      expect(mockNext).not.toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(403);
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the database for a legacy token with no claim', async () => {
+      mockQuery.mockResolvedValue([{ email_verified: 1 }]);
+      mockReq.user = { userId: 1, username: 'a', role: 'user' };
+
+      await emailVerifiedMiddleware(mockReq, mockRes as any, mockNext);
+
+      expect(mockQuery).toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    it('still catches a deleted user on the fallback path', async () => {
+      mockQuery.mockResolvedValue([]);
+      mockReq.user = { userId: 99, username: 'gone', role: 'user' };
+
+      await emailVerifiedMiddleware(mockReq, mockRes as any, mockNext);
+
+      expect(mockNext).not.toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+    });
+  });
 });

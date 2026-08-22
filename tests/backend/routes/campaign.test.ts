@@ -17,6 +17,7 @@ const mockUpdateWorld = jest.fn<AnyFn>();
 const mockDeleteWorld = jest.fn<AnyFn>();
 const mockReorderWorld = jest.fn<AnyFn>();
 const mockListLevels = jest.fn<AnyFn>();
+const mockListLevelsWithProgressForWorlds = jest.fn<AnyFn>();
 const mockCreateLevel = jest.fn<AnyFn>();
 const mockUpdateLevel = jest.fn<AnyFn>();
 const mockDeleteLevel = jest.fn<AnyFn>();
@@ -25,6 +26,7 @@ const mockReorderLevel = jest.fn<AnyFn>();
 jest.mock('../../../backend/src/services/campaign', () => ({
   listWorldsWithProgress: mockListWorldsWithProgress,
   listLevelsWithProgress: mockListLevelsWithProgress,
+  listLevelsWithProgressForWorlds: mockListLevelsWithProgressForWorlds,
   getLevel: mockGetLevel,
   listWorlds: mockListWorlds,
   createWorld: mockCreateWorld,
@@ -263,17 +265,21 @@ describe('GET /campaign/worlds', () => {
 
     const levelsWorld1 = [{ id: 10, name: 'L1' }];
     const levelsWorld2 = [{ id: 20, name: 'L2' }];
-    mockListLevelsWithProgress
-      .mockResolvedValueOnce(levelsWorld1)
-      .mockResolvedValueOnce(levelsWorld2);
+    // One grouped lookup for every world, not one call per world. (audit CAMPAIGN-NPLUS1-1)
+    mockListLevelsWithProgressForWorlds.mockResolvedValue(
+      new Map([
+        [1, levelsWorld1],
+        [2, levelsWorld2],
+      ]),
+    );
 
     const req = mockReq({ user: { userId: 42 } });
     const res = mockRes();
     await handler(req, res, jest.fn());
 
     expect(mockListWorldsWithProgress).toHaveBeenCalledWith(42);
-    expect(mockListLevelsWithProgress).toHaveBeenCalledWith(1, 42);
-    expect(mockListLevelsWithProgress).toHaveBeenCalledWith(2, 42);
+    expect(mockListLevelsWithProgressForWorlds).toHaveBeenCalledTimes(1);
+    expect(mockListLevelsWithProgressForWorlds).toHaveBeenCalledWith([1, 2], 42);
     expect(res._json).toEqual({
       worlds: [
         { ...worlds[0], levels: levelsWorld1 },
