@@ -119,8 +119,68 @@ describe('GameStateManager', () => {
       advanceTicks(shortGame, TICK_RATE);
 
       // finishTick should be set but status is still 'playing' during grace period
-      expect(shortGame.finishReason).toBe("Time's up!");
+      expect(shortGame.finishReason).toContain("Time's up");
       expect(shortGame.status).toBe('playing');
+    });
+
+    // Regression: a timed round that ended with more than one survivor recorded no winner and no
+    // placements at all, so every player was written as a loser and handed to Elo as
+    // `placement ?? 999`. (audit TIMEUP-WINNER-1)
+    describe('time expiry with multiple survivors', () => {
+      function timedGame(mode: 'ffa' | 'teams') {
+        return new GameStateManager({ ...BASE_CONFIG, roundTime: 1, gameMode: mode });
+      }
+
+      it('ranks surviving players by kills and names the leader', () => {
+        const gs = timedGame('ffa');
+        const a = gs.addPlayer(1, 'Alice', null);
+        const b = gs.addPlayer(2, 'Bob', null);
+        const c = gs.addPlayer(3, 'Cara', null);
+        startPlaying(gs);
+        b.kills = 5;
+        a.kills = 2;
+        c.kills = 0;
+
+        advanceTicks(gs, TICK_RATE);
+
+        expect(gs.winnerId).toBe(2);
+        expect(b.placement).toBe(1);
+        expect(a.placement).toBe(2);
+        expect(c.placement).toBe(3);
+      });
+
+      it('leaves a kill tie as a draw rather than inventing a winner', () => {
+        const gs = timedGame('ffa');
+        const a = gs.addPlayer(1, 'Alice', null);
+        const b = gs.addPlayer(2, 'Bob', null);
+        startPlaying(gs);
+        a.kills = 3;
+        b.kills = 3;
+
+        advanceTicks(gs, TICK_RATE);
+
+        expect(gs.winnerId).toBeNull();
+        expect(gs.finishReason).toContain('draw');
+        // Survivors are still ranked, so they are not all recorded as last place.
+        expect(a.placement).toBeGreaterThan(0);
+        expect(b.placement).toBeGreaterThan(0);
+      });
+
+      it('decides teams mode on total team kills', () => {
+        const gs = timedGame('teams');
+        const red1 = gs.addPlayer(1, 'R1', 0);
+        const red2 = gs.addPlayer(2, 'R2', 0);
+        const blue1 = gs.addPlayer(3, 'B1', 1);
+        startPlaying(gs);
+        red1.kills = 1;
+        red2.kills = 1;
+        blue1.kills = 1;
+
+        advanceTicks(gs, TICK_RATE);
+
+        expect(gs.winnerTeam).toBe(0); // 2 kills vs 1
+        expect(gs.finishReason).toContain('Red');
+      });
     });
 
     it('should transition to finished after grace period', () => {

@@ -1373,7 +1373,8 @@ export class CampaignGame {
     this.spikePhase = (this.spikePhase + 1) % SPIKE_CYCLE_TICKS;
 
     // Transition from safe to lethal
-    if (prevPhase < SPIKE_SAFE_TICKS && this.spikePhase >= SPIKE_SAFE_TICKS) {
+    const justActivated = prevPhase < SPIKE_SAFE_TICKS && this.spikePhase >= SPIKE_SAFE_TICKS;
+    if (justActivated) {
       for (const pos of this.spikePositions) {
         this.gameState.setTileTracked(pos.x, pos.y, 'spikes_active');
       }
@@ -1386,8 +1387,12 @@ export class CampaignGame {
       }
     }
 
-    // Kill entities on active spikes
-    if (this.spikePhase >= SPIKE_SAFE_TICKS) {
+    // Kill entities on active spikes. Skip the activation tick itself so anyone already standing
+    // on the tile gets one tick of grace once it visibly turns to 'spikes_active' — the same rule
+    // GameState.processSpikeTiles applies (audit SPIKE-SHIELD-1). The campaign copy of this
+    // mechanic had drifted from the multiplayer one and killed on the activation tick, giving
+    // zero reaction frames. (audit CAMPAIGN-SPIKE-1)
+    if (this.spikePhase >= SPIKE_SAFE_TICKS && !justActivated) {
       for (const player of this.gameState.players.values()) {
         if (!player.alive || player.isBuddy || player.invulnerableTicks > 0 || player.frozen)
           continue;

@@ -346,14 +346,24 @@ export class GameStateManager {
       throw new Error('Map has no spawn points');
     }
 
+    // Size the zone and the hill from the map that was actually built, not from the requested
+    // dimensions. `this.map` is `config.customMap ?? generateMap(mapWidth, mapHeight, …)`, and a
+    // custom map carries its own width/height from the DB while config.mapWidth/mapHeight stay at
+    // the room's (or the mode's default) values — 35x35 for KOTH. On a 15x15 custom map that put
+    // the hill at x=16 on a 15-wide grid, permanently out of bounds, so KOTH could never be
+    // scored; in battle royale the zone shrank toward a centre outside the map and eventually
+    // killed everyone. (audit CUSTOMMAP-DIMS-1)
+    const worldWidth = this.map.width;
+    const worldHeight = this.map.height;
+
     if (hasZone) {
-      this.zone = new BattleRoyaleZone(mapWidth, mapHeight);
+      this.zone = new BattleRoyaleZone(worldWidth, worldHeight);
     }
 
     // KOTH: initialize hill zone
     if (gameMode === 'king_of_the_hill') {
-      const hx = Math.floor(mapWidth / 2) - Math.floor(KOTH_ZONE_SIZE / 2);
-      const hy = Math.floor(mapHeight / 2) - Math.floor(KOTH_ZONE_SIZE / 2);
+      const hx = Math.floor(worldWidth / 2) - Math.floor(KOTH_ZONE_SIZE / 2);
+      const hy = Math.floor(worldHeight / 2) - Math.floor(KOTH_ZONE_SIZE / 2);
       this.hillZone = { x: hx, y: hy, width: KOTH_ZONE_SIZE, height: KOTH_ZONE_SIZE };
       this.nextHillMoveTick = KOTH_HILL_MOVE_INTERVAL;
     }
@@ -420,6 +430,11 @@ export class GameStateManager {
     const playerCells = new Set<string>();
     for (const player of this.players.values()) {
       if (player.alive) playerCells.add(`${player.position.x},${player.position.y}`);
+    }
+    // Live bombs too: a 3 second fuse outlives the respawn invulnerability window, so spawning
+    // onto one is a guaranteed death the player cannot avoid. (audit RESPAWN-SAFETY-1)
+    for (const bomb of this.bombs.values()) {
+      playerCells.add(`${bomb.position.x},${bomb.position.y}`);
     }
 
     // Try spawn points first (shuffled)
@@ -698,7 +713,18 @@ export class GameStateManager {
       if (!player.alive || player.invulnerableTicks > 0) continue;
       if (player.isBuddy) continue; // Buddy is invulnerable
       // Winner is invulnerable during grace period
-      if (isFinishing && this.winnerId === player.id) continue;
+      // Winner is invulnerable during the grace period. Teams mode declares the winner via
+      // winnerTeam and leaves winnerId null, so an id-only check left the winning team killable
+      // for the 30 ticks after the win: they could walk into a still-burning explosion and the
+      // final broadcast would show the "winners" wiped out, with alive=false in their placements.
+      // (audit TEAMS-WIN-1)
+      if (
+        isFinishing &&
+        (this.winnerId === player.id ||
+          (this.winnerTeam !== null && player.team === this.winnerTeam))
+      ) {
+        continue;
+      }
 
       for (const explosion of this.explosions.values()) {
         // Skip damage during fade-out phase (last 3 ticks) — explosion is visually fading
@@ -1033,6 +1059,17 @@ export class GameStateManager {
           this._mapEventsDirty = true;
         }
 
+        // A freeze wave cannot land while a previous one is still thawing. Push the impact — and
+        // its warning telegraph — forward instead of letting the event sit until frozenTiles
+        // happens to empty: it used to fire silently long after its 1s warning had expired, so
+        // players were frozen with no telegraph at all (and, now that map events are pruned by
+        // age, a sufficiently delayed wave would simply vanish). (audit FREEZE-RESCHEDULE-1)
+        if (event.type === 'freeze_wave' && this.tick >= event.tick && this.frozenTiles.size > 0) {
+          event.warningTick = this.tick;
+          event.tick = this.tick + 20; // re-arm the same 1 second warning
+          this._mapEventsDirty = true;
+        }
+
         // Process freeze wave impacts
         if (
           event.type === 'freeze_wave' &&
@@ -1142,10 +1179,21 @@ export class GameStateManager {
           player.respawnTick = this.tick + respawnDelay;
         }
         if (!player.alive && player.respawnTick !== null && this.tick >= player.respawnTick) {
-          const spawnPos = this.isOpenWorld
-            ? this.findSafeSpawnPosition()
-            : this.map.spawnPoints[Math.floor(this.rng.next() * this.map.spawnPoints.length)];
+          // Deathmatch used to pick a raw spawn point at random with no occupancy or hazard
+          // check, so two players killed on the same tick could respawn on the identical tile, or
+          // land on a tile already carrying a live bomb. (audit RESPAWN-SAFETY-1)
+          const spawnPos = this.findSafeSpawnPosition();
           player.respawn(spawnPos);
+          // respawn() zeroes bombCount, but the player's bombs from before they died are still
+          // ticking on the field. Each one decrements bombCount when it goes off, clamped at 0, so
+          // a player who died with bombs down could place a fresh bomb, watch the old ones drive
+          // the counter back to zero, and hold more live bombs than maxBombs allows. Re-derive the
+          // count from what is actually on the field. (audit RESPAWN-BOMBCOUNT-1)
+          let liveBombs = 0;
+          for (const bomb of this.bombs.values()) {
+            if (bomb.ownerId === player.id) liveBombs++;
+          }
+          player.bombCount = liveBombs;
           this.invalidateAliveCache();
         }
       }
@@ -1155,13 +1203,51 @@ export class GameStateManager {
     if (this.finishTick === null && this.gameMode !== 'campaign' && !this.isOpenWorld) {
       const timeElapsed = this.tick / TICK_RATE;
       if (timeElapsed >= this.roundTime && this.status === 'playing') {
+        // Decide the result on kills when the clock runs out.
+        //
+        // This used to record a winner only when exactly one player was still alive. With two or
+        // more survivors — the common outcome of a timed round — nobody was given a placement and
+        // winnerId/winnerTeam stayed null, so every player was written to match_players as a
+        // loser and handed to Elo as `placement ?? 999`. Teams mode never consulted winnerTeam
+        // here at all. (audit TIMEUP-WINNER-1)
         const alive = this.getAlivePlayers();
         if (alive.length === 1) {
           this.winnerId = alive[0].id;
           alive[0].placement = 1;
+          this.finishReason = `Time's up — ${alive[0].username} survives!`;
+        } else if (alive.length > 1) {
+          // Survivors outrank everyone already eliminated (who took their placement on death),
+          // and rank among themselves by kills.
+          const ranked = [...alive].sort((a, b) => b.kills - a.kills);
+          ranked.forEach((p, i) => {
+            p.placement = i + 1;
+          });
+
+          if (this.gameMode === 'teams') {
+            const killsByTeam = new Map<number, number>();
+            for (const p of alive) {
+              if (p.team === null) continue;
+              killsByTeam.set(p.team, (killsByTeam.get(p.team) ?? 0) + p.kills);
+            }
+            const teams = [...killsByTeam.entries()].sort((a, b) => b[1] - a[1]);
+            // A tie stays a draw rather than inventing a winner.
+            if (teams.length > 0 && (teams.length === 1 || teams[0][1] > teams[1][1])) {
+              this.winnerTeam = teams[0][0];
+              const teamName = teams[0][0] === 0 ? 'Red' : 'Blue';
+              this.finishReason = `Time's up — Team ${teamName} leads on kills!`;
+            } else {
+              this.finishReason = "Time's up — draw!";
+            }
+          } else if (ranked[0].kills > ranked[1].kills) {
+            this.winnerId = ranked[0].id;
+            this.finishReason = `Time's up — ${ranked[0].username} leads on kills!`;
+          } else {
+            this.finishReason = "Time's up — draw!";
+          }
+        } else {
+          this.finishReason = "Time's up!";
         }
         this.finishTick = this.tick;
-        this.finishReason = "Time's up!";
       }
     }
 
@@ -1559,8 +1645,14 @@ export class GameStateManager {
         const [xStr, yStr] = key.split(',');
         const x = parseInt(xStr);
         const y = parseInt(yStr);
-        // Only revert if the tile is still 'destructible' (hasn't been blown up)
-        if (this.map.tiles[y][x] === 'destructible') {
+        // Only revert if the wall is still standing (it may have been blown up, in which case the
+        // player has legitimately cleared it). With reinforcedWalls on, one bomb turns it into
+        // 'destructible_cracked' rather than destroying it — that is still a standing wall, but
+        // the old exact-match check skipped the revert and then deleted the bookkeeping entry, so
+        // the tile stayed a cracked wall forever on top of whatever it had replaced (a teleporter,
+        // a conveyor, …). (audit TEMPWALL-CRACKED-1)
+        const current = this.map.tiles[y][x];
+        if (current === 'destructible' || current === 'destructible_cracked') {
           this.setTileTracked(x, y, wallData.originalType);
         }
         this.temporaryWalls.delete(key);
