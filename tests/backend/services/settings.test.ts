@@ -11,6 +11,7 @@ jest.mock('../../../backend/src/db/connection', () => ({
 }));
 
 import {
+  clearSettingCache,
   getSetting,
   getRankConfig,
   setSetting,
@@ -26,6 +27,9 @@ import type { RankConfig } from '@blast-arena/shared';
 describe('Settings Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // getSetting caches for a few seconds so chat/emote hot paths do not hit the DB per event;
+    // each test needs a clean slate. (audit SETTINGS-CACHE-1)
+    clearSettingCache();
   });
 
   describe('getSetting', () => {
@@ -195,6 +199,64 @@ describe('Settings Service', () => {
     it('should return DEFAULT_RANK_CONFIG when the setting is an empty string', async () => {
       mockQuery.mockResolvedValue([{ setting_value: '' }]);
       expect(await getRankConfig()).toEqual(DEFAULT_RANK_CONFIG);
+    });
+  });
+
+  // ── caching ────────────────────────────────────────────────────────
+  // Chat modes, the emote mode and the spectator toggles are read on the hot path — every message,
+  // emote and spectator action did a SELECT before the rate-limit outcome was even used.
+  // (audit SETTINGS-CACHE-1)
+
+  describe('getSetting caching', () => {
+    it('reads the database once for repeated reads of the same key', async () => {
+      mockQuery.mockResolvedValue([{ setting_value: 'enabled' }]);
+
+      for (let i = 0; i < 50; i++) {
+        expect(await getSetting('emote_mode')).toBe('enabled');
+      }
+
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it('caches a missing setting too, rather than re-querying every time', async () => {
+      mockQuery.mockResolvedValue([]);
+
+      expect(await getSetting('never_set')).toBeNull();
+      expect(await getSetting('never_set')).toBeNull();
+
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps keys independent', async () => {
+      mockQuery.mockResolvedValueOnce([{ setting_value: 'a' }]);
+      mockQuery.mockResolvedValueOnce([{ setting_value: 'b' }]);
+
+      expect(await getSetting('key_a')).toBe('a');
+      expect(await getSetting('key_b')).toBe('b');
+      expect(await getSetting('key_a')).toBe('a');
+
+      expect(mockQuery).toHaveBeenCalledTimes(2);
+    });
+
+    it('reflects a write immediately, so admin changes are not delayed by the TTL', async () => {
+      mockQuery.mockResolvedValue([{ setting_value: 'disabled' }]);
+      expect(await getSetting('emote_mode')).toBe('disabled');
+
+      mockExecute.mockResolvedValue({});
+      await setSetting('emote_mode', 'enabled');
+
+      // No further query: the write refreshed the cache in place.
+      const callsBefore = mockQuery.mock.calls.length;
+      expect(await getSetting('emote_mode')).toBe('enabled');
+      expect(mockQuery.mock.calls.length).toBe(callsBefore);
+    });
+
+    it('re-reads after the cache is cleared', async () => {
+      mockQuery.mockResolvedValue([{ setting_value: 'one' }]);
+      await getSetting('k');
+      clearSettingCache('k');
+      await getSetting('k');
+      expect(mockQuery).toHaveBeenCalledTimes(2);
     });
   });
 });

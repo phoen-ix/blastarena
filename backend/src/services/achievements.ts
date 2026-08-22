@@ -204,12 +204,17 @@ interface StatsRow extends RowDataPacket {
   best_win_streak: number;
 }
 
-async function checkCumulative(userId: number, config: Record<string, unknown>): Promise<boolean> {
+/**
+ * @param row the caller's already-loaded user_stats row.
+ *
+ * This used to run `SELECT * FROM user_stats` itself, once per cumulative achievement — with ~50
+ * active achievements and eight players, a single match-end fired hundreds of identical queries.
+ * (audit ACHIEVEMENT-NPLUS1-1)
+ */
+function checkCumulative(row: StatsRow | undefined, config: Record<string, unknown>): boolean {
   const stat = config.stat as string;
   const threshold = config.threshold as number;
   if (!stat || threshold === undefined) return false;
-
-  const [row] = await query<StatsRow[]>('SELECT * FROM user_stats WHERE user_id = ?', [userId]);
   if (!row) return false;
 
   const statMap: Record<string, number> = {
@@ -265,10 +270,18 @@ function checkPerGame(gameData: GameAchievementData, config: Record<string, unkn
   }
 }
 
+/**
+ * @param totals memo for this evaluation, keyed `stat:mode`.
+ *
+ * Several achievements share the same (stat, mode) pair — "10 FFA wins", "50 FFA wins", "100 FFA
+ * wins" — and each used to run its own aggregate over matches ⋈ match_players. One query per
+ * distinct pair is enough. (audit ACHIEVEMENT-NPLUS1-1)
+ */
 async function checkModeSpecific(
   userId: number,
   gameData: GameAchievementData,
   config: Record<string, unknown>,
+  totals: Map<string, number>,
 ): Promise<boolean> {
   const mode = config.mode as string;
   const stat = config.stat as string;
@@ -278,6 +291,15 @@ async function checkModeSpecific(
   // Only evaluate if this game matches the mode
   if (gameData.gameMode !== mode) return false;
 
+  const cacheKey = `${stat}:${mode}`;
+  const cached = totals.get(cacheKey);
+  if (cached !== undefined) return cached >= threshold;
+
+  interface SumRow extends RowDataPacket {
+    total: number;
+  }
+
+  let total: number | null = null;
   if (stat === 'wins') {
     const [row] = await query<CountRow[]>(
       `SELECT COUNT(*) as total FROM matches m
@@ -285,33 +307,28 @@ async function checkModeSpecific(
        WHERE mp.user_id = ? AND m.game_mode = ? AND mp.placement = 1`,
       [userId, mode],
     );
-    return row.total >= threshold;
-  }
-
-  if (stat === 'matches') {
+    total = row.total;
+  } else if (stat === 'matches') {
     const [row] = await query<CountRow[]>(
       `SELECT COUNT(*) as total FROM matches m
        JOIN match_players mp ON mp.match_id = m.id
        WHERE mp.user_id = ? AND m.game_mode = ?`,
       [userId, mode],
     );
-    return row.total >= threshold;
-  }
-
-  if (stat === 'kills') {
-    interface SumRow extends RowDataPacket {
-      total: number;
-    }
+    total = row.total;
+  } else if (stat === 'kills') {
     const [row] = await query<SumRow[]>(
       `SELECT COALESCE(SUM(mp.kills), 0) as total FROM matches m
        JOIN match_players mp ON mp.match_id = m.id
        WHERE mp.user_id = ? AND m.game_mode = ?`,
       [userId, mode],
     );
-    return row.total >= threshold;
+    total = row.total;
   }
 
-  return false;
+  if (total === null) return false;
+  totals.set(cacheKey, total);
+  return total >= threshold;
 }
 
 async function checkCampaign(userId: number, config: Record<string, unknown>): Promise<boolean> {
@@ -377,19 +394,32 @@ export async function evaluateAfterGame(
   const newlyUnlocked: Achievement[] = [];
   const rewards: Cosmetic[] = [];
 
+  // Loaded once and shared across every cumulative check, and one aggregate per distinct
+  // (stat, mode) pair rather than one per achievement. (audit ACHIEVEMENT-NPLUS1-1)
+  let statsRow: StatsRow | undefined;
+  let statsLoaded = false;
+  const modeTotals = new Map<string, number>();
+
   for (const row of achievements) {
     const achievement = toAchievement(row);
     let met = false;
 
     switch (achievement.conditionType) {
-      case 'cumulative':
-        met = await checkCumulative(userId, achievement.conditionConfig);
+      case 'cumulative': {
+        if (!statsLoaded) {
+          [statsRow] = await query<StatsRow[]>('SELECT * FROM user_stats WHERE user_id = ?', [
+            userId,
+          ]);
+          statsLoaded = true;
+        }
+        met = checkCumulative(statsRow, achievement.conditionConfig);
         break;
+      }
       case 'per_game':
         met = checkPerGame(gameData, achievement.conditionConfig);
         break;
       case 'mode_specific':
-        met = await checkModeSpecific(userId, gameData, achievement.conditionConfig);
+        met = await checkModeSpecific(userId, gameData, achievement.conditionConfig, modeTotals);
         break;
     }
 

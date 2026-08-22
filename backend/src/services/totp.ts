@@ -174,6 +174,12 @@ async function verifyCodeInternal(
   const hashedCodes: string[] = JSON.parse(backupCodesJson);
   const normalizedCode = code.toLowerCase().trim();
 
+  // Backup codes are `xxxx-xxxx`. Anything else — notably the 6-digit TOTP code a user mistypes —
+  // cannot match, so there is no reason to bcrypt-compare it against all ten hashes. At cost 12
+  // that loop is ~2.5s of CPU on the libuv pool per failed attempt, which starves every other
+  // bcrypt and gzip operation in the process. (audit TOTP-BACKUP-CPU-1)
+  if (!/^[0-9a-z]{4}-[0-9a-z]{4}$/.test(normalizedCode)) return false;
+
   for (let i = 0; i < hashedCodes.length; i++) {
     const match = await comparePassword(normalizedCode, hashedCodes[i]);
     if (match) {

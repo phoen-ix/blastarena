@@ -75,9 +75,19 @@ export async function listMyMaps(userId: number): Promise<CustomMapSummary[]> {
   return rows.map(rowToSummary);
 }
 
+/** Upper bound on the browse-maps listing. Generous, but not unbounded. */
+const PUBLISHED_MAPS_LIMIT = 200;
+
 export async function listPublishedMaps(): Promise<CustomMapSummary[]> {
+  // Selects only what rowToSummary reads, and caps the result.
+  //
+  // This used to be `SELECT m.*` with no LIMIT, so every browse-maps request pulled each map's
+  // full `tiles` JSON — up to 51x51 tile strings per map — out of MySQL and serialised it, just to
+  // report a spawn count. (audit MAPLIST-1)
   const rows = await query<CustomMapRow[]>(
-    `SELECT m.*, u.username AS creator_username,
+    `SELECT m.id, m.name, m.map_width, m.map_height, m.spawn_points, m.is_published,
+            m.created_by, m.play_count,
+            u.username AS creator_username,
             r.avg_rating, r.rating_count
      FROM custom_maps m
      JOIN users u ON u.id = m.created_by
@@ -86,7 +96,8 @@ export async function listPublishedMaps(): Promise<CustomMapSummary[]> {
        FROM map_ratings GROUP BY map_id
      ) r ON r.map_id = m.id
      WHERE m.is_published = TRUE
-     ORDER BY r.avg_rating DESC, m.play_count DESC, m.updated_at DESC`,
+     ORDER BY r.avg_rating DESC, m.play_count DESC, m.updated_at DESC
+     LIMIT ${PUBLISHED_MAPS_LIMIT}`,
   );
   return rows.map(rowToSummary);
 }

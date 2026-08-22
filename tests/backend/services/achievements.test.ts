@@ -124,9 +124,7 @@ describe('Achievements Service', () => {
         isActive: true,
         sortOrder: 0,
       });
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.not.stringContaining('WHERE is_active = TRUE'),
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.not.stringContaining('WHERE is_active = TRUE'));
     });
 
     it('should filter active-only achievements when activeOnly is true', async () => {
@@ -134,9 +132,7 @@ describe('Achievements Service', () => {
 
       await getAllAchievements(true);
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE is_active = TRUE'),
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE is_active = TRUE'));
     });
 
     it('should parse condition_config JSON string into object', async () => {
@@ -172,10 +168,7 @@ describe('Achievements Service', () => {
       expect(result).not.toBeNull();
       expect(result!.id).toBe(5);
       expect(result!.name).toBe('First Blood');
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE id = ?'),
-        [5],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE id = ?'), [5]);
     });
 
     it('should return null when not found', async () => {
@@ -264,10 +257,11 @@ describe('Achievements Service', () => {
       await updateAchievement(1, { name: 'Updated', description: 'New desc' });
 
       expect(mockExecute).toHaveBeenCalledTimes(1);
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE achievements SET'),
-        ['Updated', 'New desc', 1],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('UPDATE achievements SET'), [
+        'Updated',
+        'New desc',
+        1,
+      ]);
     });
 
     it('should handle conditionConfig by stringifying JSON', async () => {
@@ -275,10 +269,10 @@ describe('Achievements Service', () => {
 
       await updateAchievement(2, { conditionConfig: { stat: 'kills', threshold: 10 } });
 
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('condition_config = ?'),
-        [JSON.stringify({ stat: 'kills', threshold: 10 }), 2],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('condition_config = ?'), [
+        JSON.stringify({ stat: 'kills', threshold: 10 }),
+        2,
+      ]);
     });
 
     it('should not execute when no fields are provided', async () => {
@@ -292,10 +286,11 @@ describe('Achievements Service', () => {
 
       await updateAchievement(3, { isActive: false, sortOrder: 5 });
 
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('is_active = ?'),
-        [false, 5, 3],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('is_active = ?'), [
+        false,
+        5,
+        3,
+      ]);
     });
   });
 
@@ -386,16 +381,88 @@ describe('Achievements Service', () => {
       expect(result[0].achievement.name).toBe('First Blood');
       expect(result[0].achievement.conditionType).toBe('per_game');
       expect(result[0].achievement.conditionConfig).toEqual({ stat: 'kills', threshold: 1 });
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('JOIN achievements'),
-        [1],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('JOIN achievements'), [1]);
     });
   });
 
   // ==================== evaluateAfterGame ====================
 
   describe('evaluateAfterGame', () => {
+    // Regression: checkCumulative re-selected user_stats for EVERY cumulative achievement, and
+    // each mode-specific achievement ran its own aggregate over matches JOIN match_players. With
+    // ~50 active achievements and eight players, one match-end fired hundreds of queries at the
+    // moment the game was trying to finish. (audit ACHIEVEMENT-NPLUS1-1)
+    describe('query volume', () => {
+      const stats = {
+        total_kills: 1000,
+        total_wins: 1000,
+        total_matches: 1000,
+        total_deaths: 0,
+        total_bombs: 0,
+        total_powerups: 0,
+        total_playtime: 0,
+        win_streak: 0,
+        best_win_streak: 0,
+      };
+
+      it('reads user_stats once however many cumulative achievements there are', async () => {
+        const rows = Array.from({ length: 30 }, (_, i) =>
+          makeAchievementRow({
+            id: i + 1,
+            condition_type: 'cumulative',
+            condition_config: JSON.stringify({ stat: 'total_kills', threshold: 999999 }),
+          }),
+        );
+        mockQuery.mockResolvedValueOnce(rows); // the achievements listing
+        mockQuery.mockResolvedValue([stats]); // any user_stats read
+
+        await evaluateAfterGame(makeGameData({ userId: 1 }));
+
+        // 1 listing + 1 user_stats. Previously: 1 + 30.
+        expect(mockQuery).toHaveBeenCalledTimes(2);
+      });
+
+      it('runs one aggregate per distinct stat/mode pair, not per achievement', async () => {
+        // Three "N wins in ffa" tiers plus two "N kills in ffa" tiers: two distinct pairs.
+        const rows = [
+          ...[10, 50, 100].map((threshold, i) =>
+            makeAchievementRow({
+              id: i + 1,
+              condition_type: 'mode_specific',
+              condition_config: JSON.stringify({ mode: 'ffa', stat: 'wins', threshold }),
+            }),
+          ),
+          ...[100, 500].map((threshold, i) =>
+            makeAchievementRow({
+              id: i + 10,
+              condition_type: 'mode_specific',
+              condition_config: JSON.stringify({ mode: 'ffa', stat: 'kills', threshold }),
+            }),
+          ),
+        ];
+        mockQuery.mockResolvedValueOnce(rows);
+        mockQuery.mockResolvedValue([{ total: 0 }]);
+
+        await evaluateAfterGame(makeGameData({ userId: 1, gameMode: 'ffa' }));
+
+        // 1 listing + 1 wins aggregate + 1 kills aggregate. Previously: 1 + 5.
+        expect(mockQuery).toHaveBeenCalledTimes(3);
+      });
+
+      it('skips the user_stats read entirely when nothing needs it', async () => {
+        mockQuery.mockResolvedValueOnce([
+          makeAchievementRow({
+            condition_type: 'per_game',
+            condition_config: JSON.stringify({ stat: 'kills', threshold: 999 }),
+          }),
+        ]);
+
+        await evaluateAfterGame(makeGameData({ userId: 1 }));
+
+        expect(mockQuery).toHaveBeenCalledTimes(1);
+      });
+    });
+
     describe('cumulative condition', () => {
       it('should unlock when cumulative stat meets threshold', async () => {
         const achRow = makeAchievementRow({
@@ -404,7 +471,19 @@ describe('Achievements Service', () => {
           condition_config: JSON.stringify({ stat: 'total_kills', threshold: 50 }),
         });
         mockQuery.mockResolvedValueOnce([achRow]); // achievements LEFT JOIN
-        mockQuery.mockResolvedValueOnce([{ total_kills: 75, total_wins: 0, total_matches: 0, total_deaths: 0, total_bombs: 0, total_powerups: 0, total_playtime: 0, win_streak: 0, best_win_streak: 0 }]); // user_stats
+        mockQuery.mockResolvedValueOnce([
+          {
+            total_kills: 75,
+            total_wins: 0,
+            total_matches: 0,
+            total_deaths: 0,
+            total_bombs: 0,
+            total_powerups: 0,
+            total_playtime: 0,
+            win_streak: 0,
+            best_win_streak: 0,
+          },
+        ]); // user_stats
         mockExecute.mockResolvedValueOnce({}); // INSERT user_achievements
 
         const result = await evaluateAfterGame(makeGameData({ userId: 1 }));
@@ -423,7 +502,19 @@ describe('Achievements Service', () => {
           condition_config: JSON.stringify({ stat: 'total_kills', threshold: 100 }),
         });
         mockQuery.mockResolvedValueOnce([achRow]);
-        mockQuery.mockResolvedValueOnce([{ total_kills: 50, total_wins: 0, total_matches: 0, total_deaths: 0, total_bombs: 0, total_powerups: 0, total_playtime: 0, win_streak: 0, best_win_streak: 0 }]);
+        mockQuery.mockResolvedValueOnce([
+          {
+            total_kills: 50,
+            total_wins: 0,
+            total_matches: 0,
+            total_deaths: 0,
+            total_bombs: 0,
+            total_powerups: 0,
+            total_playtime: 0,
+            win_streak: 0,
+            best_win_streak: 0,
+          },
+        ]);
 
         const result = await evaluateAfterGame(makeGameData());
 
@@ -532,7 +623,11 @@ describe('Achievements Service', () => {
         const achRow = makeAchievementRow({
           id: 6,
           condition_type: 'per_game',
-          condition_config: JSON.stringify({ stat: 'survived_seconds', operator: '<', threshold: 10 }),
+          condition_config: JSON.stringify({
+            stat: 'survived_seconds',
+            operator: '<',
+            threshold: 10,
+          }),
         });
         mockQuery.mockResolvedValueOnce([achRow]);
         mockExecute.mockResolvedValueOnce({});
@@ -593,7 +688,11 @@ describe('Achievements Service', () => {
         const achRow = makeAchievementRow({
           id: 9,
           condition_type: 'mode_specific',
-          condition_config: JSON.stringify({ mode: 'battle_royale', stat: 'matches', threshold: 10 }),
+          condition_config: JSON.stringify({
+            mode: 'battle_royale',
+            stat: 'matches',
+            threshold: 10,
+          }),
         });
         mockQuery.mockResolvedValueOnce([achRow]);
         mockQuery.mockResolvedValueOnce([{ total: 15 }]);

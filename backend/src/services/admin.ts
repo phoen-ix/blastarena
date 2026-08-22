@@ -573,9 +573,18 @@ export async function executeCleanup(
     // Socket server may not be available
   }
 
-  // Bulk delete — FK CASCADE handles related tables
-  const placeholders = userIds.map(() => '?').join(',');
-  await execute(`DELETE FROM users WHERE id IN (${placeholders})`, userIds);
+  // Bulk delete in chunks — FK CASCADE handles related tables.
+  //
+  // A single `DELETE ... IN (?,?,…)` with one placeholder per user meant a spam-hit instance with
+  // 200k matching accounts built a 200k-placeholder prepared statement, which MySQL rejects on
+  // max_prepared_stmt_count / max_allowed_packet — so the cleanup failed *after* the audit row had
+  // already been written. (audit BULK-DELETE-1)
+  const DELETE_CHUNK = 500;
+  for (let i = 0; i < userIds.length; i += DELETE_CHUNK) {
+    const chunk = userIds.slice(i, i + DELETE_CHUNK);
+    const placeholders = chunk.map(() => '?').join(',');
+    await execute(`DELETE FROM users WHERE id IN (${placeholders})`, chunk);
+  }
 
   return { deleted: userIds.length };
 }

@@ -9,12 +9,39 @@ import {
   DEFAULT_RANK_CONFIG,
 } from '@blast-arena/shared';
 
+/**
+ * Short-lived cache over server_settings.
+ *
+ * Chat modes, the emote mode and the spectator toggles are read on the hot path — every lobby or
+ * party message, every emote, every spectator action did a `SELECT setting_value` before the
+ * rate-limit outcome was even used. At the emote limiter's 5/s across eight players in each of
+ * several rooms that is a per-event database round-trip for a value that changes maybe once a
+ * month. (audit SETTINGS-CACHE-1)
+ *
+ * The TTL is deliberately short, and setSetting refreshes the entry immediately, so admin changes
+ * still take effect at once and the hot-reloadable settings stay hot-reloadable.
+ */
+const SETTING_CACHE_TTL_MS = 5000;
+const settingCache = new Map<string, { value: string | null; at: number }>();
+
+/** Drop cached settings. Exported for tests and for an explicit admin-side refresh. */
+export function clearSettingCache(key?: string): void {
+  if (key === undefined) settingCache.clear();
+  else settingCache.delete(key);
+}
+
 export async function getSetting(key: string): Promise<string | null> {
+  const cached = settingCache.get(key);
+  const now = Date.now();
+  if (cached && now - cached.at < SETTING_CACHE_TTL_MS) return cached.value;
+
   const rows = await query<SettingRow[]>(
     'SELECT setting_value FROM server_settings WHERE setting_key = ?',
     [key],
   );
-  return rows.length > 0 ? rows[0].setting_value : null;
+  const value = rows.length > 0 ? rows[0].setting_value : null;
+  settingCache.set(key, { value, at: now });
+  return value;
 }
 
 export async function setSetting(key: string, value: string): Promise<void> {
@@ -22,6 +49,8 @@ export async function setSetting(key: string, value: string): Promise<void> {
     'INSERT INTO server_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
     [key, value, value],
   );
+  // Reflect the write immediately rather than waiting out the TTL.
+  settingCache.set(key, { value, at: Date.now() });
 }
 
 export async function isRecordingEnabled(): Promise<boolean> {
