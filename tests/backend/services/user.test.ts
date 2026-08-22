@@ -360,6 +360,31 @@ describe('user service', () => {
   // ── changePassword ─────────────────────────────────────────────────
 
   describe('changePassword', () => {
+    // Regression: changing your password left every refresh token live, unlike resetPassword and
+    // the admin password reset. A user reacting to a stolen session kept the attacker signed in
+    // for the remaining 7-day refresh window. (audit PWCHANGE-REVOKE-1)
+    it('revokes all refresh tokens so other sessions are signed out', async () => {
+      mockQuery.mockResolvedValueOnce([{ password_hash: 'old-hash' }]);
+      mockComparePassword.mockResolvedValueOnce(true);
+      mockHashPassword.mockResolvedValueOnce('new-hash');
+      mockExecute.mockResolvedValue({});
+
+      await changePassword(7, 'currentPass', 'newPass');
+
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE refresh_tokens SET revoked = TRUE'),
+        [7],
+      );
+    });
+
+    it('does not revoke anything when the current password is wrong', async () => {
+      mockQuery.mockResolvedValueOnce([{ password_hash: 'old-hash' }]);
+      mockComparePassword.mockResolvedValueOnce(false);
+
+      await expect(changePassword(7, 'wrong', 'newPass')).rejects.toThrow();
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
     it('updates password hash on success', async () => {
       mockQuery.mockResolvedValueOnce([{ password_hash: 'old-hash' }]);
       mockComparePassword.mockResolvedValueOnce(true);

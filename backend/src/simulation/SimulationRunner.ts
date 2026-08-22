@@ -67,10 +67,11 @@ export class SimulationRunner extends EventEmitter {
         }
 
         const mapSeed = this.baseSeed + i;
-        this.currentGame = new SimulationGame(this.config, i, this.logDir, mapSeed);
+        const game = new SimulationGame(this.config, i, this.logDir, mapSeed);
+        this.currentGame = game;
 
         // Set up spectate streaming
-        this.currentGame.setStateCallback((state) => {
+        game.setStateCallback((state) => {
           try {
             const io = getIO();
             const room = `sim:${this.batchId}`;
@@ -83,16 +84,22 @@ export class SimulationRunner extends EventEmitter {
           }
         });
 
-        // Run the game
-        const result =
-          this.config.speed === 'fast'
-            ? await this.currentGame.runFast()
-            : await this.currentGame.runRealtime();
+        // Run the game. The dispose MUST be in a finally: runFast() has no try/catch of its own,
+        // so a throw from processTick/recordTick/finalize used to skip straight to the batch catch
+        // below, which nulled currentGame without disposing. isolated-vm isolates are not
+        // reclaimed by ordinary GC — that is the whole reason disposal is explicit (audit C1) — so
+        // every failing batch leaked one isolate per custom bot AI until the container hit its
+        // memory limit. (audit SIM-DISPOSE-1)
+        let result;
+        try {
+          result = this.config.speed === 'fast' ? await game.runFast() : await game.runRealtime();
+        } finally {
+          game.dispose(); // free isolated custom bot AIs before the next game (audit C1)
+          this.currentGame = null;
+        }
 
         this.results.push(result);
         this.gamesCompleted = i + 1;
-        this.currentGame.dispose(); // free isolated custom bot AIs before the next game (audit C1)
-        this.currentGame = null;
 
         // Emit progress and result
         this.emit('gameResult', result);

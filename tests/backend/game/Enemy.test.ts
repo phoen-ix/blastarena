@@ -56,15 +56,48 @@ describe('Enemy', () => {
       expect(enemy.typeConfig).toBe(config);
     });
 
+    // Enemy ids share a namespace with bomb ownerIds, which GameState.detonateBomb resolves
+    // against `players` — keyed by real DB user id. While the offset was +1000, an account with
+    // id >= 1000 would have an enemy's bomb decrement its bombCount and be blamed for the kill.
+    // (audit ENEMY-ID-1)
+    it('should never assign an id that could belong to a user account', () => {
+      Enemy.resetIdCounter();
+      for (let i = 0; i < 500; i++) {
+        const e = new Enemy(1, { x: 0, y: 0 }, makeConfig());
+        expect(e.id).toBeLessThan(0);
+      }
+    });
+
+    it('should not collide with bot, buddy or open-world guest id ranges', () => {
+      Enemy.resetIdCounter();
+      for (let i = 0; i < 500; i++) {
+        const e = new Enemy(1, { x: 0, y: 0 }, makeConfig());
+        expect(e.id).toBeLessThan(-12000); // clear of bots (-1..-8), buddy and guests
+      }
+    });
+
+    // Regression: CampaignGame reset this shared counter in its constructor, so starting a second
+    // session rewound ids for the first — a boss could then spawn minions over its own live
+    // enemies, silently removing them from the map. (audit ENEMY-ID-1)
+    it('should keep ids unique across concurrent sessions', () => {
+      Enemy.resetIdCounter();
+      const sessionA = [0, 1, 2].map(() => new Enemy(1, { x: 0, y: 0 }, makeConfig()).id);
+      // A second session starting up must not rewind the counter.
+      const sessionB = [0, 1, 2].map(() => new Enemy(1, { x: 0, y: 0 }, makeConfig()).id);
+      expect(new Set([...sessionA, ...sessionB]).size).toBe(6);
+    });
+
     it('should assign sequential IDs with ENEMY_ID_OFFSET', () => {
       const config = makeConfig();
       const e1 = new Enemy(1, { x: 0, y: 0 }, config);
       const e2 = new Enemy(2, { x: 1, y: 1 }, config);
       const e3 = new Enemy(3, { x: 2, y: 2 }, config);
 
-      expect(e1.id).toBe(ENEMY_ID_OFFSET + 0);
-      expect(e2.id).toBe(ENEMY_ID_OFFSET + 1);
-      expect(e3.id).toBe(ENEMY_ID_OFFSET + 2);
+      // Enemy ids count DOWN from the (negative) offset, so they can never collide with the
+      // positive id space real user accounts are allocated from. (audit ENEMY-ID-1)
+      expect(e1.id).toBe(ENEMY_ID_OFFSET - 0);
+      expect(e2.id).toBe(ENEMY_ID_OFFSET - 1);
+      expect(e3.id).toBe(ENEMY_ID_OFFSET - 2);
     });
 
     it('should reset ID counter', () => {
@@ -75,7 +108,7 @@ describe('Enemy', () => {
       Enemy.resetIdCounter();
 
       const e = new Enemy(3, { x: 2, y: 2 }, config);
-      expect(e.id).toBe(ENEMY_ID_OFFSET + 0);
+      expect(e.id).toBe(ENEMY_ID_OFFSET - 0);
     });
 
     it('should deep copy the spawn position', () => {
@@ -398,9 +431,7 @@ describe('Enemy', () => {
     });
 
     it('should trigger phase 1 when HP drops below first threshold', () => {
-      const phases: BossPhaseConfig[] = [
-        { hpThreshold: 0.5, speedMultiplier: 2 },
-      ];
+      const phases: BossPhaseConfig[] = [{ hpThreshold: 0.5, speedMultiplier: 2 }];
       const config = makeConfig({ isBoss: true, hp: 10, speed: 1, bossPhases: phases });
       const enemy = new Enemy(1, { x: 0, y: 0 }, config);
 
@@ -445,9 +476,7 @@ describe('Enemy', () => {
     });
 
     it('should not re-trigger an already-passed phase', () => {
-      const phases: BossPhaseConfig[] = [
-        { hpThreshold: 0.5, speedMultiplier: 2 },
-      ];
+      const phases: BossPhaseConfig[] = [{ hpThreshold: 0.5, speedMultiplier: 2 }];
       const config = makeConfig({ isBoss: true, hp: 10, speed: 1, bossPhases: phases });
       const enemy = new Enemy(1, { x: 0, y: 0 }, config);
 
@@ -461,9 +490,7 @@ describe('Enemy', () => {
     });
 
     it('should apply movementPattern change', () => {
-      const phases: BossPhaseConfig[] = [
-        { hpThreshold: 0.5, movementPattern: 'chase_player' },
-      ];
+      const phases: BossPhaseConfig[] = [{ hpThreshold: 0.5, movementPattern: 'chase_player' }];
       const config = makeConfig({
         isBoss: true,
         hp: 10,
@@ -489,9 +516,7 @@ describe('Enemy', () => {
 
     it('should apply bombConfig change', () => {
       const newBombConfig = { fireRange: 4, cooldownTicks: 10, trigger: 'proximity' as const };
-      const phases: BossPhaseConfig[] = [
-        { hpThreshold: 0.5, bombConfig: newBombConfig },
-      ];
+      const phases: BossPhaseConfig[] = [{ hpThreshold: 0.5, bombConfig: newBombConfig }];
       const config = makeConfig({ isBoss: true, hp: 10, bossPhases: phases });
       const enemy = new Enemy(1, { x: 0, y: 0 }, config);
 
@@ -518,9 +543,7 @@ describe('Enemy', () => {
     });
 
     it('should clamp speed to minimum 0.01 after speedMultiplier', () => {
-      const phases: BossPhaseConfig[] = [
-        { hpThreshold: 0.5, speedMultiplier: 0 },
-      ];
+      const phases: BossPhaseConfig[] = [{ hpThreshold: 0.5, speedMultiplier: 0 }];
       const config = makeConfig({ isBoss: true, hp: 10, speed: 1, bossPhases: phases });
       const enemy = new Enemy(1, { x: 0, y: 0 }, config);
 

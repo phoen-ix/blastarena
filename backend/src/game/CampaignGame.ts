@@ -216,8 +216,6 @@ export class CampaignGame {
     this.rng = new SeededRandom(Date.now());
     this.worldTheme = (theme as CampaignWorldTheme) || 'classic';
 
-    Enemy.resetIdCounter();
-
     // Build GameMap from level tiles (includes co-op P2 spawn fallback)
     const gameMap = this.buildGameMap(level);
 

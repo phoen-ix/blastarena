@@ -67,6 +67,8 @@ type TypedServer = Server<
 
 const REMATCH_VOTE_TIMEOUT_MS = 30000;
 const ROOM_CLEANUP_INTERVAL_MS = 30000;
+// Comfortably inside the 120s presence TTL, so a key never lapses between beats.
+const PRESENCE_HEARTBEAT_MS = 45000;
 
 // Per-player emote cooldown
 const emoteLastUsed = new Map<number, number>();
@@ -1754,6 +1756,20 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     roomManager.cleanup();
   }, ROOM_CLEANUP_INTERVAL_MS);
 
+  // Keep presence alive for everyone currently connected. Presence keys expire after 120s so an
+  // unclean disconnect stops showing a user as online, but setPresence only ran on state
+  // transitions — so anyone in a match or campaign level longer than two minutes went "offline"
+  // to their friends while still playing. (audit PRESENCE-TTL-1)
+  const presenceInterval = setInterval(() => {
+    const userIds = new Set<number>();
+    for (const s of io.sockets.sockets.values()) {
+      if (!s.data.isGuest && s.data.userId > 0) userIds.add(s.data.userId);
+    }
+    presenceService.refreshPresenceBatch([...userIds]).catch((err) => {
+      logger.warn({ err: getErrorMessage(err) }, 'Presence heartbeat failed');
+    });
+  }, PRESENCE_HEARTBEAT_MS);
+
   // Initialize open world manager
   openWorldManager.init(io).catch((err) => {
     logger.error({ err }, 'Failed to initialize open world manager');
@@ -1762,6 +1778,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
   // Clear cleanup interval on server shutdown
   const shutdown = () => {
     clearInterval(cleanupInterval);
+    clearInterval(presenceInterval);
     openWorldManager.shutdown();
   };
   process.once('SIGTERM', shutdown);

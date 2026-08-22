@@ -215,6 +215,13 @@ export async function changePassword(
 
   const newHash = await hashPassword(newPassword);
   await execute('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, userId]);
+
+  // Revoke every outstanding refresh token, matching resetPassword and adminService's password
+  // reset. Without this, changing your password after a session was stolen did not end that
+  // session: the attacker's refresh-token cookie kept minting access tokens for the remaining
+  // 7-day window, which is the opposite of what a user changing their password expects.
+  // (audit PWCHANGE-REVOKE-1)
+  await execute('UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = ?', [userId]);
 }
 
 export async function cancelEmailChange(userId: number): Promise<void> {

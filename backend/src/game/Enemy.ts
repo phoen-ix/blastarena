@@ -34,7 +34,7 @@ export class Enemy {
     typeConfig: EnemyTypeConfig,
     patrolPath: Position[] = [],
   ) {
-    this.id = ENEMY_ID_OFFSET + Enemy.nextId++;
+    this.id = ENEMY_ID_OFFSET - Enemy.nextId++;
     this.enemyTypeId = enemyTypeId;
     this.position = { ...position };
     this.typeConfig = typeConfig;
@@ -43,6 +43,16 @@ export class Enemy {
     this.patrolPath = patrolPath;
   }
 
+  /**
+   * Reset the shared id counter. TEST ONLY.
+   *
+   * CampaignGame used to call this from its constructor, which meant starting a second campaign
+   * session rewound the counter for the first: a boss in the running session would then spawn
+   * minions with ids already held by its live enemies, and `enemies.set(minion.id, minion)`
+   * silently overwrote them — the overwritten enemy vanished mid-fight and a kill_all objective
+   * could become unwinnable. The counter is now monotonic for the process lifetime.
+   * (audit ENEMY-ID-1)
+   */
   static resetIdCounter(): void {
     Enemy.nextId = 0;
   }

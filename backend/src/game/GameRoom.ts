@@ -669,6 +669,10 @@ export class GameRoom {
   stop(): void {
     this.gameLoop.stop();
     this.gameState.disposeAIs(); // free any isolated custom bot AIs (audit C1)
+    // The log stream is otherwise only closed on the natural game-over path (logGameOver), so an
+    // admin-closed or reaped room left its file descriptor open forever. close() is idempotent.
+    // (audit ROOM-REAP-1)
+    this.gameState.gameLogger?.close();
   }
 
   isRunning(): boolean {

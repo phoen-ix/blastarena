@@ -1087,8 +1087,16 @@ export class GameStateManager {
           this._mapEventsDirty = true;
         }
       }
+    }
 
-      // Clean old events
+    // Expire old map events.
+    //
+    // This used to live inside the `enableMapEvents` block above, but spectator Game Master
+    // actions and the KOTH hill_move push into `this.mapEvents` unconditionally. In a room with
+    // spectator actions on and map events off, nothing ever expired: the array grew for the whole
+    // match and was re-serialized into every game:state frame sent to every client. Pruning is a
+    // property of the array, not of the feature that happens to fill it. (audit MAPEVENT-PRUNE-1)
+    if (this.mapEvents.length > 0) {
       const prevLen = this.mapEvents.length;
       this.mapEvents = this.mapEvents.filter((e) => this.tick - e.tick < 200);
       if (this.mapEvents.length !== prevLen) this._mapEventsDirty = true;

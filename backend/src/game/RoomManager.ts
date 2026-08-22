@@ -54,9 +54,20 @@ export class RoomManager {
     return Array.from(this.rooms.values());
   }
 
+  /**
+   * Reap rooms whose loop has stopped.
+   *
+   * This used to just drop them from the Map. A game that ends naturally stops its own loop, so
+   * rooms whose clients never triggered room:restart/room:close were collected here — without
+   * ever calling stop(), which is what releases the isolated custom bot AIs and closes the game
+   * log stream. Every such room leaked its isolates and an open file descriptor for the lifetime
+   * of the process. stop() is idempotent, so calling it on an already-stopped loop is safe.
+   * (audit ROOM-REAP-1)
+   */
   cleanup(): void {
     for (const [code, room] of this.rooms) {
       if (!room.isRunning()) {
+        room.stop();
         this.rooms.delete(code);
       }
     }

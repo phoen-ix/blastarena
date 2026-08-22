@@ -76,3 +76,23 @@ export async function refreshPresence(userId: number): Promise<void> {
   const redis = getRedis();
   await redis.expire(`${KEY_PREFIX}${userId}`, PRESENCE_TTL);
 }
+
+/**
+ * Extend the presence TTL for a batch of connected users.
+ *
+ * Presence keys carry a 120s TTL so an unclean disconnect eventually stops showing the user as
+ * online. But setPresence is only called on state TRANSITIONS, and nothing ever refreshed the
+ * key — so any match or campaign level lasting longer than two minutes silently expired, and the
+ * player's friends saw them drop to offline mid-game. A heartbeat over the live sockets keeps the
+ * key alive without changing the disconnect semantics the TTL exists for.
+ * (audit PRESENCE-TTL-1)
+ */
+export async function refreshPresenceBatch(userIds: number[]): Promise<void> {
+  if (userIds.length === 0) return;
+  const redis = getRedis();
+  const pipeline = redis.pipeline();
+  for (const userId of userIds) {
+    pipeline.expire(`${KEY_PREFIX}${userId}`, PRESENCE_TTL);
+  }
+  await pipeline.exec();
+}

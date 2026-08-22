@@ -58,6 +58,8 @@ jest.mock('../../../backend/src/utils/gameLogger', () => ({
   GameLogger: jest.fn<AnyFn>().mockImplementation(() => ({
     log: jest.fn(),
     logGameOver: jest.fn(),
+    // GameRoom.stop() closes the log stream — a real GameLogger always has this.
+    close: jest.fn(),
     replayRecorder: null,
   })),
 }));
@@ -442,6 +444,21 @@ describe('RoomManager', () => {
 
       roomManager.cleanup();
 
+      expect(roomManager.getActiveRoomCount()).toBe(0);
+    });
+
+    // Regression: cleanup used to drop finished rooms from the Map without calling stop(), which
+    // is what releases the isolated custom bot AIs and closes the game log stream. Rooms that
+    // ended naturally and were never explicitly closed leaked both for the process lifetime.
+    // (audit ROOM-REAP-1)
+    it('should stop rooms it reaps, releasing AI isolates and the log stream', async () => {
+      mockGameLoopIsRunning.mockReturnValue(false);
+      const room = await roomManager.createGame(createMockRoom({ code: 'DONE3' }));
+      const stopSpy = jest.spyOn(room, 'stop');
+
+      roomManager.cleanup();
+
+      expect(stopSpy).toHaveBeenCalledTimes(1);
       expect(roomManager.getActiveRoomCount()).toBe(0);
     });
 
