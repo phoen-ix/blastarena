@@ -128,6 +128,26 @@ export function errorHandler(err: unknown, req: Request, res: Response, next: Ne
   }
 
   if (err instanceof AppError) {
+    // An AppError is a *curated* message, not necessarily a client fault — the status decides.
+    //
+    // A 5xx one is a server failure that happens to carry a readable message, and this branch
+    // returned before either logging path below, so it emitted nothing at all. `crypto.ts` throws
+    // `AppError('Failed to decrypt 2FA secret', 500)`: a rotated or corrupt TOTP_ENCRYPTION_KEY
+    // would lock every 2FA user out while the log stayed completely silent.
+    //
+    // 4xx stays at debug rather than warn. These are ordinary validation results — "Cannot message
+    // yourself", "Not found" — and a busy server produces them constantly; at warn they would bury
+    // the malformed-request warnings below, which is the opposite of the point. Off at
+    // LOG_LEVEL=info, and there when someone needs it. (audit APPERROR-LOG-1)
+    if (err.statusCode >= 500) {
+      logger.error({ err, path: req.path, method: req.method }, 'Request failed');
+    } else {
+      logger.debug(
+        { status: err.statusCode, code: err.code, path: req.path, method: req.method },
+        'Request rejected',
+      );
+    }
+
     res.status(err.statusCode).json({
       error: err.message,
       code: err.code,

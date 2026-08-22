@@ -7,6 +7,9 @@ jest.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
 }));
 
+const mockLogger = { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() };
+jest.mock('../../../backend/src/utils/logger', () => ({ logger: mockLogger }));
+
 import { emailVerifiedMiddleware } from '../../../backend/src/middleware/emailVerified';
 
 function createMockRes() {
@@ -151,6 +154,26 @@ describe('emailVerifiedMiddleware', () => {
     expect(mockRes.json).toHaveBeenCalledWith({
       error: 'Email not verified',
       code: 'EMAIL_NOT_VERIFIED',
+    });
+  });
+
+  // Was a bare `catch {}` — the 500 went out with no record of what failed.
+  // (audit APPERROR-LOG-1)
+  it('records why the check failed, without telling the client', async () => {
+    mockQuery.mockRejectedValue(new Error('ER_LOCK_WAIT_TIMEOUT: lock wait timeout exceeded'));
+
+    mockReq.user = { userId: 3, username: 'player', role: 'user' };
+
+    await emailVerifiedMiddleware(mockReq, mockRes as any, mockNext);
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      { err: 'ER_LOCK_WAIT_TIMEOUT: lock wait timeout exceeded', userId: 3 },
+      'Email verification check failed',
+    );
+    // ...and the client is still told nothing.
+    expect(mockRes.json).toHaveBeenCalledWith({
+      error: 'Internal server error',
+      code: 'INTERNAL_ERROR',
     });
   });
 

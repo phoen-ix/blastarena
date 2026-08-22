@@ -15,6 +15,9 @@ jest.mock('../../../backend/src/db/redis', () => ({
   })),
 }));
 
+const mockLogger = { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() };
+jest.mock('../../../backend/src/utils/logger', () => ({ logger: mockLogger }));
+
 import healthRouter, { BUILD_ID } from '../../../backend/src/routes/health';
 import { Request, Response } from 'express';
 
@@ -28,9 +31,7 @@ type RouteLayer = {
 
 function getHealthHandler(): (req: Request, res: Response) => Promise<void> {
   const stack = (healthRouter as unknown as { stack: RouteLayer[] }).stack;
-  const layer = stack.find(
-    (l) => l.route && l.route.path === '/health' && l.route.methods.get,
-  );
+  const layer = stack.find((l) => l.route && l.route.path === '/health' && l.route.methods.get);
   if (!layer) throw new Error('GET /health route not found on router');
   return layer.route.stack[0].handle;
 }
@@ -143,5 +144,32 @@ describe('GET /health', () => {
     expect(bodyStr).not.toContain('s3cret');
     expect(bodyStr).not.toContain('db.internal');
     expect(body).toEqual({ status: 'error', message: 'Service unavailable' });
+  });
+
+  // The 503 IS the signal that a dependency is down. It used to throw the reason away, so Docker
+  // would flip the container to "unhealthy" with nothing in the log saying which one failed.
+  // (audit APPERROR-LOG-1)
+  it('records which dependency failed, without putting it in the response', async () => {
+    mockExecute.mockRejectedValue(new Error('ECONNREFUSED 172.19.5.3:3306'));
+
+    const res = mockRes();
+    await handler({} as Request, res as unknown as Response);
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      { err: 'ECONNREFUSED 172.19.5.3:3306' },
+      'Health check failed',
+    );
+    // ...and the client still learns nothing.
+    expect(JSON.stringify(res._json)).not.toContain('ECONNREFUSED');
+  });
+
+  it('logs nothing on the healthy path', async () => {
+    mockExecute.mockResolvedValue([]);
+    mockPing.mockResolvedValue('PONG');
+
+    await handler({} as Request, mockRes() as unknown as Response);
+
+    expect(mockLogger.error).not.toHaveBeenCalled();
   });
 });

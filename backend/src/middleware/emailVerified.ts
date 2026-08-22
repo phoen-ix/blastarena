@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { query } from '../db/connection';
 import { RowDataPacket } from 'mysql2';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '@blast-arena/shared';
 
 interface EmailCheckRow extends RowDataPacket {
   email_verified: boolean;
@@ -57,7 +59,12 @@ export async function emailVerifiedMiddleware(
       return;
     }
     next();
-  } catch {
+  } catch (err) {
+    // Was a bare `catch {}` — the 500 went out with no record of what failed. (audit APPERROR-LOG-1)
+    logger.error(
+      { err: getErrorMessage(err), userId: req.user?.userId },
+      'Email verification check failed',
+    );
     res.status(500).json({ error: 'Internal server error', code: 'INTERNAL_ERROR' });
   }
 }

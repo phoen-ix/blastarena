@@ -5,6 +5,7 @@ jest.mock('../../../backend/src/utils/logger', () => ({
     error: jest.fn(),
     warn: jest.fn(),
     info: jest.fn(),
+    debug: jest.fn(),
   },
 }));
 
@@ -16,6 +17,7 @@ const mockLogger = logger as unknown as {
   error: jest.Mock;
   warn: jest.Mock;
   info: jest.Mock;
+  debug: jest.Mock;
 };
 
 function mockReq(overrides: Partial<Request> = {}): Request {
@@ -89,6 +91,64 @@ describe('errorHandler middleware', () => {
       { err, path: '/api/users', method: 'GET' },
       'Unhandled error',
     );
+  });
+
+  // ── AppError logging (audit APPERROR-LOG-1) ───────────────────────────────────────────────
+  //
+  // This branch returned before either logging path, so every AppError response was invisible —
+  // including the three that carry a 500. Verified empirically against the deploy: a 400
+  // VALIDATION_ERROR produced a log-line delta of exactly zero.
+
+  it('logs a 5xx AppError at error level, with the error itself', () => {
+    // crypto.ts throws exactly this shape when it cannot decrypt a 2FA secret. Silent, it would
+    // lock every 2FA user out with nothing in the log to explain it.
+    const err = new AppError('Failed to decrypt 2FA secret', 500, 'TOTP_DECRYPT_FAILED');
+    const res = mockRes();
+
+    errorHandler(err, mockReq({ path: '/api/auth/totp' }), res, next);
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      { err, path: '/api/auth/totp', method: 'POST' },
+      'Request failed',
+    );
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Failed to decrypt 2FA secret',
+      code: 'TOTP_DECRYPT_FAILED',
+    });
+  });
+
+  it('keeps ordinary 4xx validation out of error and warn', () => {
+    // These fire constantly on a busy server; at warn they would bury the malformed-request
+    // warnings, which is the opposite of the point.
+    errorHandler(
+      new AppError('Cannot message yourself', 400, 'INVALID_RECIPIENT'),
+      mockReq(),
+      mockRes(),
+      next,
+    );
+
+    expect(mockLogger.error).not.toHaveBeenCalled();
+    expect(mockLogger.warn).not.toHaveBeenCalled();
+    expect(mockLogger.debug).toHaveBeenCalledWith(
+      { status: 400, code: 'INVALID_RECIPIENT', path: '/test', method: 'POST' },
+      'Request rejected',
+    );
+  });
+
+  it.each([
+    [400, 'debug'],
+    [404, 'debug'],
+    [409, 'debug'],
+    [499, 'debug'],
+    [500, 'error'],
+    [503, 'error'],
+  ])('routes a %s AppError to logger.%s', (status, level) => {
+    errorHandler(new AppError('x', status as number), mockReq(), mockRes(), next);
+
+    expect(mockLogger[level as 'debug' | 'error']).toHaveBeenCalledTimes(1);
+    const other = level === 'error' ? 'debug' : 'error';
+    expect(mockLogger[other as 'debug' | 'error']).not.toHaveBeenCalled();
   });
 
   it('AppError instanceof works correctly', () => {
