@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PowerUpState } from '@blast-arena/shared';
 import { TILE_SIZE } from '@blast-arena/shared';
+import { wrapGhostOffsets } from '../utils/wrapGhosts';
 
 export class PowerUpRenderer {
   private scene: Phaser.Scene;
@@ -66,22 +67,8 @@ export class PowerUpRenderer {
   private updateGhosts(id: string, px: number, py: number, textureKey: string): void {
     if (!this.wrappingWorldSize) return;
     const { w, h } = this.wrappingWorldSize;
-    const thresholdX = w / 2;
-    const thresholdY = h / 2;
-    const nearLeft = px < thresholdX;
-    const nearRight = px > w - thresholdX;
-    const nearTop = py < thresholdY;
-    const nearBottom = py > h - thresholdY;
-
-    const offsets: { ox: number; oy: number }[] = [];
-    if (nearLeft) offsets.push({ ox: w, oy: 0 });
-    if (nearRight) offsets.push({ ox: -w, oy: 0 });
-    if (nearTop) offsets.push({ ox: 0, oy: h });
-    if (nearBottom) offsets.push({ ox: 0, oy: -h });
-    if (nearLeft && nearTop) offsets.push({ ox: w, oy: h });
-    if (nearLeft && nearBottom) offsets.push({ ox: w, oy: -h });
-    if (nearRight && nearTop) offsets.push({ ox: -w, oy: h });
-    if (nearRight && nearBottom) offsets.push({ ox: -w, oy: -h });
+    // See wrapGhostOffsets: the old worldSize/2 threshold matched every position. (audit WRAP-GHOST-1)
+    const offsets = wrapGhostOffsets(this.scene.cameras.main.worldView, px, py, w, h, TILE_SIZE);
 
     let ghosts = this.ghostSprites.get(id);
 

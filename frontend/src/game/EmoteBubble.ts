@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
-import { EMOTES, EmoteId, EMOTE_DISPLAY_MS } from '@blast-arena/shared';
+import { EMOTES, EmoteId, EMOTE_DISPLAY_MS, TILE_SIZE } from '@blast-arena/shared';
 
-const TILE_SIZE = 32;
 const FADE_DURATION = 400;
 const FLOAT_DISTANCE = 15;
 const FLOAT_DURATION = 300;
@@ -34,6 +33,9 @@ export class EmoteBubbleRenderer {
     if (!emote) return;
 
     const posX = x;
+    // TILE_SIZE was shadowed here by a module-local `const TILE_SIZE = 32` while the shared
+    // constant is 48, so every bubble rendered 16px low and crowded the player name label that
+    // PlayerSprite places just above the sprite. (audit EMOTE-TILESIZE-1)
     const posY = y - TILE_SIZE - 10;
 
     // Create text

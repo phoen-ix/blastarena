@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { PlayerState, TILE_SIZE } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 import { PLAYER_COLORS, BootScene } from '../scenes/BootScene';
+import { wrapGhostOffsets } from '../utils/wrapGhosts';
 
 // Team color indices: team 0 uses red-ish colors, team 1 uses blue-ish colors
 const TEAM_COLOR_INDICES: Record<number, number[]> = {
@@ -486,23 +487,11 @@ export class PlayerSpriteRenderer {
   ): void {
     if (!this.wrappingWorldSize) return;
     const { w, h } = this.wrappingWorldSize;
-    // Threshold: half the world size ensures ghosts cover any viewport width up to the world size
-    const thresholdX = w / 2;
-    const thresholdY = h / 2;
-    const nearLeft = px < thresholdX;
-    const nearRight = px > w - thresholdX;
-    const nearTop = py < thresholdY;
-    const nearBottom = py > h - thresholdY;
-
-    const offsets: { ox: number; oy: number }[] = [];
-    if (nearLeft) offsets.push({ ox: w, oy: 0 });
-    if (nearRight) offsets.push({ ox: -w, oy: 0 });
-    if (nearTop) offsets.push({ ox: 0, oy: h });
-    if (nearBottom) offsets.push({ ox: 0, oy: -h });
-    if (nearLeft && nearTop) offsets.push({ ox: w, oy: h });
-    if (nearLeft && nearBottom) offsets.push({ ox: w, oy: -h });
-    if (nearRight && nearTop) offsets.push({ ox: -w, oy: h });
-    if (nearRight && nearBottom) offsets.push({ ox: -w, oy: -h });
+    // Only mirror copies that would actually land in view. The old threshold was half the world
+    // size, which is true for every position, so every player always carried three ghost sprites
+    // plus three name labels, team indicators and shield Graphics — redrawn every frame, almost
+    // always off screen. (audit WRAP-GHOST-1)
+    const offsets = wrapGhostOffsets(this.scene.cameras.main.worldView, px, py, w, h, displaySize);
 
     let ghosts = this.ghostSprites.get(playerId);
 

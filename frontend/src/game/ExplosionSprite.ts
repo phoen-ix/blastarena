@@ -1,6 +1,7 @@
 import { ExplosionState } from '@blast-arena/shared';
 import { TILE_SIZE } from '@blast-arena/shared';
 import { getSettings } from './Settings';
+import { wrapGhostPositions } from '../utils/wrapGhosts';
 
 interface TrackedExplosion {
   sprites: Phaser.GameObjects.Sprite[];
@@ -60,28 +61,15 @@ export class ExplosionRenderer {
   private getCellPositions(cellX: number, cellY: number): { x: number; y: number }[] {
     const px = cellX * TILE_SIZE + TILE_SIZE / 2;
     const py = cellY * TILE_SIZE + TILE_SIZE / 2;
-    const positions = [{ x: px, y: py }];
 
-    if (this.wrappingWorldSize) {
-      const { w, h } = this.wrappingWorldSize;
-      const thresholdX = w / 2;
-      const thresholdY = h / 2;
-      const nearLeft = cellX * TILE_SIZE < thresholdX;
-      const nearRight = cellX * TILE_SIZE > w - thresholdX;
-      const nearTop = cellY * TILE_SIZE < thresholdY;
-      const nearBottom = cellY * TILE_SIZE > h - thresholdY;
+    if (!this.wrappingWorldSize) return [{ x: px, y: py }];
 
-      if (nearLeft) positions.push({ x: px + w, y: py });
-      if (nearRight) positions.push({ x: px - w, y: py });
-      if (nearTop) positions.push({ x: px, y: py + h });
-      if (nearBottom) positions.push({ x: px, y: py - h });
-      if (nearLeft && nearTop) positions.push({ x: px + w, y: py + h });
-      if (nearLeft && nearBottom) positions.push({ x: px + w, y: py - h });
-      if (nearRight && nearTop) positions.push({ x: px - w, y: py + h });
-      if (nearRight && nearBottom) positions.push({ x: px - w, y: py - h });
-    }
-
-    return positions;
+    // Every explosion cell used to get three wrapped copies unconditionally — the threshold was
+    // half the world size, which matches every position. A fire-range-5 bomb (~11 cells) therefore
+    // created ~44 sprites and instantly saturated EMITTER_HARD_CAP, so a player's own explosion had
+    // its particles suppressed by off-screen ghost copies. (audit WRAP-GHOST-1)
+    const { w, h } = this.wrappingWorldSize;
+    return wrapGhostPositions(this.scene.cameras.main.worldView, px, py, w, h, TILE_SIZE);
   }
 
   private createExplosion(explosion: ExplosionState): void {

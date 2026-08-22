@@ -620,14 +620,15 @@ export class HUDScene extends Phaser.Scene {
   private updateMinimap(state: GameState): void {
     if (!this.minimapEnabled || !this.minimapContainer) return;
 
-    // Only redraw every 4 ticks (~5 FPS) for performance
-    if (state.tick - this.lastMinimapTick < 4) return;
-    this.lastMinimapTick = state.tick;
-
     const map = state.map;
     const maxSize = 140;
 
-    // Maintain local tile copy (tick states omit full tiles for bandwidth)
+    // Maintain local tile copy (tick states omit full tiles for bandwidth).
+    //
+    // This MUST happen before the redraw throttle below. tileDiffs are per-tick and cleared
+    // server-side after each broadcast, so a diff skipped here is lost for good — with the
+    // throttle in front, three out of every four ticks' diffs were dropped and destroyed walls
+    // stayed drawn on the minimap for the rest of the match. (audit MINIMAP-DIFF-1)
     if (map.tiles && map.tiles.length > 0) {
       this.minimapTiles = map.tiles.map((row) => [...row]);
     } else if (this.minimapTiles && state.tileDiffs) {
@@ -635,6 +636,17 @@ export class HUDScene extends Phaser.Scene {
         this.minimapTiles[diff.y][diff.x] = diff.type;
       }
     }
+
+    // Redraw at ~5 FPS for performance.
+    //
+    // The open world builds a fresh GameStateManager for each round, which resets tick to 0. A
+    // plain `tick - last < 4` then went permanently negative from round 2 onward and the minimap
+    // froze on the previous round's map for the rest of the session (HUDScene is not restarted
+    // between rounds). A backwards tick means a new round. (audit MINIMAP-ROUND-1)
+    if (state.tick < this.lastMinimapTick) this.lastMinimapTick = -1;
+    if (state.tick - this.lastMinimapTick < 4) return;
+    this.lastMinimapTick = state.tick;
+
     if (!this.minimapTiles) return;
 
     // Lazily create canvas on first state with map data
