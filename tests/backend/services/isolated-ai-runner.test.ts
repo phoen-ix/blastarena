@@ -3,6 +3,7 @@ import {
   IsolatedBotAI,
   IsolatedEnemyAI,
   disposeAI,
+  AI_INVOKE_TIMEOUT_MS,
 } from '../../../backend/src/services/IsolatedAIRunner';
 import { CollisionSystem } from '../../../backend/src/game/CollisionSystem';
 import type { Direction, TileType } from '../../../shared/src/types/game';
@@ -131,7 +132,15 @@ describe('IsolatedAIRunner — security', () => {
     const ai = new IsolatedBotAI(BOT_LOOP, 'normal');
     const start = Date.now();
     expect(() => ai.generateInput(self, state)).toThrow(/timed out/i);
-    expect(Date.now() - start).toBeLessThan(2000); // killed quickly, not hung
+
+    // The guarantee under test is that the isolate is killed by its own timeout rather than
+    // hanging, and the throw above already establishes that. The elapsed-time check is only a
+    // sanity bound, so it is derived from the configured timeout with wide headroom instead of a
+    // bare 2000ms: on a loaded machine, scheduling delay around a 20ms budget is easily an order
+    // of magnitude, and a wall-clock assertion that tight fails for reasons unrelated to the
+    // isolate. Anything approaching this bound means the timeout is not being enforced at all.
+    // (audit FLAKY-WALLCLOCK-1)
+    expect(Date.now() - start).toBeLessThan(AI_INVOKE_TIMEOUT_MS + 5000);
     ai.dispose();
   });
 

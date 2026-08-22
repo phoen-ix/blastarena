@@ -48,30 +48,32 @@ const mockRunnerGetResults = jest.fn<AnyFn>().mockReturnValue([]);
 const mockRunnerOn = jest.fn<AnyFn>();
 
 jest.mock('../../../backend/src/simulation/SimulationRunner', () => ({
-  SimulationRunner: jest.fn<AnyFn>().mockImplementation((config: SimulationConfig, batchId: string) => {
-    const status: SimulationBatchStatus = {
-      batchId,
-      config,
-      status: 'running',
-      gamesCompleted: 0,
-      totalGames: config.totalGames,
-      currentGameTick: null,
-      currentGameMaxTicks: null,
-      startedAt: new Date().toISOString(),
-      completedAt: null,
-    };
-    mockRunnerGetStatus.mockReturnValue(status);
-    return {
-      batchId,
-      run: mockRunnerRun,
-      cancel: mockRunnerCancel,
-      isActive: mockRunnerIsActive,
-      getStatus: mockRunnerGetStatus,
-      getResults: mockRunnerGetResults,
-      on: mockRunnerOn,
-      emit: jest.fn(),
-    };
-  }),
+  SimulationRunner: jest
+    .fn<AnyFn>()
+    .mockImplementation((config: SimulationConfig, batchId: string) => {
+      const status: SimulationBatchStatus = {
+        batchId,
+        config,
+        status: 'running',
+        gamesCompleted: 0,
+        totalGames: config.totalGames,
+        currentGameTick: null,
+        currentGameMaxTicks: null,
+        startedAt: new Date().toISOString(),
+        completedAt: null,
+      };
+      mockRunnerGetStatus.mockReturnValue(status);
+      return {
+        batchId,
+        run: mockRunnerRun,
+        cancel: mockRunnerCancel,
+        isActive: mockRunnerIsActive,
+        getStatus: mockRunnerGetStatus,
+        getResults: mockRunnerGetResults,
+        on: mockRunnerOn,
+        emit: jest.fn(),
+      };
+    }),
 }));
 
 import { SimulationManager } from '../../../backend/src/simulation/SimulationManager';
@@ -586,7 +588,13 @@ describe('SimulationManager', () => {
       const statuses = result.batches.map((b) => b.status);
       // queued < running < completed
       for (let i = 0; i < statuses.length - 1; i++) {
-        const order: Record<string, number> = { queued: 0, running: 1, completed: 2, cancelled: 2, error: 2 };
+        const order: Record<string, number> = {
+          queued: 0,
+          running: 1,
+          completed: 2,
+          cancelled: 2,
+          error: 2,
+        };
         expect(order[statuses[i]]).toBeLessThanOrEqual(order[statuses[i + 1]]);
       }
     });
@@ -603,6 +611,48 @@ describe('SimulationManager', () => {
       expect(queued.length).toBe(2);
       expect(queued[0].queuePosition).toBe(1);
       expect(queued[1].queuePosition).toBe(2);
+    });
+
+    // Regression: getHistory has two exit paths, and the early one — taken when the simulations
+    // directory does not exist yet, which is this suite's default — sorted by startedAt alone.
+    // Queue order therefore held only while two batches happened to be queued in the SAME
+    // millisecond; the moment the clock ticked between them they came back reversed. That made
+    // the test above pass or fail depending on machine speed, and it was a genuine ordering bug in
+    // the admin history view. Forcing the timestamps apart pins it. (audit SIMHISTORY-ORDER-1)
+    it('orders queued entries by queue position even when they were queued milliseconds apart', () => {
+      mockRunnerIsActive.mockReturnValue(false);
+      manager.startBatch(createSimConfig(), 1);
+      mockRunnerIsActive.mockReturnValue(true);
+
+      manager.startBatch(createSimConfig(), 2);
+      manager.startBatch(createSimConfig(), 3);
+      manager.startBatch(createSimConfig(), 4);
+
+      // Spread the queuedAt stamps so a startedAt-descending sort would invert them.
+      const queueEntries = (manager as unknown as { queue: { queuedAt: Date }[] }).queue;
+      expect(queueEntries).toHaveLength(3);
+      queueEntries.forEach((entry, i) => {
+        entry.queuedAt = new Date(Date.now() + i * 1000);
+      });
+
+      const queued = manager.getHistory().batches.filter((b) => b.status === 'queued');
+      expect(queued.map((b) => b.queuePosition)).toEqual([1, 2, 3]);
+    });
+
+    it('puts queued entries ahead of the running one regardless of timestamps', () => {
+      mockRunnerIsActive.mockReturnValue(false);
+      manager.startBatch(createSimConfig(), 1);
+      mockRunnerIsActive.mockReturnValue(true);
+      manager.startBatch(createSimConfig(), 2);
+
+      const queueEntries = (manager as unknown as { queue: { queuedAt: Date }[] }).queue;
+      // Queued long ago: a startedAt-descending sort would push it behind the running batch.
+      queueEntries.forEach((entry) => {
+        entry.queuedAt = new Date(Date.now() - 60_000);
+      });
+
+      const statuses = manager.getHistory().batches.map((b) => b.status);
+      expect(statuses[0]).toBe('queued');
     });
 
     it('should handle disk batches without summary file', () => {
@@ -664,9 +714,7 @@ describe('SimulationManager', () => {
           return [{ name: 'ffa', isDirectory: () => true }];
         }
         if (dir.endsWith('ffa')) {
-          return [
-            { name: 'some_file.txt', isDirectory: () => false },
-          ];
+          return [{ name: 'some_file.txt', isDirectory: () => false }];
         }
         return [];
       });
@@ -684,9 +732,7 @@ describe('SimulationManager', () => {
       mockRunnerIsActive.mockReturnValue(false);
       const started = manager.startBatch(createSimConfig(), 1) as { batchId: string };
 
-      mockRunnerGetResults.mockReturnValue([
-        { gameIndex: 0, winnerId: -1, winnerName: 'BotA' },
-      ]);
+      mockRunnerGetResults.mockReturnValue([{ gameIndex: 0, winnerId: -1, winnerName: 'BotA' }]);
 
       const results = manager.getBatchResults(started.batchId);
       expect(results).not.toBeNull();
@@ -737,9 +783,7 @@ describe('SimulationManager', () => {
         }
         return [];
       });
-      mockReadFileSync.mockReturnValue(
-        JSON.stringify({ batchId: 'other_id', results: [] }),
-      );
+      mockReadFileSync.mockReturnValue(JSON.stringify({ batchId: 'other_id', results: [] }));
 
       const results = manager.getBatchResults('wrong_id');
       expect(results).toBeNull();
@@ -787,9 +831,7 @@ describe('SimulationManager', () => {
         }
         return [];
       });
-      mockReadFileSync.mockReturnValue(
-        JSON.stringify({ batchId: 'other_batch' }),
-      );
+      mockReadFileSync.mockReturnValue(JSON.stringify({ batchId: 'other_batch' }));
 
       const result = await manager.getSimulationReplay('batch1', 0);
       expect(result).toBeNull();
@@ -808,9 +850,7 @@ describe('SimulationManager', () => {
         // Return files without a replay match
         return ['batch_config.json', 'batch_summary.json'];
       });
-      mockReadFileSync.mockReturnValue(
-        JSON.stringify({ batchId: 'target_batch' }),
-      );
+      mockReadFileSync.mockReturnValue(JSON.stringify({ batchId: 'target_batch' }));
 
       const result = await manager.getSimulationReplay('target_batch', 0);
       expect(result).toBeNull();
@@ -859,9 +899,7 @@ describe('SimulationManager', () => {
         }
         return [];
       });
-      mockReadFileSync.mockReturnValue(
-        JSON.stringify({ batchId: started.batchId }),
-      );
+      mockReadFileSync.mockReturnValue(JSON.stringify({ batchId: started.batchId }));
 
       const deleted = manager.deleteBatch(started.batchId);
       expect(deleted).toBe(true);
@@ -1099,7 +1137,16 @@ describe('SimulationManager', () => {
         mapHeight: 17,
         roundTime: 300,
         wallDensity: 0.8,
-        enabledPowerUps: ['bomb_up', 'fire_up', 'speed_up', 'shield', 'kick', 'pierce_bomb', 'remote_bomb', 'line_bomb'] as any[],
+        enabledPowerUps: [
+          'bomb_up',
+          'fire_up',
+          'speed_up',
+          'shield',
+          'kick',
+          'pierce_bomb',
+          'remote_bomb',
+          'line_bomb',
+        ] as any[],
         powerUpDropRate: 0.5,
         friendlyFire: false,
         hazardTiles: true,

@@ -42,6 +42,7 @@ export class GameLogger {
   private logDir: string;
   private peakPlayerCount: number;
   private closed = false;
+  private closePromise: Promise<void> | null = null;
   private static lastPruneAt = 0;
   public replayRecorder: ReplayRecorder | null = null;
 
@@ -412,10 +413,25 @@ export class GameLogger {
     this.close();
   }
 
-  close(): void {
-    if (this.closed) return;
+  /**
+   * Close the log stream and finalise its filename.
+   *
+   * Returns a promise that settles once the stream has flushed AND the filename has been
+   * finalised, so a caller that needs the file complete and correctly named — a test asserting on
+   * it, or one tearing down its temp directory — can wait for the real thing instead of guessing
+   * with a sleep. Callers that do not care can keep ignoring the return value; close() stays
+   * idempotent and never rejects.
+   * (audit GAMELOG-CLOSE-1)
+   */
+  close(): Promise<void> {
+    if (this.closed) return this.closePromise ?? Promise.resolve();
     this.closed = true;
-    this.stream.end(() => this.finalizeFilename());
+    this.closePromise = new Promise<void>((resolve) => {
+      this.stream.end(() => {
+        void this.finalizeFilename().then(resolve);
+      });
+    });
+    return this.closePromise;
   }
 
   /**
@@ -423,18 +439,25 @@ export class GameLogger {
    * fill up later. Rewrite the trailing count to the peak actually observed, so that `_0p` really
    * does mean "nobody ever played" — which is the guarantee pruneOldLogs relies on.
    */
-  private finalizeFilename(): void {
+  private finalizeFilename(): Promise<void> {
     const target = this.filename.replace(/_(\d+)p\.jsonl$/, `_${this.peakPlayerCount}p.jsonl`);
-    if (target === this.filename) return;
+    if (target === this.filename) return Promise.resolve();
 
     const from = path.join(this.logDir, this.filename);
     const to = path.join(this.logDir, target);
-    fs.rename(from, to, (err) => {
-      if (err) {
-        logger.warn({ err, from: this.filename, to: target }, 'Could not finalize game log name');
-        return;
-      }
-      this.filename = target;
+    // Resolves when the rename has actually landed, so close() can mean "flushed AND renamed".
+    // It previously fired and forgot, which left close() resolving while the file still carried
+    // its opening name. Renaming stays best-effort: a failure is logged, never thrown.
+    // (audit GAMELOG-CLOSE-1)
+    return new Promise<void>((resolve) => {
+      fs.rename(from, to, (err) => {
+        if (err) {
+          logger.warn({ err, from: this.filename, to: target }, 'Could not finalize game log name');
+        } else {
+          this.filename = target;
+        }
+        resolve();
+      });
     });
   }
 }

@@ -24,6 +24,30 @@ interface QueueEntry {
   queuedAt: Date;
 }
 
+/**
+ * History ordering: queued first in queue order, then running, then everything else newest-first.
+ *
+ * Shared by both of getHistory's exit paths — they had drifted, and the early one (taken when the
+ * simulations directory does not exist yet) ignored status and queuePosition entirely.
+ * (audit SIMHISTORY-ORDER-1)
+ */
+function compareHistoryEntries(a: SimulationBatchStatus, b: SimulationBatchStatus): number {
+  const order: Record<string, number> = {
+    queued: 0,
+    running: 1,
+    completed: 2,
+    cancelled: 2,
+    error: 2,
+  };
+  const ao = order[a.status] ?? 2;
+  const bo = order[b.status] ?? 2;
+  if (ao !== bo) return ao - bo;
+  if (a.status === 'queued' && b.status === 'queued') {
+    return (a.queuePosition ?? 0) - (b.queuePosition ?? 0);
+  }
+  return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
+}
+
 export class SimulationManager {
   private runners: Map<string, SimulationRunner> = new Map();
   private batchCounter: number = 0;
@@ -148,7 +172,13 @@ export class SimulationManager {
     const memoryBatchIds = new Set([...this.runners.keys(), ...this.queue.map((e) => e.batchId)]);
     try {
       if (!fs.existsSync(SIM_LOG_DIR)) {
-        history.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+        // Same ordering as the main path below. This used to sort by startedAt alone, so before
+        // any batch had been written to disk the queue came back newest-first instead of in queue
+        // order — queuePosition 2 ahead of 1 whenever two batches were queued in different
+        // milliseconds, and in queue order whenever they happened to land in the same one. That
+        // is a real ordering bug in the admin history view, and the reason the test covering it
+        // failed intermittently. (audit SIMHISTORY-ORDER-1)
+        history.sort(compareHistoryEntries);
         return { batches: history.slice((page - 1) * limit, page * limit), total: history.length };
       }
 
@@ -203,17 +233,7 @@ export class SimulationManager {
       logger.error({ err }, 'Failed to scan simulation history');
     }
 
-    // Sort: queued first (by position), running next, then by startedAt descending
-    history.sort((a, b) => {
-      const order = { queued: 0, running: 1, completed: 2, cancelled: 2, error: 2 };
-      const ao = order[a.status] ?? 2;
-      const bo = order[b.status] ?? 2;
-      if (ao !== bo) return ao - bo;
-      if (a.status === 'queued' && b.status === 'queued') {
-        return (a.queuePosition ?? 0) - (b.queuePosition ?? 0);
-      }
-      return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
-    });
+    history.sort(compareHistoryEntries);
 
     return { batches: history.slice((page - 1) * limit, page * limit), total: history.length };
   }

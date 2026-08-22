@@ -66,8 +66,7 @@ const explosion = (): Explosion =>
 
 /** Flush the write stream, then return every parsed JSONL record. */
 async function readEntries(logger: GameLogger, dir: string): Promise<Record<string, unknown>[]> {
-  logger.close();
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await logger.close();
   const file = fs.readdirSync(dir).find((f) => f.endsWith('.jsonl'));
   if (!file) return [];
   return fs
@@ -80,6 +79,19 @@ async function readEntries(logger: GameLogger, dir: string): Promise<Record<stri
 const countTicks = (entries: Record<string, unknown>[]): number =>
   entries.filter((e) => e.event === 'tick').length;
 
+/**
+ * Poll until `predicate` holds. Used instead of a fixed sleep for things the logger does
+ * asynchronously — opening its write stream, in particular — so the test is bounded by the work
+ * actually finishing rather than by a guess at how long a loaded machine needs.
+ */
+async function waitFor(predicate: () => boolean, timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error('waitFor: condition not met within timeout');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
 /** Create a .jsonl of roughly `sizeBytes`, backdated so the prune mtime guard does not skip it. */
 function seedLog(dir: string, name: string, ageMs: number, sizeBytes: number): string {
   const file = path.join(dir, name);
@@ -89,22 +101,39 @@ function seedLog(dir: string, name: string, ageMs: number, sizeBytes: number): s
   return file;
 }
 
+/**
+ * Every logger a test creates, so teardown can wait for each one's stream to actually close.
+ *
+ * Write streams flush asynchronously. Removing tmpDir while one is still open makes it ENOENT —
+ * and because Jest runs several test FILES per worker process, that error surfaced in whichever
+ * suite ran next in the same worker, not here. This suite was the source of intermittent failures
+ * in SimulationManager and isolated-ai-runner. It used to paper over the race with a 50ms sleep,
+ * which is exactly as reliable as the machine is idle. close() is awaitable now, so teardown waits
+ * for the real thing. (audit GAMELOG-CLOSE-1)
+ */
+let openLoggers: GameLogger[] = [];
+
+function track(logger: GameLogger): GameLogger {
+  openLoggers.push(logger);
+  return logger;
+}
+
 describe('GameLogger', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     tmpDir = makeTmpDir();
+    openLoggers = [];
   });
 
   afterEach(async () => {
-    // Write streams flush asynchronously; removing the directory first makes them ENOENT into
-    // whichever test runs next.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await Promise.all(openLoggers.map((l) => l.close()));
+    openLoggers = [];
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   describe('idle gating', () => {
     it('stops writing ticks once an empty room passes the idle window', async () => {
-      const gl = new GameLogger('room', 'open_world', 0, { logDir: tmpDir });
+      const gl = track(new GameLogger('room', 'open_world', 0, { logDir: tmpDir }));
 
       for (let tick = 0; tick <= 200; tick++) {
         gl.logTick(tick, [], [], []);
@@ -117,7 +146,7 @@ describe('GameLogger', () => {
     });
 
     it('records the opening ticks of an empty room so game_init has context', async () => {
-      const gl = new GameLogger('room', 'open_world', 0, { logDir: tmpDir });
+      const gl = track(new GameLogger('room', 'open_world', 0, { logDir: tmpDir }));
 
       for (let tick = 0; tick <= 10; tick++) {
         gl.logTick(tick, [], [], []);
@@ -129,7 +158,7 @@ describe('GameLogger', () => {
     });
 
     it('resumes and keeps writing while players are present', async () => {
-      const gl = new GameLogger('room', 'open_world', 0, { logDir: tmpDir });
+      const gl = track(new GameLogger('room', 'open_world', 0, { logDir: tmpDir }));
 
       for (let tick = 0; tick <= 200; tick++) gl.logTick(tick, [], [], []);
       for (let tick = 201; tick <= 260; tick++) gl.logTick(tick, [player(1)], [], []);
@@ -139,7 +168,7 @@ describe('GameLogger', () => {
     });
 
     it('treats a bomb with no players as activity', async () => {
-      const gl = new GameLogger('room', 'open_world', 0, { logDir: tmpDir });
+      const gl = track(new GameLogger('room', 'open_world', 0, { logDir: tmpDir }));
 
       for (let tick = 0; tick <= 200; tick++) gl.logTick(tick, [], [], []);
       gl.logTick(201, [], [bomb()], []);
@@ -148,7 +177,7 @@ describe('GameLogger', () => {
     });
 
     it('treats an explosion with no players as activity', async () => {
-      const gl = new GameLogger('room', 'open_world', 0, { logDir: tmpDir });
+      const gl = track(new GameLogger('room', 'open_world', 0, { logDir: tmpDir }));
 
       for (let tick = 0; tick <= 200; tick++) gl.logTick(tick, [], [], []);
       gl.logTick(201, [], [], [explosion()]);
@@ -157,7 +186,7 @@ describe('GameLogger', () => {
     });
 
     it('never suppresses ticks in a continuously active room', async () => {
-      const gl = new GameLogger('room', 'ffa', 2, { logDir: tmpDir });
+      const gl = track(new GameLogger('room', 'ffa', 2, { logDir: tmpDir }));
 
       for (let tick = 0; tick <= 300; tick++) {
         gl.logTick(tick, [player(1), player(2)], [], []);
@@ -169,9 +198,11 @@ describe('GameLogger', () => {
 
   describe('shouldLogTick verbosity mapping', () => {
     it('is unchanged by the idle gate', () => {
-      const full = new GameLogger('r', 'm', 0, { logDir: tmpDir, verbosity: 'full' });
-      const detailed = new GameLogger('r', 'm', 0, { logDir: tmpDir, verbosity: 'detailed' });
-      const normal = new GameLogger('r', 'm', 0, { logDir: tmpDir, verbosity: 'normal' });
+      const full = track(new GameLogger('r', 'm', 0, { logDir: tmpDir, verbosity: 'full' }));
+      const detailed = track(
+        new GameLogger('r', 'm', 0, { logDir: tmpDir, verbosity: 'detailed' }),
+      );
+      const normal = track(new GameLogger('r', 'm', 0, { logDir: tmpDir, verbosity: 'normal' }));
 
       expect(full.shouldLogTick(1)).toBe(true);
       expect(full.shouldLogTick(7)).toBe(true);
@@ -315,14 +346,13 @@ describe('GameLogger', () => {
       fs.readdirSync(dir).filter((f) => f.endsWith('.jsonl'));
 
     it('rewrites the trailing count to the peak player count on close', async () => {
-      const gl = new GameLogger('openworld_r1', 'open_world', 0, { logDir: tmpDir });
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      const gl = track(new GameLogger('openworld_r1', 'open_world', 0, { logDir: tmpDir }));
+      await waitFor(() => filenames(tmpDir).length === 1);
       expect(filenames(tmpDir)[0]).toMatch(/_0p\.jsonl$/);
 
       gl.logTick(1, [player(1), player(2), player(3)], [], []);
       gl.logTick(2, [player(1)], [], []);
-      gl.close();
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await gl.close();
 
       // Peak was 3, even though the room opened empty and ended with one player.
       expect(filenames(tmpDir)).toHaveLength(1);
@@ -330,20 +360,20 @@ describe('GameLogger', () => {
     });
 
     it('leaves the name alone for a room that really stayed empty', async () => {
-      const gl = new GameLogger('openworld_r2', 'open_world', 0, { logDir: tmpDir });
+      const gl = track(new GameLogger('openworld_r2', 'open_world', 0, { logDir: tmpDir }));
       gl.logTick(1, [], [], []);
-      gl.close();
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await gl.close();
 
       expect(filenames(tmpDir)[0]).toMatch(/_0p\.jsonl$/);
     });
 
     it('is safe to close twice', async () => {
-      const gl = new GameLogger('room', 'ffa', 2, { logDir: tmpDir });
+      const gl = track(new GameLogger('room', 'ffa', 2, { logDir: tmpDir }));
       gl.logTick(1, [player(1), player(2)], [], []);
-      gl.close();
+      const first = gl.close();
       expect(() => gl.close()).not.toThrow();
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await first;
+      await gl.close(); // the second close resolves too, rather than hanging
 
       expect(filenames(tmpDir)).toHaveLength(1);
     });
