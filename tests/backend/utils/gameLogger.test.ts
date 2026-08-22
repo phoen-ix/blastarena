@@ -278,22 +278,41 @@ describe('GameLogger', () => {
       expect(fs.existsSync(path.join(tmpDir, 'ancient_open_world_0p.jsonl'))).toBe(false);
     });
 
-    it('counts only empty-room logs toward the size limit', async () => {
+    // The size cap is a statement about the directory's footprint, so it is measured against
+    // every log — including the ones we will never delete. Summing only the deletable subset
+    // meant the cap was compared against a fraction of real usage, so once real-player logs
+    // dominated the directory it could never trigger at all. Protected logs still count toward
+    // the budget without ever becoming candidates. (audit GAMELOG-ACCOUNTING-1)
+    it('counts every log toward the size limit, including protected ones', async () => {
       const MB = 1024 * 1024;
-      seedLog(tmpDir, 'big_ffa_2p.jsonl', 4 * HOUR_MS, 10 * MB); // protected, not counted
+      seedLog(tmpDir, 'big_ffa_2p.jsonl', 4 * HOUR_MS, 10 * MB); // protected, but still counted
       seedLog(tmpDir, 'small_open_world_0p.jsonl', 3 * HOUR_MS, MB);
 
       const GL = await loadWith({ GAME_LOG_MAX_AGE_DAYS: '3650', GAME_LOG_MAX_TOTAL_MB: '5' });
       await GL.pruneOldLogs(tmpDir);
 
+      // 11 MB in the directory against a 5 MB budget: the disposable log is evicted...
+      expect(fs.existsSync(path.join(tmpDir, 'small_open_world_0p.jsonl'))).toBe(false);
+      // ...and the protected one is still never deleted, even though it is what blew the budget.
       expect(fs.existsSync(path.join(tmpDir, 'big_ffa_2p.jsonl'))).toBe(true);
-      // 1 MB of prunable data is under the 5 MB budget, so it survives too.
+    });
+
+    it('leaves disposable logs alone while the directory is under the size limit', async () => {
+      const MB = 1024 * 1024;
+      seedLog(tmpDir, 'small_ffa_2p.jsonl', 4 * HOUR_MS, MB);
+      seedLog(tmpDir, 'small_open_world_0p.jsonl', 3 * HOUR_MS, MB);
+
+      const GL = await loadWith({ GAME_LOG_MAX_AGE_DAYS: '3650', GAME_LOG_MAX_TOTAL_MB: '50' });
+      await GL.pruneOldLogs(tmpDir);
+
+      expect(fs.existsSync(path.join(tmpDir, 'small_ffa_2p.jsonl'))).toBe(true);
       expect(fs.existsSync(path.join(tmpDir, 'small_open_world_0p.jsonl'))).toBe(true);
     });
   });
 
   describe('filename finalisation', () => {
-    const filenames = (dir: string): string[] => fs.readdirSync(dir).filter((f) => f.endsWith('.jsonl'));
+    const filenames = (dir: string): string[] =>
+      fs.readdirSync(dir).filter((f) => f.endsWith('.jsonl'));
 
     it('rewrites the trailing count to the peak player count on close', async () => {
       const gl = new GameLogger('openworld_r1', 'open_world', 0, { logDir: tmpDir });

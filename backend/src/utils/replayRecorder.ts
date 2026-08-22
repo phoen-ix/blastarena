@@ -18,6 +18,82 @@ import { logger } from './logger';
 
 const REPLAY_DIR = process.env.REPLAY_DIR || '/app/replays';
 
+// Retention bounds for the replay directory.
+//
+// Game logs gained an age+size bound (see gameLogger), but replays had none: one gzipped file was
+// written per finished match, forever, removed only by an explicit admin delete, and the
+// data/replays bind mount has no Docker-level rotation either. A modest deployment had already
+// accumulated 5.5k files. Deliberately generous — a safety net against unbounded growth, not an
+// archiving policy. (audit REPLAY-RETENTION-1)
+const REPLAY_MAX_TOTAL_MB = Number(process.env.REPLAY_MAX_TOTAL_MB ?? 10240);
+const REPLAY_MAX_AGE_DAYS = Number(process.env.REPLAY_MAX_AGE_DAYS ?? 365);
+const REPLAY_PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+
+// Only multiplayer match replays are prunable. Campaign replays (`campaign_<sessionId>...`) are
+// referenced by rows in campaign_replays and surfaced in the admin UI, so deleting the file behind
+// a live row would leave a broken entry — those are removed through deleteCampaignReplay only.
+const MATCH_REPLAY_RE = /^\d+_.*\.replay\.json\.gz$/;
+
+let lastReplayPruneAt = 0;
+
+/**
+ * Bound the replay directory by age, then by total size, oldest first.
+ * Housekeeping must never take a game down, so every failure here is swallowed.
+ */
+export async function pruneOldReplays(dir: string): Promise<void> {
+  const now = Date.now();
+  if (now - lastReplayPruneAt < REPLAY_PRUNE_INTERVAL_MS) return;
+  lastReplayPruneAt = now;
+
+  try {
+    const names = await fs.promises.readdir(dir);
+    const entries: { file: string; mtimeMs: number; size: number }[] = [];
+
+    for (const name of names) {
+      if (!MATCH_REPLAY_RE.test(name)) continue;
+      const file = path.join(dir, name);
+      try {
+        const st = await fs.promises.stat(file);
+        if (!st.isFile()) continue;
+        // Anything just written may still be in flight.
+        if (now - st.mtimeMs < REPLAY_PRUNE_INTERVAL_MS) continue;
+        entries.push({ file, mtimeMs: st.mtimeMs, size: st.size });
+      } catch {
+        // Raced with a delete; skip it.
+      }
+    }
+
+    entries.sort((a, b) => a.mtimeMs - b.mtimeMs); // oldest first
+
+    let total = entries.reduce((sum, e) => sum + e.size, 0);
+    const maxTotalBytes = REPLAY_MAX_TOTAL_MB * 1024 * 1024;
+    const maxAgeMs = REPLAY_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+
+    let removed = 0;
+    let freed = 0;
+    for (const entry of entries) {
+      const tooOld = now - entry.mtimeMs > maxAgeMs;
+      const overSize = total > maxTotalBytes;
+      if (!tooOld && !overSize) break; // sorted oldest-first, so nothing later qualifies on age
+
+      try {
+        await fs.promises.unlink(entry.file);
+        total -= entry.size;
+        freed += entry.size;
+        removed++;
+      } catch {
+        // Already gone; keep going.
+      }
+    }
+
+    if (removed > 0) {
+      logger.info({ removed, freedMB: Math.round(freed / 1024 / 1024), dir }, 'Pruned old replays');
+    }
+  } catch (err) {
+    logger.warn({ err, dir }, 'Replay pruning failed');
+  }
+}
+
 /**
  * Placement entries differ by game type (multiplayer, campaign, simulation, open world),
  * so the recorder accepts any JSON-serializable placement objects.
@@ -229,6 +305,8 @@ export class ReplayRecorder {
               { matchId: this.matchId, filePath, sizeKB, frames: frameCount },
               'Replay saved',
             );
+            // Bound the directory. Rate-limited internally, and never blocks the write.
+            setImmediate(() => void pruneOldReplays(dir));
           }
         });
       });

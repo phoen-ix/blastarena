@@ -2372,6 +2372,29 @@ describe('Middleware presence', () => {
     }
   });
 
+  // The DOS-1/2/3 limiter was introduced for "an unbounded filesystem scan (+ gzip decompress for
+  // replays)" but was only ever attached to /admin/simulations*. The replay endpoints — the ones
+  // that actually gunzip a whole replay, and reachable by moderators via the router-level
+  // staffMiddleware — were left ungated. (audit DOS-4)
+  it('replay read routes share the filesystem read limiter with the simulation routes', () => {
+    const handlesOf = (method: string, path: string) =>
+      getRouteStack(method, path).map((e) => e.handle);
+
+    const simHandles = handlesOf('get', '/admin/simulations');
+    const limiter = simHandles.find(
+      (h) => h !== mockAdminOnlyMiddleware && simHandles.indexOf(h) < simHandles.length - 1,
+    );
+    expect(limiter).toBeDefined();
+
+    for (const path of [
+      '/admin/replays',
+      '/admin/replays/:matchId',
+      '/admin/campaign-replays/:sessionId',
+    ]) {
+      expect(handlesOf('get', path)).toContain(limiter);
+    }
+  });
+
   it('admin-only routes have adminOnlyMiddleware in their route stack', () => {
     const adminOnlyRoutes = [
       { method: 'put', path: '/admin/settings/registration_enabled' },

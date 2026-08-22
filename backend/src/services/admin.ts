@@ -342,7 +342,7 @@ export async function getMatchDetail(matchId: number) {
     [matchId],
   );
 
-  const replayExists = hasReplay(match.id);
+  const replayExists = await hasReplay(match.id);
 
   // If replay exists, use its placements (includes bots + more stats)
   let allPlayers: ReplayData['gameOver']['placements'] | null = null;

@@ -88,14 +88,25 @@ export class GameLogger {
       const names = await fsp.readdir(logDir);
       const entries: { file: string; mtimeMs: number; size: number }[] = [];
 
+      // Directory-wide footprint. This deliberately counts logs we will never delete: the size cap
+      // is a statement about how much disk this directory may occupy, so it has to be measured
+      // against the whole directory. Summing only the deletable subset — as this used to — meant
+      // MAX_TOTAL_MB was compared against a fraction of the real usage, so once real-player logs
+      // dominated, the cap could never trigger and the "bound the directory by total size"
+      // guarantee in the comment above silently did not hold. (audit GAMELOG-ACCOUNTING-1)
+      let total = 0;
+
       for (const name of names) {
         if (!name.endsWith('.jsonl')) continue;
-        // Never auto-delete a log that had players in it. Only empty rooms are disposable.
-        if (!EMPTY_ROOM_LOG_RE.test(name)) continue;
         const file = path.join(logDir, name);
         try {
           const st = await fsp.stat(file);
           if (!st.isFile()) continue;
+          total += st.size;
+
+          // Never auto-delete a log that had players in it. Only empty rooms are disposable —
+          // they still count toward `total` above, they are just not candidates for removal.
+          if (!EMPTY_ROOM_LOG_RE.test(name)) continue;
           // Anything touched recently may still be an open stream.
           if (now - st.mtimeMs < PRUNE_INTERVAL_MS) continue;
           entries.push({ file, mtimeMs: st.mtimeMs, size: st.size });
@@ -105,8 +116,6 @@ export class GameLogger {
       }
 
       entries.sort((a, b) => a.mtimeMs - b.mtimeMs); // oldest first
-
-      let total = entries.reduce((sum, e) => sum + e.size, 0);
       const maxTotalBytes = MAX_TOTAL_MB * 1024 * 1024;
       const maxAgeMs = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 

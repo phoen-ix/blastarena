@@ -1156,7 +1156,7 @@ router.delete('/admin/matches/:id', adminOnlyMiddleware, async (req, res, next) 
     const matchId = parseInt(req.params.id);
     if (isNaN(matchId)) return res.status(400).json({ error: 'Invalid match ID' });
     // Delete replay file if it exists
-    replayService.deleteReplay(matchId);
+    await replayService.deleteReplay(matchId);
     // Delete match record (cascades to match_players)
     await execute('DELETE FROM matches WHERE id = ?', [matchId]);
     await execute(
@@ -1175,7 +1175,7 @@ router.delete('/admin/matches', adminOnlyMiddleware, async (req, res, next) => {
     const matches = await adminService.getMatchHistory(1, 100000);
     let replaysCleaned = 0;
     for (const m of matches.matches) {
-      if (replayService.deleteReplay(m.id)) replaysCleaned++;
+      if (await replayService.deleteReplay(m.id)) replaysCleaned++;
     }
     // Delete all match records (cascades to match_players)
     await execute('DELETE FROM matches');
@@ -1268,9 +1268,19 @@ router.delete(
   },
 );
 
+// Rate-limit the replay and simulation read endpoints: each performs an unbounded filesystem scan
+// (+ gzip decompress for replays), so repeated calls are a disk/CPU DoS even for admins.
+// (audit DOS-1/2/3)
+//
+// This originally guarded only /admin/simulations*, even though its own rationale calls out the
+// replay decompression — leaving the three endpoints that actually gunzip a whole replay
+// ungated, and reachable by moderators as well as admins via the router-level staffMiddleware.
+// (audit DOS-4)
+const fsReadLimiter = rateLimiter({ windowMs: 10_000, maxRequests: 15 });
+
 // --- Replays ---
 
-router.get('/admin/replays', async (req, res, next) => {
+router.get('/admin/replays', fsReadLimiter, async (req, res, next) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
@@ -1281,7 +1291,7 @@ router.get('/admin/replays', async (req, res, next) => {
   }
 });
 
-router.get('/admin/replays/:matchId', async (req, res, next) => {
+router.get('/admin/replays/:matchId', fsReadLimiter, async (req, res, next) => {
   try {
     const matchId = parseInt(req.params.matchId);
     const replay = await replayService.getReplay(matchId);
@@ -1298,7 +1308,7 @@ router.get('/admin/replays/:matchId', async (req, res, next) => {
 router.delete('/admin/replays/:matchId', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const matchId = parseInt(req.params.matchId);
-    const deleted = replayService.deleteReplay(matchId);
+    const deleted = await replayService.deleteReplay(matchId);
     if (!deleted) {
       res.status(404).json({ error: 'Replay not found' });
       return;
@@ -1324,7 +1334,7 @@ router.get('/admin/campaign-replays', async (req, res, next) => {
   }
 });
 
-router.get('/admin/campaign-replays/:sessionId', async (req, res, next) => {
+router.get('/admin/campaign-replays/:sessionId', fsReadLimiter, async (req, res, next) => {
   try {
     const replay = await replayService.getCampaignReplay(req.params.sessionId);
     if (!replay) {
@@ -1388,18 +1398,14 @@ const simulationConfigSchema = z.object({
   botAiId: z.string().max(36).optional(),
 });
 
-// Rate-limit the simulation read endpoints: each performs an unbounded recursive filesystem scan
-// (+ gzip decompress for replays), so repeated calls are a disk/CPU DoS even for admins. (audit DOS-1/2/3)
-const simReadLimiter = rateLimiter({ windowMs: 10_000, maxRequests: 15 });
-
-router.get('/admin/simulations', adminOnlyMiddleware, simReadLimiter, (req, res) => {
+router.get('/admin/simulations', adminOnlyMiddleware, fsReadLimiter, (req, res) => {
   const mgr = getSimulationManager();
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
   res.json(mgr.getHistory(page, limit));
 });
 
-router.get('/admin/simulations/:batchId', adminOnlyMiddleware, simReadLimiter, (req, res) => {
+router.get('/admin/simulations/:batchId', adminOnlyMiddleware, fsReadLimiter, (req, res) => {
   const mgr = getSimulationManager();
   const data = mgr.getBatchResults(req.params.batchId);
   if (!data) {
@@ -1412,7 +1418,7 @@ router.get('/admin/simulations/:batchId', adminOnlyMiddleware, simReadLimiter, (
 router.get(
   '/admin/simulations/:batchId/replay/:gameIndex',
   adminOnlyMiddleware,
-  simReadLimiter,
+  fsReadLimiter,
   async (req, res, next) => {
     try {
       const mgr = getSimulationManager();
