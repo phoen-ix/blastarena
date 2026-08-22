@@ -58,12 +58,14 @@ export class BotAIRegistry {
     aiId: string | undefined,
     difficulty: 'easy' | 'normal' | 'hard',
     mapSize?: { width: number; height: number },
+    /** Per-bot seed, so bot decisions are reproducible. (audit BOTAI-DETERMINISM-1) */
+    seed?: number,
   ): IBotAI {
     const id = aiId || 'builtin';
     const entry = this.loaded.get(id);
     if (!entry) {
       logger.warn({ aiId: id }, 'Requested AI not found, falling back to builtin');
-      return new BotAI(difficulty, mapSize);
+      return new BotAI(difficulty, mapSize, seed);
     }
     if (entry.kind === 'class') {
       return new entry.ctor(difficulty, mapSize);
@@ -78,7 +80,7 @@ export class BotAIRegistry {
         { aiId: id, error: msg },
         'Failed to create isolated bot AI, falling back to builtin',
       );
-      return new BotAI(difficulty, mapSize);
+      return new BotAI(difficulty, mapSize, seed);
     }
   }
 

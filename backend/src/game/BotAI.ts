@@ -9,6 +9,7 @@ import {
 import { Player } from './Player';
 import { GameStateManager } from './GameState';
 import { GameLogger } from '../utils/gameLogger';
+import { SeededRandom } from './SeededRandom';
 
 const DIRECTIONS: Direction[] = ['up', 'down', 'left', 'right'];
 const DIR_DELTA: Record<Direction, { dx: number; dy: number }> = {
@@ -225,10 +226,23 @@ export class BotAI implements IBotAI {
   private duelStalemateTicks: number = 0;
   private lastDuelKills: number = 0;
 
+  /**
+   * Seeded so bot behaviour is reproducible.
+   *
+   * Every other source of randomness in the engine runs off SeededRandom(mapSeed), which is what
+   * makes a replay re-run reproduce the recorded match and a simulation batch comparable. BotAI
+   * used this.rng.next() in ten places, so any match with bots diverged on replay. The seed is
+   * supplied per bot by the caller; the default keeps standalone construction deterministic
+   * rather than falling back to wall-clock entropy. (audit BOTAI-DETERMINISM-1)
+   */
+  private rng: SeededRandom;
+
   constructor(
     difficulty: 'easy' | 'normal' | 'hard' = 'normal',
     mapSize?: { width: number; height: number },
+    seed: number = 1,
   ) {
+    this.rng = new SeededRandom(seed);
     this.config = { ...DIFFICULTY_PRESETS[difficulty] };
 
     // Scale parameters based on map size relative to default 15×13 (Change 4)
@@ -431,9 +445,9 @@ export class BotAI implements IBotAI {
         let escapeDir = escapeResult.dir;
 
         // Easy bots sometimes flee in wrong direction
-        if (this.config.wrongMoveChance > 0 && Math.random() < this.config.wrongMoveChance) {
+        if (this.config.wrongMoveChance > 0 && this.rng.next() < this.config.wrongMoveChance) {
           const altDirs = DIRECTIONS.filter((d) => d !== escapeDir);
-          for (const d of altDirs.sort(() => Math.random() - 0.5)) {
+          for (const d of this.rng.shuffle([...altDirs])) {
             if (state.collisionSystem.canMoveTo(pos.x, pos.y, d, bombPositions, otherPlayers)) {
               escapeDir = d;
               break;
@@ -469,7 +483,7 @@ export class BotAI implements IBotAI {
             }
             const candidates = safeDirs.length > 0 ? safeDirs : anyDirs;
             if (candidates.length > 0) {
-              const dir = candidates[Math.floor(Math.random() * candidates.length)];
+              const dir = candidates[Math.floor(this.rng.next() * candidates.length)];
               this.lastDirection = dir;
               this.fleeStuckTicks = 0;
               this.lastFleePos = null;
@@ -695,7 +709,7 @@ export class BotAI implements IBotAI {
     // Random bomb placement for easy bots (before safety checks)
     if (
       this.config.randomBombChance > 0 &&
-      Math.random() < this.config.randomBombChance &&
+      this.rng.next() < this.config.randomBombChance &&
       this.bombCooldown <= 0 &&
       player.canPlaceBomb()
     ) {
@@ -786,14 +800,14 @@ export class BotAI implements IBotAI {
               }
             }
             if (hasVulnerableTarget) {
-              this.bombCooldown = cdMin + Math.floor(Math.random() * (cdMax - cdMin));
+              this.bombCooldown = cdMin + Math.floor(this.rng.next() * (cdMax - cdMin));
               logDecision('bomb_offensive', { cooldown: this.bombCooldown });
               return { seq: this.seq, direction: null, action: 'bomb', tick: state.tick };
             }
           }
 
           if (this.isNearDestructible(pos, state)) {
-            this.bombCooldown = cdMin + Math.floor(Math.random() * (cdMax - cdMin));
+            this.bombCooldown = cdMin + Math.floor(this.rng.next() * (cdMax - cdMin));
             logDecision('bomb_wall', { cooldown: this.bombCooldown });
             return { seq: this.seq, direction: null, action: 'bomb', tick: state.tick };
           }
@@ -858,7 +872,7 @@ export class BotAI implements IBotAI {
     const effectiveHuntChance = midGame
       ? Math.min(this.config.huntChance + 0.1, 1)
       : this.config.huntChance;
-    const shouldHunt = this.huntLockTicks > 0 || lateGame || Math.random() < effectiveHuntChance;
+    const shouldHunt = this.huntLockTicks > 0 || lateGame || this.rng.next() < effectiveHuntChance;
 
     if (shouldHunt) {
       // Hunt oscillation detection (Fix C): detect stuck hunting patterns
@@ -957,7 +971,7 @@ export class BotAI implements IBotAI {
               this.bombCooldown =
                 this.config.bombCooldownMin +
                 Math.floor(
-                  Math.random() * (this.config.bombCooldownMax - this.config.bombCooldownMin),
+                  this.rng.next() * (this.config.bombCooldownMax - this.config.bombCooldownMin),
                 );
               logDecision('bomb_hunt', {
                 cooldown: this.bombCooldown,
@@ -2090,11 +2104,11 @@ export class BotAI implements IBotAI {
     const pool = nonOsc.length > 0 ? nonOsc : candidates;
 
     const currentDirCandidate = pool.find((c) => c.dir === this.lastDirection);
-    if (currentDirCandidate && Math.random() < 0.85) {
+    if (currentDirCandidate && this.rng.next() < 0.85) {
       return currentDirCandidate.dir;
     }
 
-    const shuffled = pool.sort(() => Math.random() - 0.5);
+    const shuffled = this.rng.shuffle([...pool]);
     return shuffled[0].dir;
   }
 

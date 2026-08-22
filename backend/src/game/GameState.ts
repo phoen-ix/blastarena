@@ -55,6 +55,7 @@ import { getBotAIRegistry } from '../services/botai-registry';
 import { disposeAI } from '../services/IsolatedAIRunner';
 import { GameLogger } from '../utils/gameLogger';
 import { PuzzleTileProcessor } from './PuzzleTileProcessor';
+import { SeededRandom } from './SeededRandom';
 
 /** Single-pass Map-to-array transform (avoids intermediate Array.from allocation) */
 function mapToArray<K, V, R>(map: Map<K, V>, fn: (v: V) => R): R[] {
@@ -64,16 +65,6 @@ function mapToArray<K, V, R>(map: Map<K, V>, fn: (v: V) => R): R[] {
 }
 
 // Simple seeded random for power-up drops
-class SeededRandom {
-  private seed: number;
-  constructor(seed: number) {
-    this.seed = seed;
-  }
-  next(): number {
-    this.seed = (this.seed * 1664525 + 1013904223) & 0xffffffff;
-    return (this.seed >>> 0) / 0xffffffff;
-  }
-}
 
 export interface GameConfig {
   mapWidth: number;
@@ -386,10 +377,14 @@ export class GameStateManager {
     if (isBot) {
       this.botAIs.set(
         id,
-        getBotAIRegistry().createInstance(this.botAiId, this.botDifficulty, {
-          width: this.map.width,
-          height: this.map.height,
-        }),
+        getBotAIRegistry().createInstance(
+          this.botAiId,
+          this.botDifficulty,
+          { width: this.map.width, height: this.map.height },
+          // Derived from the map seed and the bot's id, so each bot is deterministic but distinct,
+          // and the whole match replays identically. (audit BOTAI-DETERMINISM-1)
+          this.map.seed + id,
+        ),
       );
     }
     return player;
@@ -527,10 +522,12 @@ export class GameStateManager {
               disposeAI(ai);
               this.botAIs.set(
                 botId,
-                getBotAIRegistry().createInstance('builtin', this.botDifficulty, {
-                  width: this.map.width,
-                  height: this.map.height,
-                }),
+                getBotAIRegistry().createInstance(
+                  'builtin',
+                  this.botDifficulty,
+                  { width: this.map.width, height: this.map.height },
+                  this.map.seed + botId,
+                ),
               );
             }
           } else {

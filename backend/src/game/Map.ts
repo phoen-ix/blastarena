@@ -1,4 +1,5 @@
 import { GameMap, TileType, Position } from '@blast-arena/shared';
+import { SeededRandom } from './SeededRandom';
 import { PuzzleConfig, PuzzleColor } from '@blast-arena/shared';
 import {
   DEFAULT_MAP_WIDTH,
@@ -11,18 +12,6 @@ import {
 import { PUZZLE_COLORS, getSwitchTile, getGateTile } from '@blast-arena/shared';
 
 // Simple seeded random number generator
-class SeededRandom {
-  private seed: number;
-
-  constructor(seed: number) {
-    this.seed = seed;
-  }
-
-  next(): number {
-    this.seed = (this.seed * 1664525 + 1013904223) & 0xffffffff;
-    return (this.seed >>> 0) / 0xffffffff;
-  }
-}
 
 export function generateMap(
   width: number = DEFAULT_MAP_WIDTH,

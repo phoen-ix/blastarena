@@ -156,16 +156,17 @@ describe('BotAIRegistry', () => {
       });
 
       registry.loadAI('custom-1');
-      const instance = registry.createInstance('custom-1', 'normal', { width: 11, height: 11 });
+      const instance = registry.createInstance('custom-1', 'normal', { width: 11, height: 11 }, 42);
 
       expect(instance).toBeDefined();
-      expect(MockBotAI).toHaveBeenCalledWith('normal', { width: 11, height: 11 });
+      // The seed is threaded through so bot decisions are reproducible. (audit BOTAI-DETERMINISM-1)
+      expect(MockBotAI).toHaveBeenCalledWith('normal', { width: 11, height: 11 }, 42);
     });
 
     it('should fall back to built-in BotAI when requested AI is not found', () => {
-      const instance = registry.createInstance('nonexistent', 'easy', { width: 11, height: 11 });
+      const instance = registry.createInstance('nonexistent', 'easy', { width: 11, height: 11 }, 7);
       expect(instance).toBeDefined();
-      expect(MockBotAI).toHaveBeenCalledWith('easy', { width: 11, height: 11 });
+      expect(MockBotAI).toHaveBeenCalledWith('easy', { width: 11, height: 11 }, 7);
     });
 
     it('should use builtin when aiId is undefined', () => {

@@ -37,18 +37,9 @@ import { ReplayRecorder } from '../utils/replayRecorder';
 import { GameLogger } from '../utils/gameLogger';
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
+import { SeededRandom } from './SeededRandom';
 
 // Simple seeded random for campaign
-class SeededRandom {
-  private seed: number;
-  constructor(seed: number) {
-    this.seed = seed;
-  }
-  next(): number {
-    this.seed = (this.seed * 1664525 + 1013904223) & 0xffffffff;
-    return (this.seed >>> 0) / 0xffffffff;
-  }
-}
 
 export interface CampaignSessionCallbacks {
   onStateUpdate: (state: CampaignGameState) => void;
