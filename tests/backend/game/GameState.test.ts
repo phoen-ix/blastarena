@@ -1087,6 +1087,44 @@ describe('GameStateManager', () => {
       expect(teamGs.finishReason).toContain('Red');
     });
 
+    // Regression: the teams branch set winnerTeam but left placement null on the survivors, so
+    // GameRoom wrote placement=null to match_players and handed Elo `placement ?? 999` — ranking
+    // the winning team last. (audit TEAMS-WIN-1)
+    it('should give every surviving member of the winning team placement 1', () => {
+      const teamGs = new GameStateManager({ ...BASE_CONFIG, gameMode: 'teams' });
+      const p1 = teamGs.addPlayer(1, 'Alice', 0); // red
+      const p2 = teamGs.addPlayer(2, 'Bob', 0); // red
+      const p3 = teamGs.addPlayer(3, 'Eve', 1); // blue
+      const p4 = teamGs.addPlayer(4, 'Dan', 1); // blue
+      startPlaying(teamGs);
+      makeVulnerable(p3);
+      makeVulnerable(p4);
+
+      p3.die();
+      p4.die();
+      teamGs.processTick();
+
+      expect(teamGs.winnerTeam).toBe(0);
+      expect(p1.placement).toBe(1);
+      expect(p2.placement).toBe(1);
+    });
+
+    // Documents the contract the win-recording bug hinged on: teams mode identifies the winner by
+    // TEAM, never by id, so anything deciding "did this player win" must consult winnerTeam.
+    it('should leave winnerId null in teams mode', () => {
+      const teamGs = new GameStateManager({ ...BASE_CONFIG, gameMode: 'teams' });
+      teamGs.addPlayer(1, 'Alice', 0);
+      const p3 = teamGs.addPlayer(3, 'Eve', 1);
+      startPlaying(teamGs);
+      makeVulnerable(p3);
+
+      p3.die();
+      teamGs.processTick();
+
+      expect(teamGs.winnerTeam).toBe(0);
+      expect(teamGs.winnerId).toBeNull();
+    });
+
     it('should not damage teammates when friendly fire is off', () => {
       const teamGs = new GameStateManager({
         ...BASE_CONFIG,

@@ -102,3 +102,39 @@ export function isValidPlayerInput(input: unknown): boolean {
     (i.action === null || i.action === 'bomb' || i.action === 'detonate' || i.action === 'throw')
   );
 }
+
+/**
+ * The only events an unauthenticated guest socket may emit.
+ *
+ * Guest sockets are open-world participants. They carry `socket.data.userId = 0` until
+ * `openworld:join` assigns a real negative guest id, and every handler in socket.ts is registered
+ * on every socket regardless of auth. Without this allowlist a guest could emit room:create /
+ * room:join (all guests colliding on the Redis key `player:0:room`), campaign:start (spinning up a
+ * full server-side game loop per socket) or game:spectatorChat into any room — as user 0, with no
+ * verified email. (audit GUEST-SCOPE-1)
+ */
+export const GUEST_ALLOWED_EVENTS: ReadonlySet<string> = new Set([
+  'openworld:join',
+  'openworld:leave',
+  'openworld:input',
+]);
+
+/**
+ * Decide whether a guest socket's incoming packet may reach its handler.
+ *
+ * Returns true to allow. When it blocks, it answers the packet's ack callback (if the client
+ * supplied one) so the caller fails fast instead of hanging on a dropped packet.
+ */
+export function allowGuestPacket(packet: unknown[]): boolean {
+  const event = packet[0];
+  if (typeof event === 'string' && GUEST_ALLOWED_EVENTS.has(event)) return true;
+
+  const ack = packet[packet.length - 1];
+  if (typeof ack === 'function') {
+    (ack as (res: { success: false; error: string }) => void)({
+      success: false,
+      error: 'Sign in to use this feature',
+    });
+  }
+  return false;
+}

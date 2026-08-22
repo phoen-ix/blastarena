@@ -14,6 +14,7 @@ import { getExplosionCells } from '@blast-arena/shared';
 import {
   DEFAULT_WALL_DENSITY,
   DEFAULT_POWERUP_DROP_RATE,
+  getRandomPowerUpType,
   TICK_RATE,
   MOVE_COOLDOWN_BASE,
   SPECTATOR_ENERGY_PER_TICK,
@@ -667,9 +668,17 @@ export class GameStateManager {
 
     // 3. Process detonations (including chain reactions)
     if (bombsToDetonate.length > 0) {
-      // Only snapshot tiles when chain reactions are possible (other bombs exist)
+      // Snapshot tiles whenever more than one blast will be resolved against them, so every bomb
+      // in the batch sees the same wall layout.
+      //
+      // This used to check only `this.bombs.size > bombsToDetonate.length` — i.e. "are there other
+      // bombs left that could chain". That misses the case where the last N bombs all expire on the
+      // SAME tick, which is the normal outcome for line_bomb (3 bombs placed at once, identical
+      // fuses). With no snapshot, bomb A destroys a wall and bomb B — detonating later in this very
+      // loop — propagates through the gap, killing players who were correctly in cover.
+      // (audit CHAIN-SNAPSHOT-1)
       const tileSnapshot =
-        this.bombs.size > bombsToDetonate.length
+        bombsToDetonate.length > 1 || this.bombs.size > bombsToDetonate.length
           ? this.map.tiles.map((row) => [...row])
           : undefined;
       for (const bomb of bombsToDetonate) {
@@ -2137,10 +2146,18 @@ export class GameStateManager {
     }
   }
 
-  /** Pick a random enabled power-up, or null when none are enabled. (audit POWERUP-EMPTY-ARRAY-1) */
+  /**
+   * Pick a random enabled power-up, or null when none are enabled. (audit POWERUP-EMPTY-ARRAY-1)
+   *
+   * Weighted by POWERUP_DEFINITIONS[].weight, not uniform: this used to index the enabled array
+   * with a flat random, which ignored the weights entirely and made every enabled power-up
+   * equally likely. With all nine enabled that dropped remote_bomb and line_bomb (weight 3) at
+   * 11.1% instead of 2.6%, while bomb_up and fire_up (weight 30) fell from 26.3% to 11.1%.
+   * getRandomPowerUpType re-normalises over the enabled subset. (audit POWERUP-WEIGHTS-1)
+   */
   private getRandomEnabledPowerUp(): PowerUpType | null {
     if (this.enabledPowerUps.length === 0) return null;
-    return this.enabledPowerUps[Math.floor(this.rng.next() * this.enabledPowerUps.length)];
+    return getRandomPowerUpType(() => this.rng.next(), this.enabledPowerUps);
   }
 
   /** Pick a random valid position for the KOTH hill zone, away from current zone */
@@ -2181,6 +2198,8 @@ export class GameStateManager {
     if (player.hasPierceBomb) droppable.push('pierce_bomb');
     if (player.hasRemoteBomb) droppable.push('remote_bomb');
     if (player.hasLineBomb) droppable.push('line_bomb');
+    // hasShield is deliberately absent — it is consumed on hit, so there is nothing to return.
+    if (player.hasBombThrow) droppable.push('bomb_throw');
     if (droppable.length > 0) {
       const type = droppable[Math.floor(this.rng.next() * droppable.length)];
       const powerUp = new PowerUp(player.position, type);
@@ -2216,6 +2235,10 @@ export class GameStateManager {
       if (aliveTeams.size <= 1 && alivePlayers.length > 0) {
         this.finishTick = this.tick;
         this.winnerTeam = alivePlayers[0].team;
+        // Every survivor on the winning team places 1st. Without this the winning team kept
+        // placement=null, which GameRoom writes straight to match_players and feeds to Elo as
+        // `placement ?? 999` — ranking the winners dead last. (audit TEAMS-WIN-1)
+        for (const p of alivePlayers) p.placement = 1;
         const teamName = alivePlayers[0].team === 0 ? 'Red' : 'Blue';
         this.finishReason = `Team ${teamName} wins!`;
       } else if (alivePlayers.length === 0) {

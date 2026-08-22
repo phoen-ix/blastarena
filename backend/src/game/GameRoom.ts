@@ -479,6 +479,13 @@ export class GameRoom {
           );
         }
 
+        // Who won. Teams mode sets `winnerTeam` and leaves `winnerId` null, so an id-only check
+        // reports every player as a loser — which is exactly what user_stats used to do while Elo
+        // and achievements honoured the team, leaving the three systems disagreeing about the same
+        // match. One predicate, used by all of them. (audit TEAMS-WIN-1)
+        const isWinningPlayer = (p: { id: number; team: number | null }): boolean =>
+          p.id === state.winnerId || (state.winnerTeam !== null && p.team === state.winnerTeam);
+
         // Elo calculation MUST read user_stats before total_matches is incremented below, so the
         // K-factor uses the pre-match match count (K=32 for <30 games). (audit ELO-1)
         // Results are emitted later, after stats are updated (so cumulative achievements see the new totals).
@@ -491,9 +498,7 @@ export class GameRoom {
                 userId: p.id,
                 placement: p.placement ?? 999,
                 team: p.team,
-                isWinner:
-                  p.id === state.winnerId ||
-                  (state.winnerTeam !== null && p.team === state.winnerTeam),
+                isWinner: isWinningPlayer(p),
               }));
 
             eloResults = await eloService.processMatchElo(
@@ -509,7 +514,7 @@ export class GameRoom {
         // Update user_stats (skip bots)
         for (const player of this.gameState.players.values()) {
           if (player.isBot) continue;
-          const isWinner = player.id === state.winnerId;
+          const isWinner = isWinningPlayer(player);
           await execute(
             `UPDATE user_stats SET
               total_matches = total_matches + 1,
@@ -550,9 +555,7 @@ export class GameRoom {
               const unlocked = await achievementsService.evaluateAfterGame({
                 userId: player.id,
                 gameMode: this.room.config.gameMode,
-                isWinner:
-                  player.id === state.winnerId ||
-                  (state.winnerTeam !== null && player.team === state.winnerTeam),
+                isWinner: isWinningPlayer(player),
                 kills: player.kills,
                 deaths: player.deaths,
                 selfKills: player.selfKills,
@@ -596,7 +599,7 @@ export class GameRoom {
                 bombsPlaced: player?.bombsPlaced ?? 0,
                 powerupsCollected: player?.powerupsCollected ?? 0,
                 placement: p.placement,
-                isWinner: p.userId === state.winnerId,
+                isWinner: isWinningPlayer({ id: p.userId, team: p.team }),
               },
               xpMultiplier,
             );
@@ -643,7 +646,7 @@ export class GameRoom {
                 await challengesService.recordChallengeResult(
                   activeChallenge.id,
                   p.userId,
-                  state.winnerId === p.userId,
+                  isWinningPlayer({ id: p.userId, team: p.team }),
                   player?.kills ?? 0,
                   player?.deaths ?? 0,
                   p.placement,

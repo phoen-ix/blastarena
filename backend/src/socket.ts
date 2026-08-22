@@ -51,6 +51,7 @@ import {
   readySchema,
   adminKickSchema,
   adminCloseRoomSchema,
+  allowGuestPacket,
 } from './utils/socketValidation';
 import { query } from './db/connection';
 import { UserRow } from './db/types';
@@ -305,7 +306,17 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Guest connections only need open world handlers — skip room/lobby/friend setup
     if (socket.data.isGuest) {
-      // Open world handlers are set up below alongside other handlers
+      // Open world handlers are set up below alongside other handlers, and every handler in this
+      // file is registered on every socket. Gate at the packet level so a guest cannot reach the
+      // account-only surface. (audit GUEST-SCOPE-1)
+      socket.use((packet, next) => {
+        if (allowGuestPacket(packet as unknown[])) return next();
+        logger.warn(
+          { event: packet[0], socketId: socket.id },
+          'Guest socket attempted an account-only event; dropped',
+        );
+        // Intentionally does not call next() — the packet never reaches the handler.
+      });
     } else {
       // Auto-join admin room for simulation broadcasts
       if (socket.data.role === 'admin') {
