@@ -102,26 +102,6 @@ export class BootScene extends Phaser.Scene {
         gfx.generateTexture(`player_${i}_${dir}`, 48, 48);
         gfx.destroy();
       }
-
-      // Also generate a generic player texture for backwards compat
-      const gfx = this.make.graphics({ x: 0, y: 0 });
-      const darkerColor = Phaser.Display.Color.IntegerToColor(color).darken(20).color;
-      gfx.fillStyle(darkerColor, 1);
-      gfx.fillRoundedRect(2, 2, 44, 44, 6);
-      gfx.fillStyle(color, 1);
-      gfx.fillRoundedRect(2, 2, 44, 36, 6);
-      gfx.lineStyle(2, 0xffffff, 0.4);
-      gfx.strokeRoundedRect(2, 2, 44, 44, 6);
-      gfx.fillStyle(0xffffff, 0.3);
-      gfx.fillRoundedRect(6, 5, 10, 6, 3);
-      gfx.fillStyle(0xffffff, 0.95);
-      gfx.fillCircle(17, 26, 5);
-      gfx.fillCircle(31, 26, 5);
-      gfx.fillStyle(0x111111, 1);
-      gfx.fillCircle(17, 28, 2.5);
-      gfx.fillCircle(31, 28, 2.5);
-      gfx.generateTexture(`player_${i}`, 48, 48);
-      gfx.destroy();
     });
   }
 
@@ -224,14 +204,6 @@ export class BootScene extends Phaser.Scene {
       floorGfx.generateTexture(`floor_${v}`, 48, 48);
       floorGfx.destroy();
     }
-    // Default floor for compat
-    const floorGfx = this.make.graphics({ x: 0, y: 0 });
-    floorGfx.fillStyle(0x2a2a3e, 1);
-    floorGfx.fillRect(0, 0, 48, 48);
-    floorGfx.lineStyle(1, 0x333348, 0.3);
-    floorGfx.strokeRect(0, 0, 48, 48);
-    floorGfx.generateTexture('floor', 48, 48);
-    floorGfx.destroy();
 
     // Teleporter textures
     for (const suffix of ['a', 'b']) {

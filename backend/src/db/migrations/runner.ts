@@ -81,25 +81,6 @@ export async function runMigrations(): Promise<void> {
 }
 
 /**
- * Returns the list of applied migration names, ordered alphabetically.
- */
-export async function getAppliedMigrations(): Promise<string[]> {
-  const pool = getPool();
-
-  // Ensure the tracking table exists before querying
-  await pool.execute(`
-    CREATE TABLE IF NOT EXISTS _migrations (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      name VARCHAR(255) NOT NULL UNIQUE,
-      executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  const [rows] = await pool.execute<MigrationRow[]>('SELECT name FROM _migrations ORDER BY name');
-  return rows.map((r) => r.name);
-}
-
-/**
  * Migrations whose down script cannot restore the data they dropped. Rolling these back is
  * permanently destructive, so it is refused unless the caller explicitly opts in with `force`.
  *

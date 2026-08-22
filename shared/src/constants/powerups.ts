@@ -76,11 +76,6 @@ export const POWERUP_DEFINITIONS: Record<PowerUpType, PowerUpDefinition> = {
   },
 };
 
-export const POWERUP_TOTAL_WEIGHT = Object.values(POWERUP_DEFINITIONS).reduce(
-  (sum, def) => sum + def.weight,
-  0,
-);
-
 export function getRandomPowerUpType(
   random: () => number,
   enabledTypes?: PowerUpType[],

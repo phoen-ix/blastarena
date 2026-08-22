@@ -3,7 +3,6 @@ import {
   EnemyEyeStyle,
   EnemyAccessory,
   EnemyMovementPattern,
-  CampaignWinCondition,
 } from '../types/campaign';
 
 export const CAMPAIGN_RESPAWN_TICKS = 40; // 2 seconds
@@ -42,11 +41,4 @@ export const MOVEMENT_PATTERNS: EnemyMovementPattern[] = [
   'patrol_path',
   'wall_follow',
   'stationary',
-];
-
-export const WIN_CONDITIONS: CampaignWinCondition[] = [
-  'kill_all',
-  'find_exit',
-  'reach_goal',
-  'survive_time',
 ];

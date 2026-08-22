@@ -41,21 +41,6 @@ interface TilesRow extends RowDataPacket {
   tiles: string;
 }
 
-function toChallenge(row: ChallengeRow): MapChallenge {
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    customMapId: row.custom_map_id,
-    gameMode: row.game_mode,
-    startDate: row.start_date.toISOString().split('T')[0],
-    endDate: row.end_date.toISOString().split('T')[0],
-    isActive: !!row.is_active,
-    createdBy: row.created_by,
-    createdAt: row.created_at.toISOString(),
-  };
-}
-
 function toSummary(row: ChallengeSummaryRow): MapChallengeSummary {
   return {
     id: row.id,
@@ -93,11 +78,6 @@ export async function getActiveChallenge(): Promise<MapChallengeSummary | null> 
      LIMIT 1`,
   );
   return rows.length > 0 ? toSummary(rows[0]) : null;
-}
-
-export async function getChallengeById(id: number): Promise<MapChallenge | null> {
-  const rows = await query<ChallengeRow[]>('SELECT * FROM map_challenges WHERE id = ?', [id]);
-  return rows.length > 0 ? toChallenge(rows[0]) : null;
 }
 
 export async function listChallenges(

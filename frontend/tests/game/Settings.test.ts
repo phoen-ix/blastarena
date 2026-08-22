@@ -3,7 +3,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 describe('Settings', () => {
   let getSettings: typeof import('../../src/game/Settings').getSettings;
   let saveSettings: typeof import('../../src/game/Settings').saveSettings;
-  let updateSetting: typeof import('../../src/game/Settings').updateSetting;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -11,7 +10,6 @@ describe('Settings', () => {
     const mod = await import('../../src/game/Settings');
     getSettings = mod.getSettings;
     saveSettings = mod.saveSettings;
-    updateSetting = mod.updateSetting;
   });
 
   describe('getSettings', () => {
@@ -102,22 +100,6 @@ describe('Settings', () => {
       saveSettings(settings);
       const result = getSettings();
       expect(result).toEqual(settings);
-    });
-  });
-
-  describe('updateSetting', () => {
-    it('updates a single key', () => {
-      updateSetting('animations', false);
-      const result = getSettings();
-      expect(result.animations).toBe(false);
-    });
-
-    it('preserves other keys', () => {
-      updateSetting('screenShake', false);
-      const result = getSettings();
-      expect(result.animations).toBe(true);
-      expect(result.particles).toBe(true);
-      expect(result.screenShake).toBe(false);
     });
   });
 });

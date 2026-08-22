@@ -44,12 +44,3 @@ export function saveSettings(settings: VisualSettings): void {
   cached = { ...settings };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(cached));
 }
-
-export function updateSetting<K extends keyof VisualSettings>(
-  key: K,
-  value: VisualSettings[K],
-): void {
-  const s = getSettings();
-  s[key] = value;
-  saveSettings(s);
-}

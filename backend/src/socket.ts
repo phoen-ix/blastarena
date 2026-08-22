@@ -21,6 +21,7 @@ import {
   getErrorMessage,
   EMOTES,
   EMOTE_COOLDOWN_MS,
+  SPECTATOR_CHAT_MAX_LENGTH,
 } from '@blast-arena/shared';
 import {
   setupFriendHandlers,
@@ -820,7 +821,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       if (!roomCode) return;
       if (!data || typeof data.message !== 'string') return;
 
-      const message = data.message.trim().slice(0, 200);
+      const message = data.message.trim().slice(0, SPECTATOR_CHAT_MAX_LENGTH);
       if (!message) return;
 
       const mode = await settingsService.getSpectatorChatMode();

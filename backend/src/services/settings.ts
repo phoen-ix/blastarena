@@ -7,6 +7,14 @@ import {
   ChatMode,
   RankConfig,
   DEFAULT_RANK_CONFIG,
+  OPENWORLD_DEFAULT_MAP_WIDTH,
+  OPENWORLD_DEFAULT_MAP_HEIGHT,
+  OPENWORLD_DEFAULT_WALL_DENSITY,
+  OPENWORLD_DEFAULT_MAX_PLAYERS,
+  OPENWORLD_DEFAULT_ROUND_TIME,
+  OPENWORLD_DEFAULT_AFK_TIMEOUT,
+  OPENWORLD_RESPAWN_TICKS,
+  TICK_RATE,
 } from '@blast-arena/shared';
 
 /**
@@ -196,16 +204,26 @@ export async function getOpenWorldSettings(): Promise<OpenWorldSettings> {
     keys,
   );
   const map = new Map(rows.map((r) => [r.setting_key, r.setting_value]));
+  // Fallbacks come from the shared constants rather than repeating their values as string
+  // literals here. The OPENWORLD_DEFAULT_* constants existed for exactly this and had no
+  // references at all, because the numbers had been duplicated inline — so the two could silently
+  // disagree about what "default" means. (audit OPENWORLD-DEFAULTS-1)
+  const num = (key: string, fallback: number) => {
+    const raw = map.get(key);
+    const parsed = raw !== undefined ? Number(raw) : NaN;
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
   return {
     enabled: map.get('open_world_enabled') !== 'false',
     guestAccess: map.get('open_world_guest_access') !== 'false',
-    maxPlayers: parseInt(map.get('open_world_max_players') ?? '32', 10),
-    roundTime: parseInt(map.get('open_world_round_time') ?? '300', 10),
-    mapWidth: parseInt(map.get('open_world_map_width') ?? '51', 10),
-    mapHeight: parseInt(map.get('open_world_map_height') ?? '41', 10),
-    wallDensity: parseFloat(map.get('open_world_wall_density') ?? '0.5'),
-    respawnDelay: parseInt(map.get('open_world_respawn_delay') ?? '3', 10),
-    afkTimeoutSeconds: parseInt(map.get('open_world_afk_timeout') ?? '60', 10),
+    maxPlayers: num('open_world_max_players', OPENWORLD_DEFAULT_MAX_PLAYERS),
+    roundTime: num('open_world_round_time', OPENWORLD_DEFAULT_ROUND_TIME),
+    mapWidth: num('open_world_map_width', OPENWORLD_DEFAULT_MAP_WIDTH),
+    mapHeight: num('open_world_map_height', OPENWORLD_DEFAULT_MAP_HEIGHT),
+    wallDensity: num('open_world_wall_density', OPENWORLD_DEFAULT_WALL_DENSITY),
+    respawnDelay: num('open_world_respawn_delay', OPENWORLD_RESPAWN_TICKS / TICK_RATE),
+    afkTimeoutSeconds: num('open_world_afk_timeout', OPENWORLD_DEFAULT_AFK_TIMEOUT),
   };
 }
 

@@ -15,14 +15,6 @@ export function tileToPos(tileX: number, tileY: number): Position {
     y: tileY * TILE_SIZE + TILE_SIZE / 2,
   };
 }
-
-export function tileToPixelOrigin(tileX: number, tileY: number): Position {
-  return {
-    x: tileX * TILE_SIZE,
-    y: tileY * TILE_SIZE,
-  };
-}
-
 export function getExplosionCells(
   originX: number,
   originY: number,

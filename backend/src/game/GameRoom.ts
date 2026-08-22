@@ -454,8 +454,13 @@ export class GameRoom {
         const duration = Math.floor(state.timeElapsed);
         // Don't store bot IDs (negative) as winner_id in DB
         const dbWinnerId = state.winnerId && state.winnerId > 0 ? state.winnerId : null;
-        const matchStatus =
-          this.gameState.finishReason === 'All players disconnected' ? 'aborted' : 'finished';
+        // Always 'finished'. This used to compare finishReason against the literal
+        // 'All players disconnected', a string that is assigned nowhere in the codebase — so
+        // matchStatus could never be 'aborted' and the `matchStatus !== 'aborted'` guards around
+        // Elo and achievements below were unreachable. Removing the dead branch rather than
+        // wiring it: making abandoned matches skip rating is a product decision, and it needs a
+        // real trigger, not a string comparison that never matches. (audit MATCHSTATUS-DEAD-1)
+        const matchStatus = 'finished';
         await execute(
           `UPDATE matches SET status = ?, finished_at = NOW(), duration = ?, winner_id = ? WHERE id = ?`,
           [matchStatus, duration, dbWinnerId, this.matchId],
@@ -490,25 +495,23 @@ export class GameRoom {
         // K-factor uses the pre-match match count (K=32 for <30 games). (audit ELO-1)
         // Results are emitted later, after stats are updated (so cumulative achievements see the new totals).
         let eloResults: import('@blast-arena/shared').EloResult[] = [];
-        if (matchStatus !== 'aborted') {
-          try {
-            const eloPlayers = [...this.gameState.players.values()]
-              .filter((p) => !p.isBot)
-              .map((p) => ({
-                userId: p.id,
-                placement: p.placement ?? 999,
-                team: p.team,
-                isWinner: isWinningPlayer(p),
-              }));
+        try {
+          const eloPlayers = [...this.gameState.players.values()]
+            .filter((p) => !p.isBot)
+            .map((p) => ({
+              userId: p.id,
+              placement: p.placement ?? 999,
+              team: p.team,
+              isWinner: isWinningPlayer(p),
+            }));
 
-            eloResults = await eloService.processMatchElo(
-              this.room.config.gameMode,
-              eloPlayers,
-              this.matchId!,
-            );
-          } catch (eloErr) {
-            logger.error({ err: eloErr }, 'Failed to process Elo');
-          }
+          eloResults = await eloService.processMatchElo(
+            this.room.config.gameMode,
+            eloPlayers,
+            this.matchId!,
+          );
+        } catch (eloErr) {
+          logger.error({ err: eloErr }, 'Failed to process Elo');
         }
 
         // Update user_stats (skip bots)
@@ -543,35 +546,33 @@ export class GameRoom {
 
         // Emit Elo results (computed above, before the stats increment) and evaluate achievements
         // (which read the now-incremented cumulative stats).
-        if (matchStatus !== 'aborted') {
-          if (eloResults.length > 0) {
-            this.io.to(`room:${this.code}`).emit('game:eloUpdate', eloResults);
-          }
+        if (eloResults.length > 0) {
+          this.io.to(`room:${this.code}`).emit('game:eloUpdate', eloResults);
+        }
 
-          // Achievement evaluation for each human player
-          for (const player of this.gameState.players.values()) {
-            if (player.isBot) continue;
-            try {
-              const unlocked = await achievementsService.evaluateAfterGame({
-                userId: player.id,
-                gameMode: this.room.config.gameMode,
-                isWinner: isWinningPlayer(player),
-                kills: player.kills,
-                deaths: player.deaths,
-                selfKills: player.selfKills,
-                bombsPlaced: player.bombsPlaced,
-                powerupsCollected: player.powerupsCollected,
-                survivedSeconds: Math.floor(state.timeElapsed),
-                placement: player.placement ?? 999,
-                playerCount: this.gameState.players.size,
-              });
+        // Achievement evaluation for each human player
+        for (const player of this.gameState.players.values()) {
+          if (player.isBot) continue;
+          try {
+            const unlocked = await achievementsService.evaluateAfterGame({
+              userId: player.id,
+              gameMode: this.room.config.gameMode,
+              isWinner: isWinningPlayer(player),
+              kills: player.kills,
+              deaths: player.deaths,
+              selfKills: player.selfKills,
+              bombsPlaced: player.bombsPlaced,
+              powerupsCollected: player.powerupsCollected,
+              survivedSeconds: Math.floor(state.timeElapsed),
+              placement: player.placement ?? 999,
+              playerCount: this.gameState.players.size,
+            });
 
-              if (unlocked.achievements.length > 0) {
-                this.io.to(`user:${player.id}`).emit('achievement:unlocked', unlocked);
-              }
-            } catch (achErr) {
-              logger.error({ err: achErr, userId: player.id }, 'Failed to evaluate achievements');
+            if (unlocked.achievements.length > 0) {
+              this.io.to(`user:${player.id}`).emit('achievement:unlocked', unlocked);
             }
+          } catch (achErr) {
+            logger.error({ err: achErr, userId: player.id }, 'Failed to evaluate achievements');
           }
         }
 

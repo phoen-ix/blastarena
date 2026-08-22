@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   posToTile,
   tileToPos,
-  tileToPixelOrigin,
   getExplosionCells,
   manhattanDistance,
   isInBounds,
@@ -48,13 +47,6 @@ describe('tileToPos', () => {
   it('tile (0,0) returns half-tile-size', () => {
     const result = tileToPos(0, 0);
     expect(result).toEqual({ x: TILE_SIZE / 2, y: TILE_SIZE / 2 });
-  });
-});
-
-describe('tileToPixelOrigin', () => {
-  it('returns top-left corner of tile', () => {
-    const result = tileToPixelOrigin(3, 2);
-    expect(result).toEqual({ x: 3 * TILE_SIZE, y: 2 * TILE_SIZE });
   });
 });
 

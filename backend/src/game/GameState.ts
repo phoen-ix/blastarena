@@ -41,6 +41,7 @@ import {
   KOTH_HILL_MOVE_INTERVAL,
   KOTH_HILL_MOVE_WARNING,
   OPENWORLD_RESPAWN_TICKS,
+  OPENWORLD_RESPAWN_INVULNERABILITY_TICKS,
 } from '@blast-arena/shared';
 import { Player } from './Player';
 import { Bomb, BombType } from './Bomb';
@@ -122,7 +123,6 @@ export class GameStateManager {
 
   private rng: SeededRandom;
   private gameMode: string;
-  private placementCounter: number = 0;
   private enabledPowerUps: PowerUpType[];
   private powerUpDropRate: number;
   private friendlyFire: boolean;
@@ -373,7 +373,6 @@ export class GameStateManager {
     const spawnPos = this.map.spawnPoints[spawnIndex];
     const player = new Player(id, username, spawnPos, team, isBot, isBuddy, buddyOwnerId);
     this.players.set(id, player);
-    this.placementCounter++;
     if (isBot) {
       this.botAIs.set(
         id,
@@ -409,7 +408,6 @@ export class GameStateManager {
     const spawnPos = this.findSafeSpawnPosition();
     const player = new Player(id, username, spawnPos, null, false, false, null);
     this.players.set(id, player);
-    this.placementCounter++;
     this._alivePlayersCache = null;
     return player;
   }
@@ -753,7 +751,6 @@ export class GameStateManager {
           } else {
             player.die();
             this.invalidateAliveCache();
-            this.placementCounter--;
             player.placement = this.getAlivePlayers().length + 1;
 
             // Credit kill or track self-kill (self-kills subtract 1 from score)
@@ -1159,7 +1156,6 @@ export class GameStateManager {
           } else {
             player.die();
             this.invalidateAliveCache();
-            this.placementCounter--;
             player.placement = this.getAlivePlayers().length + 1;
             this.tickEvents.playerDied.push({ playerId: player.id, killerId: null, cause: 'zone' });
             this.dropPowerUpOnDeath(player);
@@ -1181,6 +1177,12 @@ export class GameStateManager {
           // land on a tile already carrying a live bomb. (audit RESPAWN-SAFETY-1)
           const spawnPos = this.findSafeSpawnPosition();
           player.respawn(spawnPos);
+          // Open world grants its own (shorter) respawn invulnerability. The constant existed for
+          // this and had no references at all, so respawning players silently got the generic
+          // INVULNERABILITY_TICKS instead. (audit OPENWORLD-DEFAULTS-1)
+          if (this.isOpenWorld) {
+            player.invulnerableTicks = OPENWORLD_RESPAWN_INVULNERABILITY_TICKS;
+          }
           // respawn() zeroes bombCount, but the player's bombs from before they died are still
           // ticking on the field. Each one decrements bombCount when it goes off, clamped at 0, so
           // a player who died with bombs down could place a fresh bomb, watch the old ones drive
@@ -1288,7 +1290,6 @@ export class GameStateManager {
           } else if (player.invulnerableTicks <= 0) {
             player.die();
             this.invalidateAliveCache();
-            this.placementCounter--;
             player.placement = this.getAlivePlayers().length + 1;
             this.tickEvents.playerDied.push({
               playerId: player.id,
@@ -1432,7 +1433,6 @@ export class GameStateManager {
           } else {
             player.die();
             this.invalidateAliveCache();
-            this.placementCounter--;
             player.placement = this.getAlivePlayers().length + 1;
             this.tickEvents.playerDied.push({
               playerId: player.id,
@@ -2376,7 +2376,6 @@ export class GameStateManager {
 
     player.die();
     this.invalidateAliveCache();
-    this.placementCounter--;
     player.placement = this.getAlivePlayers().length + 1;
     this.tickEvents.playerDied.push({ playerId, killerId, cause });
     this.dropPowerUpOnDeath(player);

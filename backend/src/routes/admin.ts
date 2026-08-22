@@ -190,7 +190,7 @@ router.get('/admin/settings/lobby_chat_mode', async (_req, res, next) => {
   }
 });
 
-// Public: get DM mode (no auth required, needed by DMPanel)
+// Public: get DM mode (no auth required, needed by the Messages view)
 router.get('/admin/settings/dm_mode', async (_req, res, next) => {
   try {
     const mode = await settingsService.getDMMode();

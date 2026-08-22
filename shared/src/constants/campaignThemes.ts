@@ -13,18 +13,6 @@ export type CampaignWorldTheme =
   | 'swamp'
   | 'sky';
 
-export const CAMPAIGN_WORLD_THEMES: readonly CampaignWorldTheme[] = [
-  'classic',
-  'forest',
-  'desert',
-  'ice',
-  'volcano',
-  'void',
-  'castle',
-  'swamp',
-  'sky',
-] as const;
-
 export const CAMPAIGN_THEME_NAMES: Record<CampaignWorldTheme, string> = {
   classic: 'Classic',
   forest: 'Forest',

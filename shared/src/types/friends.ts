@@ -84,7 +84,6 @@ export interface DMConversation {
 // Constants
 export const MAX_FRIENDS = 200;
 export const MAX_PARTY_SIZE = 8;
-export const MAX_PENDING_INVITES = 5;
 export const PARTY_CHAT_MAX_LENGTH = 200;
 export const LOBBY_CHAT_MAX_LENGTH = 200;
 export const DM_MAX_LENGTH = 500;
