@@ -11,10 +11,12 @@ Production is the canonical run mode for this deployment (plain `docker compose 
 ```bash
 cp .env.example .env  # prod requires DB passwords, JWT_SECRET, EMAIL_PEPPER, TOTP_ENCRYPTION_KEY (>=32 chars each)
 
-# The backend container runs as the unprivileged `node` user (uid 1000). The bind-mounted data
+# The backend container runs as the unprivileged `node` user (uid 1000). Its five bind-mounted
 # directories must be owned by that uid or the backend cannot write logs, replays or AI uploads.
-# Required once, on an existing deployment that previously ran the container as root:
-sudo chown -R 1000:1000 data/
+# Required once, on an existing deployment that previously ran the container as root.
+# NOTE: name the five explicitly — do NOT chown all of data/. data/db and data/redis belong to
+# uid 999 (mysql / redis) and chowning them breaks both containers.
+sudo chown -R 1000:1000 data/gamelogs data/simulations data/replays data/ai data/enemy-ai
 
 # Production (default)
 docker compose up --build -d
