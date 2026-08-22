@@ -40,6 +40,7 @@ FROM nginx:alpine AS nginx-dev
 COPY docker/nginx/nginx.dev.conf /etc/nginx/nginx.conf
 COPY docker/nginx/security-headers.conf /etc/nginx/security-headers.conf
 COPY docker/nginx/502.html /usr/share/nginx/html/502.html
+COPY docker/nginx/502.js /usr/share/nginx/html/502.js
 
 EXPOSE 80
 
@@ -52,6 +53,7 @@ COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
 COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY docker/nginx/security-headers.conf /etc/nginx/security-headers.conf
 COPY docker/nginx/502.html /usr/share/nginx/html/502.html
+COPY docker/nginx/502.js /usr/share/nginx/html/502.js
 
 EXPOSE 80
 
