@@ -60,6 +60,14 @@ export class MenuScene extends Phaser.Scene {
     this.titleTexts = [];
     this.events.once('shutdown', this.shutdown, this);
 
+    // MenuScene is re-entered on logout and whenever the player returns to the menu, and Phaser
+    // reuses the scene instance — so this create() replaces the registry's SocketClient wholesale.
+    // The previous one was left connected and authenticated, still holding its `language-changed`
+    // window listener and still receiving broadcasts; three logout/login cycles left three live
+    // sockets. Close it before replacing it. (audit MENU-SOCKET-LEAK-1)
+    const previousSocket = this.registry.get('socketClient') as SocketClient | undefined;
+    previousSocket?.disconnect();
+
     this.notifications = new NotificationUI();
     this.authManager = new AuthManager();
     this.socketClient = new SocketClient(this.authManager);

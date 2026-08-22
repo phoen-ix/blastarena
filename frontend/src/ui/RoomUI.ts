@@ -13,6 +13,13 @@ export class RoomUI {
   private notifications: NotificationUI;
   private room: Room;
   private onLeave: () => void;
+
+  // Kept so removeListeners() can pass the exact handler to off() — a handler-less off() would
+  // remove other consumers' listeners for the same event. (audit SOCKET-OFF-REF-1)
+  private onRoomState?: (room: Room) => void;
+  private onPlayerJoined?: (player: RoomPlayer) => void;
+  private onPlayerLeft?: (userId: number) => void;
+  private onPlayerReady?: (data: { userId: number; ready: boolean }) => void;
   constructor(
     socketClient: SocketClient,
     authManager: AuthManager,
@@ -63,33 +70,44 @@ export class RoomUI {
   }
 
   private setupListeners(): void {
-    this.socketClient.on('room:state', (room) => {
+    // Handler references are kept so removeListeners can pass them to off().
+    //
+    // SocketClient.off(event) with no handler removes EVERY listener for that event, and
+    // GameOverScene registers its own 'room:state' handler to drive the post-match navigation.
+    // Any path that tore down a RoomUI while the scoreboard was up — a party follow, an admin
+    // kick, a rematch re-entering the room view — silently killed it, leaving the player stuck on
+    // the scoreboard with a dead "Play Again". (audit SOCKET-OFF-REF-1)
+    this.onRoomState = (room) => {
       this.room = room;
       this.render();
-    });
+    };
+    this.socketClient.on('room:state', this.onRoomState);
 
-    this.socketClient.on('room:playerJoined', (player) => {
+    this.onPlayerJoined = (player) => {
       if (!this.room.players.some((p) => p.user.id === player.user.id)) {
         this.room.players.push(player);
       }
       this.render();
       this.notifications.info(t('ui:room.playerJoined', { username: player.user.username }));
-    });
+    };
+    this.socketClient.on('room:playerJoined', this.onPlayerJoined);
 
-    this.socketClient.on('room:playerLeft', (userId) => {
+    this.onPlayerLeft = (userId) => {
       const player = this.room.players.find((p) => p.user.id === userId);
       this.room.players = this.room.players.filter((p) => p.user.id !== userId);
       this.render();
       if (player) {
         this.notifications.info(t('ui:room.playerLeft', { username: player.user.username }));
       }
-    });
+    };
+    this.socketClient.on('room:playerLeft', this.onPlayerLeft);
 
-    this.socketClient.on('room:playerReady', (data) => {
+    this.onPlayerReady = (data) => {
       const player = this.room.players.find((p) => p.user.id === data.userId);
       if (player) player.ready = data.ready;
       this.render();
-    });
+    };
+    this.socketClient.on('room:playerReady', this.onPlayerReady);
 
     // Delegated event handlers — set up once, survive innerHTML rebuilds
     this.container.addEventListener('click', (e) => {
@@ -127,10 +145,10 @@ export class RoomUI {
   }
 
   private removeListeners(): void {
-    this.socketClient.off('room:state');
-    this.socketClient.off('room:playerJoined');
-    this.socketClient.off('room:playerLeft');
-    this.socketClient.off('room:playerReady');
+    if (this.onRoomState) this.socketClient.off('room:state', this.onRoomState);
+    if (this.onPlayerJoined) this.socketClient.off('room:playerJoined', this.onPlayerJoined);
+    if (this.onPlayerLeft) this.socketClient.off('room:playerLeft', this.onPlayerLeft);
+    if (this.onPlayerReady) this.socketClient.off('room:playerReady', this.onPlayerReady);
   }
 
   private isHost(): boolean {

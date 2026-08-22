@@ -49,6 +49,8 @@ import { EmoteId, EMOTES, CampaignLevelSummary } from '@blast-arena/shared';
 import { audioManager } from '../game/AudioManager';
 
 export class GameScene extends Phaser.Scene {
+  /** ScaleManager resize handler; removed in shutdown(). (audit SCENE-RESIZE-LEAK-1) */
+  private onResize?: (gameSize: Phaser.Structs.Size) => void;
   private socketClient!: SocketClient;
   private authManager!: AuthManager;
   private localPlayerId!: number;
@@ -775,8 +777,13 @@ export class GameScene extends Phaser.Scene {
       this.initSplitScreen();
     }
 
-    // Re-apply camera bounds when viewport resizes
-    this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
+    // Re-apply camera bounds when viewport resizes.
+    //
+    // `this.scale` is the game-wide ScaleManager, not scene-scoped, so this survives the scene.
+    // It is registered on every create() and must be removed in shutdown(), or each game played
+    // leaves another live closure holding a dead scene — and its lastGameState — alive.
+    // (audit SCENE-RESIZE-LEAK-1)
+    this.onResize = (gameSize: Phaser.Structs.Size) => {
       this.cameras.main.setSize(gameSize.width, gameSize.height);
       if (this.lastGameState) {
         this.applyCameraBounds(this.lastGameState.map.width, this.lastGameState.map.height);
@@ -784,7 +791,8 @@ export class GameScene extends Phaser.Scene {
       if (this.localCoopMode && this.p2Camera && this.coopCameraMode !== 'shared') {
         this.updateSplitViewports(gameSize.width, gameSize.height);
       }
-    });
+    };
+    this.scale.on('resize', this.onResize);
 
     this.registry.set('spectateTargetId', null);
   }
@@ -1800,6 +1808,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   shutdown(): void {
+    if (this.onResize) {
+      this.scale.off('resize', this.onResize);
+      this.onResize = undefined;
+    }
     this.socketClient.off('game:state');
     this.socketClient.off('game:over');
     this.socketClient.off('game:bombThrown');

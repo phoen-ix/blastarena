@@ -191,6 +191,22 @@ export class PlayerSpriteRenderer {
           }
           this.destroyGhostOverlays(player.id);
 
+          // Free the particle emitters. removePlayer() does this, but it only runs when a player
+          // leaves the game — a dead player is still in state.players, so nothing released them.
+          // A cosmetic trail emitter is frequency-driven with emitting:true, so it kept spitting
+          // particles at the exact tile the player died on for the rest of the match.
+          // (audit TRAIL-EMITTER-LEAK-1)
+          const deadTrail = this.trailEmitters.get(player.id);
+          if (deadTrail) {
+            deadTrail.destroy();
+            this.trailEmitters.delete(player.id);
+          }
+          const deadDust = this.dustEmitters.get(player.id);
+          if (deadDust) {
+            deadDust.destroy();
+            this.dustEmitters.delete(player.id);
+          }
+
           // Clean up tracking maps
           this.prevShieldState.delete(player.id);
           this.prevPositions.delete(player.id);
@@ -660,6 +676,10 @@ export class PlayerSpriteRenderer {
     this.buddyGlowGraphics.clear();
     for (const emitter of this.dustEmitters.values()) emitter.destroy();
     this.dustEmitters.clear();
+    // destroy() cleared dust but not trails, so a renderer teardown left them behind too.
+    // (audit TRAIL-EMITTER-LEAK-1)
+    for (const emitter of this.trailEmitters.values()) emitter.destroy();
+    this.trailEmitters.clear();
     for (const ghosts of this.ghostSprites.values()) {
       for (const g of ghosts) g.destroy();
     }

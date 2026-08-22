@@ -131,7 +131,11 @@ export class GameOverScene extends Phaser.Scene {
     };
     socketClient.on('rematch:triggered', rematchTriggeredHandler);
 
-    this.events.on('shutdown', () => {
+    // `once`, matching every other scene: Phaser's Systems.shutdown() only clears the transition
+    // events, so a scene `shutdown` listener registered with `on` survives and accumulates one
+    // more closure — holding the old socketClient and six stale handler refs — per finished match.
+    // (audit SCENE-SHUTDOWN-ONCE-1)
+    this.events.once('shutdown', () => {
       socketClient.off('room:state', roomStateHandler);
       socketClient.off('game:eloUpdate', eloHandler);
       socketClient.off('game:xpUpdate', xpHandler);

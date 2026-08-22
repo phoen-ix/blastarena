@@ -79,6 +79,8 @@ interface EditorUndoState {
 }
 
 export class LevelEditorScene extends Phaser.Scene {
+  /** ScaleManager resize handler; removed in shutdown(). (audit SCENE-RESIZE-LEAK-1) */
+  private onResize?: (gameSize: Phaser.Structs.Size) => void;
   private levelId: number | null = null;
   private level: CampaignLevel | null = null;
   private enemyTypes: EnemyTypeEntry[] = [];
@@ -88,7 +90,7 @@ export class LevelEditorScene extends Phaser.Scene {
   private tiles: TileType[][] = [];
   private tileSprites: Phaser.GameObjects.Sprite[][] = [];
   private gridOverlay!: Phaser.GameObjects.Graphics;
-  private spawnOverlay!: Phaser.GameObjects.Graphics;
+  private spawnOverlay: Phaser.GameObjects.Graphics | null = null;
   private spawnLabels: Phaser.GameObjects.Text[] = [];
 
   private enemies: PlacedEnemy[] = [];
@@ -175,6 +177,23 @@ export class LevelEditorScene extends Phaser.Scene {
     this.puzzleSwitchVariants = new Map();
     this.puzzleLinkGraphics = null;
     this.worldTheme = 'classic';
+
+    // Phaser reuses the scene instance, so every session-specific field has to be reset here —
+    // these were not, and loadData() only calls initEmptyMap() when `tiles` is empty. Opening an
+    // existing level, going back, then choosing "New Level" therefore opened the NEW level
+    // pre-filled with the previous level's grid, name, size, lives and published flag, and saving
+    // it silently created a duplicate of the old level. (audit EDITOR-RESET-1)
+    this.tiles = [];
+    this.level = null;
+    this.mapWidth = 15;
+    this.mapHeight = 13;
+    this.levelName = t('editor:defaults.untitledLevel');
+    this.levelLives = 3;
+    this.levelTimeLimit = 0;
+    this.levelParTime = 0;
+    this.levelWinCondition = 'kill_all';
+    this.levelIsPublished = false;
+    this.spawnOverlay = null;
 
     this.events.once('shutdown', this.shutdown, this);
 
@@ -608,10 +627,13 @@ export class LevelEditorScene extends Phaser.Scene {
     cam.setViewport(tw, 0, this.scale.width - tw, this.scale.height);
     cam.centerOn(worldW / 2, worldH / 2);
 
-    // Update viewport on window resize
-    this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
+    // Update viewport on window resize. Removed in shutdown(): `this.scale` is the game-wide
+    // ScaleManager, so without that each visit to the editor leaves another closure running
+    // setViewport on a camera belonging to a dead scene. (audit SCENE-RESIZE-LEAK-1)
+    this.onResize = (gameSize: Phaser.Structs.Size) => {
       cam.setViewport(tw, 0, gameSize.width - tw, gameSize.height);
-    });
+    };
+    this.scale.on('resize', this.onResize);
 
     // Zoom with scroll wheel
     this.input.on(
@@ -2059,6 +2081,10 @@ export class LevelEditorScene extends Phaser.Scene {
   }
 
   shutdown(): void {
+    if (this.onResize) {
+      this.scale.off('resize', this.onResize);
+      this.onResize = undefined;
+    }
     if (this.beforeUnloadHandler) {
       window.removeEventListener('beforeunload', this.beforeUnloadHandler);
       this.beforeUnloadHandler = null;
@@ -2074,6 +2100,7 @@ export class LevelEditorScene extends Phaser.Scene {
     for (const s of this.coveredTileSprites.values()) s.destroy();
     this.gridOverlay?.destroy();
     this.spawnOverlay?.destroy();
+    this.spawnOverlay = null;
     this.puzzleLinkGraphics?.destroy();
     for (const label of this.spawnLabels) label.destroy();
     this.spawnLabels = [];
