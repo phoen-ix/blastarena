@@ -62,6 +62,10 @@
 
 ### Nginx Rate Limiting
 - `limit_req_zone` for API (30r/s), Socket.io (10r/s), auth (5r/s) — defense-in-depth alongside Express middleware
+- **These are per-IP only because of the `real_ip` block at the top of `docker/nginx/nginx.conf`.** The container publishes `127.0.0.1:8280` and sits behind Traefik on the host, so without it `$remote_addr` is the Docker bridge gateway for every visitor and all three zones become one shared bucket — roughly three simultaneous page loads exhausted the Socket.io burst site-wide, while an abusive client was indistinguishable from legitimate traffic. It also fed the gateway address onward as `X-Real-IP`/`X-Forwarded-For`, so Express's `trust proxy` resolved `req.ip` to the gateway too. (audit NGINX-REALIP-1)
+- **Deployment contract — this is load-bearing, not incidental.** Trusting `X-Forwarded-For` is only safe because Traefik declares no `forwardedHeaders.trustedIPs`, so it treats every client as untrusted and *replaces* inbound `X-Forwarded-*` rather than passing them through. `real_ip_recursive` is deliberately `off`, so nginx takes the **last** entry in the chain — the peer Traefik itself observed — which keeps forged entries to the left harmless even if Traefik were later reconfigured to append. Replacing the host proxy with one that forwards a client-supplied `X-Forwarded-For` verbatim would make every rate limit spoofable, including the 5r/s auth limiter.
+- The subnet is intentionally *not* pinned in `docker-compose.yml`; `set_real_ip_from` covers `172.16.0.0/12` so a recreated Docker network cannot silently stop the recovery. If the trust range ever stops matching, the limiter degrades to the old single-bucket behaviour — strict, never spoofable.
+- `$http_x_forwarded_for` is in the access `log_format`, so a collapse back to one address is visible: `docker logs blast-arena-nginx | grep -v /api/health | awk '{print $1}' | sort -u | wc -l` should be well above 1.
 
 ### Socket.io Auth Hardening
 - Socket middleware reads `role` from database (not JWT) on each connection — demoted admins lose privileges immediately

@@ -264,6 +264,11 @@ describe('Leaderboard Service', () => {
         expect.stringContaining('FROM season_elo se'),
         [5, 25, 0],
       );
+      // Total order, or pages overlap and gap. (audit LEADERBOARD-PAGE-1)
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('ORDER BY se.elo_rating DESC, se.id ASC'),
+        [5, 25, 0],
+      );
     });
 
     it('should use active season when no seasonId is given and active season exists', async () => {
@@ -286,6 +291,10 @@ describe('Leaderboard Service', () => {
         expect.stringContaining('FROM season_elo se'),
         [3, 25, 0],
       );
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('ORDER BY se.elo_rating DESC, se.id ASC'),
+        [3, 25, 0],
+      );
     });
 
     it('should use user_stats when no seasonId and no active season', async () => {
@@ -299,6 +308,12 @@ describe('Leaderboard Service', () => {
       expect(result.season).toBeNull();
       expect(mockQuery).toHaveBeenCalledWith(
         expect.stringContaining('FROM user_stats us'),
+        [25, 0],
+      );
+      // user_id DESC, not ASC: the tiebreaker has to run the same direction as the index scan
+      // or MariaDB adds a filesort. See the comment on getLeaderboard.
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('ORDER BY us.elo_rating DESC, us.user_id DESC'),
         [25, 0],
       );
     });

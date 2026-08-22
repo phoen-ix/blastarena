@@ -143,7 +143,7 @@ All resources self-hosted — no external CDN. Meta tags (OG, Twitter Card, JSON
 - **Email verification**: Required before game access. Socket + REST middleware enforce. Max 3 resends per account
 - **Email enumeration prevention**: Existing email returns generic error + warning email to owner
 - **TOTP 2FA**: AES-256-GCM encrypted secrets. Two-step login (challenge token → verify). 10 backup codes
-- **Rate limiting**: Nginx (API 30r/s, Socket.io 10r/s, auth 5r/s) + Express middleware + per-socket sliding window limiters
+- **Rate limiting**: Nginx (API 30r/s, Socket.io 10r/s, auth 5r/s) + Express middleware + per-socket sliding window limiters. The nginx zones are per-IP only via the `real_ip` block in `docker/nginx/nginx.conf`, which depends on Traefik stripping inbound `X-Forwarded-*` — see [docs/infrastructure.md](docs/infrastructure.md#nginx-rate-limiting) before changing either
 - **Atomic operations**: Refresh token rotation (compare-and-swap), password reset (single UPDATE with token check), room start (Lua script)
 - **Socket.io role from DB**: Socket middleware reads role from database (not JWT) on each connection
 - **Socket validation**: Zod schemas for room/admin events, manual validation for hot-path `game:input`

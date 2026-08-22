@@ -65,6 +65,27 @@ interface LeaderboardRow extends RowDataPacket {
   level: number;
 }
 
+/**
+ * A page of the leaderboard.
+ *
+ * Every `ORDER BY elo_rating DESC` here carries a primary-key tiebreaker, and must keep it. Elo
+ * ties are the normal case — every account starts at 1000 — and `ORDER BY` on a non-unique key is
+ * not a total order, so the database may return tied rows in a different sequence for each
+ * LIMIT/OFFSET window. That is not theoretical: with three players tied at 1000 and `limit=2`,
+ * page 1 returned users [7, 3] and page 2 returned user 7 *again*, while user 2 appeared on no
+ * page at all. Ranks are assigned from the array index below, so an unstable sequence also means
+ * rank numbers that change between requests.
+ *
+ * The tiebreaker direction is not free choice — it has to match the index that already answers
+ * the sort, or MariaDB adds a filesort over the whole table to an unauthenticated endpoint:
+ *   - user_stats: PK user_id, KEY idx_user_stats_elo(elo_rating). InnoDB appends the PK to a
+ *     secondary index, so the backward scan for `elo_rating DESC` already yields `user_id DESC`.
+ *     EXPLAIN: `, us.user_id DESC` -> Using index. `, us.user_id ASC` -> Using index; Using filesort.
+ *   - season_elo: PK id, KEY idx_season_elo_ranking(season_id, elo_rating DESC). The forward scan
+ *     yields `id ASC`. EXPLAIN: `, se.id ASC` -> Using where. `, se.id DESC` and `, se.user_id ASC`
+ *     -> Using filesort. (`se.id` is the PK; `user_id` is unique per season but not in the index.)
+ * (audit LEADERBOARD-PAGE-1)
+ */
 export async function getLeaderboard(opts: {
   page?: number;
   limit?: number;
@@ -90,7 +111,7 @@ export async function getLeaderboard(opts: {
          JOIN users u ON u.id = se.user_id
          LEFT JOIN user_stats us ON us.user_id = se.user_id
          WHERE se.season_id = ? AND u.is_deactivated = 0 AND u.is_profile_public = 1
-         ORDER BY se.elo_rating DESC
+         ORDER BY se.elo_rating DESC, se.id ASC
          LIMIT ? OFFSET ?`,
         [opts.seasonId, limit, offset],
       ),
@@ -118,7 +139,7 @@ export async function getLeaderboard(opts: {
            JOIN users u ON u.id = se.user_id
            LEFT JOIN user_stats us ON us.user_id = se.user_id
            WHERE se.season_id = ? AND u.is_deactivated = 0 AND u.is_profile_public = 1
-           ORDER BY se.elo_rating DESC
+           ORDER BY se.elo_rating DESC, se.id ASC
            LIMIT ? OFFSET ?`,
           [activeSeason.id, limit, offset],
         ),
@@ -141,7 +162,7 @@ export async function getLeaderboard(opts: {
            FROM user_stats us
            JOIN users u ON u.id = us.user_id
            WHERE u.is_deactivated = 0 AND u.is_profile_public = 1
-           ORDER BY us.elo_rating DESC
+           ORDER BY us.elo_rating DESC, us.user_id DESC
            LIMIT ? OFFSET ?`,
           [limit, offset],
         ),
