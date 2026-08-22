@@ -972,8 +972,11 @@ router.post(
 
 router.get('/admin/users', async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
+    // Clamped like /admin/simulations and /leaderboard already are. Unclamped, `?page=-5`
+    // produced a negative SQL OFFSET (a driver error surfacing as an opaque 500) and
+    // `?limit=1000000` streamed the whole table. (audit ADMIN-PAGINATION-1)
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
     const search = req.query.search as string | undefined;
     const result = await adminService.listUsers(page, limit, search);
     res.json(result);
@@ -1131,8 +1134,11 @@ router.get('/admin/stats', adminOnlyMiddleware, async (_req, res, next) => {
 
 router.get('/admin/matches', async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
+    // Clamped like /admin/simulations and /leaderboard already are. Unclamped, `?page=-5`
+    // produced a negative SQL OFFSET (a driver error surfacing as an opaque 500) and
+    // `?limit=1000000` streamed the whole table. (audit ADMIN-PAGINATION-1)
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
     const result = await adminService.getMatchHistory(page, limit);
     res.json(result);
   } catch (err) {
@@ -1210,8 +1216,11 @@ router.get('/admin/rooms', async (_req, res, next) => {
 
 router.get('/admin/actions', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
+    // Clamped like /admin/simulations and /leaderboard already are. Unclamped, `?page=-5`
+    // produced a negative SQL OFFSET (a driver error surfacing as an opaque 500) and
+    // `?limit=1000000` streamed the whole table. (audit ADMIN-PAGINATION-1)
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
     const action = req.query.action as string | undefined;
     const result = await adminService.getAdminActions(page, limit, action);
     res.json(result);
@@ -1282,8 +1291,11 @@ const fsReadLimiter = rateLimiter({ windowMs: 10_000, maxRequests: 15 });
 
 router.get('/admin/replays', fsReadLimiter, async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
+    // Clamped like /admin/simulations and /leaderboard already are. Unclamped, `?page=-5`
+    // produced a negative SQL OFFSET (a driver error surfacing as an opaque 500) and
+    // `?limit=1000000` streamed the whole table. (audit ADMIN-PAGINATION-1)
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
     const result = await replayService.listReplays(page, limit);
     res.json(result);
   } catch (err) {
@@ -1323,8 +1335,11 @@ router.delete('/admin/replays/:matchId', adminOnlyMiddleware, async (req, res, n
 
 router.get('/admin/campaign-replays', async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
+    // Clamped like /admin/simulations and /leaderboard already are. Unclamped, `?page=-5`
+    // produced a negative SQL OFFSET (a driver error surfacing as an opaque 500) and
+    // `?limit=1000000` streamed the whole table. (audit ADMIN-PAGINATION-1)
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
     const userId = req.query.userId ? parseInt(req.query.userId as string) : undefined;
     const levelId = req.query.levelId ? parseInt(req.query.levelId as string) : undefined;
     const result = await replayService.listCampaignReplays(page, limit, userId, levelId);

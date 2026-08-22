@@ -12,6 +12,7 @@ jest.mock('../../../backend/src/db/connection', () => ({
 
 import {
   getSetting,
+  getRankConfig,
   setSetting,
   isRecordingEnabled,
   getGameDefaults,
@@ -19,6 +20,8 @@ import {
   getSimulationDefaults,
   setSimulationDefaults,
 } from '../../../backend/src/services/settings';
+import { DEFAULT_RANK_CONFIG } from '@blast-arena/shared';
+import type { RankConfig } from '@blast-arena/shared';
 
 describe('Settings Service', () => {
   beforeEach(() => {
@@ -53,10 +56,11 @@ describe('Settings Service', () => {
 
       await setSetting('my_key', 'my_value');
 
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('ON DUPLICATE KEY UPDATE'),
-        ['my_key', 'my_value', 'my_value'],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('ON DUPLICATE KEY UPDATE'), [
+        'my_key',
+        'my_value',
+        'my_value',
+      ]);
     });
   });
 
@@ -120,10 +124,11 @@ describe('Settings Service', () => {
 
       await setGameDefaults(defaults);
 
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('ON DUPLICATE KEY UPDATE'),
-        ['game_defaults', JSON.stringify(defaults), JSON.stringify(defaults)],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('ON DUPLICATE KEY UPDATE'), [
+        'game_defaults',
+        JSON.stringify(defaults),
+        JSON.stringify(defaults),
+      ]);
     });
   });
 
@@ -153,10 +158,43 @@ describe('Settings Service', () => {
 
       await setSimulationDefaults(defaults);
 
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('ON DUPLICATE KEY UPDATE'),
-        ['simulation_defaults', JSON.stringify(defaults), JSON.stringify(defaults)],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('ON DUPLICATE KEY UPDATE'), [
+        'simulation_defaults',
+        JSON.stringify(defaults),
+        JSON.stringify(defaults),
+      ]);
+    });
+  });
+
+  // ── getRankConfig ──────────────────────────────────────────────────
+  // Moved here from leaderboard.test.ts: getRankConfig was implemented byte-identically in both
+  // services, so routes/leaderboard and routes/admin could have drifted apart. It now lives here
+  // and leaderboard re-exports it. (audit RANKCONFIG-DUP-1)
+
+  describe('getRankConfig', () => {
+    it('should return parsed JSON from settings when valid', async () => {
+      const customConfig: RankConfig = {
+        tiers: [{ name: 'Custom', minElo: 0, maxElo: 5000, color: '#123456' }],
+        subTiersEnabled: false,
+      };
+      mockQuery.mockResolvedValue([{ setting_value: JSON.stringify(customConfig) }]);
+
+      expect(await getRankConfig()).toEqual(customConfig);
+    });
+
+    it('should return DEFAULT_RANK_CONFIG when the setting is missing', async () => {
+      mockQuery.mockResolvedValue([]);
+      expect(await getRankConfig()).toEqual(DEFAULT_RANK_CONFIG);
+    });
+
+    it('should return DEFAULT_RANK_CONFIG on invalid JSON', async () => {
+      mockQuery.mockResolvedValue([{ setting_value: '{not valid json!!!' }]);
+      expect(await getRankConfig()).toEqual(DEFAULT_RANK_CONFIG);
+    });
+
+    it('should return DEFAULT_RANK_CONFIG when the setting is an empty string', async () => {
+      mockQuery.mockResolvedValue([{ setting_value: '' }]);
+      expect(await getRankConfig()).toEqual(DEFAULT_RANK_CONFIG);
     });
   });
 });

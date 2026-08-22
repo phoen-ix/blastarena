@@ -387,7 +387,12 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         const config = parsed.data.config;
         let customMapName: string | undefined;
         if (config.customMapId) {
-          const mapName = await customMapsService.getMapName(config.customMapId);
+          // Same rule as GET /maps/:id — owner, or published. (audit CUSTOMMAP-AUTHZ-1)
+          const allowed = await customMapsService.canUserPlayMap(
+            config.customMapId,
+            socket.data.userId,
+          );
+          const mapName = allowed ? await customMapsService.getMapName(config.customMapId) : null;
           if (!mapName) {
             return callback({ success: false, error: 'Custom map not found' });
           }
@@ -1270,7 +1275,22 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
             onPlayerLockedIn: (playerId, position) => {
               emitToCampaign('campaign:playerLockedIn', { playerId, position });
             },
-            onLevelComplete: async (timeSeconds, deaths) => {
+            onLevelComplete: async (timeSeconds, deaths, carried) => {
+              // Persist P1's power-ups so a carryOverPowerups level can pick them up next time.
+              // updateCarriedPowerups had no call sites at all, so campaign_user_state's
+              // carried_powerups was always null and the carry-over never happened.
+              // (audit CARRYOVER-1)
+              if (socket.data.userId > 0) {
+                try {
+                  await progressService.updateCarriedPowerups(socket.data.userId, carried);
+                } catch (err) {
+                  logger.warn(
+                    { err: getErrorMessage(err), userId: socket.data.userId },
+                    'Failed to persist carried power-ups',
+                  );
+                }
+              }
+
               // Record completion for all real players
               let stars = 0;
               for (const uid of userIds) {
@@ -1673,6 +1693,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         emoteLastUsed.delete(socket.data.userId);
         spectatorChatLimiter.remove(socket.id);
         spectatorActionLimiter.remove(socket.id);
+        // Capture before clearing: the room-cleanup block further down reads this, and clearing it
+        // first made its `||` dead, forcing a Redis lookup every disconnect — and if the
+        // `player:<id>:room` key had expired during a long session, that lookup returned null and
+        // the player was never removed from the room at all, leaving a ghost. (audit DISCONNECT-ROOM-1)
+        const disconnectRoomCode = socket.data.activeRoomCode;
         socket.data.activeRoomCode = undefined;
 
         // Clean up rematch votes for the disconnecting player
@@ -1725,7 +1750,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         }
 
         const roomCode =
-          socket.data.activeRoomCode || (await lobbyService.getPlayerRoom(socket.data.userId));
+          disconnectRoomCode || (await lobbyService.getPlayerRoom(socket.data.userId));
         if (roomCode) {
           const gameRoom = roomManager.getRoom(roomCode);
           if (gameRoom && gameRoom.isRunning()) {

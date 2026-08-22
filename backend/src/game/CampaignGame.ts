@@ -38,6 +38,7 @@ import { GameLogger } from '../utils/gameLogger';
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 import { SeededRandom } from './SeededRandom';
+import { DEFAULT_MAX_BOMBS, DEFAULT_FIRE_RANGE, DEFAULT_SPEED } from '@blast-arena/shared';
 
 // Simple seeded random for campaign
 
@@ -53,7 +54,12 @@ export interface CampaignSessionCallbacks {
   onEnemyDied: (enemyId: number, position: Position, isBoss: boolean) => void;
   onExitOpened: (position: Position) => void;
   onPlayerLockedIn?: (playerId: number, position: Position) => void;
-  onLevelComplete: (timeSeconds: number, deaths: number) => void;
+  onLevelComplete: (
+    timeSeconds: number,
+    deaths: number,
+    /** P1's power-ups at completion, for levels with carryOverPowerups. */
+    carried: StartingPowerUps,
+  ) => void;
   onGameOver: (reason: string) => void;
 }
 
@@ -1120,7 +1126,31 @@ export class CampaignGame {
     const elapsedTicks = this.gameState.tick - this.startTick;
     const timeSeconds = Math.round(elapsedTicks / TICK_RATE);
 
-    this.callbacks.onLevelComplete(timeSeconds, this.playerDeaths);
+    this.callbacks.onLevelComplete(timeSeconds, this.playerDeaths, this.collectedPowerUps());
+  }
+
+  /**
+   * P1's power-ups as a StartingPowerUps snapshot.
+   *
+   * carryOverPowerups levels read this back through campaign_user_state on the next level. Nothing
+   * ever wrote it — updateCarriedPowerups had no call sites at all — so the stored value was
+   * always null and CampaignGame silently fell back to the level's own startingPowerups, i.e. the
+   * advertised carry-over never happened. (audit CARRYOVER-1)
+   */
+  private collectedPowerUps(): StartingPowerUps {
+    const p1 = this.gameState.players.get(this.userIds[0]);
+    if (!p1) return {};
+    return {
+      bombUp: Math.max(0, p1.maxBombs - DEFAULT_MAX_BOMBS),
+      fireUp: Math.max(0, p1.fireRange - DEFAULT_FIRE_RANGE),
+      speedUp: Math.max(0, p1.speed - DEFAULT_SPEED),
+      shield: p1.hasShield,
+      kick: p1.hasKick,
+      pierceBomb: p1.hasPierceBomb,
+      remoteBomb: p1.hasRemoteBomb,
+      lineBomb: p1.hasLineBomb,
+      bombThrow: p1.hasBombThrow,
+    };
   }
 
   private gameOverInternal(reason: string): void {

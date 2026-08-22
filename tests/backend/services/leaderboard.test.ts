@@ -11,8 +11,21 @@ jest.mock('../../../backend/src/db/connection', () => ({
 }));
 
 const mockGetSetting = jest.fn<AnyFn>();
+// getRankConfig now lives in the settings service and is re-exported by leaderboard, so the mock
+// has to provide it. Its behaviour is driven by mockGetSetting exactly as the real one is, and it
+// is covered directly in settings.test.ts. (audit RANKCONFIG-DUP-1)
+const mockGetRankConfig = jest.fn<AnyFn>(async () => {
+  const value = await mockGetSetting('rank_tiers');
+  if (!value) return DEFAULT_RANK_CONFIG;
+  try {
+    return JSON.parse(value as string);
+  } catch {
+    return DEFAULT_RANK_CONFIG;
+  }
+});
 jest.mock('../../../backend/src/services/settings', () => ({
   getSetting: mockGetSetting,
+  getRankConfig: mockGetRankConfig,
 }));
 
 const mockGetActiveSeason = jest.fn<AnyFn>();
@@ -161,47 +174,6 @@ describe('Leaderboard Service', () => {
 
       const result = getRankForElo(1500, config);
       expect(result).toEqual({ name: 'Everyone', color: '#fff' });
-    });
-  });
-
-  // ── getRankConfig ─────────────────────────────────────────────────
-
-  describe('getRankConfig', () => {
-    it('should return parsed JSON from settings when valid', async () => {
-      const customConfig: RankConfig = {
-        tiers: [{ name: 'Custom', minElo: 0, maxElo: 5000, color: '#123456' }],
-        subTiersEnabled: false,
-      };
-      mockGetSetting.mockResolvedValue(JSON.stringify(customConfig));
-
-      const result = await getRankConfig();
-
-      expect(result).toEqual(customConfig);
-      expect(mockGetSetting).toHaveBeenCalledWith('rank_tiers');
-    });
-
-    it('should return DEFAULT_RANK_CONFIG when setting is null', async () => {
-      mockGetSetting.mockResolvedValue(null);
-
-      const result = await getRankConfig();
-
-      expect(result).toEqual(DEFAULT_RANK_CONFIG);
-    });
-
-    it('should return DEFAULT_RANK_CONFIG on invalid JSON', async () => {
-      mockGetSetting.mockResolvedValue('{not valid json!!!');
-
-      const result = await getRankConfig();
-
-      expect(result).toEqual(DEFAULT_RANK_CONFIG);
-    });
-
-    it('should return DEFAULT_RANK_CONFIG when setting is empty string', async () => {
-      mockGetSetting.mockResolvedValue('');
-
-      const result = await getRankConfig();
-
-      expect(result).toEqual(DEFAULT_RANK_CONFIG);
     });
   });
 

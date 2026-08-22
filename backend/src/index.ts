@@ -52,9 +52,24 @@ async function main(): Promise<void> {
     logger.info({ port }, 'Server listening');
   });
 
+  // Reap expired/revoked refresh tokens. Rows were inserted on every login and every rotation and
+  // only ever flagged revoked, so the table grew without bound and the token_hash lookup on
+  // /auth/refresh degraded with it. (audit REFRESH-TOKEN-REAP-1)
+  const { cleanupExpiredRefreshTokens } = await import('./services/auth');
+  const reapRefreshTokens = () => {
+    cleanupExpiredRefreshTokens()
+      .then((removed) => {
+        if (removed > 0) logger.info({ removed }, 'Reaped refresh tokens');
+      })
+      .catch((err) => logger.warn({ err }, 'Refresh token cleanup failed'));
+  };
+  reapRefreshTokens();
+  const refreshTokenReaper = setInterval(reapRefreshTokens, 24 * 60 * 60 * 1000);
+
   // Graceful shutdown
   const shutdown = async () => {
     logger.info('Shutting down...');
+    clearInterval(refreshTokenReaper);
     io.close();
     httpServer.close();
     process.exit(0);

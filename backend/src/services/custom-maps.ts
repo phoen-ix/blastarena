@@ -190,6 +190,23 @@ export async function getMapName(id: number): Promise<string | null> {
   return rows.length > 0 ? rows[0].name : null;
 }
 
+/**
+ * Is this map playable by this user? Owner, or published.
+ *
+ * GET /maps/:id enforces exactly this, but the socket paths that resolve a map for a room
+ * (room:create resolving the display name, room:start loading the tiles) did not — so anyone could
+ * point a room's customMapId at another user's UNPUBLISHED map, play it, see its layout and bump
+ * its play_count. (audit CUSTOMMAP-AUTHZ-1)
+ */
+export async function canUserPlayMap(id: number, userId: number): Promise<boolean> {
+  const rows = await query<CustomMapRow[]>(
+    'SELECT created_by, is_published FROM custom_maps WHERE id = ?',
+    [id],
+  );
+  if (rows.length === 0) return false;
+  return rows[0].created_by === userId || !!rows[0].is_published;
+}
+
 export async function rateMap(
   mapId: number,
   userId: number,

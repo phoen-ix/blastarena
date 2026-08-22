@@ -25,6 +25,7 @@ import {
 } from '@blast-arena/shared';
 import * as totpService from './totp';
 import { logger } from '../utils/logger';
+import { getErrorMessage } from '@blast-arena/shared';
 import { UserRow, RefreshTokenJoinRow, IdRow, IdWithLanguageRow } from '../db/types';
 import * as cosmeticsService from './cosmetics';
 
@@ -441,7 +442,28 @@ export async function forgotPassword(email: string): Promise<void> {
     [hashToken(resetToken), expires, emailHash],
   );
 
-  await sendPasswordResetEmail(email, resetToken, rows[0].language || 'en');
+  // Fire and forget. Awaiting the SMTP round-trip made the response measurably slower for a
+  // registered address than for an unknown one — and an SMTP outage turned a known address into a
+  // 500 while an unknown one still returned 200. Either difference is an account-existence oracle,
+  // which defeats the deliberate uniform-response design used in register. (audit EMAIL-TIMING-1)
+  void sendPasswordResetEmail(email, resetToken, rows[0].language || 'en').catch((err) => {
+    logger.warn({ err: getErrorMessage(err) }, 'Failed to send password reset email');
+  });
+}
+
+/**
+ * Delete refresh tokens that are expired or revoked.
+ *
+ * Rows were inserted on every login and every rotation and only ever flagged `revoked` — nothing
+ * ever removed them, despite `idx_refresh_tokens_expires` existing for exactly this job. With a
+ * 15 minute access token, one active user writes ~96 rows a day, forever, and the token_hash
+ * lookup on /auth/refresh degrades along with the table. (audit REFRESH-TOKEN-REAP-1)
+ */
+export async function cleanupExpiredRefreshTokens(): Promise<number> {
+  const result = await execute(
+    'DELETE FROM refresh_tokens WHERE expires_at < NOW() OR revoked = TRUE',
+  );
+  return result.affectedRows ?? 0;
 }
 
 export async function resetPassword(token: string, newPassword: string): Promise<void> {

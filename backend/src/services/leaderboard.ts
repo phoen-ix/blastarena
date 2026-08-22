@@ -4,7 +4,6 @@ import {
   LeaderboardResponse,
   PublicProfile,
   RankConfig,
-  DEFAULT_RANK_CONFIG,
   Season,
 } from '@blast-arena/shared';
 import { PublicProfileRow, CountRow } from '../db/types';
@@ -12,7 +11,6 @@ import { RowDataPacket } from 'mysql2';
 import * as seasonService from './season';
 import * as cosmeticsService from './cosmetics';
 import * as achievementsService from './achievements';
-import { getSetting } from './settings';
 
 export function getRankForElo(elo: number, config: RankConfig): { name: string; color: string } {
   const sorted = [...config.tiers].sort((a, b) => b.minElo - a.minElo);
@@ -44,15 +42,16 @@ export function getRankForElo(elo: number, config: RankConfig): { name: string; 
   return { name: lowest.name, color: lowest.color };
 }
 
-export async function getRankConfig(): Promise<RankConfig> {
-  const value = await getSetting('rank_tiers');
-  if (!value) return DEFAULT_RANK_CONFIG;
-  try {
-    return JSON.parse(value) as RankConfig;
-  } catch {
-    return DEFAULT_RANK_CONFIG;
-  }
-}
+/**
+ * Re-exported from the settings service, which owns every other `server_settings` reader.
+ *
+ * This was a byte-identical second implementation: routes/leaderboard called this copy while
+ * routes/admin called settings.getRankConfig, so a change to how rank tiers are parsed would have
+ * landed in one path and not the other. (audit RANKCONFIG-DUP-1)
+ */
+import { getRankConfig } from './settings';
+
+export { getRankConfig };
 
 interface LeaderboardRow extends RowDataPacket {
   user_id: number;
