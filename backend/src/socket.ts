@@ -528,7 +528,16 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       const roomCode = requireRoom(socket);
       if (!roomCode) return;
 
-      const room = await lobbyService.getRoom(roomCode);
+      // This await sits before the try below, so a Redis failure here used to escape the handler
+      // as an unhandled rejection. (audit SOCKET-TRYCATCH-1)
+      let room;
+      try {
+        room = await lobbyService.getRoom(roomCode);
+      } catch (err: unknown) {
+        logger.error({ err: getErrorMessage(err), roomCode }, 'Error handling room:start');
+        socket.emit('error', { message: 'Failed to start game' });
+        return;
+      }
       if (!room) return;
 
       // Verify host
@@ -611,121 +620,139 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         logger.error({ err, roomCode }, 'Failed to start game');
         io.to(`room:${roomCode}`).emit('error', { message: 'Failed to start game' });
         // CAS: only revert if still in 'countdown' (this start attempt's transition). (audit REDIS-RACE-2)
-        await lobbyService.updateRoomStatus(roomCode, 'waiting', 'countdown');
+        // Guarded: this runs on the failure path, where Redis is the thing most likely to be
+        // unavailable — an unhandled rejection out of a catch block helps nobody.
+        // (audit SOCKET-TRYCATCH-1)
+        try {
+          await lobbyService.updateRoomStatus(roomCode, 'waiting', 'countdown');
+        } catch (revertErr: unknown) {
+          logger.error(
+            { err: getErrorMessage(revertErr), roomCode },
+            'Failed to revert room status after a failed start',
+          );
+        }
       }
     });
 
     // Restart room (play again)
     socket.on('room:restart', async (callback) => {
-      const roomCode = socket.data.activeRoomCode;
-      if (!roomCode) {
-        callback({ success: false, error: 'Not in a room' });
-        return;
-      }
+      try {
+        const roomCode = socket.data.activeRoomCode;
+        if (!roomCode) {
+          callback({ success: false, error: 'Not in a room' });
+          return;
+        }
 
-      const room = await lobbyService.getRoom(roomCode);
-      if (!room) {
-        callback({ success: false, error: 'Room not found' });
-        return;
-      }
+        const room = await lobbyService.getRoom(roomCode);
+        if (!room) {
+          callback({ success: false, error: 'Room not found' });
+          return;
+        }
 
-      if (room.status !== 'finished') {
-        callback({ success: false, error: 'Game is not finished' });
-        return;
-      }
+        if (room.status !== 'finished') {
+          callback({ success: false, error: 'Game is not finished' });
+          return;
+        }
 
-      // Clear any pending rematch votes
-      const existingVotes = rematchVotes.get(roomCode);
-      if (existingVotes) {
-        clearTimeout(existingVotes.timeout);
-        rematchVotes.delete(roomCode);
-      }
-
-      // Clean up finished game room
-      roomManager.removeRoom(roomCode);
-
-      // Reset room state
-      room.status = 'waiting';
-      room.players.forEach((p) => (p.ready = false));
-      await lobbyService.updateRoom(roomCode, room);
-
-      // Notify all players in the room
-      io.to(`room:${roomCode}`).emit('room:state', room);
-
-      callback({ success: true, room });
-      broadcastRoomList();
-    });
-
-    // Rematch voting
-    socket.on('rematch:vote', async (data, callback) => {
-      const parsed = validateSocket(rematchVoteSchema, data, callback);
-      if (!parsed) return;
-      const roomCode = requireRoom(socket, callback);
-      if (!roomCode) return;
-
-      const room = await lobbyService.getRoom(roomCode);
-      if (!room) return callback({ success: false, error: 'Room not found' });
-      if (room.status !== 'finished')
-        return callback({ success: false, error: 'Game not finished' });
-
-      // Atomic get-or-create — no await between check and set prevents race
-      let voteState = rematchVotes.get(roomCode);
-      if (!voteState) {
-        const humanPlayerIds = new Set(
-          room.players.filter((p) => p.user.id > 0).map((p) => p.user.id),
-        );
-        const timeout = setTimeout(() => {
+        // Clear any pending rematch votes
+        const existingVotes = rematchVotes.get(roomCode);
+        if (existingVotes) {
+          clearTimeout(existingVotes.timeout);
           rematchVotes.delete(roomCode);
-          io.to(`room:${roomCode}`).emit('rematch:update', {
-            votes: [],
-            threshold: Math.floor(humanPlayerIds.size / 2) + 1,
-            totalPlayers: humanPlayerIds.size,
-          });
-        }, REMATCH_VOTE_TIMEOUT_MS);
-        voteState = { votes: new Map(), humanPlayerIds, timeout };
-        rematchVotes.set(roomCode, voteState);
-      }
+        }
 
-      if (!voteState.humanPlayerIds.has(socket.data.userId)) {
-        return callback({ success: false, error: 'Not a player in this game' });
-      }
-
-      voteState.votes.set(socket.data.userId, {
-        username: socket.data.username,
-        vote: parsed.vote,
-      });
-
-      const threshold = Math.floor(voteState.humanPlayerIds.size / 2) + 1;
-      const yesVotes = [...voteState.votes.values()].filter((v) => v.vote).length;
-
-      const votesArray = [...voteState.votes.entries()].map(([userId, v]) => ({
-        userId,
-        username: v.username,
-        vote: v.vote,
-      }));
-
-      io.to(`room:${roomCode}`).emit('rematch:update', {
-        votes: votesArray,
-        threshold,
-        totalPlayers: voteState.humanPlayerIds.size,
-      });
-
-      callback({ success: true });
-
-      // Check if threshold met
-      if (yesVotes >= threshold) {
-        clearTimeout(voteState.timeout);
-        rematchVotes.delete(roomCode);
-
-        // Same restart logic as room:restart
+        // Clean up finished game room
         roomManager.removeRoom(roomCode);
+
+        // Reset room state
         room.status = 'waiting';
         room.players.forEach((p) => (p.ready = false));
         await lobbyService.updateRoom(roomCode, room);
 
-        io.to(`room:${roomCode}`).emit('rematch:triggered');
+        // Notify all players in the room
         io.to(`room:${roomCode}`).emit('room:state', room);
+
+        callback({ success: true, room });
         broadcastRoomList();
+      } catch (err: unknown) {
+        callback({ success: false, error: clientError(err) });
+      }
+    });
+
+    // Rematch voting
+    socket.on('rematch:vote', async (data, callback) => {
+      try {
+        const parsed = validateSocket(rematchVoteSchema, data, callback);
+        if (!parsed) return;
+        const roomCode = requireRoom(socket, callback);
+        if (!roomCode) return;
+
+        const room = await lobbyService.getRoom(roomCode);
+        if (!room) return callback({ success: false, error: 'Room not found' });
+        if (room.status !== 'finished')
+          return callback({ success: false, error: 'Game not finished' });
+
+        // Atomic get-or-create — no await between check and set prevents race
+        let voteState = rematchVotes.get(roomCode);
+        if (!voteState) {
+          const humanPlayerIds = new Set(
+            room.players.filter((p) => p.user.id > 0).map((p) => p.user.id),
+          );
+          const timeout = setTimeout(() => {
+            rematchVotes.delete(roomCode);
+            io.to(`room:${roomCode}`).emit('rematch:update', {
+              votes: [],
+              threshold: Math.floor(humanPlayerIds.size / 2) + 1,
+              totalPlayers: humanPlayerIds.size,
+            });
+          }, REMATCH_VOTE_TIMEOUT_MS);
+          voteState = { votes: new Map(), humanPlayerIds, timeout };
+          rematchVotes.set(roomCode, voteState);
+        }
+
+        if (!voteState.humanPlayerIds.has(socket.data.userId)) {
+          return callback({ success: false, error: 'Not a player in this game' });
+        }
+
+        voteState.votes.set(socket.data.userId, {
+          username: socket.data.username,
+          vote: parsed.vote,
+        });
+
+        const threshold = Math.floor(voteState.humanPlayerIds.size / 2) + 1;
+        const yesVotes = [...voteState.votes.values()].filter((v) => v.vote).length;
+
+        const votesArray = [...voteState.votes.entries()].map(([userId, v]) => ({
+          userId,
+          username: v.username,
+          vote: v.vote,
+        }));
+
+        io.to(`room:${roomCode}`).emit('rematch:update', {
+          votes: votesArray,
+          threshold,
+          totalPlayers: voteState.humanPlayerIds.size,
+        });
+
+        callback({ success: true });
+
+        // Check if threshold met
+        if (yesVotes >= threshold) {
+          clearTimeout(voteState.timeout);
+          rematchVotes.delete(roomCode);
+
+          // Same restart logic as room:restart
+          roomManager.removeRoom(roomCode);
+          room.status = 'waiting';
+          room.players.forEach((p) => (p.ready = false));
+          await lobbyService.updateRoom(roomCode, room);
+
+          io.to(`room:${roomCode}`).emit('rematch:triggered');
+          io.to(`room:${roomCode}`).emit('room:state', room);
+          broadcastRoomList();
+        }
+      } catch (err: unknown) {
+        callback({ success: false, error: clientError(err) });
       }
     });
 
@@ -792,196 +819,229 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // In-game emotes
     socket.on('game:emote', async (data) => {
-      const roomCode = requireRoom(socket);
-      if (!roomCode) return;
+      try {
+        const roomCode = requireRoom(socket);
+        if (!roomCode) return;
 
-      if (typeof data.emoteId !== 'number' || data.emoteId < 0 || data.emoteId >= EMOTES.length)
-        return;
+        if (typeof data.emoteId !== 'number' || data.emoteId < 0 || data.emoteId >= EMOTES.length)
+          return;
 
-      const emoteMode = await settingsService.getEmoteMode();
-      if (emoteMode === 'disabled') return;
-      if (emoteMode === 'admin_only' && socket.data.role !== 'admin') return;
-      if (emoteMode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator')
-        return;
+        const emoteMode = await settingsService.getEmoteMode();
+        if (emoteMode === 'disabled') return;
+        if (emoteMode === 'admin_only' && socket.data.role !== 'admin') return;
+        if (
+          emoteMode === 'staff' &&
+          socket.data.role !== 'admin' &&
+          socket.data.role !== 'moderator'
+        )
+          return;
 
-      const now = Date.now();
-      const last = emoteLastUsed.get(socket.data.userId) ?? 0;
-      if (now - last < EMOTE_COOLDOWN_MS) return;
-      emoteLastUsed.set(socket.data.userId, now);
+        const now = Date.now();
+        const last = emoteLastUsed.get(socket.data.userId) ?? 0;
+        if (now - last < EMOTE_COOLDOWN_MS) return;
+        emoteLastUsed.set(socket.data.userId, now);
 
-      io.to(`room:${roomCode}`).emit('game:emote', {
-        playerId: socket.data.userId,
-        emoteId: data.emoteId,
-      });
+        io.to(`room:${roomCode}`).emit('game:emote', {
+          playerId: socket.data.userId,
+          emoteId: data.emoteId,
+        });
+      } catch (err: unknown) {
+        logger.error(
+          { err: getErrorMessage(err), userId: socket.data.userId },
+          'Error handling game:emote',
+        );
+      }
     });
 
     // Spectator chat
     socket.on('game:spectatorChat', async (data) => {
-      const roomCode = requireRoom(socket);
-      if (!roomCode) return;
-      if (!data || typeof data.message !== 'string') return;
+      try {
+        const roomCode = requireRoom(socket);
+        if (!roomCode) return;
+        if (!data || typeof data.message !== 'string') return;
 
-      const message = data.message.trim().slice(0, SPECTATOR_CHAT_MAX_LENGTH);
-      if (!message) return;
+        const message = data.message.trim().slice(0, SPECTATOR_CHAT_MAX_LENGTH);
+        if (!message) return;
 
-      const mode = await settingsService.getSpectatorChatMode();
-      if (mode === 'disabled') return;
-      if (mode === 'admin_only' && socket.data.role !== 'admin') return;
-      if (mode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator')
-        return;
+        const mode = await settingsService.getSpectatorChatMode();
+        if (mode === 'disabled') return;
+        if (mode === 'admin_only' && socket.data.role !== 'admin') return;
+        if (mode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator')
+          return;
 
-      if (!spectatorChatLimiter.isAllowed(socket.id)) return;
+        if (!spectatorChatLimiter.isAllowed(socket.id)) return;
 
-      // Verify sender is dead or is admin spectator
-      const gameRoom = roomManager.getRoom(roomCode);
-      if (gameRoom && gameRoom.isPlayerAlive(socket.data.userId)) return;
+        // Verify sender is dead or is admin spectator
+        const gameRoom = roomManager.getRoom(roomCode);
+        if (gameRoom && gameRoom.isPlayerAlive(socket.data.userId)) return;
 
-      io.to(`room:${roomCode}`).emit('game:spectatorChat', {
-        fromUserId: socket.data.userId,
-        fromUsername: socket.data.username,
-        role: socket.data.role,
-        message,
-        timestamp: Date.now(),
-      });
+        io.to(`room:${roomCode}`).emit('game:spectatorChat', {
+          fromUserId: socket.data.userId,
+          fromUsername: socket.data.username,
+          role: socket.data.role,
+          message,
+          timestamp: Date.now(),
+        });
+      } catch (err: unknown) {
+        logger.error(
+          { err: getErrorMessage(err), userId: socket.data.userId },
+          'Error handling game:spectatorChat',
+        );
+      }
     });
 
     // Spectator Game Master action
     socket.on('spectator:action', async (data, callback) => {
-      const roomCode = requireRoom(socket, callback);
-      if (!roomCode) return;
-      if (!data || !data.type || !data.position) {
-        return callback({ success: false, error: 'Invalid data' });
+      try {
+        const roomCode = requireRoom(socket, callback);
+        if (!roomCode) return;
+        if (!data || !data.type || !data.position) {
+          return callback({ success: false, error: 'Invalid data' });
+        }
+
+        const validTypes = ['place_wall', 'trigger_meteor', 'drop_powerup', 'speed_zone'];
+        if (!validTypes.includes(data.type)) {
+          return callback({ success: false, error: 'Invalid action type' });
+        }
+
+        if (
+          typeof data.position.x !== 'number' ||
+          typeof data.position.y !== 'number' ||
+          !Number.isInteger(data.position.x) ||
+          !Number.isInteger(data.position.y)
+        ) {
+          return callback({ success: false, error: 'Invalid position' });
+        }
+
+        // Only eliminated players (spectators) may use spectator actions — check before consuming a
+        // rate-limit slot, matching game:spectatorChat. (audit SOCKET-SPECTATOR-1)
+        const gameRoom = roomManager.getRoom(roomCode);
+        if (gameRoom && gameRoom.isPlayerAlive(socket.data.userId)) {
+          return callback({
+            success: false,
+            error: 'Only eliminated players can use spectator actions',
+          });
+        }
+
+        // Rate limit
+        if (!spectatorActionLimiter.isAllowed(socket.id)) {
+          return callback({ success: false, error: 'Too many actions' });
+        }
+
+        // Global admin toggle
+        const enabled = await settingsService.isSpectatorActionsEnabled();
+        if (!enabled) {
+          return callback({ success: false, error: 'Spectator actions are globally disabled' });
+        }
+
+        if (!gameRoom) {
+          return callback({ success: false, error: 'Game not found' });
+        }
+
+        const result = gameRoom.handleSpectatorAction(
+          socket.data.userId,
+          data.type as 'place_wall' | 'trigger_meteor' | 'drop_powerup' | 'speed_zone',
+          data.position,
+        );
+
+        if (result.success) {
+          io.to(`room:${roomCode}`).emit('spectator:actionApplied', {
+            type: data.type as 'place_wall' | 'trigger_meteor' | 'drop_powerup' | 'speed_zone',
+            position: data.position,
+          });
+        }
+
+        callback(result);
+      } catch (err: unknown) {
+        callback({ success: false, error: clientError(err) });
       }
-
-      const validTypes = ['place_wall', 'trigger_meteor', 'drop_powerup', 'speed_zone'];
-      if (!validTypes.includes(data.type)) {
-        return callback({ success: false, error: 'Invalid action type' });
-      }
-
-      if (
-        typeof data.position.x !== 'number' ||
-        typeof data.position.y !== 'number' ||
-        !Number.isInteger(data.position.x) ||
-        !Number.isInteger(data.position.y)
-      ) {
-        return callback({ success: false, error: 'Invalid position' });
-      }
-
-      // Only eliminated players (spectators) may use spectator actions — check before consuming a
-      // rate-limit slot, matching game:spectatorChat. (audit SOCKET-SPECTATOR-1)
-      const gameRoom = roomManager.getRoom(roomCode);
-      if (gameRoom && gameRoom.isPlayerAlive(socket.data.userId)) {
-        return callback({
-          success: false,
-          error: 'Only eliminated players can use spectator actions',
-        });
-      }
-
-      // Rate limit
-      if (!spectatorActionLimiter.isAllowed(socket.id)) {
-        return callback({ success: false, error: 'Too many actions' });
-      }
-
-      // Global admin toggle
-      const enabled = await settingsService.isSpectatorActionsEnabled();
-      if (!enabled) {
-        return callback({ success: false, error: 'Spectator actions are globally disabled' });
-      }
-
-      if (!gameRoom) {
-        return callback({ success: false, error: 'Game not found' });
-      }
-
-      const result = gameRoom.handleSpectatorAction(
-        socket.data.userId,
-        data.type as 'place_wall' | 'trigger_meteor' | 'drop_powerup' | 'speed_zone',
-        data.position,
-      );
-
-      if (result.success) {
-        io.to(`room:${roomCode}`).emit('spectator:actionApplied', {
-          type: data.type as 'place_wall' | 'trigger_meteor' | 'drop_powerup' | 'speed_zone',
-          position: data.position,
-        });
-      }
-
-      callback(result);
     });
 
     // Admin: kick player from room
     socket.on('admin:kick', async (data, callback) => {
-      if (!adminActionLimiter(socket.id))
-        return callback({ success: false, error: 'Rate limited' });
-      if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') {
-        return callback({ success: false, error: 'Insufficient permissions' });
-      }
-
-      const parsed = validateSocket(adminKickSchema, data, callback);
-      if (!parsed) return;
-
-      const gameRoom = roomManager.getRoom(parsed.roomCode);
-      if (gameRoom) {
-        gameRoom.handlePlayerDisconnect(parsed.userId);
-      }
-
-      const room = await lobbyService.leaveRoom(parsed.roomCode, parsed.userId);
-
-      // Find target socket and notify
-      const sockets = await io.in(`room:${parsed.roomCode}`).fetchSockets();
-      for (const s of sockets) {
-        if (s.data.userId === parsed.userId) {
-          s.emit('admin:kicked', { reason: parsed.reason || 'Kicked by admin' });
-          s.leave(`room:${parsed.roomCode}`);
+      try {
+        if (!adminActionLimiter(socket.id))
+          return callback({ success: false, error: 'Rate limited' });
+        if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') {
+          return callback({ success: false, error: 'Insufficient permissions' });
         }
-      }
 
-      if (room) {
-        io.to(`room:${parsed.roomCode}`).emit('room:playerLeft', parsed.userId);
-        io.to(`room:${parsed.roomCode}`).emit('room:state', room);
-      }
-      broadcastRoomList();
+        const parsed = validateSocket(adminKickSchema, data, callback);
+        if (!parsed) return;
 
-      logger.info(
-        { admin: socket.data.username, targetUserId: parsed.userId, roomCode: parsed.roomCode },
-        'Admin kicked player',
-      );
-      callback({ success: true });
+        const gameRoom = roomManager.getRoom(parsed.roomCode);
+        if (gameRoom) {
+          gameRoom.handlePlayerDisconnect(parsed.userId);
+        }
+
+        const room = await lobbyService.leaveRoom(parsed.roomCode, parsed.userId);
+
+        // Find target socket and notify
+        const sockets = await io.in(`room:${parsed.roomCode}`).fetchSockets();
+        for (const s of sockets) {
+          if (s.data.userId === parsed.userId) {
+            s.emit('admin:kicked', { reason: parsed.reason || 'Kicked by admin' });
+            s.leave(`room:${parsed.roomCode}`);
+          }
+        }
+
+        if (room) {
+          io.to(`room:${parsed.roomCode}`).emit('room:playerLeft', parsed.userId);
+          io.to(`room:${parsed.roomCode}`).emit('room:state', room);
+        }
+        broadcastRoomList();
+
+        logger.info(
+          { admin: socket.data.username, targetUserId: parsed.userId, roomCode: parsed.roomCode },
+          'Admin kicked player',
+        );
+        callback({ success: true });
+      } catch (err: unknown) {
+        callback({ success: false, error: clientError(err) });
+      }
     });
 
     // Admin: force close room
     socket.on('admin:closeRoom', async (data, callback) => {
-      if (!adminActionLimiter(socket.id))
-        return callback({ success: false, error: 'Rate limited' });
-      if (socket.data.role !== 'admin') {
-        return callback({ success: false, error: 'Admin access required' });
+      try {
+        if (!adminActionLimiter(socket.id))
+          return callback({ success: false, error: 'Rate limited' });
+        if (socket.data.role !== 'admin') {
+          return callback({ success: false, error: 'Admin access required' });
+        }
+
+        const parsed = validateSocket(adminCloseRoomSchema, data, callback);
+        if (!parsed) return;
+
+        // Notify all players in the room
+        io.to(`room:${parsed.roomCode}`).emit('admin:kicked', { reason: 'Room closed by admin' });
+
+        // Remove all sockets from the room
+        const sockets = await io.in(`room:${parsed.roomCode}`).fetchSockets();
+        for (const s of sockets) {
+          await lobbyService.leaveRoom(parsed.roomCode, s.data.userId);
+          s.leave(`room:${parsed.roomCode}`);
+        }
+
+        // Clear any pending rematch votes for this room
+        const existingVotes = rematchVotes.get(parsed.roomCode);
+        if (existingVotes) {
+          clearTimeout(existingVotes.timeout);
+          rematchVotes.delete(parsed.roomCode);
+        }
+
+        roomManager.removeRoom(parsed.roomCode);
+        await lobbyService.deleteRoom(parsed.roomCode);
+        broadcastRoomList();
+
+        logger.info(
+          { admin: socket.data.username, roomCode: parsed.roomCode },
+          'Admin closed room',
+        );
+        callback({ success: true });
+      } catch (err: unknown) {
+        callback({ success: false, error: clientError(err) });
       }
-
-      const parsed = validateSocket(adminCloseRoomSchema, data, callback);
-      if (!parsed) return;
-
-      // Notify all players in the room
-      io.to(`room:${parsed.roomCode}`).emit('admin:kicked', { reason: 'Room closed by admin' });
-
-      // Remove all sockets from the room
-      const sockets = await io.in(`room:${parsed.roomCode}`).fetchSockets();
-      for (const s of sockets) {
-        await lobbyService.leaveRoom(parsed.roomCode, s.data.userId);
-        s.leave(`room:${parsed.roomCode}`);
-      }
-
-      // Clear any pending rematch votes for this room
-      const existingVotes = rematchVotes.get(parsed.roomCode);
-      if (existingVotes) {
-        clearTimeout(existingVotes.timeout);
-        rematchVotes.delete(parsed.roomCode);
-      }
-
-      roomManager.removeRoom(parsed.roomCode);
-      await lobbyService.deleteRoom(parsed.roomCode);
-      broadcastRoomList();
-
-      logger.info({ admin: socket.data.username, roomCode: parsed.roomCode }, 'Admin closed room');
-      callback({ success: true });
     });
 
     // Admin: spectate room

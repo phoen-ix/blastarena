@@ -5,6 +5,7 @@ import {
   InterServerEvents,
   SocketData,
   PARTY_CHAT_MAX_LENGTH,
+  getErrorMessage,
 } from '@blast-arena/shared';
 import * as partyService from '../services/party';
 import * as friendsService from '../services/friends';
@@ -123,9 +124,16 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Decline party invite
   socket.on('party:declineInvite', async (data) => {
-    const parsed = validateSocket(inviteIdSchema, data);
-    if (!parsed) return;
-    await partyService.removeInvite(userId, parsed.inviteId);
+    try {
+      const parsed = validateSocket(inviteIdSchema, data);
+      if (!parsed) return;
+      await partyService.removeInvite(userId, parsed.inviteId);
+    } catch (err: unknown) {
+      logger.error(
+        { err: getErrorMessage(err), userId: socket.data.userId },
+        'Error handling party:declineInvite',
+      );
+    }
   });
 
   // Leave party
@@ -194,29 +202,36 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Party chat
   socket.on('party:chat', async (data) => {
-    if (!partyChatLimiter.isAllowed(socket.id)) return;
-    const partyId = socket.data.activePartyId;
-    if (!partyId) return;
+    try {
+      if (!partyChatLimiter.isAllowed(socket.id)) return;
+      const partyId = socket.data.activePartyId;
+      if (!partyId) return;
 
-    // Check chat mode setting
-    const chatMode = await settingsService.getChatMode();
-    if (chatMode === 'disabled') return;
-    if (chatMode === 'admin_only' && socket.data.role !== 'admin') return;
-    if (chatMode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator')
-      return;
+      // Check chat mode setting
+      const chatMode = await settingsService.getChatMode();
+      if (chatMode === 'disabled') return;
+      if (chatMode === 'admin_only' && socket.data.role !== 'admin') return;
+      if (chatMode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator')
+        return;
 
-    const message =
-      typeof data.message === 'string'
-        ? data.message.trim().substring(0, PARTY_CHAT_MAX_LENGTH)
-        : '';
-    if (!message) return;
+      const message =
+        typeof data.message === 'string'
+          ? data.message.trim().substring(0, PARTY_CHAT_MAX_LENGTH)
+          : '';
+      if (!message) return;
 
-    io.to(`party:${partyId}`).emit('party:chat', {
-      fromUserId: userId,
-      fromUsername: username,
-      message,
-      timestamp: Date.now(),
-    });
+      io.to(`party:${partyId}`).emit('party:chat', {
+        fromUserId: userId,
+        fromUsername: username,
+        message,
+        timestamp: Date.now(),
+      });
+    } catch (err: unknown) {
+      logger.error(
+        { err: getErrorMessage(err), userId: socket.data.userId },
+        'Error handling party:chat',
+      );
+    }
   });
 
   // Room invite (invite friend to current room)
@@ -277,9 +292,16 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Decline room invite
   socket.on('invite:declineRoom', async (data) => {
-    const parsed = validateSocket(inviteIdSchema, data);
-    if (!parsed) return;
-    await partyService.removeInvite(userId, parsed.inviteId);
+    try {
+      const parsed = validateSocket(inviteIdSchema, data);
+      if (!parsed) return;
+      await partyService.removeInvite(userId, parsed.inviteId);
+    } catch (err: unknown) {
+      logger.error(
+        { err: getErrorMessage(err), userId: socket.data.userId },
+        'Error handling invite:declineRoom',
+      );
+    }
   });
 }
 

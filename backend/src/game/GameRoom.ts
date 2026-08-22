@@ -59,6 +59,14 @@ export class GameRoom {
   private matchId: number | null = null;
   private replayRecorder: ReplayRecorder | null = null;
   private disconnectedPlayers: Map<number, number> = new Map(); // playerId -> tick when disconnected
+  /**
+   * Humans who left for good — an explicit leave, or a disconnect whose grace period expired.
+   *
+   * Needed because neither is distinguishable after the fact: grace expiry kills the player but
+   * leaves them in `gameState.players`, exactly like a player killed in normal play. A match is
+   * abandoned only if every human is in here. (audit MATCH-ABORTED-1)
+   */
+  private departedHumans: Set<number> = new Set();
   private onBotsOnly: (() => void) | null = null;
 
   constructor(io: TypedServer, room: Room, customMap?: GameConfig['customMap']) {
@@ -305,11 +313,13 @@ export class GameRoom {
         'Player left game voluntarily',
       );
     }
+    if (player && !player.isBot) this.departedHumans.add(playerId);
 
     this.checkBotOnlySpeedup();
   }
 
   handlePlayerReconnect(playerId: number): boolean {
+    this.departedHumans.delete(playerId);
     if (!this.disconnectedPlayers.has(playerId)) return false;
     const player = this.gameState.players.get(playerId);
     if (!player?.alive) return false;
@@ -335,6 +345,7 @@ export class GameRoom {
           { code: this.code, playerId },
           'Player killed after disconnect grace period expired',
         );
+        if (player && !player.isBot) this.departedHumans.add(playerId);
         this.disconnectedPlayers.delete(playerId);
         killedByGrace = true;
       }
@@ -358,6 +369,20 @@ export class GameRoom {
         this.onBotsOnly?.();
       }
     }
+  }
+
+  /**
+   * Did every human walk out before the match ended?
+   *
+   * Only counts humans who are gone for good — an explicit leave, or a disconnect whose grace
+   * period expired (see `departedHumans`). A human simply killed in normal play is still a
+   * participant, so a hard-fought match ending with everyone dead is NOT abandoned. Bot-only rooms
+   * return false: with no humans there is nothing to abandon, and nothing to rate.
+   * (audit MATCH-ABORTED-1)
+   */
+  private isAbandoned(): boolean {
+    const humans = [...this.gameState.players.values()].filter((p) => !p.isBot);
+    return humans.length > 0 && humans.every((p) => this.departedHumans.has(p.id));
   }
 
   isPlayerDisconnected(playerId: number): boolean {
@@ -454,13 +479,19 @@ export class GameRoom {
         const duration = Math.floor(state.timeElapsed);
         // Don't store bot IDs (negative) as winner_id in DB
         const dbWinnerId = state.winnerId && state.winnerId > 0 ? state.winnerId : null;
-        // Always 'finished'. This used to compare finishReason against the literal
-        // 'All players disconnected', a string that is assigned nowhere in the codebase — so
-        // matchStatus could never be 'aborted' and the `matchStatus !== 'aborted'` guards around
-        // Elo and achievements below were unreachable. Removing the dead branch rather than
-        // wiring it: making abandoned matches skip rating is a product decision, and it needs a
-        // real trigger, not a string comparison that never matches. (audit MATCHSTATUS-DEAD-1)
-        const matchStatus = 'finished';
+        // A match everyone walked out of does not count. `aborted` is driven by real departure
+        // bookkeeping (departedHumans), not by a magic finishReason string — the previous
+        // incarnation compared against a literal that was assigned nowhere, so the status could
+        // never be 'aborted' and the guards below were unreachable. Bot-only rooms are excluded:
+        // with no humans there is nothing to abandon. (audit MATCH-ABORTED-1)
+        const aborted = this.isAbandoned();
+        const matchStatus = aborted ? 'aborted' : 'finished';
+        if (aborted) {
+          logger.info(
+            { code: this.code, matchId: this.matchId },
+            'Match abandoned by every human player — skipping rating, XP and achievements',
+          );
+        }
         await execute(
           `UPDATE matches SET status = ?, finished_at = NOW(), duration = ?, winner_id = ? WHERE id = ?`,
           [matchStatus, duration, dbWinnerId, this.matchId],
@@ -495,28 +526,31 @@ export class GameRoom {
         // K-factor uses the pre-match match count (K=32 for <30 games). (audit ELO-1)
         // Results are emitted later, after stats are updated (so cumulative achievements see the new totals).
         let eloResults: import('@blast-arena/shared').EloResult[] = [];
-        try {
-          const eloPlayers = [...this.gameState.players.values()]
-            .filter((p) => !p.isBot)
-            .map((p) => ({
-              userId: p.id,
-              placement: p.placement ?? 999,
-              team: p.team,
-              isWinner: isWinningPlayer(p),
-            }));
+        if (!aborted) {
+          try {
+            const eloPlayers = [...this.gameState.players.values()]
+              .filter((p) => !p.isBot)
+              .map((p) => ({
+                userId: p.id,
+                placement: p.placement ?? 999,
+                team: p.team,
+                isWinner: isWinningPlayer(p),
+              }));
 
-          eloResults = await eloService.processMatchElo(
-            this.room.config.gameMode,
-            eloPlayers,
-            this.matchId!,
-          );
-        } catch (eloErr) {
-          logger.error({ err: eloErr }, 'Failed to process Elo');
+            eloResults = await eloService.processMatchElo(
+              this.room.config.gameMode,
+              eloPlayers,
+              this.matchId!,
+            );
+          } catch (eloErr) {
+            logger.error({ err: eloErr }, 'Failed to process Elo');
+          }
         }
 
-        // Update user_stats (skip bots)
+        // Update user_stats (skip bots, and skip entirely for an abandoned match — it should
+        // leave no trace on anyone's record). (audit MATCH-ABORTED-1)
         for (const player of this.gameState.players.values()) {
-          if (player.isBot) continue;
+          if (player.isBot || aborted) continue;
           const isWinner = isWinningPlayer(player);
           await execute(
             `UPDATE user_stats SET
@@ -550,9 +584,10 @@ export class GameRoom {
           this.io.to(`room:${this.code}`).emit('game:eloUpdate', eloResults);
         }
 
-        // Achievement evaluation for each human player
+        // Achievement evaluation for each human player (skipped for abandoned matches).
+        // (audit MATCH-ABORTED-1)
         for (const player of this.gameState.players.values()) {
-          if (player.isBot) continue;
+          if (player.isBot || aborted) continue;
           try {
             const unlocked = await achievementsService.evaluateAfterGame({
               userId: player.id,
@@ -584,7 +619,7 @@ export class GameRoom {
           const xpResults: XpUpdateResult[] = [];
 
           for (const p of placements) {
-            if (p.isBot || p.userId < 0) continue;
+            if (p.isBot || p.userId < 0 || aborted) continue;
 
             const [statsRow] = await query<UserStatsXpRow[]>(
               'SELECT total_xp, level FROM user_stats WHERE user_id = ?',
@@ -642,7 +677,7 @@ export class GameRoom {
             const activeChallenge = await challengesService.getActiveChallenge();
             if (activeChallenge && activeChallenge.customMapId === this.room.config.customMapId) {
               for (const p of placements) {
-                if (p.isBot || p.userId < 0) continue;
+                if (p.isBot || p.userId < 0 || aborted) continue;
                 const player = this.gameState.players.get(p.userId);
                 await challengesService.recordChallengeResult(
                   activeChallenge.id,

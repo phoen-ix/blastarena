@@ -529,11 +529,20 @@ export class GameStateManager {
               );
             }
           } else {
-            // Off-tick: reuse last input (movement continues, no new decisions)
+            // Off-tick: reuse last input (movement continues, no new decisions).
+            //
+            // `action` is deliberately dropped. Movement is idempotent — it is gated by
+            // canMove()/applyMoveCooldown() — but actions are one-shot side effects with no
+            // "already consumed" guard, so replaying them fired a decision the AI made once,
+            // twice: `bomb` placed a second bomb whenever the bot had maxBombs >= 2 (canPlaceBomb
+            // only checks the live-bomb budget), and `detonate` fell through to the
+            // hasRemoteBomb branch on the replay tick and silently flipped remoteDetonateMode
+            // between 'fifo' and 'all'. (audit BOT-REPLAY-ACTION-1)
             const lastInput = this._lastBotInputs.get(botId);
             if (lastInput) {
               this.inputBuffer.addInput(botId, {
                 ...lastInput,
+                action: null,
                 seq: lastInput.seq + 1,
                 tick: this.tick,
               });

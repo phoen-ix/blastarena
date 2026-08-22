@@ -5,12 +5,24 @@ import {
   InterServerEvents,
   SocketData,
   LOBBY_CHAT_MAX_LENGTH,
+  getErrorMessage,
 } from '@blast-arena/shared';
+import { logger } from '../utils/logger';
 import * as settingsService from '../services/settings';
 import { createSocketRateLimiter } from '../utils/socketRateLimit';
 
-type TypedServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
-type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
+type TypedServer = Server<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>;
+type TypedSocket = Socket<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>;
 
 const lobbyChatLimiter = createSocketRateLimiter(3);
 
@@ -19,24 +31,34 @@ export function setupLobbyHandlers(socket: TypedSocket, io: TypedServer): void {
   const username = socket.data.username;
 
   socket.on('lobby:chat', async (data) => {
-    if (!lobbyChatLimiter.isAllowed(socket.id)) return;
+    try {
+      if (!lobbyChatLimiter.isAllowed(socket.id)) return;
 
-    const chatMode = await settingsService.getLobbyChatMode();
-    if (chatMode === 'disabled') return;
-    if (chatMode === 'admin_only' && socket.data.role !== 'admin') return;
-    if (chatMode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator') return;
+      const chatMode = await settingsService.getLobbyChatMode();
+      if (chatMode === 'disabled') return;
+      if (chatMode === 'admin_only' && socket.data.role !== 'admin') return;
+      if (chatMode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator')
+        return;
 
-    const message =
-      typeof data.message === 'string' ? data.message.trim().substring(0, LOBBY_CHAT_MAX_LENGTH) : '';
-    if (!message) return;
+      const message =
+        typeof data.message === 'string'
+          ? data.message.trim().substring(0, LOBBY_CHAT_MAX_LENGTH)
+          : '';
+      if (!message) return;
 
-    io.emit('lobby:chat', {
-      fromUserId: userId,
-      fromUsername: username,
-      message,
-      timestamp: Date.now(),
-      role: socket.data.role,
-    });
+      io.emit('lobby:chat', {
+        fromUserId: userId,
+        fromUsername: username,
+        message,
+        timestamp: Date.now(),
+        role: socket.data.role,
+      });
+    } catch (err: unknown) {
+      logger.error(
+        { err: getErrorMessage(err), userId: socket.data.userId },
+        'Error handling lobby:chat',
+      );
+    }
   });
 }
 

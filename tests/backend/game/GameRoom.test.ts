@@ -38,11 +38,19 @@ jest.mock('../../../backend/src/services/settings', () => ({
 const mockGameLoopStart = jest.fn();
 const mockGameLoopStop = jest.fn();
 const mockGameLoopIsRunning = jest.fn().mockReturnValue(false);
+// getTickRate/setTickRate are used by checkBotOnlySpeedup, which every leave/disconnect path
+// reaches. Default to the normal rate so the speed-up branch behaves as it does in a live room.
+// Lazy: jest.mock is hoisted above the imports, so TICK_RATE is not initialised yet at
+// module-eval time — only when the mock is actually called.
+const mockGameLoopGetTickRate = jest.fn(() => TICK_RATE);
+const mockGameLoopSetTickRate = jest.fn();
 jest.mock('../../../backend/src/game/GameLoop', () => ({
   GameLoop: jest.fn().mockImplementation(() => ({
     start: mockGameLoopStart,
     stop: mockGameLoopStop,
     isRunning: mockGameLoopIsRunning,
+    getTickRate: mockGameLoopGetTickRate,
+    setTickRate: mockGameLoopSetTickRate,
   })),
 }));
 
@@ -54,17 +62,29 @@ jest.mock('../../../backend/src/utils/replayRecorder', () => ({
   })),
 }));
 
+// A permissive stand-in: GameLogger has ~20 log* methods and the code under test calls whichever
+// suits its path (logKill, logPlayerDisconnectKill, close, …). Enumerating them by hand just means
+// the next test to exercise a new path fails on a missing mock rather than on its own assertion.
 jest.mock('../../../backend/src/utils/gameLogger', () => ({
-  GameLogger: jest.fn().mockImplementation(() => ({
-    log: jest.fn(),
-    logGameOver: jest.fn(),
-    logPlayerDisconnect: jest.fn(),
-    logPlayerLeave: jest.fn(),
-    replayRecorder: null,
-  })),
+  GameLogger: jest.fn().mockImplementation(() => {
+    const stubs = new Map<string, unknown>();
+    return new Proxy({ replayRecorder: null } as Record<string, unknown>, {
+      get(target: Record<string, unknown>, prop: string) {
+        if (prop in target) return target[prop];
+        if (prop === 'then') return undefined; // never look thenable to an await
+        if (!stubs.has(prop)) stubs.set(prop, jest.fn());
+        return stubs.get(prop);
+      },
+      set(target: Record<string, unknown>, prop: string, value: unknown) {
+        target[prop] = value;
+        return true;
+      },
+    });
+  }),
 }));
 
 import { GameRoom } from '../../../backend/src/game/GameRoom';
+import { TICK_RATE } from '@blast-arena/shared';
 
 // --- Helpers ---
 
@@ -286,6 +306,93 @@ describe('GameRoom', () => {
       );
       // Only 2 human players, not 4 (2 humans + 2 bots)
       expect(matchPlayerCalls.length).toBe(2);
+    });
+  });
+
+  // ─────────────────────────────────────────────────
+  // Abandoned matches
+  // ─────────────────────────────────────────────────
+  // A match everyone walked out of should not touch anyone's rating, XP or achievements. The
+  // previous incarnation of this compared finishReason against a literal assigned nowhere, so the
+  // status could never be 'aborted' and every guard around it was unreachable. The trigger is now
+  // real departure bookkeeping. (audit MATCH-ABORTED-1)
+  describe('isAbandoned', () => {
+    interface Abandonable {
+      isAbandoned(): boolean;
+      departedHumans: Set<number>;
+      handlePlayerLeave(id: number): void;
+      handlePlayerReconnect(id: number): boolean;
+      handlePlayerDisconnect(id: number): void;
+    }
+
+    // Players are added by start(), not the constructor — building a room without it makes
+    // every assertion here vacuously true.
+    async function makeRoom() {
+      mockGameLoopIsRunning.mockReturnValue(true);
+      const gameRoom = new GameRoom(mockIo, createMockRoom() as any);
+      await gameRoom.start();
+      return gameRoom as unknown as Abandonable & { gameState: any };
+    }
+
+    /** Ids of the humans start() actually put in the game state. */
+    function humansOf(gr: { gameState: any }): number[] {
+      return [...gr.gameState.players.values()].filter((p: any) => !p.isBot).map((p: any) => p.id);
+    }
+
+    it('is false while a human is still playing', async () => {
+      const gr = await makeRoom();
+      expect(humansOf(gr).length).toBeGreaterThan(0); // guard against a vacuous pass
+      expect(gr.isAbandoned()).toBe(false);
+    });
+
+    it('is false when humans died in normal play', async () => {
+      const gr = await makeRoom();
+      for (const p of gr.gameState.players.values()) p.alive = false;
+      // Nobody departed — they were killed. This is a real finish, not an abandonment.
+      expect(gr.isAbandoned()).toBe(false);
+    });
+
+    it('is true once every human has explicitly left', async () => {
+      const gr = await makeRoom();
+      const humanIds = humansOf(gr);
+      expect(humanIds.length).toBeGreaterThan(0);
+
+      for (const id of humanIds) gr.handlePlayerLeave(id);
+      expect(gr.isAbandoned()).toBe(true);
+    });
+
+    it('is false while even one human remains', async () => {
+      const gr = await makeRoom();
+      const humanIds = humansOf(gr);
+
+      gr.handlePlayerLeave(humanIds[0]);
+      expect(gr.isAbandoned()).toBe(false);
+    });
+
+    it('counts a disconnect whose grace period expired', async () => {
+      const gr = await makeRoom();
+      const humanIds = humansOf(gr);
+
+      // Simulate grace expiry the way checkDisconnectGracePeriods does.
+      for (const id of humanIds) gr.departedHumans.add(id);
+      expect(gr.isAbandoned()).toBe(true);
+    });
+
+    it('un-departs a player who reconnects', async () => {
+      const gr = await makeRoom();
+      const humanIds = humansOf(gr);
+
+      for (const id of humanIds) gr.handlePlayerLeave(id);
+      expect(gr.isAbandoned()).toBe(true);
+
+      gr.handlePlayerReconnect(humanIds[0]);
+      expect(gr.isAbandoned()).toBe(false);
+    });
+
+    it('is false for a room with no humans at all', async () => {
+      const gr = await makeRoom();
+      for (const p of gr.gameState.players.values()) p.isBot = true;
+      expect(gr.isAbandoned()).toBe(false);
     });
   });
 });
