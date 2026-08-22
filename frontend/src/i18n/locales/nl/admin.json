@@ -28,7 +28,8 @@
       "wins": "Overwinningen",
       "joined": "Lid sinds",
       "lastLogin": "Laatste login",
-      "actions": "Acties"
+      "actions": "Acties",
+      "twoFactor": "2FA"
     },
     "roles": {
       "user": "gebruiker",
@@ -115,6 +116,16 @@
       "cancel": "Cancel",
       "success": "Deleted {{deleted}} account(s)",
       "errorDaysRequired": "Days threshold is required for this cleanup type"
+    },
+    "resetTotp": "2FA opnieuw instellen",
+    "resetTotpSuccess": "Tweefactorauthenticatie opnieuw ingesteld",
+    "twoFactorOn": "Ingeschakeld",
+    "resetTotpModal": {
+      "title": "2FA opnieuw instellen",
+      "ariaLabel": "Tweefactorauthenticatie opnieuw instellen",
+      "cancel": "Annuleren",
+      "confirm": "2FA opnieuw instellen",
+      "description": "Hiermee wordt tweefactorauthenticatie uitgeschakeld voor <strong style=\"color:var(--text);\">{{username}}</strong>. Deze moet opnieuw worden ingesteld om 2FA weer in te schakelen."
     }
   },
   "matches": {
@@ -523,7 +534,7 @@
     "gameCreationDefaults": "Standaardwaarden spelaanmaak",
     "simulationDefaults": "Standaardwaarden simulatie",
     "overridesCount": "({{count}} overschrijvingen)",
-    "defaultOption": "\u2014 Standaard \u2014",
+    "defaultOption": "— Standaard —",
     "defaultIndicator": "(standaard)",
     "gameMode": "Spelmodus",
     "maxPlayers": "Max. spelers",
@@ -615,8 +626,8 @@
     },
     "endDialog": {
       "prompt": "Hoe moeten spelersbeoordelingen worden gereset?",
-      "softReset": "Zachte reset \u2014 beoordelingen vervallen richting basislijn",
-      "hardReset": "Harde reset \u2014 alle beoordelingen worden naar standaard gereset",
+      "softReset": "Zachte reset — beoordelingen vervallen richting basislijn",
+      "hardReset": "Harde reset — alle beoordelingen worden naar standaard gereset",
       "cancel": "Annuleren"
     },
     "rankTiers": {
@@ -649,7 +660,6 @@
     "viewWorlds": "Werelden & levels",
     "viewEnemies": "Vijandtypes",
     "viewReplays": "Replays",
-
     "worlds": {
       "createWorld": "Wereld aanmaken",
       "tableHeaders": {
@@ -677,7 +687,6 @@
       "worldUnpublished": "Wereld gedepubliceerd",
       "worldPublished": "Wereld gepubliceerd"
     },
-
     "levels": {
       "tableHeaders": {
         "order": "#",
@@ -707,14 +716,12 @@
       "deleteLevelConfirm": "Level \"{{name}}\" verwijderen?",
       "levelDeleted": "Level verwijderd"
     },
-
     "winConditions": {
       "kill_all": "Alle vijanden verslaan",
       "find_exit": "Uitgang vinden",
       "reach_goal": "Doel bereiken",
       "survive_time": "Tijd overleven"
     },
-
     "worldModal": {
       "editTitle": "Wereld bewerken",
       "createTitle": "Wereld aanmaken",
@@ -732,7 +739,6 @@
       "worldUpdated": "Wereld bijgewerkt",
       "worldCreated": "Wereld aangemaakt"
     },
-
     "enemies": {
       "createEnemy": "Vijandtype aanmaken",
       "importEnemy": "Vijandtype importeren",
@@ -755,7 +761,6 @@
       "deleteBtn": "Verwijderen",
       "enemyImported": "Vijandtype geïmporteerd"
     },
-
     "enemyModal": {
       "editTitle": "Vijandtype bewerken",
       "createTitle": "Vijandtype aanmaken",
@@ -802,9 +807,7 @@
       "enemyUpdated": "Vijandtype bijgewerkt",
       "enemyCreated": "Vijandtype aangemaakt"
     },
-
     "exportDownloaded": "Export gedownload",
-
     "importLevelModal": {
       "ariaLabel": "Level importeren",
       "title": "Level importeren",
@@ -819,7 +822,6 @@
       "importFailed": "Import mislukt — controleer bestandsformaat",
       "importSuccess": "Level succesvol geïmporteerd"
     },
-
     "conflictModal": {
       "ariaLabel": "Vijandtype-conflicten oplossen",
       "title": "Vijandtype-conflicten oplossen",
@@ -832,7 +834,6 @@
       "import": "Importeren",
       "importSuccess": "Level succesvol geïmporteerd"
     },
-
     "deleteModal": {
       "entityLabels": {
         "world": "Wereld",
@@ -852,7 +853,6 @@
       "deleteBtn": "Verwijderen",
       "deleteSuccess": "{{entity}} verwijderd"
     },
-
     "replays": {
       "totalCount": "{{count}} campagne-replay",
       "totalCount_other": "{{count}} campagne-replays",
@@ -977,7 +977,6 @@
       "reinforcedWalls": "Versterkte muren",
       "mapEvents": "Kaartgebeurtenissen",
       "hazardTiles": "Gevaarlijke tegels",
-      "puzzleTiles": "Puzzle Tiles",
       "friendlyFire": "Friendly fire",
       "recordReplays": "Replays opnemen",
       "powerUps": "Power-ups",

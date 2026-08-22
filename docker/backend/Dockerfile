@@ -9,7 +9,9 @@ COPY shared/package.json ./shared/
 COPY backend/package.json ./backend/
 
 # Install dependencies
-RUN npm install --workspace=shared --workspace=backend
+# npm ci, not npm install: the lockfile is copied above and must be honoured, or two
+# builds of the same commit can ship different transitive dependencies. (audit NPM-CI-1)
+RUN npm ci --workspace=shared --workspace=backend
 
 # Copy source
 COPY shared/ ./shared/
@@ -28,7 +30,7 @@ COPY package.json package-lock.json* ./
 COPY shared/package.json ./shared/
 COPY backend/package.json ./backend/
 
-RUN npm install --workspace=shared --workspace=backend --omit=dev
+RUN npm ci --workspace=shared --workspace=backend --omit=dev
 
 COPY --from=builder /app/shared/dist ./shared/dist
 COPY shared/package.json ./shared/
@@ -39,6 +41,14 @@ COPY docs/ ./docs/
 
 COPY docker/backend/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+# Drop root. This process executes untrusted, admin-uploaded bot and enemy AI (in isolated-vm
+# isolates) and writes to five bind-mounted host directories; running it as uid 0 removed the
+# second layer of defence behind the isolate boundary and left root-owned files on the host.
+# The node:22-alpine image already provides the `node` user (uid 1000). (audit CONTAINER-ROOT-1)
+RUN mkdir -p /app/gamelogs /app/simulations /app/replays /app/ai /app/enemy-ai \
+    && chown -R node:node /app
+USER node
 
 EXPOSE 3000
 

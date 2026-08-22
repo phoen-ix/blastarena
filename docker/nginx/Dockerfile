@@ -7,7 +7,7 @@ COPY package.json package-lock.json* ./
 COPY shared/package.json ./shared/
 COPY frontend/package.json ./frontend/
 
-RUN npm install --workspace=shared --workspace=frontend
+RUN npm ci --workspace=shared --workspace=frontend
 
 COPY shared/ ./shared/
 COPY frontend/ ./frontend/
@@ -23,7 +23,7 @@ COPY package.json package-lock.json* ./
 COPY shared/package.json ./shared/
 COPY frontend/package.json ./frontend/
 
-RUN npm install --workspace=shared --workspace=frontend
+RUN npm ci --workspace=shared --workspace=frontend
 
 COPY shared/ ./shared/
 COPY frontend/ ./frontend/

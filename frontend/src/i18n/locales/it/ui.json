@@ -18,7 +18,8 @@
     "logout": "Esci",
     "expand": "Espandi barra laterale",
     "collapse": "Comprimi barra laterale",
-    "viewProfile": "Visualizza profilo"
+    "viewProfile": "Visualizza profilo",
+    "openWorld": "Mondo aperto"
   },
   "rooms": {
     "title": "Stanze disponibili",
@@ -161,6 +162,32 @@
         "cancel": "Annulla",
         "confirm": "Elimina il mio account",
         "deleting": "Eliminazione in corso..."
+      },
+      "twoFactor": {
+        "title": "Autenticazione a due fattori",
+        "description": "Aggiungi un ulteriore livello di sicurezza al tuo account usando un'app di autenticazione come Google Authenticator, Authy o 1Password.",
+        "enable": "Attiva 2FA",
+        "disable": "Disattiva 2FA",
+        "enabled": "L'autenticazione a due fattori è attiva.",
+        "setupTitle": "Configura l'autenticazione a due fattori",
+        "scanQr": "Scansiona questo codice QR con la tua app di autenticazione:",
+        "manualEntry": "Oppure inserisci questo codice manualmente:",
+        "confirmCode": "Inserisci un codice dalla tua app di autenticazione per confermare la configurazione:",
+        "confirm": "Conferma e attiva",
+        "confirming": "Verifica in corso...",
+        "cancel": "Annulla",
+        "backupTitle": "Codici di backup",
+        "backupDescription": "Conserva questi codici in un luogo sicuro. Ognuno può essere usato una sola volta se perdi l'accesso alla tua app di autenticazione.",
+        "copy": "Copia",
+        "copied": "Copiato!",
+        "enableSuccess": "L'autenticazione a due fattori è stata attivata.",
+        "disableTitle": "Disattiva l'autenticazione a due fattori",
+        "disableDescription": "Inserisci la tua password e un codice dalla tua app di autenticazione per disattivare la 2FA.",
+        "disablePassword": "Password",
+        "disableCode": "Codice di autenticazione o codice di backup",
+        "disableConfirm": "Disattiva 2FA",
+        "disabling": "Disattivazione...",
+        "disableSuccess": "L'autenticazione a due fattori è stata disattivata."
       }
     },
     "cosmetics": {
@@ -392,10 +419,10 @@
     "medium": "Media",
     "large": "Grande",
     "sizes": {
-      "11x11": "Piccola (11\u00d711)",
-      "15x13": "Media (15\u00d713)",
-      "19x15": "Grande (19\u00d715)",
-      "21x21": "Enorme (21\u00d721)"
+      "11x11": "Piccola (11×11)",
+      "15x13": "Media (15×13)",
+      "19x15": "Grande (19×15)",
+      "21x21": "Enorme (21×21)"
     },
     "density": {
       "none": "Nessuna (0%)",
@@ -457,11 +484,11 @@
       "ufo_abduction": "Rapimento UFO"
     },
     "mapSizes": {
-      "21": "21\u00d721 (Piccola)",
-      "31": "31\u00d731 (Normale)",
-      "39": "39\u00d739 (Grande)",
-      "51": "51\u00d751 (Enorme)",
-      "61": "61\u00d761 (Massiccia)"
+      "21": "21×21 (Piccola)",
+      "31": "31×31 (Normale)",
+      "39": "39×39 (Grande)",
+      "51": "51×51 (Enorme)",
+      "61": "61×61 (Massiccia)"
     },
     "wallDensities": {
       "low30": "Bassa (30%)",
@@ -492,7 +519,7 @@
     "place_wall": "Piazza muro",
     "trigger_meteor": "Scatena meteora",
     "drop_powerup": "Lascia potenziamento",
-    "speed_zone": "Zona velocit\u00e0",
+    "speed_zone": "Zona velocità",
     "clickToPlace": "Clicca sulla mappa per posizionare"
   },
   "challenge": {
@@ -525,11 +552,11 @@
     "teamBlue": "Squadra Blu",
     "remoteMode": {
       "all": "TUTTE",
-      "fifo": "1\u00aa"
+      "fifo": "1ª"
     }
   },
   "room": {
-    "back": "\u2190 Indietro",
+    "back": "← Indietro",
     "inviteFriend": "Invita amico",
     "inviteInfo": "Usa il pannello Amici (lobby) per invitare amici in questa stanza",
     "roomCode": "Codice stanza:",
@@ -585,7 +612,7 @@
     "levelFailed": "LIVELLO FALLITO",
     "playAgain": "[ Gioca ancora ]",
     "voteRematch": "[ Vota rivincita ]",
-    "rematchVoted": "[ Rivincita \u2713 ]",
+    "rematchVoted": "[ Rivincita ✓ ]",
     "backToLobby": "[ Torna alla lobby ]",
     "nextLevel": "[ Livello successivo ]",
     "retry": "[ Riprova ]",
@@ -600,7 +627,7 @@
     "stars": "{{count}}/3",
     "teamRed": "Rosso",
     "teamBlue": "Blu",
-    "levelUp": "LIVELLO SU! \u2192 Livello {{level}}"
+    "levelUp": "LIVELLO SU! → Livello {{level}}"
   },
   "coop": {
     "partnerDisconnected": "Il compagno si è disconnesso",

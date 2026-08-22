@@ -11,7 +11,7 @@ COPY shared/package.json ./shared/
 COPY backend/package.json ./backend/
 
 # Install all dependencies (including devDependencies)
-RUN npm install --workspace=shared --workspace=backend
+RUN npm ci --workspace=shared --workspace=backend
 
 # Copy source (will be overridden by volume mounts in dev)
 COPY shared/ ./shared/

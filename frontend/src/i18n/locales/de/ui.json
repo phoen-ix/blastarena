@@ -18,7 +18,8 @@
     "logout": "Abmelden",
     "expand": "Seitenleiste ausklappen",
     "collapse": "Seitenleiste einklappen",
-    "viewProfile": "Profil ansehen"
+    "viewProfile": "Profil ansehen",
+    "openWorld": "Offene Welt"
   },
   "rooms": {
     "title": "Verfügbare Räume",
@@ -161,6 +162,32 @@
         "cancel": "Abbrechen",
         "confirm": "Mein Konto löschen",
         "deleting": "Wird gelöscht..."
+      },
+      "twoFactor": {
+        "title": "Zwei-Faktor-Authentifizierung",
+        "description": "Schütze dein Konto zusätzlich mit einer Authenticator-App wie Google Authenticator, Authy oder 1Password.",
+        "enable": "2FA aktivieren",
+        "disable": "2FA deaktivieren",
+        "enabled": "Die Zwei-Faktor-Authentifizierung ist aktiviert.",
+        "setupTitle": "Zwei-Faktor-Authentifizierung einrichten",
+        "scanQr": "Scanne diesen QR-Code mit deiner Authenticator-App:",
+        "manualEntry": "Oder gib diesen Code manuell ein:",
+        "confirmCode": "Gib zur Bestätigung einen Code aus deiner Authenticator-App ein:",
+        "confirm": "Bestätigen & aktivieren",
+        "confirming": "Wird überprüft ...",
+        "cancel": "Abbrechen",
+        "backupTitle": "Backup-Codes",
+        "backupDescription": "Bewahre diese Codes sicher auf. Jeder Code lässt sich genau einmal verwenden, falls du keinen Zugriff mehr auf deine Authenticator-App hast.",
+        "copy": "Kopieren",
+        "copied": "Kopiert!",
+        "enableSuccess": "Die Zwei-Faktor-Authentifizierung wurde aktiviert.",
+        "disableTitle": "Zwei-Faktor-Authentifizierung deaktivieren",
+        "disableDescription": "Gib dein Passwort und einen Code aus deiner Authenticator-App ein, um 2FA zu deaktivieren.",
+        "disablePassword": "Passwort",
+        "disableCode": "Authenticator-Code oder Backup-Code",
+        "disableConfirm": "2FA deaktivieren",
+        "disabling": "Wird deaktiviert ...",
+        "disableSuccess": "Die Zwei-Faktor-Authentifizierung wurde deaktiviert."
       }
     },
     "cosmetics": {
@@ -508,9 +535,9 @@
     "leaderboard": "Rangliste",
     "player": "Spieler",
     "wins": "Siege",
-    "kills": "Absch\u00fcsse",
+    "kills": "Abschüsse",
     "games": "Spiele",
-    "noScores": "Noch keine Ergebnisse \u2014 sei der Erste!"
+    "noScores": "Noch keine Ergebnisse — sei der Erste!"
   },
   "hud": {
     "spectator": "ZUSCHAUER — WASD/Pfeiltasten/D-Pad zum Bewegen, 1-9/LB/RB oder Klick zum Folgen",

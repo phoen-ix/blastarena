@@ -18,7 +18,8 @@
     "logout": "Cerrar Sesión",
     "expand": "Expandir barra lateral",
     "collapse": "Contraer barra lateral",
-    "viewProfile": "Ver perfil"
+    "viewProfile": "Ver perfil",
+    "openWorld": "Mundo abierto"
   },
   "rooms": {
     "title": "Salas Disponibles",
@@ -161,6 +162,32 @@
         "cancel": "Cancelar",
         "confirm": "Eliminar Mi Cuenta",
         "deleting": "Eliminando..."
+      },
+      "twoFactor": {
+        "title": "Autenticación en dos pasos",
+        "description": "Añade una capa extra de seguridad a tu cuenta usando una aplicación de autenticación como Google Authenticator, Authy o 1Password.",
+        "enable": "Activar 2FA",
+        "disable": "Desactivar 2FA",
+        "enabled": "La autenticación en dos pasos está activada.",
+        "setupTitle": "Configurar la autenticación en dos pasos",
+        "scanQr": "Escanea este código QR con tu aplicación de autenticación:",
+        "manualEntry": "O introduce este código manualmente:",
+        "confirmCode": "Introduce un código de tu aplicación de autenticación para confirmar la configuración:",
+        "confirm": "Confirmar y activar",
+        "confirming": "Verificando...",
+        "cancel": "Cancelar",
+        "backupTitle": "Códigos de respaldo",
+        "backupDescription": "Guarda estos códigos en un lugar seguro. Cada uno solo puede usarse una vez si pierdes el acceso a tu aplicación de autenticación.",
+        "copy": "Copiar",
+        "copied": "¡Copiado!",
+        "enableSuccess": "La autenticación en dos pasos ha sido activada.",
+        "disableTitle": "Desactivar la autenticación en dos pasos",
+        "disableDescription": "Introduce tu contraseña y un código de tu aplicación de autenticación para desactivar la 2FA.",
+        "disablePassword": "Contraseña",
+        "disableCode": "Código de autenticación o código de respaldo",
+        "disableConfirm": "Desactivar 2FA",
+        "disabling": "Desactivando...",
+        "disableSuccess": "La autenticación en dos pasos ha sido desactivada."
       }
     },
     "cosmetics": {
@@ -392,10 +419,10 @@
     "medium": "Mediano",
     "large": "Grande",
     "sizes": {
-      "11x11": "Pequeño (11\u00d711)",
-      "15x13": "Mediano (15\u00d713)",
-      "19x15": "Grande (19\u00d715)",
-      "21x21": "Enorme (21\u00d721)"
+      "11x11": "Pequeño (11×11)",
+      "15x13": "Mediano (15×13)",
+      "19x15": "Grande (19×15)",
+      "21x21": "Enorme (21×21)"
     },
     "density": {
       "none": "Ninguna (0%)",
@@ -457,11 +484,11 @@
       "ufo_abduction": "Abducción OVNI"
     },
     "mapSizes": {
-      "21": "21\u00d721 (Pequeño)",
-      "31": "31\u00d731 (Normal)",
-      "39": "39\u00d739 (Grande)",
-      "51": "51\u00d751 (Enorme)",
-      "61": "61\u00d761 (Masivo)"
+      "21": "21×21 (Pequeño)",
+      "31": "31×31 (Normal)",
+      "39": "39×39 (Grande)",
+      "51": "51×51 (Enorme)",
+      "61": "61×61 (Masivo)"
     },
     "wallDensities": {
       "low30": "Baja (30%)",
@@ -529,7 +556,7 @@
     }
   },
   "room": {
-    "back": "\u2190 Volver",
+    "back": "← Volver",
     "inviteFriend": "Invitar Amigo",
     "inviteInfo": "Usa el panel de Amigos (lobby) para invitar amigos a esta sala",
     "roomCode": "Código de Sala:",
@@ -585,7 +612,7 @@
     "levelFailed": "NIVEL FALLIDO",
     "playAgain": "[ Jugar de Nuevo ]",
     "voteRematch": "[ Votar Revancha ]",
-    "rematchVoted": "[ Revancha \u2713 ]",
+    "rematchVoted": "[ Revancha ✓ ]",
     "backToLobby": "[ Volver al Lobby ]",
     "nextLevel": "[ Siguiente Nivel ]",
     "retry": "[ Reintentar ]",
@@ -600,7 +627,7 @@
     "stars": "{{count}}/3",
     "teamRed": "Rojo",
     "teamBlue": "Azul",
-    "levelUp": "¡SUBISTE DE NIVEL! \u2192 Nivel {{level}}"
+    "levelUp": "¡SUBISTE DE NIVEL! → Nivel {{level}}"
   },
   "coop": {
     "partnerDisconnected": "Compañero desconectado",

@@ -11,6 +11,11 @@ Production is the canonical run mode for this deployment (plain `docker compose 
 ```bash
 cp .env.example .env  # prod requires DB passwords, JWT_SECRET, EMAIL_PEPPER, TOTP_ENCRYPTION_KEY (>=32 chars each)
 
+# The backend container runs as the unprivileged `node` user (uid 1000). The bind-mounted data
+# directories must be owned by that uid or the backend cannot write logs, replays or AI uploads.
+# Required once, on an existing deployment that previously ran the container as root:
+sudo chown -R 1000:1000 data/
+
 # Production (default)
 docker compose up --build -d
 
@@ -43,7 +48,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
 ## Frontend Architecture
 - **Themes**: 11 palettes in `frontend/src/themes/definitions.ts`. `ThemeManager` reads localStorage → admin default → 'inferno'. `[data-theme]` on `<html>`. Inline `<script>` in `<head>` prevents flash
-- **CSS**: All styles in `frontend/index.html` via CSS custom properties. Always use CSS variables (e.g. `var(--primary)` not hardcoded hex). Typography: Chakra Petch (headings) + DM Sans (body). Fonts self-hosted woff2 — no external CDN
+- **CSS**: All styles in `frontend/src/styles.css`, imported by `main.ts` so Vite emits a hashed, cacheable `/assets/*.css` (nginx serves `index.html` with `no-store`, so inline CSS was re-downloaded on every navigation). Only two things stay inline in `frontend/index.html`: the `@font-face` block, and the theme `<script>` that sets `[data-theme]` before first paint — its sha256 is pinned in the CSP, so editing it means regenerating that hash in `docker/nginx/security-headers.conf`. Always use CSS variables (e.g. `var(--primary)` not hardcoded hex). Typography: Chakra Petch (headings) + DM Sans (body). Fonts self-hosted woff2 — no external CDN
 - **Sidebar & Views**: `.app-layout` with collapsible sidebar + `.main-content`. `ILobbyView` with `render()`/`destroy()`. All lobby views render in `.main-body`. Views with own sub-header hide `.main-header`
 - **UI conventions**: Unified CSS classes: `.panel-header`/`.panel-content`, `.tab-bar`/`.tab-item`, `.data-table`, `.form-grid`/`.form-group`/`.input`/`.select`, `.toggle-switch`, `.setting-row`, `.option-chip`, `.mini-stat`, `.modal-header`/`.modal-body`/`.modal-footer`, `.btn`/`.btn-primary`/`.btn-secondary`/`.btn-ghost`/`.btn-sm`
 - **Gamepad UI nav**: `UIGamepadNavigator` spatial navigation — new interactive elements need `.sidebar-nav-item`, `.room-card`, or `.messages-conv-item` classes
@@ -84,7 +89,7 @@ Friendships (reciprocal, DB-backed), presence (Redis, 120s TTL), parties (Redis,
 Full-screen panel for admin/moderator roles. `staffMiddleware` and `adminOnlyMiddleware` for route protection. All actions audit-logged. `admin_actions.target_id` is `INT NOT NULL` — use `0` for bulk operations. Features: session revocation, account cleanup, TOTP reset, registration toggle. See [docs/admin-and-systems.md](docs/admin-and-systems.md)
 
 ## AI Systems
-- **Bot AI**: Three-layer sandbox (source scan, esbuild bundle, `vm.runInContext()` with 5s timeout). Crash recovery falls back to built-in. Team-aware. See [docs/bot-ai-guide.md](docs/bot-ai-guide.md)
+- **Bot AI**: Source scan + esbuild bundle at upload time, then execution. **Untrusted** (admin-uploaded) AIs run in an `isolated-vm` isolate per instance with a memory cap and a hard invoke timeout (`IsolatedAIRunner`); only trusted seeded AIs are loaded in-process via `vm.runInContext()` with a 5s timeout, and that context is given no host objects and has code generation disabled. Crash recovery falls back to built-in. Team-aware. Bot decisions are seeded per bot from the map seed, so matches with bots replay deterministically. See [docs/bot-ai-guide.md](docs/bot-ai-guide.md)
 - **Enemy AI**: Same sandbox pipeline. `IEnemyAI.decide(context)` returns `{ direction, placeBomb }`. See [docs/enemy-ai-guide.md](docs/enemy-ai-guide.md)
 - **Simulations**: Admin-only batch runner. See [docs/admin-and-systems.md](docs/admin-and-systems.md#bot-simulation-system)
 

@@ -28,7 +28,8 @@
       "wins": "Vittorie",
       "joined": "Iscritto",
       "lastLogin": "Ultimo accesso",
-      "actions": "Azioni"
+      "actions": "Azioni",
+      "twoFactor": "2FA"
     },
     "roles": {
       "user": "utente",
@@ -115,6 +116,16 @@
       "cancel": "Cancel",
       "success": "Deleted {{deleted}} account(s)",
       "errorDaysRequired": "Days threshold is required for this cleanup type"
+    },
+    "resetTotp": "Reimposta 2FA",
+    "resetTotpSuccess": "Autenticazione a due fattori reimpostata",
+    "twoFactorOn": "Attiva",
+    "resetTotpModal": {
+      "title": "Reimposta 2FA",
+      "ariaLabel": "Reimposta l'autenticazione a due fattori",
+      "cancel": "Annulla",
+      "confirm": "Reimposta 2FA",
+      "description": "Questo disattiverà l'autenticazione a due fattori per <strong style=\"color:var(--text);\">{{username}}</strong>. Dovrà configurarla di nuovo per riattivare la 2FA."
     }
   },
   "matches": {
@@ -523,7 +534,7 @@
     "gameCreationDefaults": "Predefiniti creazione partita",
     "simulationDefaults": "Predefiniti simulazione",
     "overridesCount": "({{count}} modifiche)",
-    "defaultOption": "\u2014 Predefinito \u2014",
+    "defaultOption": "— Predefinito —",
     "defaultIndicator": "(predefinito)",
     "gameMode": "Modalità di gioco",
     "maxPlayers": "Giocatori massimi",
@@ -615,8 +626,8 @@
     },
     "endDialog": {
       "prompt": "Come devono essere reimpostati i punteggi dei giocatori?",
-      "softReset": "Reset morbido \u2014 i punteggi decadono verso la base",
-      "hardReset": "Reset completo \u2014 tutti i punteggi tornano al valore predefinito",
+      "softReset": "Reset morbido — i punteggi decadono verso la base",
+      "hardReset": "Reset completo — tutti i punteggi tornano al valore predefinito",
       "cancel": "Annulla"
     },
     "rankTiers": {
@@ -649,7 +660,6 @@
     "viewWorlds": "Mondi e livelli",
     "viewEnemies": "Tipi di nemici",
     "viewReplays": "Replay",
-
     "worlds": {
       "createWorld": "Crea mondo",
       "tableHeaders": {
@@ -677,7 +687,6 @@
       "worldUnpublished": "Mondo non pubblicato",
       "worldPublished": "Mondo pubblicato"
     },
-
     "levels": {
       "tableHeaders": {
         "order": "#",
@@ -707,14 +716,12 @@
       "deleteLevelConfirm": "Eliminare il livello \"{{name}}\"?",
       "levelDeleted": "Livello eliminato"
     },
-
     "winConditions": {
       "kill_all": "Uccidi tutti i nemici",
       "find_exit": "Trova l'uscita",
       "reach_goal": "Raggiungi l'obiettivo",
       "survive_time": "Sopravvivi al tempo"
     },
-
     "worldModal": {
       "editTitle": "Modifica mondo",
       "createTitle": "Crea mondo",
@@ -732,7 +739,6 @@
       "worldUpdated": "Mondo aggiornato",
       "worldCreated": "Mondo creato"
     },
-
     "enemies": {
       "createEnemy": "Crea tipo di nemico",
       "importEnemy": "Importa tipo di nemico",
@@ -755,7 +761,6 @@
       "deleteBtn": "Elimina",
       "enemyImported": "Tipo di nemico importato"
     },
-
     "enemyModal": {
       "editTitle": "Modifica tipo di nemico",
       "createTitle": "Crea tipo di nemico",
@@ -802,9 +807,7 @@
       "enemyUpdated": "Tipo di nemico aggiornato",
       "enemyCreated": "Tipo di nemico creato"
     },
-
     "exportDownloaded": "Esportazione scaricata",
-
     "importLevelModal": {
       "ariaLabel": "Importa livello",
       "title": "Importa livello",
@@ -819,7 +822,6 @@
       "importFailed": "Importazione fallita — controlla il formato del file",
       "importSuccess": "Livello importato con successo"
     },
-
     "conflictModal": {
       "ariaLabel": "Risolvi conflitti tipo nemico",
       "title": "Risolvi conflitti tipo nemico",
@@ -832,7 +834,6 @@
       "import": "Importa",
       "importSuccess": "Livello importato con successo"
     },
-
     "deleteModal": {
       "entityLabels": {
         "world": "Mondo",
@@ -852,7 +853,6 @@
       "deleteBtn": "Elimina",
       "deleteSuccess": "{{entity}} eliminato"
     },
-
     "replays": {
       "totalCount": "{{count}} replay campagna",
       "totalCount_other": "{{count}} replay campagna",
@@ -977,7 +977,6 @@
       "reinforcedWalls": "Muri rinforzati",
       "mapEvents": "Eventi mappa",
       "hazardTiles": "Caselle pericolose",
-      "puzzleTiles": "Puzzle Tiles",
       "friendlyFire": "Fuoco amico",
       "recordReplays": "Registra replay",
       "powerUps": "Potenziamenti",

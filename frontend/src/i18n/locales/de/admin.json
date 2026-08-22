@@ -28,7 +28,8 @@
       "wins": "Siege",
       "joined": "Beigetreten",
       "lastLogin": "Letzter Login",
-      "actions": "Aktionen"
+      "actions": "Aktionen",
+      "twoFactor": "2FA"
     },
     "roles": {
       "user": "Benutzer",
@@ -115,6 +116,16 @@
       "cancel": "Cancel",
       "success": "Deleted {{deleted}} account(s)",
       "errorDaysRequired": "Days threshold is required for this cleanup type"
+    },
+    "resetTotp": "2FA zurücksetzen",
+    "resetTotpSuccess": "Zwei-Faktor-Authentifizierung zurückgesetzt",
+    "twoFactorOn": "Aktiviert",
+    "resetTotpModal": {
+      "title": "2FA zurücksetzen",
+      "ariaLabel": "Zwei-Faktor-Authentifizierung zurücksetzen",
+      "cancel": "Abbrechen",
+      "confirm": "2FA zurücksetzen",
+      "description": "Dadurch wird die Zwei-Faktor-Authentifizierung für <strong style=\"color:var(--text);\">{{username}}</strong> deaktiviert. Sie muss neu eingerichtet werden, um 2FA wieder zu aktivieren."
     }
   },
   "matches": {
@@ -649,7 +660,6 @@
     "viewWorlds": "Welten & Level",
     "viewEnemies": "Gegnertypen",
     "viewReplays": "Replays",
-
     "worlds": {
       "createWorld": "Welt erstellen",
       "tableHeaders": {
@@ -677,7 +687,6 @@
       "worldUnpublished": "Welt zurückgezogen",
       "worldPublished": "Welt veröffentlicht"
     },
-
     "levels": {
       "tableHeaders": {
         "order": "#",
@@ -707,14 +716,12 @@
       "deleteLevelConfirm": "Level \"{{name}}\" löschen?",
       "levelDeleted": "Level gelöscht"
     },
-
     "winConditions": {
       "kill_all": "Alle Gegner besiegen",
       "find_exit": "Ausgang finden",
       "reach_goal": "Ziel erreichen",
       "survive_time": "Zeit überleben"
     },
-
     "worldModal": {
       "editTitle": "Welt bearbeiten",
       "createTitle": "Welt erstellen",
@@ -732,7 +739,6 @@
       "worldUpdated": "Welt aktualisiert",
       "worldCreated": "Welt erstellt"
     },
-
     "enemies": {
       "createEnemy": "Gegnertyp erstellen",
       "importEnemy": "Gegnertyp importieren",
@@ -755,7 +761,6 @@
       "deleteBtn": "Löschen",
       "enemyImported": "Gegnertyp importiert"
     },
-
     "enemyModal": {
       "editTitle": "Gegnertyp bearbeiten",
       "createTitle": "Gegnertyp erstellen",
@@ -802,9 +807,7 @@
       "enemyUpdated": "Gegnertyp aktualisiert",
       "enemyCreated": "Gegnertyp erstellt"
     },
-
     "exportDownloaded": "Export heruntergeladen",
-
     "importLevelModal": {
       "ariaLabel": "Level importieren",
       "title": "Level importieren",
@@ -819,7 +822,6 @@
       "importFailed": "Import fehlgeschlagen — Dateiformat prüfen",
       "importSuccess": "Level erfolgreich importiert"
     },
-
     "conflictModal": {
       "ariaLabel": "Gegnertyp-Konflikte lösen",
       "title": "Gegnertyp-Konflikte lösen",
@@ -832,7 +834,6 @@
       "import": "Importieren",
       "importSuccess": "Level erfolgreich importiert"
     },
-
     "deleteModal": {
       "entityLabels": {
         "world": "Welt",
@@ -852,7 +853,6 @@
       "deleteBtn": "Löschen",
       "deleteSuccess": "{{entity}} gelöscht"
     },
-
     "replays": {
       "totalCount": "{{count}} Kampagnen-Replay",
       "totalCount_other": "{{count}} Kampagnen-Replays",
@@ -977,7 +977,6 @@
       "reinforcedWalls": "Verstärkte Wände",
       "mapEvents": "Karten-Events",
       "hazardTiles": "Gefahrenfelder",
-      "puzzleTiles": "Puzzle Tiles",
       "friendlyFire": "Eigenbeschuss",
       "recordReplays": "Replays aufzeichnen",
       "powerUps": "Power-Ups",

@@ -18,7 +18,8 @@
     "logout": "Cikis Yap",
     "expand": "Kenar cubugunu genislet",
     "collapse": "Kenar cubugunu daralt",
-    "viewProfile": "Profili goruntule"
+    "viewProfile": "Profili goruntule",
+    "openWorld": "Açık Dünya"
   },
   "rooms": {
     "title": "Mevcut Odalar",
@@ -161,6 +162,32 @@
         "cancel": "Iptal",
         "confirm": "Hesabimi Sil",
         "deleting": "Siliniyor..."
+      },
+      "twoFactor": {
+        "title": "İki Faktörlü Doğrulama",
+        "description": "Google Authenticator, Authy veya 1Password gibi bir kimlik doğrulama uygulamasıyla hesabına ek bir güvenlik katmanı ekle.",
+        "enable": "2FA’yı etkinleştir",
+        "disable": "2FA’yı devre dışı bırak",
+        "enabled": "İki faktörlü doğrulama etkin.",
+        "setupTitle": "İki Faktörlü Doğrulamayı Kur",
+        "scanQr": "Bu QR kodunu kimlik doğrulama uygulamanla tara:",
+        "manualEntry": "Veya bu kodu elle gir:",
+        "confirmCode": "Kurulumu onaylamak için kimlik doğrulama uygulamandaki kodu gir:",
+        "confirm": "Onayla ve etkinleştir",
+        "confirming": "Doğrulanıyor...",
+        "cancel": "İptal",
+        "backupTitle": "Yedek Kodlar",
+        "backupDescription": "Bu kodları güvenli bir yerde sakla. Kimlik doğrulama uygulamana erişimini kaybedersen her kod yalnızca bir kez kullanılabilir.",
+        "copy": "Kopyala",
+        "copied": "Kopyalandı!",
+        "enableSuccess": "İki faktörlü doğrulama etkinleştirildi.",
+        "disableTitle": "İki Faktörlü Doğrulamayı Devre Dışı Bırak",
+        "disableDescription": "2FA’yı devre dışı bırakmak için şifreni ve kimlik doğrulama uygulamandaki bir kodu gir.",
+        "disablePassword": "Şifre",
+        "disableCode": "Kimlik doğrulama kodu veya yedek kod",
+        "disableConfirm": "2FA’yı devre dışı bırak",
+        "disabling": "Devre dışı bırakılıyor...",
+        "disableSuccess": "İki faktörlü doğrulama devre dışı bırakıldı."
       }
     },
     "cosmetics": {
@@ -433,7 +460,7 @@
     "mapSpawnHint": "Bu haritada {{count}} dogma noktasi var (maks {{count}} oyuncu)",
     "mapDimensions": "{{width}}x{{height}} harita",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} dogma)",
-    "loadingPreview": "\u00d6nizleme y\u00fckleniyor...",
+    "loadingPreview": "Önizleme yükleniyor...",
     "recordGame": "Oyunu Kaydet",
     "mapSizes": {
       "21": "21x21 (Kucuk)",
@@ -529,7 +556,7 @@
     }
   },
   "room": {
-    "back": "\u2190 Geri",
+    "back": "← Geri",
     "inviteFriend": "Arkadas Davet Et",
     "inviteInfo": "Arkadaslarinizi bu odaya davet etmek icin Arkadaslar panelini (lobi) kullanin",
     "roomCode": "Oda Kodu:",
@@ -585,7 +612,7 @@
     "levelFailed": "BOLUM BASARISIZ",
     "playAgain": "[ Tekrar Oyna ]",
     "voteRematch": "[ Rovansi Oyla ]",
-    "rematchVoted": "[ Rovans \u2713 ]",
+    "rematchVoted": "[ Rovans ✓ ]",
     "backToLobby": "[ Lobiye Don ]",
     "nextLevel": "[ Sonraki Bolum ]",
     "retry": "[ Tekrar Dene ]",
@@ -600,7 +627,7 @@
     "stars": "{{count}}/3",
     "teamRed": "Kirmizi",
     "teamBlue": "Mavi",
-    "levelUp": "SEVIYE ATLADI! \u2192 Seviye {{level}}"
+    "levelUp": "SEVIYE ATLADI! → Seviye {{level}}"
   },
   "coop": {
     "partnerDisconnected": "Partner baglantisi kesildi",

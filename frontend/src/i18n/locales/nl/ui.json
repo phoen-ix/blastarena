@@ -18,7 +18,8 @@
     "logout": "Uitloggen",
     "expand": "Zijbalk uitklappen",
     "collapse": "Zijbalk inklappen",
-    "viewProfile": "Profiel bekijken"
+    "viewProfile": "Profiel bekijken",
+    "openWorld": "Open wereld"
   },
   "rooms": {
     "title": "Beschikbare kamers",
@@ -161,6 +162,32 @@
         "cancel": "Annuleren",
         "confirm": "Mijn account verwijderen",
         "deleting": "Verwijderen..."
+      },
+      "twoFactor": {
+        "title": "Tweefactorauthenticatie",
+        "description": "Voeg een extra beveiligingslaag toe aan je account met een authenticator-app zoals Google Authenticator, Authy of 1Password.",
+        "enable": "2FA inschakelen",
+        "disable": "2FA uitschakelen",
+        "enabled": "Tweefactorauthenticatie is ingeschakeld.",
+        "setupTitle": "Tweefactorauthenticatie instellen",
+        "scanQr": "Scan deze QR-code met je authenticator-app:",
+        "manualEntry": "Of voer deze code handmatig in:",
+        "confirmCode": "Voer een code uit je authenticator-app in om de instelling te bevestigen:",
+        "confirm": "Bevestigen & inschakelen",
+        "confirming": "Bezig met verifiëren...",
+        "cancel": "Annuleren",
+        "backupTitle": "Back-upcodes",
+        "backupDescription": "Bewaar deze codes op een veilige plek. Elke code kan één keer worden gebruikt als je geen toegang meer hebt tot je authenticator-app.",
+        "copy": "Kopiëren",
+        "copied": "Gekopieerd!",
+        "enableSuccess": "Tweefactorauthenticatie is ingeschakeld.",
+        "disableTitle": "Tweefactorauthenticatie uitschakelen",
+        "disableDescription": "Voer je wachtwoord en een code uit je authenticator-app in om 2FA uit te schakelen.",
+        "disablePassword": "Wachtwoord",
+        "disableCode": "Authenticator-code of back-upcode",
+        "disableConfirm": "2FA uitschakelen",
+        "disabling": "Bezig met uitschakelen...",
+        "disableSuccess": "Tweefactorauthenticatie is uitgeschakeld."
       }
     },
     "cosmetics": {
@@ -392,10 +419,10 @@
     "medium": "Middel",
     "large": "Groot",
     "sizes": {
-      "11x11": "Klein (11\u00d711)",
-      "15x13": "Middel (15\u00d713)",
-      "19x15": "Groot (19\u00d715)",
-      "21x21": "Enorm (21\u00d721)"
+      "11x11": "Klein (11×11)",
+      "15x13": "Middel (15×13)",
+      "19x15": "Groot (19×15)",
+      "21x21": "Enorm (21×21)"
     },
     "density": {
       "none": "Geen (0%)",
@@ -436,11 +463,11 @@
     "loadingPreview": "Voorbeeld laden...",
     "recordGame": "Spel opnemen",
     "mapSizes": {
-      "21": "21\u00d721 (Klein)",
-      "31": "31\u00d731 (Normaal)",
-      "39": "39\u00d739 (Groot)",
-      "51": "51\u00d751 (Enorm)",
-      "61": "61\u00d761 (Massief)"
+      "21": "21×21 (Klein)",
+      "31": "31×31 (Normaal)",
+      "39": "39×39 (Groot)",
+      "51": "51×51 (Enorm)",
+      "61": "61×61 (Massief)"
     },
     "wallDensities": {
       "low30": "Laag (30%)",
@@ -529,7 +556,7 @@
     }
   },
   "room": {
-    "back": "\u2190 Terug",
+    "back": "← Terug",
     "inviteFriend": "Vriend uitnodigen",
     "inviteInfo": "Gebruik het Vriendenpaneel (lobby) om vrienden voor deze kamer uit te nodigen",
     "roomCode": "Kamercode:",
@@ -585,7 +612,7 @@
     "levelFailed": "LEVEL MISLUKT",
     "playAgain": "[ Opnieuw spelen ]",
     "voteRematch": "[ Stem herwedstrijd ]",
-    "rematchVoted": "[ Herwedstrijd \u2713 ]",
+    "rematchVoted": "[ Herwedstrijd ✓ ]",
     "backToLobby": "[ Terug naar lobby ]",
     "nextLevel": "[ Volgend level ]",
     "retry": "[ Opnieuw proberen ]",
@@ -600,7 +627,7 @@
     "stars": "{{count}}/3",
     "teamRed": "Rood",
     "teamBlue": "Blauw",
-    "levelUp": "LEVEL OMHOOG! \u2192 Niveau {{level}}"
+    "levelUp": "LEVEL OMHOOG! → Niveau {{level}}"
   },
   "coop": {
     "partnerDisconnected": "Partner losgekoppeld",

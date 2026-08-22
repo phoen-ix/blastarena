@@ -35,7 +35,9 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    // No source maps in the production bundle: they published readable TypeScript for the whole
+    // client, admin UI included. (audit SOURCEMAP-1)
+    sourcemap: false,
     modulePreload: { polyfill: false },
     minify: 'terser',
     rollupOptions: {

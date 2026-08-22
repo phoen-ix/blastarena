@@ -28,7 +28,8 @@
       "wins": "Vinster",
       "joined": "Gick med",
       "lastLogin": "Senaste inloggning",
-      "actions": "Åtgärder"
+      "actions": "Åtgärder",
+      "twoFactor": "2FA"
     },
     "roles": {
       "user": "användare",
@@ -115,6 +116,16 @@
       "cancel": "Cancel",
       "success": "Deleted {{deleted}} account(s)",
       "errorDaysRequired": "Days threshold is required for this cleanup type"
+    },
+    "resetTotp": "Återställ 2FA",
+    "resetTotpSuccess": "Tvåfaktorsautentisering återställd",
+    "twoFactorOn": "Aktiverad",
+    "resetTotpModal": {
+      "title": "Återställ 2FA",
+      "ariaLabel": "Återställ tvåfaktorsautentisering",
+      "cancel": "Avbryt",
+      "confirm": "Återställ 2FA",
+      "description": "Detta inaktiverar tvåfaktorsautentisering för <strong style=\"color:var(--text);\">{{username}}</strong>. Den måste konfigureras på nytt för att aktivera 2FA igen."
     }
   },
   "matches": {
@@ -523,7 +534,7 @@
     "gameCreationDefaults": "Standardvärden för spelskapande",
     "simulationDefaults": "Standardvärden för simulering",
     "overridesCount": "({{count}} åsidosättningar)",
-    "defaultOption": "\u2014 Standard \u2014",
+    "defaultOption": "— Standard —",
     "defaultIndicator": "(standard)",
     "gameMode": "Spelläge",
     "maxPlayers": "Max spelare",
@@ -615,8 +626,8 @@
     },
     "endDialog": {
       "prompt": "Hur ska spelarnas betyg återställas?",
-      "softReset": "Mjuk återställning \u2014 betyg sjunker mot baslinje",
-      "hardReset": "Hård återställning \u2014 alla betyg återställs till standard",
+      "softReset": "Mjuk återställning — betyg sjunker mot baslinje",
+      "hardReset": "Hård återställning — alla betyg återställs till standard",
       "cancel": "Avbryt"
     },
     "rankTiers": {
@@ -649,7 +660,6 @@
     "viewWorlds": "Världar & banor",
     "viewEnemies": "Fiendetyper",
     "viewReplays": "Repriser",
-
     "worlds": {
       "createWorld": "Skapa värld",
       "tableHeaders": {
@@ -677,7 +687,6 @@
       "worldUnpublished": "Värld avpublicerad",
       "worldPublished": "Värld publicerad"
     },
-
     "levels": {
       "tableHeaders": {
         "order": "#",
@@ -707,14 +716,12 @@
       "deleteLevelConfirm": "Ta bort banan \"{{name}}\"?",
       "levelDeleted": "Bana borttagen"
     },
-
     "winConditions": {
       "kill_all": "Döda alla fiender",
       "find_exit": "Hitta utgången",
       "reach_goal": "Nå målet",
       "survive_time": "Överlev tiden"
     },
-
     "worldModal": {
       "editTitle": "Redigera värld",
       "createTitle": "Skapa värld",
@@ -732,7 +739,6 @@
       "worldUpdated": "Värld uppdaterad",
       "worldCreated": "Värld skapad"
     },
-
     "enemies": {
       "createEnemy": "Skapa fiendetyp",
       "importEnemy": "Importera fiendetyp",
@@ -755,7 +761,6 @@
       "deleteBtn": "Ta bort",
       "enemyImported": "Fiendetyp importerad"
     },
-
     "enemyModal": {
       "editTitle": "Redigera fiendetyp",
       "createTitle": "Skapa fiendetyp",
@@ -802,9 +807,7 @@
       "enemyUpdated": "Fiendetyp uppdaterad",
       "enemyCreated": "Fiendetyp skapad"
     },
-
     "exportDownloaded": "Export nedladdad",
-
     "importLevelModal": {
       "ariaLabel": "Importera bana",
       "title": "Importera bana",
@@ -819,7 +822,6 @@
       "importFailed": "Import misslyckades — kontrollera filformatet",
       "importSuccess": "Bana importerad framgångsrikt"
     },
-
     "conflictModal": {
       "ariaLabel": "Lös fiendetypskonflikter",
       "title": "Lös fiendetypskonflikter",
@@ -832,7 +834,6 @@
       "import": "Importera",
       "importSuccess": "Bana importerad framgångsrikt"
     },
-
     "deleteModal": {
       "entityLabels": {
         "world": "Värld",
@@ -852,7 +853,6 @@
       "deleteBtn": "Ta bort",
       "deleteSuccess": "{{entity}} borttagen"
     },
-
     "replays": {
       "totalCount": "{{count}} kampanjrepris",
       "totalCount_other": "{{count}} kampanjrepriser",
@@ -977,7 +977,6 @@
       "reinforcedWalls": "Förstärkta väggar",
       "mapEvents": "Karthändelser",
       "hazardTiles": "Farorutor",
-      "puzzleTiles": "Puzzle Tiles",
       "friendlyFire": "Friendly fire",
       "recordReplays": "Spela in repriser",
       "powerUps": "Power-ups",

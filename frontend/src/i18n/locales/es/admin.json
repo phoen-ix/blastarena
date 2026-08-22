@@ -28,7 +28,8 @@
       "wins": "Victorias",
       "joined": "Registro",
       "lastLogin": "Último Acceso",
-      "actions": "Acciones"
+      "actions": "Acciones",
+      "twoFactor": "2FA"
     },
     "roles": {
       "user": "usuario",
@@ -115,6 +116,16 @@
       "cancel": "Cancel",
       "success": "Deleted {{deleted}} account(s)",
       "errorDaysRequired": "Days threshold is required for this cleanup type"
+    },
+    "resetTotp": "Restablecer 2FA",
+    "resetTotpSuccess": "Autenticación en dos pasos restablecida",
+    "twoFactorOn": "Activada",
+    "resetTotpModal": {
+      "title": "Restablecer 2FA",
+      "ariaLabel": "Restablecer la autenticación en dos pasos",
+      "cancel": "Cancelar",
+      "confirm": "Restablecer 2FA",
+      "description": "Esto desactivará la autenticación en dos pasos de <strong style=\"color:var(--text);\">{{username}}</strong>. Tendrá que configurarla de nuevo para volver a activar la 2FA."
     }
   },
   "matches": {
@@ -523,7 +534,7 @@
     "gameCreationDefaults": "Valores Predeterminados de Partida",
     "simulationDefaults": "Valores Predeterminados de Simulación",
     "overridesCount": "({{count}} modificaciones)",
-    "defaultOption": "\u2014 Predeterminado \u2014",
+    "defaultOption": "— Predeterminado —",
     "defaultIndicator": "(predeterminado)",
     "gameMode": "Modo de Juego",
     "maxPlayers": "Máximo de Jugadores",
@@ -615,8 +626,8 @@
     },
     "endDialog": {
       "prompt": "¿Cómo se deben restablecer las puntuaciones?",
-      "softReset": "Restablecimiento Suave \u2014 las puntuaciones decaen hacia la base",
-      "hardReset": "Restablecimiento Fuerte \u2014 todas las puntuaciones se resetean al valor predeterminado",
+      "softReset": "Restablecimiento Suave — las puntuaciones decaen hacia la base",
+      "hardReset": "Restablecimiento Fuerte — todas las puntuaciones se resetean al valor predeterminado",
       "cancel": "Cancelar"
     },
     "rankTiers": {
@@ -649,7 +660,6 @@
     "viewWorlds": "Mundos y Niveles",
     "viewEnemies": "Tipos de Enemigos",
     "viewReplays": "Repeticiones",
-
     "worlds": {
       "createWorld": "Crear Mundo",
       "tableHeaders": {
@@ -677,7 +687,6 @@
       "worldUnpublished": "Mundo despublicado",
       "worldPublished": "Mundo publicado"
     },
-
     "levels": {
       "tableHeaders": {
         "order": "#",
@@ -707,14 +716,12 @@
       "deleteLevelConfirm": "¿Eliminar nivel \"{{name}}\"?",
       "levelDeleted": "Nivel eliminado"
     },
-
     "winConditions": {
       "kill_all": "Eliminar Todos los Enemigos",
       "find_exit": "Encontrar la Salida",
       "reach_goal": "Llegar a la Meta",
       "survive_time": "Sobrevivir el Tiempo"
     },
-
     "worldModal": {
       "editTitle": "Editar Mundo",
       "createTitle": "Crear Mundo",
@@ -732,7 +739,6 @@
       "worldUpdated": "Mundo actualizado",
       "worldCreated": "Mundo creado"
     },
-
     "enemies": {
       "createEnemy": "Crear Tipo de Enemigo",
       "importEnemy": "Importar Tipo de Enemigo",
@@ -755,7 +761,6 @@
       "deleteBtn": "Eliminar",
       "enemyImported": "Tipo de enemigo importado"
     },
-
     "enemyModal": {
       "editTitle": "Editar Tipo de Enemigo",
       "createTitle": "Crear Tipo de Enemigo",
@@ -802,9 +807,7 @@
       "enemyUpdated": "Tipo de enemigo actualizado",
       "enemyCreated": "Tipo de enemigo creado"
     },
-
     "exportDownloaded": "Exportación descargada",
-
     "importLevelModal": {
       "ariaLabel": "Importar Nivel",
       "title": "Importar Nivel",
@@ -814,12 +817,11 @@
       "importing": "Importando...",
       "bundleDetected": "<span class=\"text-success\">Paquete detectado:</span> nivel \"{{name}}\" con {{count}} tipo(s) de enemigo",
       "levelDetected": "<span class=\"text-success\">Nivel detectado:</span> \"{{name}}\"",
-      "unknownFormat": "<span class=\"text-warning\">Formato desconocido \u2014 se intentará importar</span>",
+      "unknownFormat": "<span class=\"text-warning\">Formato desconocido — se intentará importar</span>",
       "invalidJson": "<span class=\"text-danger\">Archivo JSON inválido</span>",
-      "importFailed": "Importación fallida \u2014 verifica el formato del archivo",
+      "importFailed": "Importación fallida — verifica el formato del archivo",
       "importSuccess": "Nivel importado exitosamente"
     },
-
     "conflictModal": {
       "ariaLabel": "Resolver Conflictos de Tipos de Enemigos",
       "title": "Resolver Conflictos de Tipos de Enemigos",
@@ -832,7 +834,6 @@
       "import": "Importar",
       "importSuccess": "Nivel importado exitosamente"
     },
-
     "deleteModal": {
       "entityLabels": {
         "world": "Mundo",
@@ -852,7 +853,6 @@
       "deleteBtn": "Eliminar",
       "deleteSuccess": "{{entity}} eliminado"
     },
-
     "replays": {
       "totalCount": "{{count}} repetición de campaña",
       "totalCount_other": "{{count}} repeticiones de campaña",
@@ -977,7 +977,6 @@
       "reinforcedWalls": "Muros Reforzados",
       "mapEvents": "Eventos del Mapa",
       "hazardTiles": "Casillas de Peligro",
-      "puzzleTiles": "Puzzle Tiles",
       "friendlyFire": "Fuego Amigo",
       "recordReplays": "Grabar Repeticiones",
       "powerUps": "Power-Ups",

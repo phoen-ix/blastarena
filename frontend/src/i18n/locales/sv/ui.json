@@ -18,7 +18,8 @@
     "logout": "Logga ut",
     "expand": "Expandera sidofält",
     "collapse": "Fäll ihop sidofält",
-    "viewProfile": "Visa profil"
+    "viewProfile": "Visa profil",
+    "openWorld": "Öppen värld"
   },
   "rooms": {
     "title": "Tillgängliga rum",
@@ -161,6 +162,32 @@
         "cancel": "Avbryt",
         "confirm": "Ta bort mitt konto",
         "deleting": "Tar bort..."
+      },
+      "twoFactor": {
+        "title": "Tvåfaktorsautentisering",
+        "description": "Lägg till ett extra säkerhetslager på ditt konto med en autentiseringsapp som Google Authenticator, Authy eller 1Password.",
+        "enable": "Aktivera 2FA",
+        "disable": "Inaktivera 2FA",
+        "enabled": "Tvåfaktorsautentisering är aktiverad.",
+        "setupTitle": "Konfigurera tvåfaktorsautentisering",
+        "scanQr": "Skanna den här QR-koden med din autentiseringsapp:",
+        "manualEntry": "Eller ange den här koden manuellt:",
+        "confirmCode": "Ange en kod från din autentiseringsapp för att bekräfta konfigurationen:",
+        "confirm": "Bekräfta och aktivera",
+        "confirming": "Verifierar ...",
+        "cancel": "Avbryt",
+        "backupTitle": "Reservkoder",
+        "backupDescription": "Spara koderna på ett säkert ställe. Varje kod kan användas en gång om du förlorar åtkomsten till din autentiseringsapp.",
+        "copy": "Kopiera",
+        "copied": "Kopierad!",
+        "enableSuccess": "Tvåfaktorsautentisering har aktiverats.",
+        "disableTitle": "Inaktivera tvåfaktorsautentisering",
+        "disableDescription": "Ange ditt lösenord och en kod från din autentiseringsapp för att inaktivera 2FA.",
+        "disablePassword": "Lösenord",
+        "disableCode": "Autentiseringskod eller reservkod",
+        "disableConfirm": "Inaktivera 2FA",
+        "disabling": "Inaktiverar ...",
+        "disableSuccess": "Tvåfaktorsautentisering har inaktiverats."
       }
     },
     "cosmetics": {
@@ -392,10 +419,10 @@
     "medium": "Medel",
     "large": "Stor",
     "sizes": {
-      "11x11": "Liten (11\u00d711)",
-      "15x13": "Medel (15\u00d713)",
-      "19x15": "Stor (19\u00d715)",
-      "21x21": "Enorm (21\u00d721)"
+      "11x11": "Liten (11×11)",
+      "15x13": "Medel (15×13)",
+      "19x15": "Stor (19×15)",
+      "21x21": "Enorm (21×21)"
     },
     "density": {
       "none": "Ingen (0%)",
@@ -436,11 +463,11 @@
     "loadingPreview": "Laddar förhandsvisning...",
     "recordGame": "Spela in spel",
     "mapSizes": {
-      "21": "21\u00d721 (Liten)",
-      "31": "31\u00d731 (Normal)",
-      "39": "39\u00d739 (Stor)",
-      "51": "51\u00d751 (Enorm)",
-      "61": "61\u00d761 (Massiv)"
+      "21": "21×21 (Liten)",
+      "31": "31×31 (Normal)",
+      "39": "39×39 (Stor)",
+      "51": "51×51 (Enorm)",
+      "61": "61×61 (Massiv)"
     },
     "wallDensities": {
       "low30": "Låg (30%)",
@@ -529,7 +556,7 @@
     }
   },
   "room": {
-    "back": "\u2190 Tillbaka",
+    "back": "← Tillbaka",
     "inviteFriend": "Bjud in vän",
     "inviteInfo": "Använd vänpanelen (lobbyn) för att bjuda in vänner till detta rum",
     "roomCode": "Rumskod:",
@@ -585,7 +612,7 @@
     "levelFailed": "BANA MISSLYCKAD",
     "playAgain": "[ Spela igen ]",
     "voteRematch": "[ Rösta returmatch ]",
-    "rematchVoted": "[ Returmatch \u2713 ]",
+    "rematchVoted": "[ Returmatch ✓ ]",
     "backToLobby": "[ Tillbaka till lobbyn ]",
     "nextLevel": "[ Nästa bana ]",
     "retry": "[ Försök igen ]",
@@ -600,7 +627,7 @@
     "stars": "{{count}}/3",
     "teamRed": "Röd",
     "teamBlue": "Blå",
-    "levelUp": "NIVÅ UPP! \u2192 Nivå {{level}}"
+    "levelUp": "NIVÅ UPP! → Nivå {{level}}"
   },
   "coop": {
     "partnerDisconnected": "Partner frånkopplad",

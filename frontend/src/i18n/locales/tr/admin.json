@@ -28,7 +28,8 @@
       "wins": "Galibiyetler",
       "joined": "Katilim",
       "lastLogin": "Son Giris",
-      "actions": "Islemler"
+      "actions": "Islemler",
+      "twoFactor": "2FA"
     },
     "roles": {
       "user": "kullanici",
@@ -115,6 +116,16 @@
       "cancel": "Cancel",
       "success": "Deleted {{deleted}} account(s)",
       "errorDaysRequired": "Days threshold is required for this cleanup type"
+    },
+    "resetTotp": "2FA’yı sıfırla",
+    "resetTotpSuccess": "İki faktörlü doğrulama sıfırlandı",
+    "twoFactorOn": "Etkin",
+    "resetTotpModal": {
+      "title": "2FA’yı sıfırla",
+      "ariaLabel": "İki faktörlü doğrulamayı sıfırla",
+      "cancel": "İptal",
+      "confirm": "2FA’yı sıfırla",
+      "description": "Bu işlem <strong style=\"color:var(--text);\">{{username}}</strong> için iki faktörlü doğrulamayı devre dışı bırakır. 2FA’yı yeniden etkinleştirmek için baştan kurulması gerekir."
     }
   },
   "matches": {
@@ -523,7 +534,7 @@
     "gameCreationDefaults": "Oyun Olusturma Varsayilanlari",
     "simulationDefaults": "Simulasyon Varsayilanlari",
     "overridesCount": "({{count}} gecersiz kilma)",
-    "defaultOption": "\u2014 Varsayilan \u2014",
+    "defaultOption": "— Varsayilan —",
     "defaultIndicator": "(varsayilan)",
     "gameMode": "Oyun Modu",
     "maxPlayers": "Maks Oyuncu",
@@ -615,8 +626,8 @@
     },
     "endDialog": {
       "prompt": "Oyuncu derecelendirmeleri nasil sifirlansin?",
-      "softReset": "Yumusak Sifirlama \u2014 dereceler taban degerine dogru duser",
-      "hardReset": "Sert Sifirlama \u2014 tum dereceler varsayilana sifirlanir",
+      "softReset": "Yumusak Sifirlama — dereceler taban degerine dogru duser",
+      "hardReset": "Sert Sifirlama — tum dereceler varsayilana sifirlanir",
       "cancel": "Iptal"
     },
     "rankTiers": {
@@ -649,7 +660,6 @@
     "viewWorlds": "Dunyalar ve Bolumler",
     "viewEnemies": "Dusman Turleri",
     "viewReplays": "Tekrarlar",
-
     "worlds": {
       "createWorld": "Dunya Olustur",
       "tableHeaders": {
@@ -677,7 +687,6 @@
       "worldUnpublished": "Dunya yayindan kaldirildi",
       "worldPublished": "Dunya yayinlandi"
     },
-
     "levels": {
       "tableHeaders": {
         "order": "#",
@@ -707,14 +716,12 @@
       "deleteLevelConfirm": "\"{{name}}\" bolumu silinsin mi?",
       "levelDeleted": "Bolum silindi"
     },
-
     "winConditions": {
       "kill_all": "Tum Dusmanlari Oldur",
       "find_exit": "Cikisi Bul",
       "reach_goal": "Hedefe Ulas",
       "survive_time": "Sureyi Atlatir"
     },
-
     "worldModal": {
       "editTitle": "Dunyayi Duzenle",
       "createTitle": "Dunya Olustur",
@@ -732,7 +739,6 @@
       "worldUpdated": "Dunya guncellendi",
       "worldCreated": "Dunya olusturuldu"
     },
-
     "enemies": {
       "createEnemy": "Dusman Turu Olustur",
       "importEnemy": "Dusman Turu Ice Aktar",
@@ -755,7 +761,6 @@
       "deleteBtn": "Sil",
       "enemyImported": "Dusman turu ice aktarildi"
     },
-
     "enemyModal": {
       "editTitle": "Dusman Turunu Duzenle",
       "createTitle": "Dusman Turu Olustur",
@@ -802,9 +807,7 @@
       "enemyUpdated": "Dusman turu guncellendi",
       "enemyCreated": "Dusman turu olusturuldu"
     },
-
     "exportDownloaded": "Disa aktarim indirildi",
-
     "importLevelModal": {
       "ariaLabel": "Bolum Ice Aktar",
       "title": "Bolum Ice Aktar",
@@ -819,7 +822,6 @@
       "importFailed": "Ice aktarim basarisiz — dosya bicimini kontrol edin",
       "importSuccess": "Bolum basariyla ice aktarildi"
     },
-
     "conflictModal": {
       "ariaLabel": "Dusman Turu Catismalarini Coz",
       "title": "Dusman Turu Catismalarini Coz",
@@ -832,7 +834,6 @@
       "import": "Ice Aktar",
       "importSuccess": "Bolum basariyla ice aktarildi"
     },
-
     "deleteModal": {
       "entityLabels": {
         "world": "Dunya",
@@ -852,7 +853,6 @@
       "deleteBtn": "Sil",
       "deleteSuccess": "{{entity}} silindi"
     },
-
     "replays": {
       "totalCount": "{{count}} kampanya tekrari",
       "totalCount_other": "{{count}} kampanya tekrari",
@@ -977,7 +977,6 @@
       "reinforcedWalls": "Guclendirilmis Duvarlar",
       "mapEvents": "Harita Olaylari",
       "hazardTiles": "Tehlike Kareleri",
-      "puzzleTiles": "Puzzle Tiles",
       "friendlyFire": "Dost Atesi",
       "recordReplays": "Tekrarlari Kaydet",
       "powerUps": "Guc-upler",
