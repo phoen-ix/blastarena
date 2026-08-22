@@ -8,7 +8,7 @@ import {
   CustomMapSummary,
   getErrorMessage,
 } from '@blast-arena/shared';
-import { escapeHtml, escapeAttr } from '../../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { showCreateRoomModal } from '../modals/CreateRoomModal';
 import { t } from '../../i18n';
 
@@ -42,12 +42,15 @@ export class RoomsView implements ILobbyView {
 
   async render(container: HTMLElement): Promise<void> {
     this.container = container;
-    container.innerHTML = `
+    setHtml(
+      container,
+      `
       <div id="lobby-banner-area" style="padding:0 var(--sp-6);"></div>
       <div class="room-list empty" id="room-list">
         <div class="room-list-empty-state">${t('ui:rooms.loading')}</div>
       </div>
-    `;
+    `,
+    );
 
     // Delegated click + keyboard handler on room list — set up once per render()
     const list = container.querySelector('#room-list')!;
@@ -104,14 +107,16 @@ export class RoomsView implements ILobbyView {
 
     if (rooms.length === 0) {
       list.classList.add('empty');
-      list.innerHTML = `<div class="room-list-empty-state">${t('ui:rooms.empty')}</div>`;
+      setHtml(list, `<div class="room-list-empty-state">${t('ui:rooms.empty')}</div>`);
       return;
     }
 
     list.classList.remove('empty');
-    list.innerHTML = rooms
-      .map(
-        (room) => `
+    setHtml(
+      list,
+      rooms
+        .map(
+          (room) => `
       <div class="room-card ${room.status === 'waiting' ? 'waiting' : 'playing'}" data-code="${escapeAttr(room.code)}" tabindex="0" role="button">
         <h3>${escapeHtml(room.name)}</h3>
         <div class="room-info">
@@ -124,8 +129,9 @@ export class RoomsView implements ILobbyView {
         </div>
       </div>
     `,
-      )
-      .join('');
+        )
+        .join(''),
+    );
   }
 
   private async joinRoom(code: string): Promise<void> {
@@ -148,14 +154,17 @@ export class RoomsView implements ILobbyView {
       const banner = await ApiClient.get<ActiveBanner | null>('/admin/announcements/banner');
       const area = this.container?.querySelector('#lobby-banner-area');
       if (area && banner && banner.message) {
-        area.innerHTML = `
+        setHtml(
+          area,
+          `
           <div class="admin-banner">
             <span>${escapeHtml(banner.message)}</span>
             <button class="banner-close">&times;</button>
           </div>
-        `;
+        `,
+        );
         area.querySelector('.banner-close')?.addEventListener('click', () => {
-          area.innerHTML = '';
+          setHtml(area, '');
         });
       }
     } catch {

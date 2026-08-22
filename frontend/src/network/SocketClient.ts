@@ -3,6 +3,7 @@ import { SOCKET_URL, API_URL } from '../config';
 import { ClientToServerEvents, ServerToClientEvents } from '@blast-arena/shared';
 import { AuthManager } from './AuthManager';
 import { i18n } from '../i18n';
+import { setHtml } from '../utils/html';
 
 /** Extract parameter types from an event handler function type */
 type EventParams<T> = T extends (...args: infer P) => void ? P : never;
@@ -211,12 +212,15 @@ export class SocketClient {
     if (this.overlay) return;
     this.overlay = document.createElement('div');
     this.overlay.className = 'connection-overlay';
-    this.overlay.innerHTML = `
+    setHtml(
+      this.overlay,
+      `
       <div class="connection-message">
         <div class="connection-spinner"></div>
         <div>Reconnecting to server...</div>
       </div>
-    `;
+    `,
+    );
     document.body.appendChild(this.overlay);
     this.startHealthPoll();
   }

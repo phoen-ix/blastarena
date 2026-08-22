@@ -15,7 +15,7 @@ import {
   LogVerbosity,
   BotAIEntry,
 } from '@blast-arena/shared';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { game } from '../../main';
 import { t } from '../../i18n';
@@ -123,7 +123,9 @@ export class SimulationsTab {
       if (!this.container) return;
       const batches = resp.batches ?? [];
 
-      this.container.innerHTML = `
+      setHtml(
+        this.container,
+        `
         <div class="sim-section-header">
           <h3>${t('admin:simulations.title')}</h3>
           <button class="btn btn-primary" id="sim-new-batch">${t('admin:simulations.newSimulation')}</button>
@@ -146,7 +148,8 @@ export class SimulationsTab {
             ${batches.length === 0 ? `<tr><td colspan="8" class="sim-empty-row">${t('admin:simulations.noSimulations')}</td></tr>` : ''}
           </tbody>
         </table>
-      `;
+      `,
+      );
 
       this.container.querySelector('#sim-new-batch')?.addEventListener('click', () => {
         this.showConfigModal();
@@ -155,7 +158,10 @@ export class SimulationsTab {
       this.container.addEventListener('click', this.handleListClick);
     } catch {
       if (this.container) {
-        this.container.innerHTML = `<div class="sim-error">${t('admin:simulations.errors.loadFailed')}</div>`;
+        setHtml(
+          this.container,
+          `<div class="sim-error">${t('admin:simulations.errors.loadFailed')}</div>`,
+        );
       }
     }
   }
@@ -408,7 +414,9 @@ export class SimulationsTab {
           ? 'text-success'
           : 'text-warning';
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="sim-back-row">
         <button class="btn btn-secondary btn-sm" id="sim-back-to-list">${t('admin:simulations.backToList')}</button>
       </div>
@@ -477,7 +485,8 @@ export class SimulationsTab {
       }
 
       ${this.renderResultsTable()}
-    `;
+    `,
+    );
 
     this.container.querySelector('#sim-back-to-list')?.addEventListener('click', () => {
       this.detailBatchId = null;
@@ -645,7 +654,7 @@ export class SimulationsTab {
     const oldPagination = oldTable?.nextElementSibling;
 
     const temp = document.createElement('div');
-    temp.innerHTML = this.renderResultsTable();
+    setHtml(temp, this.renderResultsTable());
 
     if (oldTable) {
       oldTable.replaceWith(temp.querySelector('#sim-results-table')!);
@@ -688,7 +697,9 @@ export class SimulationsTab {
       className: 'modal sim-modal',
       parent: document.getElementById('ui-overlay')!,
     });
-    modalContent.innerHTML = `
+    setHtml(
+      modalContent,
+      `
         <h2>${t('admin:simulations.modal.title')}</h2>
 
         <div class="sim-modal-grid">
@@ -837,7 +848,8 @@ export class SimulationsTab {
           <button class="btn btn-secondary" id="sim-config-cancel">${t('admin:simulations.modal.cancel')}</button>
           <button class="btn btn-primary" id="sim-config-start">${t('admin:simulations.modal.startBatch')}</button>
         </div>
-    `;
+    `,
+    );
 
     // Apply admin-configured simulation defaults
     this.applySimulationDefaults(modal, simDefaults);

@@ -2,7 +2,7 @@ import { ApiClient } from '../../network/ApiClient';
 import { SocketClient } from '../../network/SocketClient';
 import { NotificationUI } from '../NotificationUI';
 import { RoomListItem, UserRole } from '@blast-arena/shared';
-import { escapeHtml, escapeAttr } from '../../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
 
@@ -47,7 +47,9 @@ export class RoomsTab {
       const rooms = await ApiClient.get<RoomListItem[]>('/admin/rooms');
       if (!this.container) return;
 
-      this.container.innerHTML = `
+      setHtml(
+        this.container,
+        `
         <table class="admin-table">
           <thead>
             <tr>
@@ -82,11 +84,15 @@ export class RoomsTab {
             ${rooms.length === 0 ? `<tr><td colspan="6" style="text-align:center;color:var(--text-dim);">${t('admin:rooms.noActiveRooms')}</td></tr>` : ''}
           </tbody>
         </table>
-      `;
+      `,
+      );
 
       this.container.addEventListener('click', this.handleClick);
     } catch {
-      this.container.innerHTML = `<div style="color:var(--danger);">${t('admin:rooms.loadFailed')}</div>`;
+      setHtml(
+        this.container,
+        `<div style="color:var(--danger);">${t('admin:rooms.loadFailed')}</div>`,
+      );
     }
   }
 
@@ -119,14 +125,17 @@ export class RoomsTab {
       style: 'max-width:400px;',
       parent: document.getElementById('ui-overlay')!,
     });
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <h2 style="margin-bottom:12px;">${t('admin:rooms.sendMessageTitle')}</h2>
       <input type="text" class="admin-input" id="room-message-input" placeholder="${escapeAttr(t('admin:rooms.messagePlaceholder'))}" aria-label="${escapeAttr(t('admin:rooms.messageAriaLabel'))}">
       <div class="modal-actions" style="margin-top:16px;">
         <button class="btn btn-secondary" id="msg-cancel">${t('admin:rooms.cancelBtn')}</button>
         <button class="btn btn-primary" id="msg-send">${t('admin:rooms.sendBtn')}</button>
       </div>
-    `;
+    `,
+    );
 
     overlay.querySelector('#msg-cancel')!.addEventListener('click', close);
     overlay.querySelector('#msg-send')!.addEventListener('click', () => {
@@ -166,7 +175,9 @@ export class RoomsTab {
       style: 'max-width:400px;',
       parent: document.getElementById('ui-overlay')!,
     });
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <h2 style="margin-bottom:12px;">${t('admin:rooms.kickPlayerTitle', { code: escapeHtml(code) })}</h2>
       <label style="color:var(--text-dim);font-size:13px;">${t('admin:rooms.playerUserIdLabel')}</label>
       <input type="number" class="admin-input" id="kick-user-id" placeholder="${escapeAttr(t('admin:rooms.enterUserIdPlaceholder'))}" style="margin-top:6px;">
@@ -176,7 +187,8 @@ export class RoomsTab {
         <button class="btn btn-secondary" id="kick-cancel">${t('admin:rooms.cancelBtn')}</button>
         <button class="btn-warn" style="padding:8px 16px;font-size:14px;" id="kick-confirm">${t('admin:rooms.kickConfirmBtn')}</button>
       </div>
-    `;
+    `,
+    );
 
     overlay.querySelector('#kick-cancel')!.addEventListener('click', close);
     overlay.querySelector('#kick-confirm')!.addEventListener('click', () => {
@@ -204,14 +216,17 @@ export class RoomsTab {
       style: 'max-width:380px;',
       parent: document.getElementById('ui-overlay')!,
     });
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <h2 style="margin-bottom:12px;color:var(--danger);">${t('admin:rooms.closeRoomTitle')}</h2>
       <p style="color:var(--text-dim);">${t('admin:rooms.closeRoomConfirmation', { code: escapeHtml(code) })}</p>
       <div class="modal-actions" style="margin-top:16px;">
         <button class="btn btn-secondary" id="close-cancel">${t('admin:rooms.cancelBtn')}</button>
         <button class="btn-danger" style="padding:8px 16px;font-size:14px;" id="close-confirm">${t('admin:rooms.closeRoomBtn')}</button>
       </div>
-    `;
+    `,
+    );
 
     overlay.querySelector('#close-cancel')!.addEventListener('click', close);
     overlay.querySelector('#close-confirm')!.addEventListener('click', () => {

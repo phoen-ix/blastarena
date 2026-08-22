@@ -16,6 +16,7 @@ import { SeasonsTab } from './admin/SeasonsTab';
 import { ChallengesTab } from './admin/ChallengesTab';
 import { AchievementsTab } from './admin/AchievementsTab';
 import { t } from '../i18n';
+import { setHtml } from '../utils/html';
 
 interface Tab {
   id: string;
@@ -163,7 +164,9 @@ export class AdminUI {
       tab.label = t(`admin:tabs.${tab.id}`);
     }
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="admin-header">
         <h1 style="color:var(--primary);margin:0;">${t('admin:title')}</h1>
         <button class="btn btn-secondary" id="admin-close">${t('admin:backToLobby')}</button>
@@ -178,7 +181,8 @@ export class AdminUI {
           .join('')}
       </div>
       <div class="admin-tab-content" id="admin-tab-content"></div>
-    `;
+    `,
+    );
 
     this.container.querySelector('#admin-close')!.addEventListener('click', () => {
       this.hide();
@@ -213,7 +217,7 @@ export class AdminUI {
 
     // Clear and render new tab
     if (this.contentEl) {
-      this.contentEl.innerHTML = '';
+      setHtml(this.contentEl, '');
     }
     await this.renderActiveTab();
     this.pushGamepadContext();
@@ -234,7 +238,9 @@ export class AdminUI {
 
     const viewContent = document.createElement('div');
     viewContent.className = 'view-content';
-    viewContent.innerHTML = `
+    setHtml(
+      viewContent,
+      `
       <div class="admin-tabs" id="admin-tab-bar">
         ${this.tabs
           .map(
@@ -245,7 +251,8 @@ export class AdminUI {
           .join('')}
       </div>
       <div class="admin-tab-content" id="admin-tab-content"></div>
-    `;
+    `,
+    );
 
     this.container.appendChild(viewContent);
 

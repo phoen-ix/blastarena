@@ -23,6 +23,7 @@ import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { ApiClient } from '../network/ApiClient';
 import { generateThemedTileTextures, generateHazardTileTextures } from '../utils/campaignThemes';
 import { getTileTexture, isConveyorTile, conveyorAnimKey } from '../utils/tileTextures';
+import { setHtml } from '../utils/html';
 
 type EditorTool =
   | 'empty'
@@ -1004,7 +1005,9 @@ export class LevelEditorScene extends Phaser.Scene {
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', t('editor:modals.unsavedChanges'));
-    overlay.innerHTML = `
+    setHtml(
+      overlay,
+      `
       <div class="modal" style="max-width:400px;">
         <div class="modal-header">
           <h2>${t('editor:modals.unsavedChanges')}</h2>
@@ -1018,7 +1021,8 @@ export class LevelEditorScene extends Phaser.Scene {
           <button class="btn btn-primary" id="unsaved-save">${t('editor:modals.saveAndExit')}</button>
         </div>
       </div>
-    `;
+    `,
+    );
     document.getElementById('ui-overlay')!.appendChild(overlay);
 
     overlay.addEventListener('click', (e) => {
@@ -1408,7 +1412,7 @@ export class LevelEditorScene extends Phaser.Scene {
         const hazardBtnsContainer = document.createElement('div');
 
         const renderHazardButtons = () => {
-          hazardBtnsContainer.innerHTML = '';
+          setHtml(hazardBtnsContainer, '');
           const tilesToShow = showAll ? allHazardTiles : themeHazards;
           if (tilesToShow.length === 0) {
             const noTiles = document.createElement('div');

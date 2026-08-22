@@ -1,7 +1,7 @@
 import { AuthManager } from '../network/AuthManager';
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
-import { escapeHtml, trapFocus } from '../utils/html';
+import { escapeHtml, trapFocus, setHtml } from '../utils/html';
 import {
   getErrorMessage,
   Cosmetic,
@@ -128,7 +128,9 @@ export class SettingsUI {
         });
       }
 
-      this.container.innerHTML = `
+      setHtml(
+        this.container,
+        `
         <div class="admin-header">
           <h1>${t('settings.title')}</h1>
           <button class="btn btn-secondary" id="settings-ui-close">${t('settings.backToLobby')}</button>
@@ -143,7 +145,8 @@ export class SettingsUI {
             .join('')}
         </div>
         <div class="admin-tab-content" id="settings-tab-content"></div>
-      `;
+      `,
+      );
 
       this.contentEl = this.container.querySelector('#settings-tab-content');
       await this.renderActiveTab();
@@ -163,7 +166,7 @@ export class SettingsUI {
     }
 
     if (this.contentEl) {
-      this.contentEl.innerHTML = '';
+      setHtml(this.contentEl, '');
     }
     await this.renderActiveTab();
     this.pushGamepadContext();
@@ -195,14 +198,19 @@ export class SettingsUI {
     try {
       profile = await ApiClient.get<UserProfileResponse>('/user/profile');
     } catch (err: unknown) {
-      this.contentEl.innerHTML = `<div class="error-banner">${t('settings.loadProfileFailed', { error: escapeHtml(getErrorMessage(err)) })}</div>`;
+      setHtml(
+        this.contentEl,
+        `<div class="error-banner">${t('settings.loadProfileFailed', { error: escapeHtml(getErrorMessage(err)) })}</div>`,
+      );
       return;
     }
 
     const user = this.authManager.getUser();
     const isAdmin = user?.role === 'admin';
 
-    this.contentEl.innerHTML = `
+    setHtml(
+      this.contentEl,
+      `
       <div class="settings-panel">
         <div class="content-section">
           <h3 class="settings-section-title">${t('settings.account.profile')}</h3>
@@ -285,7 +293,8 @@ export class SettingsUI {
             : ''
         }
       </div>
-    `;
+    `,
+    );
 
     // Save username
     this.contentEl.querySelector('#acct-save-profile')!.addEventListener('click', async () => {
@@ -295,7 +304,10 @@ export class SettingsUI {
       ).value.trim();
 
       if (!newUsername) {
-        statusEl.innerHTML = `<span class="text-danger">${t('settings.account.usernameEmpty')}</span>`;
+        setHtml(
+          statusEl,
+          `<span class="text-danger">${t('settings.account.usernameEmpty')}</span>`,
+        );
         return;
       }
 
@@ -303,7 +315,7 @@ export class SettingsUI {
       if (newUsername !== profile.username) updates.username = newUsername;
 
       if (Object.keys(updates).length === 0) {
-        statusEl.innerHTML = `<span class="text-dim">${t('settings.account.noChanges')}</span>`;
+        setHtml(statusEl, `<span class="text-dim">${t('settings.account.noChanges')}</span>`);
         return;
       }
 
@@ -311,9 +323,12 @@ export class SettingsUI {
         const updated = await ApiClient.put<UserProfileResponse>('/user/profile', updates);
         profile = updated;
         this.authManager.updateUser({ username: updated.username });
-        statusEl.innerHTML = `<span class="text-success">${t('settings.account.profileUpdated')}</span>`;
+        setHtml(
+          statusEl,
+          `<span class="text-success">${t('settings.account.profileUpdated')}</span>`,
+        );
       } catch (err: unknown) {
-        statusEl.innerHTML = `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`;
+        setHtml(statusEl, `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`);
       }
     });
 
@@ -325,7 +340,7 @@ export class SettingsUI {
       ).value.trim();
 
       if (!newEmail) {
-        statusEl.innerHTML = `<span class="text-danger">${t('settings.account.emailEmpty')}</span>`;
+        setHtml(statusEl, `<span class="text-danger">${t('settings.account.emailEmpty')}</span>`);
         return;
       }
 
@@ -333,10 +348,10 @@ export class SettingsUI {
         const result = await ApiClient.post<{ message: string }>('/user/email', {
           email: newEmail,
         });
-        statusEl.innerHTML = `<span class="text-success">${escapeHtml(result.message)}</span>`;
+        setHtml(statusEl, `<span class="text-success">${escapeHtml(result.message)}</span>`);
         (this.contentEl!.querySelector('#acct-new-email') as HTMLInputElement).value = '';
       } catch (err: unknown) {
-        statusEl.innerHTML = `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`;
+        setHtml(statusEl, `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`);
       }
     });
 
@@ -353,15 +368,24 @@ export class SettingsUI {
       ).value;
 
       if (!currentPassword || !newPassword) {
-        statusEl.innerHTML = `<span class="text-danger">${t('settings.account.passwordFieldsRequired')}</span>`;
+        setHtml(
+          statusEl,
+          `<span class="text-danger">${t('settings.account.passwordFieldsRequired')}</span>`,
+        );
         return;
       }
       if (newPassword.length < 8) {
-        statusEl.innerHTML = `<span class="text-danger">${t('settings.account.passwordTooShort')}</span>`;
+        setHtml(
+          statusEl,
+          `<span class="text-danger">${t('settings.account.passwordTooShort')}</span>`,
+        );
         return;
       }
       if (newPassword !== confirmPassword) {
-        statusEl.innerHTML = `<span class="text-danger">${t('settings.account.passwordMismatch')}</span>`;
+        setHtml(
+          statusEl,
+          `<span class="text-danger">${t('settings.account.passwordMismatch')}</span>`,
+        );
         return;
       }
 
@@ -370,12 +394,12 @@ export class SettingsUI {
           currentPassword,
           newPassword,
         });
-        statusEl.innerHTML = `<span class="text-success">${escapeHtml(result.message)}</span>`;
+        setHtml(statusEl, `<span class="text-success">${escapeHtml(result.message)}</span>`);
         (this.contentEl!.querySelector('#acct-current-password') as HTMLInputElement).value = '';
         (this.contentEl!.querySelector('#acct-new-password') as HTMLInputElement).value = '';
         (this.contentEl!.querySelector('#acct-confirm-password') as HTMLInputElement).value = '';
       } catch (err: unknown) {
-        statusEl.innerHTML = `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`;
+        setHtml(statusEl, `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`);
       }
     });
 
@@ -387,7 +411,7 @@ export class SettingsUI {
           await ApiClient.delete('/user/email');
           this.notifications.success(t('settings.account.pendingCancelled'));
           if (this.contentEl) {
-            this.contentEl.innerHTML = '';
+            setHtml(this.contentEl, '');
             await this.renderAccountTab();
           }
         } catch (err: unknown) {
@@ -429,7 +453,9 @@ export class SettingsUI {
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-label', t('settings.account.twoFactor.setupTitle'));
-    modal.innerHTML = `
+    setHtml(
+      modal,
+      `
       <div class="modal" style="max-width:480px;">
         <h2>${t('settings.account.twoFactor.setupTitle')}</h2>
 
@@ -460,7 +486,8 @@ export class SettingsUI {
           <button class="btn btn-primary" id="totp-setup-confirm">${t('settings.account.twoFactor.confirm')}</button>
         </div>
       </div>
-    `;
+    `,
+    );
 
     const releaseFocusTrap = trapFocus(modal);
     const closeModal = () => {
@@ -494,7 +521,7 @@ export class SettingsUI {
       const code = (modal.querySelector('#totp-confirm-code') as HTMLInputElement).value.trim();
       const statusEl = modal.querySelector('#totp-setup-status')!;
       if (!code || code.length < 6) {
-        statusEl.innerHTML = `<span class="text-danger">${t('auth:totp.invalidCode')}</span>`;
+        setHtml(statusEl, `<span class="text-danger">${t('auth:totp.invalidCode')}</span>`);
         return;
       }
       const btn = modal.querySelector('#totp-setup-confirm') as HTMLButtonElement;
@@ -505,13 +532,13 @@ export class SettingsUI {
         closeModal();
         this.notifications.success(t('settings.account.twoFactor.enableSuccess'));
         if (this.contentEl) {
-          this.contentEl.innerHTML = '';
+          setHtml(this.contentEl, '');
           await this.renderAccountTab();
         }
       } catch (err: unknown) {
         btn.disabled = false;
         btn.textContent = t('settings.account.twoFactor.confirm');
-        statusEl.innerHTML = `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`;
+        setHtml(statusEl, `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`);
       }
     });
 
@@ -531,7 +558,9 @@ export class SettingsUI {
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-label', t('settings.account.twoFactor.disableTitle'));
-    modal.innerHTML = `
+    setHtml(
+      modal,
+      `
       <div class="modal" style="max-width:440px;">
         <h2>${t('settings.account.twoFactor.disableTitle')}</h2>
         <p style="margin:var(--sp-3) 0;color:var(--text-dim);">${t('settings.account.twoFactor.disableDescription')}</p>
@@ -545,7 +574,8 @@ export class SettingsUI {
           <button class="btn" style="background:var(--danger);color:#fff;" id="disable-2fa-confirm">${t('settings.account.twoFactor.disableConfirm')}</button>
         </div>
       </div>
-    `;
+    `,
+    );
 
     const releaseFocusTrap = trapFocus(modal);
     const closeModal = () => {
@@ -567,7 +597,10 @@ export class SettingsUI {
       const code = (modal.querySelector('#disable-2fa-code') as HTMLInputElement).value.trim();
       const statusEl = modal.querySelector('#disable-2fa-status')!;
       if (!password || !code) {
-        statusEl.innerHTML = `<span class="text-danger">${t('settings.account.passwordFieldsRequired')}</span>`;
+        setHtml(
+          statusEl,
+          `<span class="text-danger">${t('settings.account.passwordFieldsRequired')}</span>`,
+        );
         return;
       }
       const btn = modal.querySelector('#disable-2fa-confirm') as HTMLButtonElement;
@@ -578,13 +611,13 @@ export class SettingsUI {
         closeModal();
         this.notifications.success(t('settings.account.twoFactor.disableSuccess'));
         if (this.contentEl) {
-          this.contentEl.innerHTML = '';
+          setHtml(this.contentEl, '');
           await this.renderAccountTab();
         }
       } catch (err: unknown) {
         btn.disabled = false;
         btn.textContent = t('settings.account.twoFactor.disableConfirm');
-        statusEl.innerHTML = `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`;
+        setHtml(statusEl, `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`);
       }
     });
 
@@ -598,7 +631,9 @@ export class SettingsUI {
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-label', t('settings.account.deleteModal.title'));
-    modal.innerHTML = `
+    setHtml(
+      modal,
+      `
       <div class="modal" style="max-width:440px;">
         <h2 style="color:var(--danger);">${t('settings.account.deleteModal.title')}</h2>
         <p style="margin:var(--sp-3) 0;color:var(--text-dim);">${t('settings.account.deleteModal.description')}</p>
@@ -612,7 +647,8 @@ export class SettingsUI {
           <button class="btn" style="background:var(--danger);color:#fff;" id="delete-confirm">${t('settings.account.deleteModal.confirm')}</button>
         </div>
       </div>
-    `;
+    `,
+    );
 
     const releaseFocusTrap = trapFocus(modal);
     const closeModal = () => {
@@ -633,7 +669,10 @@ export class SettingsUI {
       const password = (modal.querySelector('#delete-password') as HTMLInputElement).value;
       const statusEl = modal.querySelector('#delete-status')!;
       if (!password) {
-        statusEl.innerHTML = `<span class="text-danger">${t('settings.account.deleteModal.passwordRequired')}</span>`;
+        setHtml(
+          statusEl,
+          `<span class="text-danger">${t('settings.account.deleteModal.passwordRequired')}</span>`,
+        );
         return;
       }
       const btn = modal.querySelector('#delete-confirm') as HTMLButtonElement;
@@ -646,7 +685,7 @@ export class SettingsUI {
       } catch (err: unknown) {
         btn.disabled = false;
         btn.textContent = t('settings.account.deleteModal.confirm');
-        statusEl.innerHTML = `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`;
+        setHtml(statusEl, `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`);
       }
     });
 
@@ -659,7 +698,9 @@ export class SettingsUI {
     const settings = getSettings();
     const currentTheme = themeManager.getTheme();
 
-    this.contentEl.innerHTML = `
+    setHtml(
+      this.contentEl,
+      `
       <div class="settings-panel wide">
         <h3 class="content-section-title">${t('settings.theme')}</h3>
         <div class="theme-picker" id="theme-picker">
@@ -815,7 +856,8 @@ export class SettingsUI {
           </div>
         </div>
       </div>
-    `;
+    `,
+    );
 
     // Load and populate buddy settings
     this.loadBuddySettings();
@@ -914,7 +956,7 @@ export class SettingsUI {
 
     // Build color swatches
     const buildSwatches = () => {
-      swatchContainer.innerHTML = '';
+      setHtml(swatchContainer, '');
       for (const color of PLAYER_COLORS) {
         const hex = '#' + color.toString(16).padStart(6, '0');
         const swatch = document.createElement('div');
@@ -967,11 +1009,16 @@ export class SettingsUI {
     try {
       profile = await ApiClient.get<UserProfileResponse>('/user/profile');
     } catch (err: unknown) {
-      this.contentEl.innerHTML = `<div class="error-banner">${t('settings.loadProfileFailed', { error: escapeHtml(getErrorMessage(err)) })}</div>`;
+      setHtml(
+        this.contentEl,
+        `<div class="error-banner">${t('settings.loadProfileFailed', { error: escapeHtml(getErrorMessage(err)) })}</div>`,
+      );
       return;
     }
 
-    this.contentEl.innerHTML = `
+    setHtml(
+      this.contentEl,
+      `
       <div class="settings-panel">
         <h3 class="settings-section-title">${t('settings.privacy.settingsTitle')}</h3>
         <div class="settings-toggle-list">
@@ -992,18 +1039,19 @@ export class SettingsUI {
         </div>
         <div id="privacy-status" class="settings-status mt-3"></div>
       </div>
-    `;
+    `,
+    );
 
     const savePrivacy = async (field: string, value: boolean) => {
       const statusEl = this.contentEl!.querySelector('#privacy-status')!;
       try {
         await ApiClient.put('/user/privacy', { [field]: value });
-        statusEl.innerHTML = `<span class="text-success">${t('settings.privacy.saved')}</span>`;
+        setHtml(statusEl, `<span class="text-success">${t('settings.privacy.saved')}</span>`);
         setTimeout(() => {
-          statusEl.innerHTML = '';
+          setHtml(statusEl, '');
         }, 2000);
       } catch (err: unknown) {
-        statusEl.innerHTML = `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`;
+        setHtml(statusEl, `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`);
       }
     };
 
@@ -1037,7 +1085,10 @@ export class SettingsUI {
       myCosmetics = mineResp.cosmetics;
       equipped = equippedResp;
     } catch (err: unknown) {
-      this.contentEl.innerHTML = `<div class="error-banner">${t('settings.cosmetics.loadFailed', { error: escapeHtml(getErrorMessage(err)) })}</div>`;
+      setHtml(
+        this.contentEl,
+        `<div class="error-banner">${t('settings.cosmetics.loadFailed', { error: escapeHtml(getErrorMessage(err)) })}</div>`,
+      );
       return;
     }
 
@@ -1081,7 +1132,9 @@ export class SettingsUI {
       `;
     };
 
-    this.contentEl.innerHTML = `
+    setHtml(
+      this.contentEl,
+      `
       <div class="settings-panel wide">
         <h3 class="settings-section-title">${t('settings.cosmetics.title')}</h3>
         <div class="cosmetic-preview">
@@ -1101,7 +1154,8 @@ export class SettingsUI {
         ${slots.map(renderSlot).join('')}
         <div id="cosmetics-status" class="settings-status"></div>
       </div>
-    `;
+    `,
+    );
 
     this.drawCosmeticsPreview(allCosmetics, equipped);
 
@@ -1122,7 +1176,7 @@ export class SettingsUI {
           await this.renderCosmeticsTab();
           this.notifications.success(t('settings.cosmetics.updated'));
         } catch (err: unknown) {
-          statusEl.innerHTML = `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`;
+          setHtml(statusEl, `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`);
         }
       });
     });
@@ -1213,7 +1267,9 @@ export class SettingsUI {
   async renderEmbedded(container: HTMLElement): Promise<void> {
     this.container = container;
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="view-content">
         <div class="admin-tabs" id="settings-tab-bar">
           ${this.tabs
@@ -1226,7 +1282,8 @@ export class SettingsUI {
         </div>
         <div class="admin-tab-content" id="settings-tab-content"></div>
       </div>
-    `;
+    `,
+    );
 
     this.container.querySelector('#settings-tab-bar')!.addEventListener('click', (e: Event) => {
       const target = e.target as HTMLElement;

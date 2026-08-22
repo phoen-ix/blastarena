@@ -3,7 +3,7 @@ import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
 import { LobbyChatMessage, ChatMode, UserRole, LOBBY_CHAT_MAX_LENGTH } from '@blast-arena/shared';
 import type { ServerToClientEvents } from '@blast-arena/shared';
-import { escapeHtml } from '../utils/html';
+import { escapeHtml, setHtml } from '../utils/html';
 import { getSettings } from '../game/Settings';
 import { t } from '../i18n';
 
@@ -106,7 +106,7 @@ export class LobbyChatPanel {
 
   private render(): void {
     this.container.className = 'lobby-chat';
-    this.container.innerHTML = '';
+    setHtml(this.container, '');
 
     // User-level disable
     if (!getSettings().lobbyChat) {
@@ -120,7 +120,10 @@ export class LobbyChatPanel {
     // Toggle button
     const toggle = document.createElement('button');
     toggle.className = 'lobby-chat-toggle' + (this.expanded ? ' expanded' : '');
-    toggle.innerHTML = `<span>Lobby Chat</span><span class="lobby-chat-arrow">${this.expanded ? '\u25BC' : '\u25B2'}</span>`;
+    setHtml(
+      toggle,
+      `<span>Lobby Chat</span><span class="lobby-chat-arrow">${this.expanded ? '\u25BC' : '\u25B2'}</span>`,
+    );
     toggle.addEventListener('click', () => {
       this.expanded = !this.expanded;
       this.render();
@@ -190,16 +193,19 @@ export class LobbyChatPanel {
     if (!this.messagesEl) return;
 
     if (this.messages.length === 0) {
-      this.messagesEl.innerHTML = `<div class="lobby-chat-empty">${t('ui:lobbyChat.empty')}</div>`;
+      setHtml(this.messagesEl, `<div class="lobby-chat-empty">${t('ui:lobbyChat.empty')}</div>`);
       return;
     }
 
-    this.messagesEl.innerHTML = this.messages
-      .map((m) => {
-        const nameColor = this.getRoleColor(m.role);
-        return `<div class="lobby-chat-msg"><span class="lobby-chat-msg-name" style="color:${nameColor};">${escapeHtml(m.fromUsername)}</span> <span class="lobby-chat-msg-text">${escapeHtml(m.message)}</span></div>`;
-      })
-      .join('');
+    setHtml(
+      this.messagesEl,
+      this.messages
+        .map((m) => {
+          const nameColor = this.getRoleColor(m.role);
+          return `<div class="lobby-chat-msg"><span class="lobby-chat-msg-name" style="color:${nameColor};">${escapeHtml(m.fromUsername)}</span> <span class="lobby-chat-msg-text">${escapeHtml(m.message)}</span></div>`;
+        })
+        .join(''),
+    );
 
     this.scrollToBottom();
   }

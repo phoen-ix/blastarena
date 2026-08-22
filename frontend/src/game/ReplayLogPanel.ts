@@ -1,5 +1,5 @@
 import { ReplayLogEntry, ReplayLogEventType, TICK_RATE } from '@blast-arena/shared';
-import { escapeHtml } from '../utils/html';
+import { escapeHtml, setHtml } from '../utils/html';
 import { t } from '../i18n';
 
 interface FilterState {
@@ -235,7 +235,7 @@ export class ReplayLogPanel {
 
   private renderLogEntries(): void {
     if (!this.logList) return;
-    this.logList.innerHTML = '';
+    setHtml(this.logList, '');
     this.entryElements.clear();
 
     const fragment = document.createDocumentFragment();
@@ -288,7 +288,7 @@ export class ReplayLogPanel {
     // Message
     const msg = document.createElement('span');
     msg.style.cssText = 'flex:1; word-break:break-word;';
-    msg.innerHTML = this.formatEntry(entry);
+    setHtml(msg, this.formatEntry(entry));
     el.appendChild(msg);
 
     el.addEventListener('click', () => {

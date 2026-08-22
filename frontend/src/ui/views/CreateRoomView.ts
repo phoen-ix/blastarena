@@ -12,7 +12,7 @@ import {
 import { game } from '../../main';
 import { renderMapPreview } from '../../utils/mapPreview';
 import { getCustomMapTiles } from '../../utils/mapPreviewCache';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 export class CreateRoomView implements ILobbyView {
@@ -71,7 +71,9 @@ export class CreateRoomView implements ILobbyView {
     const allPowerUps = Object.values(POWERUP_DEFINITIONS);
     const hasMultipleAIs = this.activeAIs.length > 1;
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="create-room-page">
         <div class="create-room-content">
           <div class="create-room-section">
@@ -305,7 +307,8 @@ export class CreateRoomView implements ILobbyView {
           </div>
         </div>
       </div>
-    `;
+    `,
+    );
 
     this.applyDefaults();
     this.bindEvents();
@@ -457,14 +460,17 @@ export class CreateRoomView implements ILobbyView {
       if (previewEl) {
         if (isCustom) {
           previewEl.style.display = 'block';
-          previewEl.innerHTML = `<span style="font-size:11px;color:var(--text-muted);">${t('ui:createRoom.loadingPreview')}</span>`;
+          setHtml(
+            previewEl,
+            `<span style="font-size:11px;color:var(--text-muted);">${t('ui:createRoom.loadingPreview')}</span>`,
+          );
           const selectedVal = val;
           getCustomMapTiles(parseInt(selectedVal))
             .then((data) => {
               if (customMapSelect.value !== selectedVal) return;
               const canvas = renderMapPreview(data.tiles, { maxCanvasSize: 200 });
               canvas.style.cssText = 'border:1px solid var(--border);border-radius:4px;';
-              previewEl.innerHTML = '';
+              setHtml(previewEl, '');
               previewEl.appendChild(canvas);
             })
             .catch(() => {
@@ -473,7 +479,7 @@ export class CreateRoomView implements ILobbyView {
             });
         } else {
           previewEl.style.display = 'none';
-          previewEl.innerHTML = '';
+          setHtml(previewEl, '');
         }
       }
     };

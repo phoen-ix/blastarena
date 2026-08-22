@@ -8,7 +8,7 @@ import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 import { PLAYER_COLORS } from '../../scenes/BootScene';
 import { ApiClient } from '../../network/ApiClient';
 import { drawPlayerSprite, playerColorToHex } from '../../utils/playerCanvas';
-import { trapFocus } from '../../utils/html';
+import { trapFocus, setHtml } from '../../utils/html';
 import type { BuddySettings } from '@blast-arena/shared';
 import { t } from '../../i18n';
 
@@ -275,7 +275,7 @@ export function showBuddyModal(
   }
 
   function render(): void {
-    overlay.innerHTML = '';
+    setHtml(overlay, '');
 
     const modal = document.createElement('div');
     modal.className = 'modal';

@@ -1,7 +1,7 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
 import { Friend, FriendRequest, ActivityStatus } from '@blast-arena/shared';
-import { escapeHtml, enableKeyboardActions } from '../../utils/html';
+import { escapeHtml, enableKeyboardActions, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 export class FriendsView implements ILobbyView {
@@ -260,7 +260,9 @@ export class FriendsView implements ILobbyView {
     if (!this.container) return;
     const incomingCount = this.incoming.length;
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="friends-page">
         <div class="friends-page-header">
           <div class="tab-bar">
@@ -283,7 +285,8 @@ export class FriendsView implements ILobbyView {
           ${this.renderActiveTab()}
         </div>
       </div>
-    `;
+    `,
+    );
 
     // Listeners are delegated via setupDelegatedListeners() — no per-render attachment needed
   }
@@ -457,7 +460,7 @@ export class FriendsView implements ILobbyView {
       this.searchResults = result.users;
       const listEl = this.container?.querySelector('#friends-list-content');
       if (listEl) {
-        listEl.innerHTML = this.renderSearchResults();
+        setHtml(listEl, this.renderSearchResults());
       }
     } catch {
       this.deps.notifications.error(t('ui:friends.searchFailed'));

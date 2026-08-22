@@ -1,7 +1,7 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
 import { t } from '../../i18n';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, setHtml } from '../../utils/html';
 
 interface MatchEntry {
   id: number;
@@ -59,7 +59,10 @@ export class MatchHistoryView implements ILobbyView {
   private async loadPage(): Promise<void> {
     if (!this.container) return;
 
-    this.container.innerHTML = `<div style="padding:20px;color:var(--text-dim);text-align:center;">${t('ui:matchHistory.loading')}</div>`;
+    setHtml(
+      this.container,
+      `<div style="padding:20px;color:var(--text-dim);text-align:center;">${t('ui:matchHistory.loading')}</div>`,
+    );
 
     try {
       const data = await ApiClient.get<MatchHistoryResponse>(
@@ -68,7 +71,10 @@ export class MatchHistoryView implements ILobbyView {
       this.total = data.total;
       this.renderMatches(data);
     } catch {
-      this.container.innerHTML = `<div style="padding:20px;color:var(--danger);text-align:center;">${t('ui:matchHistory.error')}</div>`;
+      setHtml(
+        this.container,
+        `<div style="padding:20px;color:var(--danger);text-align:center;">${t('ui:matchHistory.error')}</div>`,
+      );
     }
   }
 
@@ -77,7 +83,10 @@ export class MatchHistoryView implements ILobbyView {
     const totalPages = Math.ceil(data.total / data.limit);
 
     if (data.matches.length === 0) {
-      this.container.innerHTML = `<div style="padding:40px;color:var(--text-dim);text-align:center;">${t('ui:matchHistory.noMatches')}</div>`;
+      setHtml(
+        this.container,
+        `<div style="padding:40px;color:var(--text-dim);text-align:center;">${t('ui:matchHistory.noMatches')}</div>`,
+      );
       return;
     }
 
@@ -128,7 +137,9 @@ export class MatchHistoryView implements ILobbyView {
     const prevDisabled = this.page <= 1 ? 'disabled' : '';
     const nextDisabled = this.page >= totalPages ? 'disabled' : '';
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div style="padding:16px;">
         ${statsHtml ? `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">${statsHtml}</div>` : ''}
         <table class="data-table">
@@ -155,7 +166,8 @@ export class MatchHistoryView implements ILobbyView {
             : ''
         }
       </div>
-    `;
+    `,
+    );
 
     // Pagination handlers
     this.container.querySelector('#mh-prev')?.addEventListener('click', () => {

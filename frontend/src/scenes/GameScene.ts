@@ -34,7 +34,7 @@ import { EnemyTextureGenerator } from '../game/EnemyTextureGenerator';
 import { EmoteBubbleRenderer } from '../game/EmoteBubble';
 import { EmoteWheel } from '../game/EmoteWheel';
 import { generateThemedTileTextures, generateHazardTileTextures } from '../utils/campaignThemes';
-import { trapFocus } from '../utils/html';
+import { trapFocus, setHtml } from '../utils/html';
 import type { HUDScene } from './HUDScene';
 import { MapEventRenderer } from '../game/MapEventRenderer';
 import {
@@ -1626,14 +1626,17 @@ export class GameScene extends Phaser.Scene {
     this.hidePauseOverlay();
     const overlay = document.createElement('div');
     overlay.className = 'pause-overlay';
-    overlay.innerHTML = `
+    setHtml(
+      overlay,
+      `
       <div class="pause-menu">
         <h2 class="pause-title">${t('ui:game.leaveTitle')}</h2>
         <p style="color: var(--text-muted); margin: 0; font-size: 14px;">${t('ui:game.leaveWarning')}</p>
         <button class="btn btn-primary pause-btn" id="leave-confirm" style="background: var(--danger);">${t('ui:game.leaveConfirm')}</button>
         <button class="btn btn-secondary pause-btn" id="leave-cancel">${t('ui:game.leaveCancel')}</button>
       </div>
-    `;
+    `,
+    );
     document.body.appendChild(overlay);
     this.pauseOverlay = overlay;
 
@@ -1683,14 +1686,17 @@ export class GameScene extends Phaser.Scene {
     this.hidePauseOverlay();
     const overlay = document.createElement('div');
     overlay.className = 'pause-overlay';
-    overlay.innerHTML = `
+    setHtml(
+      overlay,
+      `
       <div class="pause-menu">
         <h2 class="pause-title">PAUSED</h2>
         <button class="btn btn-primary pause-btn" id="pause-continue">Continue</button>
         <button class="btn btn-secondary pause-btn" id="pause-restart">Restart Level</button>
         <button class="btn btn-ghost pause-btn" id="pause-exit">Exit Level</button>
       </div>
-    `;
+    `,
+    );
     document.body.appendChild(overlay);
     this.pauseOverlay = overlay;
 

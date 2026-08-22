@@ -1,4 +1,5 @@
 import { EMOTES, EmoteId } from '@blast-arena/shared';
+import { setHtml } from '../utils/html';
 
 const WHEEL_RADIUS = 100;
 const STICK_DEADZONE = 0.5;
@@ -18,7 +19,7 @@ export class EmoteWheel {
 
     this.overlay = document.createElement('div');
     this.overlay.className = 'emote-wheel-overlay';
-    this.overlay.innerHTML = this.buildHTML();
+    setHtml(this.overlay, this.buildHTML());
     document.body.appendChild(this.overlay);
 
     // Bind click handlers via delegation

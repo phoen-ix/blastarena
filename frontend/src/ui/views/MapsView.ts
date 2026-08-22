@@ -1,7 +1,7 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
 import { CustomMapSummary, Position, TileType } from '@blast-arena/shared';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 import { game } from '../../main';
 
@@ -46,21 +46,26 @@ export class MapsView implements ILobbyView {
     if (!this.container) return;
 
     if (this.maps.length === 0) {
-      this.container.innerHTML = `
+      setHtml(
+        this.container,
+        `
         <div style="text-align:center;padding:40px 20px;color:var(--text-dim);">
           <div style="font-size:48px;margin-bottom:16px;">&#9638;</div>
           <h3 style="margin:0 0 8px 0;color:var(--text);">${t('ui:maps.noMapsYet')}</h3>
           <p style="margin:0 0 16px 0;">${t('ui:maps.emptyDescription')}</p>
           <button class="btn btn-primary" id="empty-create-map">${t('ui:maps.createFirst')}</button>
         </div>
-      `;
+      `,
+      );
       this.container.querySelector('#empty-create-map')?.addEventListener('click', () => {
         this.launchEditor(null);
       });
       return;
     }
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <table class="data-table">
         <thead>
           <tr>
@@ -93,7 +98,8 @@ export class MapsView implements ILobbyView {
             .join('')}
         </tbody>
       </table>
-    `;
+    `,
+    );
 
     this.bindEvents();
   }

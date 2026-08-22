@@ -8,6 +8,7 @@ import { themeManager } from '../themes/ThemeManager';
 import { API_URL } from '../config';
 import { t } from '../i18n';
 import type { GameState, OpenWorldScoreEntry } from '@blast-arena/shared';
+import { setHtml } from '../utils/html';
 
 interface OpenWorldStatus {
   enabled: boolean;
@@ -167,7 +168,9 @@ export class MenuScene extends Phaser.Scene {
 
     this.landingContainer = document.createElement('div');
     this.landingContainer.className = 'menu-landing';
-    this.landingContainer.innerHTML = `
+    setHtml(
+      this.landingContainer,
+      `
       <div class="menu-landing-buttons">
         <div class="menu-landing-brand"><span>${t('auth:login.title')}</span>${t('auth:login.titleAccent')}</div>
         ${
@@ -181,7 +184,8 @@ export class MenuScene extends Phaser.Scene {
         <button class="btn btn-secondary" id="menu-login-btn">${t('ui:menu.login')}</button>
         <button class="btn btn-ghost" id="menu-register-btn">${t('ui:menu.register')}</button>
       </div>
-    `;
+    `,
+    );
 
     const uiOverlay = document.getElementById('ui-overlay');
     if (uiOverlay) {

@@ -7,6 +7,7 @@ import { RoomUI } from '../ui/RoomUI';
 import { GameState, Room, CoopStartData } from '@blast-arena/shared';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { t } from '../i18n';
+import { setHtml } from '../utils/html';
 
 export class LobbyScene extends Phaser.Scene {
   private authManager!: AuthManager;
@@ -118,7 +119,7 @@ export class LobbyScene extends Phaser.Scene {
       const area = document.getElementById('lobby-banner-area');
       if (area) {
         if (data.message) {
-          area.innerHTML = '';
+          setHtml(area, '');
           const banner = document.createElement('div');
           banner.className = 'admin-banner';
           const span = document.createElement('span');
@@ -131,7 +132,7 @@ export class LobbyScene extends Phaser.Scene {
           banner.appendChild(closeBtn);
           area.appendChild(banner);
         } else {
-          area.innerHTML = '';
+          setHtml(area, '');
         }
       }
     };

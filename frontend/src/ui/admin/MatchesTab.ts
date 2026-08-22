@@ -1,6 +1,6 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { GameState, ReplayData } from '@blast-arena/shared';
 import { game } from '../../main';
@@ -95,7 +95,9 @@ export class MatchesTab {
       const totalPages = Math.ceil(result.total / result.limit);
 
       const colCount = this.isAdmin ? 9 : 8;
-      this.container.innerHTML = `
+      setHtml(
+        this.container,
+        `
         ${
           this.isAdmin && result.total > 0
             ? `<div style="margin-bottom:10px;display:flex;justify-content:flex-end;">
@@ -143,11 +145,15 @@ export class MatchesTab {
           <span class="page-info">${t('admin:matches.pageInfo', { page: this.page, totalPages, total: result.total })}</span>
           <button ${this.page >= totalPages ? 'disabled' : ''} data-page="${this.page + 1}">${t('admin:matches.nextPage')}</button>
         </div>
-      `;
+      `,
+      );
 
       this.container.addEventListener('click', this.handleClick);
     } catch {
-      this.container.innerHTML = `<div style="color:var(--danger);">${t('admin:matches.failedToLoad')}</div>`;
+      setHtml(
+        this.container,
+        `<div style="color:var(--danger);">${t('admin:matches.failedToLoad')}</div>`,
+      );
     }
   }
 
@@ -245,7 +251,9 @@ export class MatchesTab {
         style: 'max-width:520px;',
         parent: document.getElementById('ui-overlay')!,
       });
-      content.innerHTML = `
+      setHtml(
+        content,
+        `
           <h2 style="margin-bottom:16px;">${t('admin:matches.detailTitle', { matchId: match.id })}</h2>
           <div style="margin-bottom:16px;">
             <div class="match-detail-row"><span class="label">${t('admin:matches.detailRoomCode')}</span><span class="value">${escapeHtml(match.roomCode)}</span></div>
@@ -276,7 +284,8 @@ export class MatchesTab {
             ${match.hasReplay ? `<button class="btn btn-primary" id="match-watch-replay" style="margin-right:8px;">${t('admin:matches.watchReplay')}</button>` : ''}
             <button class="btn btn-secondary" id="match-detail-close">${t('admin:matches.close')}</button>
           </div>
-      `;
+      `,
+      );
       overlay.querySelector('#match-detail-close')!.addEventListener('click', close);
 
       // Watch Replay button

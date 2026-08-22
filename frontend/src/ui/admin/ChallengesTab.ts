@@ -1,7 +1,7 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
 import { MapChallengeSummary, CustomMapSummary, getErrorMessage } from '@blast-arena/shared';
-import { escapeHtml, escapeAttr } from '../../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 export class ChallengesTab {
@@ -41,12 +41,14 @@ export class ChallengesTab {
   }
 
   private renderContent(): void {
-    this.container.innerHTML = '';
+    setHtml(this.container, '');
 
     // Global toggle
     const toggleSection = document.createElement('div');
     toggleSection.className = 'admin-card';
-    toggleSection.innerHTML = `
+    setHtml(
+      toggleSection,
+      `
       <div class="admin-card-header">
         <h3>${t('admin:challenges.globalToggle')}</h3>
       </div>
@@ -59,7 +61,8 @@ export class ChallengesTab {
             <span class="toggle-slider"></span>
           </label>
         </div>
-      </div>`;
+      </div>`,
+    );
     this.container.appendChild(toggleSection);
 
     toggleSection
@@ -79,7 +82,9 @@ export class ChallengesTab {
     const createSection = document.createElement('div');
     createSection.className = 'admin-card';
     createSection.style.marginTop = '1rem';
-    createSection.innerHTML = `
+    setHtml(
+      createSection,
+      `
       <div class="admin-card-header" style="display:flex; justify-content:space-between; align-items:center;">
         <h3>${t('admin:challenges.title')}</h3>
         <button class="btn btn-sm btn-primary" id="toggle-create-form">
@@ -89,7 +94,8 @@ export class ChallengesTab {
       <div class="admin-card-body">
         ${this.showCreateForm ? this.renderCreateForm() : ''}
         ${this.renderChallengeTable()}
-      </div>`;
+      </div>`,
+    );
     this.container.appendChild(createSection);
 
     // Toggle form
@@ -240,6 +246,6 @@ export class ChallengesTab {
   }
 
   destroy(): void {
-    this.container.innerHTML = '';
+    setHtml(this.container, '');
   }
 }

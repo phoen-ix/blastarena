@@ -1,7 +1,7 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
 import { Season, RankConfig, DEFAULT_RANK_CONFIG, getErrorMessage } from '@blast-arena/shared';
-import { escapeHtml, escapeAttr } from '../../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 export class SeasonsTab {
@@ -44,19 +44,22 @@ export class SeasonsTab {
   }
 
   private renderContent(): void {
-    this.container.innerHTML = '';
+    setHtml(this.container, '');
 
     // --- Season Management Section ---
     const seasonSection = document.createElement('div');
     seasonSection.className = 'admin-section';
-    seasonSection.innerHTML = `
+    setHtml(
+      seasonSection,
+      `
       <h3>${t('admin:seasons.sectionTitle')}</h3>
       <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
         <button class="btn btn-primary" id="seasons-create-btn">${t('admin:seasons.createSeason')}</button>
       </div>
       <div id="seasons-create-form"></div>
       <div id="seasons-table-area"></div>
-    `;
+    `,
+    );
     this.container.appendChild(seasonSection);
 
     // Create form toggle
@@ -71,7 +74,10 @@ export class SeasonsTab {
     // --- Rank Tier Section ---
     const rankSection = document.createElement('div');
     rankSection.className = 'admin-section';
-    rankSection.innerHTML = `<h3>${t('admin:seasons.rankTierTitle')}</h3><div id="rank-tiers-area"></div>`;
+    setHtml(
+      rankSection,
+      `<h3>${t('admin:seasons.rankTierTitle')}</h3><div id="rank-tiers-area"></div>`,
+    );
     this.container.appendChild(rankSection);
 
     this.renderRankTiers(rankSection.querySelector('#rank-tiers-area')!);
@@ -81,11 +87,13 @@ export class SeasonsTab {
 
   private renderCreateForm(el: HTMLElement): void {
     if (!this.showCreateForm) {
-      el.innerHTML = '';
+      setHtml(el, '');
       return;
     }
 
-    el.innerHTML = `
+    setHtml(
+      el,
+      `
       <div style="background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
           <div>
@@ -106,7 +114,8 @@ export class SeasonsTab {
           <button class="btn btn-primary" id="season-submit">${t('admin:seasons.form.create')}</button>
         </div>
       </div>
-    `;
+    `,
+    );
 
     el.querySelector('#season-cancel')!.addEventListener('click', () => {
       this.showCreateForm = false;
@@ -147,11 +156,16 @@ export class SeasonsTab {
 
   private renderSeasonsTable(el: HTMLElement): void {
     if (this.seasons.length === 0) {
-      el.innerHTML = `<p style="color:var(--text-dim);font-size:13px;">${t('admin:seasons.table.empty')}</p>`;
+      setHtml(
+        el,
+        `<p style="color:var(--text-dim);font-size:13px;">${t('admin:seasons.table.empty')}</p>`,
+      );
       return;
     }
 
-    el.innerHTML = `
+    setHtml(
+      el,
+      `
       <table class="admin-table">
         <thead>
           <tr>
@@ -198,7 +212,8 @@ export class SeasonsTab {
             .join('')}
         </tbody>
       </table>
-    `;
+    `,
+    );
 
     // Activate handlers
     el.querySelectorAll<HTMLButtonElement>('[data-activate]').forEach((btn) => {
@@ -236,7 +251,9 @@ export class SeasonsTab {
     dialog.className = 'end-season-dialog';
     dialog.style.cssText =
       'position:absolute;z-index:10;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:0 8px 32px rgba(0,0,0,0.4);min-width:220px;';
-    dialog.innerHTML = `
+    setHtml(
+      dialog,
+      `
       <p style="color:var(--text);font-size:13px;margin:0 0 12px 0;">${t('admin:seasons.endDialog.prompt')}</p>
       <div style="display:flex;flex-direction:column;gap:8px;">
         <button class="btn btn-ghost" id="end-soft" style="font-size:12px;text-align:left;">
@@ -247,7 +264,8 @@ export class SeasonsTab {
         </button>
         <button class="btn btn-ghost" id="end-cancel" style="font-size:12px;">${t('admin:seasons.endDialog.cancel')}</button>
       </div>
-    `;
+    `,
+    );
 
     // Insert dialog after the button's row
     const row = anchorBtn.closest('tr');
@@ -310,7 +328,9 @@ export class SeasonsTab {
   private renderRankTiers(el: HTMLElement): void {
     const tiers = this.rankConfig.tiers;
 
-    el.innerHTML = `
+    setHtml(
+      el,
+      `
       <div id="rank-tiers-list">
         ${tiers
           .map(
@@ -336,7 +356,8 @@ export class SeasonsTab {
       <div style="display:flex;justify-content:flex-end;margin-top:16px;">
         <button class="btn btn-primary" id="rank-save">${t('admin:seasons.rankTiers.saveConfig')}</button>
       </div>
-    `;
+    `,
+    );
 
     // Add tier
     el.querySelector('#rank-add-tier')!.addEventListener('click', () => {

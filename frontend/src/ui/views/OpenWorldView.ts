@@ -1,7 +1,7 @@
 import { ILobbyView, ViewDeps } from './types';
 import { GameState, OpenWorldScoreEntry } from '@blast-arena/shared';
 import { API_URL } from '../../config';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 import { game } from '../../main';
 
@@ -72,9 +72,12 @@ export class OpenWorldView implements ILobbyView {
       appLayout.style.display = 'none';
     }
 
-    container.innerHTML = `<div class="panel-content" style="padding:2rem; text-align:center;">
+    setHtml(
+      container,
+      `<div class="panel-content" style="padding:2rem; text-align:center;">
       <p style="color:var(--text-muted); font-size:1.1rem;">${t('ui:openWorld.joining')}</p>
-    </div>`;
+    </div>`,
+    );
 
     // Fetch current status
     let status: OpenWorldStatus | null = null;
@@ -89,10 +92,13 @@ export class OpenWorldView implements ILobbyView {
 
     if (!status?.enabled) {
       if (appLayout) appLayout.style.display = '';
-      container.innerHTML = `
+      setHtml(
+        container,
+        `
         <div class="panel-content" style="padding:2rem; text-align:center;">
           <p style="color:var(--text-muted); font-size:1.1rem;">${t('ui:openWorld.disabled')}</p>
-        </div>`;
+        </div>`,
+      );
       return;
     }
 
@@ -114,7 +120,9 @@ export class OpenWorldView implements ILobbyView {
     if (!this.container) return;
     const timeStr = this.formatTime(this.roundTimeRemaining);
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div style="padding:1rem; max-width:500px; margin:0 auto; text-align:center;">
         <div class="panel-content" style="padding:1.5rem;">
           <div style="display:flex; justify-content:center; gap:1.5rem; margin-bottom:1rem;">
@@ -143,7 +151,8 @@ export class OpenWorldView implements ILobbyView {
             <tbody></tbody>
           </table>
         </div>
-      </div>`;
+      </div>`,
+    );
 
     this.renderLeaderboard(status.leaderboard ?? []);
 
@@ -162,22 +171,28 @@ export class OpenWorldView implements ILobbyView {
     const body = this.container?.querySelector('#ow-board tbody');
     if (!body) return;
     if (entries.length === 0) {
-      body.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">
-        ${t('ui:openWorld.noPlayers')}</td></tr>`;
+      setHtml(
+        body,
+        `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">
+        ${t('ui:openWorld.noPlayers')}</td></tr>`,
+      );
       return;
     }
-    body.innerHTML = entries
-      .slice(0, 10)
-      .map(
-        (e, i) => `<tr>
+    setHtml(
+      body,
+      entries
+        .slice(0, 10)
+        .map(
+          (e, i) => `<tr>
           <td>${i + 1}</td>
           <td style="text-align:left;">${escapeHtml(e.username)}</td>
           <td>${e.kills}</td>
           <td>${e.deaths}</td>
           <td>${e.score}</td>
         </tr>`,
-      )
-      .join('');
+        )
+        .join(''),
+    );
   }
 
   private formatTime(seconds: number): string {
@@ -237,18 +252,24 @@ export class OpenWorldView implements ILobbyView {
 
   private showError(message: string): void {
     if (!this.container) return;
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="panel-content" style="padding:2rem; text-align:center;">
         <p style="color:var(--text-muted); font-size:1.1rem;">${escapeHtml(message)}</p>
         <button class="btn btn-primary" id="ow-retry-btn" style="margin-top:1rem;">
           ${t('ui:openWorld.joinButton')}
         </button>
-      </div>`;
+      </div>`,
+    );
     this.container.querySelector('#ow-retry-btn')?.addEventListener('click', () => {
       if (!this.container) return;
-      this.container.innerHTML = `<div class="panel-content" style="padding:2rem; text-align:center;">
+      setHtml(
+        this.container,
+        `<div class="panel-content" style="padding:2rem; text-align:center;">
         <p style="color:var(--text-muted); font-size:1.1rem;">${t('ui:openWorld.joining')}</p>
-      </div>`;
+      </div>`,
+      );
       this.joinWorld();
     });
   }

@@ -13,8 +13,8 @@ import type { CampaignWorldTheme } from '@blast-arena/shared';
 import { renderPowerUpCanvas } from '../utils/powerUpCanvas';
 import { renderTileCanvas } from '../utils/tileCanvas';
 import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 import { t } from '../i18n';
+import { setHtml, insertHtml } from '../utils/html';
 
 interface HelpTab {
   id: string;
@@ -150,7 +150,9 @@ export class HelpUI {
       );
     }
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="admin-header">
         <h1>${t('help:title')}</h1>
         <button class="btn btn-secondary" id="help-ui-close">${t('help:backToLobby')}</button>
@@ -165,7 +167,8 @@ export class HelpUI {
         ${rightLinks.length > 0 ? `<span class="help-tab-spacer"></span>${rightLinks.join('')}` : ''}
       </div>
       <div class="admin-tab-content" id="help-tab-content"></div>
-    `;
+    `,
+    );
 
     this.container.querySelector('#help-ui-close')!.addEventListener('click', () => {
       this.hide();
@@ -194,7 +197,7 @@ export class HelpUI {
       btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
     });
     if (this.contentEl) {
-      this.contentEl.innerHTML = '';
+      setHtml(this.contentEl, '');
     }
     await this.renderActiveTab();
     this.pushGamepadContext();
@@ -229,7 +232,9 @@ export class HelpUI {
   }
 
   private renderGettingStartedTab(): void {
-    this.contentEl!.innerHTML = `
+    setHtml(
+      this.contentEl!,
+      `
       <div class="help-section">
         <div class="help-heading">${t('help:keyboard.heading')}</div>
         <div class="help-row"><span class="help-key">WASD</span> / <span class="help-key">${t('help:keyboard.arrowKeys')}</span> ${t('help:keyboard.move')}</div>
@@ -273,7 +278,8 @@ export class HelpUI {
         <div class="help-row"><span class="help-key">1</span>–<span class="help-key">9</span> ${t('help:spectator.jumpToNth')}</div>
         <div class="help-row">${t('help:spectator.breakFollow')}</div>
       </div>
-    `;
+    `,
+    );
   }
 
   private renderPowerUpsTab(): void {
@@ -297,10 +303,13 @@ export class HelpUI {
 
       const info = document.createElement('div');
       info.className = 'help-powerup-info';
-      info.innerHTML = `
+      setHtml(
+        info,
+        `
         <div class="help-powerup-name" style="color:${def.color}">${t(`game:powerups.${type}.name`)}</div>
         <div class="help-powerup-desc">${powerUpDetails[type] || t(`game:powerups.${type}.description`)}</div>
-      `;
+      `,
+      );
       row.appendChild(info);
 
       wrapper.appendChild(row);
@@ -331,7 +340,7 @@ export class HelpUI {
         </div>
       `;
     }
-    this.contentEl!.innerHTML = html;
+    setHtml(this.contentEl!, html);
   }
 
   private renderMapFeaturesTab(): void {
@@ -342,11 +351,14 @@ export class HelpUI {
     // Reinforced Walls section — with tile previews
     const wallSection = document.createElement('div');
     wallSection.className = 'help-section';
-    wallSection.innerHTML = `
+    setHtml(
+      wallSection,
+      `
       <div class="help-heading">${t('help:mapFeatures.reinforcedWalls.heading')}</div>
       <div class="help-tip">${t('help:mapFeatures.reinforcedWalls.tip')}</div>
       <div class="help-row" id="help-reinforced-row"></div>
-    `;
+    `,
+    );
     wrapper.appendChild(wallSection);
 
     const reinforcedRow = wallSection.querySelector('#help-reinforced-row')!;
@@ -359,12 +371,14 @@ export class HelpUI {
     const crackedCanvas = renderTileCanvas('destructible_cracked', 22);
     crackedCanvas.className = 'help-tile';
     reinforcedRow.appendChild(crackedCanvas);
-    reinforcedRow.insertAdjacentHTML('beforeend', ` ${t('help:mapFeatures.reinforcedWalls.desc')}`);
+    insertHtml(reinforcedRow, 'beforeend', ` ${t('help:mapFeatures.reinforcedWalls.desc')}`);
 
     // Dynamic Events section
     const eventsSection = document.createElement('div');
     eventsSection.className = 'help-section';
-    eventsSection.innerHTML = `
+    setHtml(
+      eventsSection,
+      `
       <div class="help-heading">${t('help:mapFeatures.dynamicEvents.heading')}</div>
       <div class="help-tip">${t('help:mapFeatures.dynamicEvents.tip')}</div>
       <div class="help-row help-row-spaced">
@@ -382,18 +396,22 @@ export class HelpUI {
       <div class="help-row">
         <b class="text-danger">${t('help:mapFeatures.dynamicEvents.bombSurge')}</b> — ${t('help:mapFeatures.dynamicEvents.bombSurgeDesc')}
       </div>
-    `;
+    `,
+    );
     wrapper.appendChild(eventsSection);
 
     // Hazard Tiles section — with canvas tile previews
     const hazardSection = document.createElement('div');
     hazardSection.className = 'help-section';
-    hazardSection.innerHTML = `
+    setHtml(
+      hazardSection,
+      `
       <div class="help-heading">${t('help:mapFeatures.hazardTiles.heading')}</div>
       <div class="help-tip">${t('help:mapFeatures.hazardTiles.tip')}</div>
       <div class="help-row help-row-spaced" id="help-teleporter-row"></div>
       <div class="help-row" id="help-conveyor-row"></div>
-    `;
+    `,
+    );
     wrapper.appendChild(hazardSection);
 
     const teleRow = hazardSection.querySelector('#help-teleporter-row')!;
@@ -403,7 +421,8 @@ export class HelpUI {
     const teleB = renderTileCanvas('teleporter_b', 22);
     teleB.className = 'help-tile';
     teleRow.appendChild(teleB);
-    teleRow.insertAdjacentHTML(
+    insertHtml(
+      teleRow,
       'beforeend',
       ` <b>${t('help:mapFeatures.hazardTiles.teleporters')}</b> — ${t('help:mapFeatures.hazardTiles.teleportersDesc')}`,
     );
@@ -412,7 +431,8 @@ export class HelpUI {
     const convCanvas = renderTileCanvas('conveyor_right', 22);
     convCanvas.className = 'help-tile';
     convRow.appendChild(convCanvas);
-    convRow.insertAdjacentHTML(
+    insertHtml(
+      convRow,
       'beforeend',
       ` <b>${t('help:mapFeatures.hazardTiles.conveyorBelts')}</b> — ${t('help:mapFeatures.hazardTiles.conveyorBeltsDesc')}`,
     );
@@ -420,10 +440,13 @@ export class HelpUI {
     // Theme Variants section — showcase wall/destructible across all themes
     const themeSection = document.createElement('div');
     themeSection.className = 'help-section';
-    themeSection.innerHTML = `
+    setHtml(
+      themeSection,
+      `
       <div class="help-heading">${t('help:mapFeatures.themeVariants.heading')}</div>
       <div class="help-tip">${t('help:mapFeatures.themeVariants.tip')}</div>
-    `;
+    `,
+    );
     const themeGrid = document.createElement('div');
     themeGrid.className = 'help-theme-grid';
     const themes: CampaignWorldTheme[] = [
@@ -445,7 +468,8 @@ export class HelpUI {
       const destC = renderTileCanvas('destructible', 28, palette);
       cell.appendChild(wallC);
       cell.appendChild(destC);
-      cell.insertAdjacentHTML(
+      insertHtml(
+        cell,
         'beforeend',
         `<div class="help-theme-label">${CAMPAIGN_THEME_NAMES[theme]}</div>`,
       );
@@ -461,16 +485,19 @@ export class HelpUI {
     if (!this.contentEl) return;
 
     const guideDocs = getGuideDocs();
-    this.contentEl.innerHTML = guideDocs
-      .map(
-        (doc) => `
+    setHtml(
+      this.contentEl,
+      guideDocs
+        .map(
+          (doc) => `
       <details class="help-guide-section" data-doc="${doc.filename}">
         <summary>${doc.title}</summary>
         <div class="help-markdown"><div class="help-status">${t('help:loading')}</div></div>
       </details>
     `,
-      )
-      .join('');
+        )
+        .join(''),
+    );
 
     // Load docs in parallel
     const sections = this.contentEl.querySelectorAll<HTMLElement>('.help-guide-section');
@@ -478,18 +505,21 @@ export class HelpUI {
       try {
         const html = await this.fetchAndParseDoc(`/api/docs/${doc.filename}`);
         const content = sections[i]?.querySelector('.help-markdown');
-        if (content) content.innerHTML = html;
+        if (content) setHtml(content, html);
       } catch {
         const content = sections[i]?.querySelector('.help-markdown');
         if (content) {
-          content.innerHTML = `<div class="help-status-error">${t('help:failedToLoadDoc', { title: doc.title })} <button class="btn btn-ghost" data-retry="${i}">${t('help:retry')}</button></div>`;
+          setHtml(
+            content,
+            `<div class="help-status-error">${t('help:failedToLoadDoc', { title: doc.title })} <button class="btn btn-ghost" data-retry="${i}">${t('help:retry')}</button></div>`,
+          );
           content.querySelector(`[data-retry="${i}"]`)?.addEventListener('click', async () => {
-            content.innerHTML = `<div class="help-status">${t('help:loading')}</div>`;
+            setHtml(content, `<div class="help-status">${t('help:loading')}</div>`);
             try {
               const html = await this.fetchAndParseDoc(`/api/docs/${doc.filename}`, true);
-              content.innerHTML = html;
+              setHtml(content, html);
             } catch {
-              content.innerHTML = `<div class="help-status-error">${t('help:failedToLoad')}</div>`;
+              setHtml(content, `<div class="help-status-error">${t('help:failedToLoad')}</div>`);
             }
           });
         }
@@ -507,10 +537,13 @@ export class HelpUI {
     // Tile Reference section
     const refSection = document.createElement('div');
     refSection.className = 'help-section';
-    refSection.innerHTML = `
+    setHtml(
+      refSection,
+      `
       <div class="help-heading">${t('help:levelEditor.tileReference')}</div>
       <div class="help-tip">${t('help:levelEditor.tileRefTip')}</div>
-    `;
+    `,
+    );
     wrapper.appendChild(refSection);
 
     // Helper to create a tile row with canvas + description
@@ -526,7 +559,7 @@ export class HelpUI {
         c.className = 'help-tile';
         row.appendChild(c);
       }
-      row.insertAdjacentHTML('beforeend', ` ${text}`);
+      insertHtml(row, 'beforeend', ` ${text}`);
       return row;
     };
 
@@ -596,11 +629,14 @@ export class HelpUI {
     // Full docs section (loaded async)
     const docsSection = document.createElement('div');
     docsSection.className = 'help-section';
-    docsSection.innerHTML = `
+    setHtml(
+      docsSection,
+      `
       <div class="help-heading">${t('help:levelEditor.fullDocs')}</div>
       <div class="help-tip">${t('help:levelEditor.fullDocsDesc')}</div>
       <div class="help-markdown"><div class="help-status">${t('help:loading')}</div></div>
-    `;
+    `,
+    );
     wrapper.appendChild(docsSection);
 
     this.contentEl.appendChild(wrapper);
@@ -609,9 +645,12 @@ export class HelpUI {
     const markdownEl = docsSection.querySelector('.help-markdown')!;
     try {
       const html = await this.fetchAndParseDoc('/api/docs/campaign.md');
-      markdownEl.innerHTML = html;
+      setHtml(markdownEl, html);
     } catch {
-      markdownEl.innerHTML = `<div class="help-status-error">${t('help:failedToLoadLevelEditor')}</div>`;
+      setHtml(
+        markdownEl,
+        `<div class="help-status-error">${t('help:failedToLoadLevelEditor')}</div>`,
+      );
     }
   }
 
@@ -619,16 +658,19 @@ export class HelpUI {
     if (!this.contentEl) return;
 
     const staffDocs = getStaffDocs();
-    this.contentEl.innerHTML = staffDocs
-      .map(
-        (doc) => `
+    setHtml(
+      this.contentEl,
+      staffDocs
+        .map(
+          (doc) => `
       <details class="help-guide-section" data-doc="${doc.filename}">
         <summary>${doc.title}</summary>
         <div class="help-markdown"><div class="help-status">${t('help:loading')}</div></div>
       </details>
     `,
-      )
-      .join('');
+        )
+        .join(''),
+    );
 
     const sections = this.contentEl.querySelectorAll<HTMLElement>('.help-guide-section');
     const promises = staffDocs.map(async (doc, i) => {
@@ -638,15 +680,18 @@ export class HelpUI {
         const el = sections[i]?.querySelector('.help-markdown');
         if (el) {
           if (isYaml) {
-            el.innerHTML = `<pre><code>${this.escapeForPre(content)}</code></pre>`;
+            setHtml(el, `<pre><code>${this.escapeForPre(content)}</code></pre>`);
           } else {
-            el.innerHTML = DOMPurify.sanitize(await marked.parse(content));
+            setHtml(el, await marked.parse(content));
           }
         }
       } catch {
         const el = sections[i]?.querySelector('.help-markdown');
         if (el) {
-          el.innerHTML = `<div class="help-status-error">${t('help:failedToLoadDoc', { title: doc.title })}</div>`;
+          setHtml(
+            el,
+            `<div class="help-status-error">${t('help:failedToLoadDoc', { title: doc.title })}</div>`,
+          );
         }
       }
     });
@@ -659,7 +704,10 @@ export class HelpUI {
       return this.markdownCache.get(url)!;
     }
     const raw = await this.fetchRawDoc(url);
-    const html = DOMPurify.sanitize(await marked.parse(raw));
+    // Not sanitised here: every consumer inserts through setHtml, which sanitises with the app's
+    // one configuration. Sanitising twice, with two different configs, was how `target="_blank"`
+    // silently disappeared from the docs. (audit CSP-1)
+    const html = await marked.parse(raw);
     this.markdownCache.set(url, html);
     return html;
   }
@@ -693,7 +741,9 @@ export class HelpUI {
       );
     }
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="view-content">
         <div class="admin-tabs" id="help-tab-bar">
           ${this.tabs
@@ -706,7 +756,8 @@ export class HelpUI {
         </div>
         <div class="admin-tab-content" id="help-tab-content"></div>
       </div>
-    `;
+    `,
+    );
 
     this.container.querySelector('#help-tab-bar')!.addEventListener('click', (e: Event) => {
       const target = e.target as HTMLElement;
@@ -745,16 +796,22 @@ export class HelpUI {
     this.container.querySelector('[data-tab="imprint"]')?.classList.add('active');
     this.activeTabId = '';
 
-    this.contentEl.innerHTML = `<div class="help-section"><p>${t('help:imprint.loading')}</p></div>`;
+    setHtml(this.contentEl, `<div class="help-section"><p>${t('help:imprint.loading')}</p></div>`);
     try {
       const resp = await ApiClient.get<{ enabled: boolean; text: string }>(
         '/admin/settings/imprint',
       );
       const text = resp.text || t('help:imprint.noInfo');
       const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      this.contentEl.innerHTML = `<div class="help-section" style="white-space:pre-wrap;line-height:1.6;">${escaped}</div>`;
+      setHtml(
+        this.contentEl,
+        `<div class="help-section" style="white-space:pre-wrap;line-height:1.6;">${escaped}</div>`,
+      );
     } catch {
-      this.contentEl.innerHTML = `<div class="help-section"><p class="text-danger">${t('help:imprint.failedToLoad')}</p></div>`;
+      setHtml(
+        this.contentEl,
+        `<div class="help-section"><p class="text-danger">${t('help:imprint.failedToLoad')}</p></div>`,
+      );
     }
   }
 

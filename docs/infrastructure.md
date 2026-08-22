@@ -5,9 +5,15 @@
 ### CORS & CSP
 - CORS restricted to `APP_URL` origin for both Express and Socket.io (not `origin: true`)
 - Content-Security-Policy header in nginx: `default-src 'self'`, inline styles allowed, WebSocket connections. All fonts self-hosted (no external CDN)
+- **Trusted Types enabled**: `require-trusted-types-for 'script'` + `trusted-types dompurify`. See XSS Prevention below
 
 ### XSS Prevention
-- All user-generated content (usernames) escaped via `escapeHtml()` before innerHTML insertion (HUD kill feed, player list)
+- **Single HTML sink**: `setHtml(el, html)` / `insertHtml(el, position, html)` in `frontend/src/utils/html.ts` are the only way HTML enters the DOM. They sanitise with DOMPurify and insert *nodes*, so no app code touches a Trusted Types sink
+  - Table fragments (`<tr>`, `<td>`) are wrapped in a `<table>` context before sanitising — DOMPurify parses in a body context, where the HTML parser would otherwise discard them and keep only their text
+  - `ADD_ATTR: ['target']` — DOMPurify strips `target` by default; the app's external links carry `rel="noopener"`, which is the actual mitigation
+- **Enforced by lint**: `no-restricted-syntax` in `eslint.config.mjs` rejects any raw `innerHTML`/`outerHTML` assignment or `insertAdjacentHTML` call outside `utils/html.ts`, plus `eval`/`new Function`
+- **Enforced by test**: `frontend/tests/utils/sanitizerFidelity.test.ts` parses every TypeScript source file, extracts every HTML literal, and asserts `setHtml` produces the same DOM as the plain assignment it replaced. A sanitiser that starts eating real markup fails CI instead of shipping
+- All user-generated content (usernames) escaped via `escapeHtml()` before insertion (HUD kill feed, player list) — sanitising is the second layer, not a replacement
 - No inline `onclick` handlers — all event handlers use `addEventListener` for CSP compatibility
 - Admin `roomMessage` server-side sanitization: type check, empty check, 500-char length limit
 

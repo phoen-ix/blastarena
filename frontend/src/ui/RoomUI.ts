@@ -2,7 +2,7 @@ import { SocketClient } from '../network/SocketClient';
 import { AuthManager } from '../network/AuthManager';
 import { NotificationUI } from './NotificationUI';
 import { Room, RoomPlayer, POWERUP_DEFINITIONS } from '@blast-arena/shared';
-import { escapeHtml } from '../utils/html';
+import { escapeHtml, setHtml } from '../utils/html';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { t } from '../i18n';
 
@@ -175,7 +175,9 @@ export class RoomUI {
 
     const modeLabel = t(`game:modes.${this.room.config.gameMode}.name`);
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="lobby-header">
         <div style="display:flex;align-items:center;gap:16px;">
           <button class="btn btn-ghost" data-action="back" style="padding:8px 14px;">${t('ui:room.back')}</button>
@@ -285,7 +287,8 @@ export class RoomUI {
           </div>
         </div>
       </div>
-    `;
+    `,
+    );
   }
 
   private renderPlayer(player: RoomPlayer, index: number): string {

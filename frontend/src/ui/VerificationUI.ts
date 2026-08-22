@@ -3,6 +3,7 @@ import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
 import { getErrorMessage } from '@blast-arena/shared';
 import { t } from '../i18n';
+import { setHtml } from '../utils/html';
 
 export class VerificationUI {
   private overlay: HTMLElement;
@@ -30,7 +31,9 @@ export class VerificationUI {
 
   private render(): void {
     const user = this.authManager.getUser();
-    this.overlay.innerHTML = `
+    setHtml(
+      this.overlay,
+      `
       <div class="auth-container" style="max-width:440px;">
         <div class="auth-header">
           <h1><span style="color:var(--text)">${t('auth:verification.title')}</span> <span style="color:var(--primary)">${t('auth:verification.titleAccent')}</span></h1>
@@ -61,7 +64,8 @@ export class VerificationUI {
           ${user ? `<p style="color:var(--text-muted);font-size:12px;margin-top:var(--sp-4);">${t('auth:verification.loggedInAs', { username: user.username })}</p>` : ''}
         </div>
       </div>
-    `;
+    `,
+    );
 
     this.overlay.querySelector('#resend-btn')!.addEventListener('click', () => this.handleResend());
     this.overlay
@@ -79,7 +83,7 @@ export class VerificationUI {
     const btn = this.overlay.querySelector('#resend-btn') as HTMLButtonElement;
 
     if (!email) {
-      statusEl.innerHTML = `<span class="text-danger">${t('auth:verification.enterEmail')}</span>`;
+      setHtml(statusEl, `<span class="text-danger">${t('auth:verification.enterEmail')}</span>`);
       return;
     }
 
@@ -92,7 +96,7 @@ export class VerificationUI {
       );
       this.resendCount++;
       const remaining = resp.remainingResends ?? this.maxResends - this.resendCount;
-      statusEl.innerHTML = `<span class="text-success">${t('auth:verification.resent')}</span>`;
+      setHtml(statusEl, `<span class="text-success">${t('auth:verification.resent')}</span>`);
       if (remaining <= 0) {
         this.startResendCountdown(btn, true);
       } else {
@@ -104,7 +108,7 @@ export class VerificationUI {
         this.resendCount = this.maxResends;
         btn.textContent = t('auth:verification.resendLimitReached');
       } else {
-        statusEl.innerHTML = `<span class="text-danger">${msg}</span>`;
+        setHtml(statusEl, `<span class="text-danger">${msg}</span>`);
         btn.disabled = false;
       }
     }
@@ -142,7 +146,10 @@ export class VerificationUI {
     try {
       const refreshed = await this.authManager.refresh();
       if (!refreshed) {
-        statusEl.innerHTML = `<span class="text-danger">${t('auth:verification.sessionExpired')}</span>`;
+        setHtml(
+          statusEl,
+          `<span class="text-danger">${t('auth:verification.sessionExpired')}</span>`,
+        );
         return;
       }
 
@@ -153,10 +160,10 @@ export class VerificationUI {
         this.overlay.remove();
         this.onVerified();
       } else {
-        statusEl.innerHTML = `<span class="text-warning">${t('auth:verification.notYet')}</span>`;
+        setHtml(statusEl, `<span class="text-warning">${t('auth:verification.notYet')}</span>`);
       }
     } catch {
-      statusEl.innerHTML = `<span class="text-danger">${t('auth:verification.checkFailed')}</span>`;
+      setHtml(statusEl, `<span class="text-danger">${t('auth:verification.checkFailed')}</span>`);
     } finally {
       btn.disabled = false;
       btn.textContent = t('auth:verification.checkStatus');

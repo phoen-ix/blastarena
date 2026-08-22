@@ -1,6 +1,6 @@
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
-import { escapeHtml } from '../utils/html';
+import { escapeHtml, setHtml } from '../utils/html';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { t } from '../i18n';
 import {
@@ -51,7 +51,9 @@ export class LeaderboardUI {
 
   async renderEmbedded(container: HTMLElement): Promise<void> {
     this.container = container;
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="view-content">
         <div class="lb-filter-bar">
           <label>${t('ui:leaderboard.season')}</label>
@@ -64,7 +66,8 @@ export class LeaderboardUI {
         </div>
         <div id="lb-pagination" class="admin-pagination"></div>
       </div>
-    `;
+    `,
+    );
 
     this.container.querySelector('#lb-season-select')!.addEventListener('change', (e) => {
       const val = (e.target as HTMLSelectElement).value;
@@ -106,7 +109,9 @@ export class LeaderboardUI {
   }
 
   private renderShell(): void {
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="admin-header">
         <h1>${t('ui:leaderboard.title')}</h1>
         <button class="btn btn-secondary" id="lb-back">${t('ui:leaderboard.backToLobby')}</button>
@@ -121,7 +126,8 @@ export class LeaderboardUI {
         <div class="lb-status">${t('ui:leaderboard.loading')}</div>
       </div>
       <div id="lb-pagination" class="admin-pagination"></div>
-    `;
+    `,
+    );
 
     this.container.querySelector('#lb-back')!.addEventListener('click', () => {
       this.hide();
@@ -173,17 +179,20 @@ export class LeaderboardUI {
     const activeSeason = this.seasons.find((s) => s.isActive);
     if (activeSeason) this.currentSeasonId = activeSeason.id;
 
-    select.innerHTML = this.seasons
-      .map(
-        (s) =>
-          `<option value="${s.id}" ${s.id === this.currentSeasonId ? 'selected' : ''}>${escapeHtml(s.name)}${s.isActive ? t('ui:leaderboard.currentSeason') : ''}</option>`,
-      )
-      .join('');
+    setHtml(
+      select,
+      this.seasons
+        .map(
+          (s) =>
+            `<option value="${s.id}" ${s.id === this.currentSeasonId ? 'selected' : ''}>${escapeHtml(s.name)}${s.isActive ? t('ui:leaderboard.currentSeason') : ''}</option>`,
+        )
+        .join(''),
+    );
   }
 
   private async loadLeaderboard(): Promise<void> {
     const tableContainer = this.container.querySelector('#lb-table-container')!;
-    tableContainer.innerHTML = `<div class="lb-status">${t('ui:leaderboard.loading')}</div>`;
+    setHtml(tableContainer, `<div class="lb-status">${t('ui:leaderboard.loading')}</div>`);
 
     try {
       let url = `/leaderboard?page=${this.currentPage}&limit=${PAGE_LIMIT}`;
@@ -192,7 +201,10 @@ export class LeaderboardUI {
       this.renderTable(data);
       this.renderPagination(data);
     } catch (err: unknown) {
-      tableContainer.innerHTML = `<div class="lb-status error">${escapeHtml(t('ui:leaderboard.loadFailed', { error: getErrorMessage(err) }))}</div>`;
+      setHtml(
+        tableContainer,
+        `<div class="lb-status error">${escapeHtml(t('ui:leaderboard.loadFailed', { error: getErrorMessage(err) }))}</div>`,
+      );
     }
   }
 
@@ -200,11 +212,13 @@ export class LeaderboardUI {
     const tableContainer = this.container.querySelector('#lb-table-container')!;
 
     if (data.entries.length === 0) {
-      tableContainer.innerHTML = `<div class="lb-status">${t('ui:leaderboard.noEntries')}</div>`;
+      setHtml(tableContainer, `<div class="lb-status">${t('ui:leaderboard.noEntries')}</div>`);
       return;
     }
 
-    tableContainer.innerHTML = `
+    setHtml(
+      tableContainer,
+      `
       <table class="data-table">
         <thead>
           <tr>
@@ -221,7 +235,8 @@ export class LeaderboardUI {
           ${data.entries.map((e) => this.renderRow(e)).join('')}
         </tbody>
       </table>
-    `;
+    `,
+    );
   }
 
   private renderRow(entry: LeaderboardEntry): string {
@@ -247,15 +262,18 @@ export class LeaderboardUI {
     const totalPages = Math.max(1, Math.ceil(data.total / data.limit));
 
     if (totalPages <= 1) {
-      paginationEl.innerHTML = '';
+      setHtml(paginationEl, '');
       return;
     }
 
-    paginationEl.innerHTML = `
+    setHtml(
+      paginationEl,
+      `
       <button class="btn btn-secondary btn-sm" id="lb-prev" ${this.currentPage <= 1 ? 'disabled' : ''}>${t('ui:leaderboard.prev')}</button>
       <span class="page-info">${t('ui:leaderboard.pageInfo', { current: this.currentPage, total: totalPages })}</span>
       <button class="btn btn-secondary btn-sm" id="lb-next" ${this.currentPage >= totalPages ? 'disabled' : ''}>${t('ui:leaderboard.next')}</button>
-    `;
+    `,
+    );
 
     paginationEl.querySelector('#lb-prev')?.addEventListener('click', () => {
       if (this.currentPage > 1) {

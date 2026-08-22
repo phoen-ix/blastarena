@@ -3,7 +3,7 @@ import { ApiClient } from '../../network/ApiClient';
 import { Party, PartyChatMessage, ChatMode, Friend } from '@blast-arena/shared';
 import type { ServerToClientEvents } from '@blast-arena/shared';
 import { PartyBar } from '../PartyBar';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 const AVATAR_COLORS = [
@@ -128,7 +128,9 @@ export class PartyView implements ILobbyView {
 
   private renderNoParty(): void {
     if (!this.container) return;
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="party-page party-page-empty">
         <div class="party-empty-content">
           <div class="party-empty-icon">&#9733;</div>
@@ -138,7 +140,8 @@ export class PartyView implements ILobbyView {
           <p class="party-empty-tip">${t('ui:party.noPartyTip')}</p>
         </div>
       </div>
-    `;
+    `,
+    );
 
     this.container.querySelector('#party-create-btn')!.addEventListener('click', () => {
       this.partyBar.createParty();
@@ -148,7 +151,9 @@ export class PartyView implements ILobbyView {
   private renderPartyPage(): void {
     if (!this.container || !this.party) return;
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="party-page">
         <div class="party-page-main">
           <div class="party-page-header">
@@ -212,7 +217,8 @@ export class PartyView implements ILobbyView {
               : ''
         }
       </div>
-    `;
+    `,
+    );
 
     this.bindPartyEvents();
     this.renderChatMessages();
@@ -291,20 +297,23 @@ export class PartyView implements ILobbyView {
     if (!body) return;
 
     if (this.chatMessages.length === 0) {
-      body.innerHTML = `<div class="party-page-chat-empty">${t('ui:party.chatEmpty')}</div>`;
+      setHtml(body, `<div class="party-page-chat-empty">${t('ui:party.chatEmpty')}</div>`);
       return;
     }
 
-    body.innerHTML = this.chatMessages
-      .map(
-        (m) => `
+    setHtml(
+      body,
+      this.chatMessages
+        .map(
+          (m) => `
         <div class="party-page-chat-msg">
           <span class="party-chat-sender">${escapeHtml(m.fromUsername)}</span>
           <span class="party-chat-text">${escapeHtml(m.message)}</span>
         </div>
       `,
-      )
-      .join('');
+        )
+        .join(''),
+    );
   }
 
   private scrollChatToBottom(): void {
@@ -340,7 +349,9 @@ export class PartyView implements ILobbyView {
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', t('ui:party.inviteModalTitle'));
-    overlay.innerHTML = `
+    setHtml(
+      overlay,
+      `
       <div class="modal" style="max-width:400px;">
         <div class="modal-header">
           <h3>${t('ui:party.inviteModalTitle')}</h3>
@@ -368,7 +379,8 @@ export class PartyView implements ILobbyView {
             .join('')}
         </div>
       </div>
-    `;
+    `,
+    );
 
     document.body.appendChild(overlay);
 

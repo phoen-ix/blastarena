@@ -1,7 +1,7 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
 import { BotAIEntry, EnemyAIEntry, getErrorMessage } from '@blast-arena/shared';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, setHtml } from '../../utils/html';
 import { API_URL } from '../../config';
 import { t } from '../../i18n';
 
@@ -42,7 +42,9 @@ export class AITab {
       /* enemy AI endpoint may not exist yet */
     }
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="admin-section">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
           <h3 style="margin:0;">${t('admin:ai.botManagement')}</h3>
@@ -89,7 +91,8 @@ export class AITab {
           </tbody>
         </table>
       </div>
-    `;
+    `,
+    );
 
     this.container.querySelector('#bot-ai-upload-btn')?.addEventListener('click', () => {
       this.showUploadModal('bot');
@@ -312,7 +315,9 @@ export class AITab {
     overlay.style.cssText =
       'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;';
 
-    overlay.innerHTML = `
+    setHtml(
+      overlay,
+      `
       <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:500px;max-width:90vw;">
         <h3 style="margin:0 0 16px;color:var(--primary);">${title}</h3>
         <div style="display:flex;flex-direction:column;gap:12px;">
@@ -336,7 +341,8 @@ export class AITab {
           </div>
         </div>
       </div>
-    `;
+    `,
+    );
 
     document.body.appendChild(overlay);
 
@@ -381,10 +387,13 @@ export class AITab {
       } catch (err: unknown) {
         const msg = getErrorMessage(err);
         errorsDiv.style.display = 'block';
-        errorsDiv.innerHTML = `
+        setHtml(
+          errorsDiv,
+          `
           <p style="color:var(--danger);font-weight:600;margin:0 0 8px;">${t('admin:ai.compilationFailed')}</p>
           <pre style="color:var(--text-dim);margin:0;white-space:pre-wrap;font-size:12px;">${escapeHtml(msg)}</pre>
-        `;
+        `,
+        );
         submitBtn.disabled = false;
         submitBtn.textContent = t('admin:ai.uploadAndCompile');
       }
@@ -404,7 +413,9 @@ export class AITab {
     overlay.style.cssText =
       'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;';
 
-    overlay.innerHTML = `
+    setHtml(
+      overlay,
+      `
       <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:400px;max-width:90vw;">
         <h3 style="margin:0 0 16px;color:var(--primary);">${title}</h3>
         <div style="display:flex;flex-direction:column;gap:12px;">
@@ -419,7 +430,8 @@ export class AITab {
           </div>
         </div>
       </div>
-    `;
+    `,
+    );
 
     document.body.appendChild(overlay);
 
@@ -455,10 +467,13 @@ export class AITab {
       } catch (err: unknown) {
         const msg = getErrorMessage(err);
         errorsDiv.style.display = 'block';
-        errorsDiv.innerHTML = `
+        setHtml(
+          errorsDiv,
+          `
           <p style="color:var(--danger);font-weight:600;margin:0 0 8px;">${t('admin:ai.compilationFailed')}</p>
           <pre style="color:var(--text-dim);margin:0;white-space:pre-wrap;font-size:12px;">${escapeHtml(msg)}</pre>
-        `;
+        `,
+        );
         submitBtn.disabled = false;
         submitBtn.textContent = t('admin:ai.uploadAndCompile');
       }
@@ -478,7 +493,9 @@ export class AITab {
     overlay.style.cssText =
       'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;';
 
-    overlay.innerHTML = `
+    setHtml(
+      overlay,
+      `
       <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:400px;max-width:90vw;">
         <h3 style="margin:0 0 16px;color:var(--primary);">${title}</h3>
         <div style="display:flex;flex-direction:column;gap:12px;">
@@ -496,7 +513,8 @@ export class AITab {
           </div>
         </div>
       </div>
-    `;
+    `,
+    );
 
     document.body.appendChild(overlay);
 
@@ -545,7 +563,9 @@ export class AITab {
     overlay.style.cssText =
       'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;';
 
-    overlay.innerHTML = `
+    setHtml(
+      overlay,
+      `
       <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:400px;max-width:90vw;">
         <h3 style="margin:0 0 12px;color:var(--danger);">${title}</h3>
         <p style="color:var(--text-dim);margin:0 0 12px;">${t('admin:ai.deleteConfirmMessage', { name: escapeHtml(name), fallbackMessage: fallbackMsg })}</p>
@@ -556,7 +576,8 @@ export class AITab {
           <button class="btn btn-danger" id="ai-delete-submit" disabled>${t('admin:ai.delete')}</button>
         </div>
       </div>
-    `;
+    `,
+    );
 
     document.body.appendChild(overlay);
 

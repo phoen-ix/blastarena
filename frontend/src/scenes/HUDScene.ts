@@ -7,7 +7,7 @@ import {
   KillCause,
   OpenWorldScoreEntry,
 } from '@blast-arena/shared';
-import { escapeHtml, reconcileChildren } from '../utils/html';
+import { escapeHtml, reconcileChildren, setHtml } from '../utils/html';
 import { SpectatorChat } from '../game/SpectatorChat';
 import { SpectatorActionBar } from '../game/SpectatorActionBar';
 import { t } from '../i18n';
@@ -171,7 +171,9 @@ export class HUDScene extends Phaser.Scene {
     // Main HUD container
     this.hudContainer = document.createElement('div');
     this.hudContainer.className = 'hud-container';
-    this.hudContainer.innerHTML = `
+    setHtml(
+      this.hudContainer,
+      `
       <div class="hud-top">
         <div class="hud-top-left">
           <div class="hud-timer" id="hud-timer">${noTimeLimit ? '0:00' : '3:00'}</div>
@@ -181,7 +183,8 @@ export class HUDScene extends Phaser.Scene {
       <div class="hud-spectator-banner" id="hud-spectator" style="display:none;">
         ${t('ui:hud.spectator')}
       </div>
-    `;
+    `,
+    );
 
     // Player list
     this.playerListEl = document.createElement('div');
@@ -286,11 +289,14 @@ export class HUDScene extends Phaser.Scene {
       this.campaignHudEl.style.cssText =
         'position:fixed;top:48px;left:20px;display:flex;gap:16px;align-items:center;font-family:"Chakra Petch",sans-serif;font-size:16px;color:#eae8e4;z-index:100;';
       const isCoopMode = !!this.registry.get('campaignCoopMode');
-      this.campaignHudEl.innerHTML = `
+      setHtml(
+        this.campaignHudEl,
+        `
         <span id="campaign-lives" style="display:flex;align-items:center;gap:4px;"></span>
         <span id="campaign-enemies" style="color:var(--danger);"></span>
         ${isCoopMode ? '<span id="campaign-coop-status" style="display:flex;gap:8px;align-items:center;"></span>' : ''}
-      `;
+      `,
+      );
       const overlay = document.getElementById('ui-overlay');
       overlay?.appendChild(this.campaignHudEl);
 
@@ -374,7 +380,7 @@ export class HUDScene extends Phaser.Scene {
 
     const banner = document.createElement('div');
     banner.className = 'hud-death-banner';
-    banner.innerHTML = message;
+    setHtml(banner, message);
     document.getElementById('ui-overlay')?.appendChild(banner);
 
     // Fade out and remove after 3 seconds
@@ -406,7 +412,7 @@ export class HUDScene extends Phaser.Scene {
           const el = document.createElement('div');
           el.className = 'killfeed-entry';
           el.style.opacity = String(opacity);
-          el.innerHTML = entry.text;
+          setHtml(el, entry.text);
           this.killFeedEl.appendChild(el);
           entry.el = el;
         }
@@ -494,7 +500,9 @@ export class HUDScene extends Phaser.Scene {
       if (statsEl) {
         // Lazily create stat elements once
         if (!this.statEls) {
-          statsEl.innerHTML = `
+          setHtml(
+            statsEl,
+            `
             <span class="stat-item">💣 <span id="stat-bombs"></span></span>
             <span class="stat-item">🔥 <span id="stat-fire"></span></span>
             <span class="stat-item">⚡ <span id="stat-speed"></span></span>
@@ -502,7 +510,8 @@ export class HUDScene extends Phaser.Scene {
             <span class="stat-item" id="stat-kick">👢</span>
             <span class="stat-item" id="stat-throw" style="opacity:0.3">🎯</span>
             <span class="stat-item" id="stat-remote-mode" style="display:none; font-size:0.75em;">🎯 ALL</span>
-          `;
+          `,
+          );
           this.statEls = {
             bombs: document.getElementById('stat-bombs')!,
             fire: document.getElementById('stat-fire')!,
@@ -654,7 +663,10 @@ export class HUDScene extends Phaser.Scene {
           const buddyTag = p.isBuddy
             ? '<span style="color:var(--accent);font-size:10px;font-weight:700;margin-left:4px;">[BUDDY]</span>'
             : '';
-          row.nameEl.innerHTML = `${teamDot}${p.isBot ? '🤖 ' : ''}${escapeHtml(p.username)}${buddyTag}`;
+          setHtml(
+            row.nameEl,
+            `${teamDot}${p.isBot ? '🤖 ' : ''}${escapeHtml(p.username)}${buddyTag}`,
+          );
 
           if (isKOTH) {
             row.badgeEl.style.cssText = `margin-left:auto;font-size:11px;font-weight:700;color:${isControlling ? '#00e676' : '#ffaa22'};font-family:'Chakra Petch',monospace;`;
@@ -853,27 +865,30 @@ export class HUDScene extends Phaser.Scene {
       if (statusEl) {
         const players = state.gameState.players;
         const locked = state.lockedInPlayers ?? [];
-        statusEl.innerHTML = players
-          .map((p) => {
-            let statusIcon = '';
-            let statusColor = 'var(--success)';
-            if (!p.alive) {
-              statusIcon = ' (dead)';
-              statusColor = 'var(--danger)';
-              // Check respawn timer
-              if (state.respawnTimers && state.respawnTimers[p.id] !== undefined) {
-                const ticksLeft = state.respawnTimers[p.id];
-                const secsLeft = Math.ceil(ticksLeft / 20);
-                statusIcon = ` (${secsLeft}s)`;
-                statusColor = 'var(--warning)';
+        setHtml(
+          statusEl,
+          players
+            .map((p) => {
+              let statusIcon = '';
+              let statusColor = 'var(--success)';
+              if (!p.alive) {
+                statusIcon = ' (dead)';
+                statusColor = 'var(--danger)';
+                // Check respawn timer
+                if (state.respawnTimers && state.respawnTimers[p.id] !== undefined) {
+                  const ticksLeft = state.respawnTimers[p.id];
+                  const secsLeft = Math.ceil(ticksLeft / 20);
+                  statusIcon = ` (${secsLeft}s)`;
+                  statusColor = 'var(--warning)';
+                }
+              } else if (locked.includes(p.id)) {
+                statusIcon = ' (ready)';
+                statusColor = 'var(--accent)';
               }
-            } else if (locked.includes(p.id)) {
-              statusIcon = ' (ready)';
-              statusColor = 'var(--accent)';
-            }
-            return `<span style="color:${statusColor}">${escapeHtml(p.username)}${statusIcon}</span>`;
-          })
-          .join('');
+              return `<span style="color:${statusColor}">${escapeHtml(p.username)}${statusIcon}</span>`;
+            })
+            .join(''),
+        );
       }
     }
 
@@ -908,10 +923,13 @@ export class HUDScene extends Phaser.Scene {
     this.owRoundEl = document.getElementById('hud-round');
     this.owBoardEl = document.createElement('div');
     this.owBoardEl.className = 'hud-ow-board';
-    this.owBoardEl.innerHTML = `
+    setHtml(
+      this.owBoardEl,
+      `
       <div class="hud-ow-title">${t('ui:openWorld.leaderboard')}</div>
       <div class="hud-ow-rows"></div>
-    `;
+    `,
+    );
     this.owRowsEl = this.owBoardEl.querySelector('.hud-ow-rows');
     overlay?.appendChild(this.owBoardEl);
     this.renderOpenWorldBoard();
@@ -998,7 +1016,7 @@ export class HUDScene extends Phaser.Scene {
     if (!this.owRowsEl) return;
     const entries = this.sortedOpenWorldScores();
     if (entries.length === 0) {
-      this.owRowsEl.innerHTML = `<div class="hud-ow-empty">${t('ui:openWorld.noPlayers')}</div>`;
+      setHtml(this.owRowsEl, `<div class="hud-ow-empty">${t('ui:openWorld.noPlayers')}</div>`);
       return;
     }
 
@@ -1009,7 +1027,7 @@ export class HUDScene extends Phaser.Scene {
       rows.push('<div class="hud-ow-gap">···</div>');
       rows.push(this.openWorldRowHtml(entries[myRank], myRank + 1));
     }
-    this.owRowsEl.innerHTML = rows.join('');
+    setHtml(this.owRowsEl, rows.join(''));
   }
 
   private showRoundEndOverlay(data: {
@@ -1043,7 +1061,9 @@ export class HUDScene extends Phaser.Scene {
 
     this.owRoundEndEl = document.createElement('div');
     this.owRoundEndEl.className = 'hud-ow-roundend';
-    this.owRoundEndEl.innerHTML = `
+    setHtml(
+      this.owRoundEndEl,
+      `
       <div class="hud-ow-roundend-title">${t('ui:openWorld.roundEnd')}</div>
       <div class="hud-ow-roundend-sub">${t('ui:openWorld.roundNumber', { number: data.roundNumber })}</div>
       <table class="hud-ow-roundend-table">
@@ -1059,7 +1079,8 @@ export class HUDScene extends Phaser.Scene {
         <tbody>${rows}</tbody>
       </table>
       <div class="hud-ow-roundend-next"></div>
-    `;
+    `,
+    );
     document.getElementById('ui-overlay')?.appendChild(this.owRoundEndEl);
 
     const nextEl = this.owRoundEndEl.querySelector('.hud-ow-roundend-next') as HTMLElement;
@@ -1153,11 +1174,14 @@ export class HUDScene extends Phaser.Scene {
   private mountAuthBar(): void {
     this.authBarEl = document.createElement('div');
     this.authBarEl.className = 'hud-auth-bar';
-    this.authBarEl.innerHTML = `
+    setHtml(
+      this.authBarEl,
+      `
       <div class="hud-auth-brand"><span>${t('auth:login.title')}</span>${t('auth:login.titleAccent')}</div>
       <button class="btn btn-secondary" id="hud-login-btn">${t('ui:menu.login')}</button>
       <button class="btn btn-ghost" id="hud-register-btn">${t('ui:menu.register')}</button>
-    `;
+    `,
+    );
     // Seamless takeover from an already-docked landing bar: same spot, no fly-in replay.
     if (this.registry.get('authBarNoAnim')) {
       this.registry.remove('authBarNoAnim');

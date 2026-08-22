@@ -136,7 +136,7 @@ bomb_up, fire_up, speed_up, shield, kick, pierce_bomb, remote_bomb (E to detonat
 Gzipped JSON replays with tile diffs. Campaign replays in `campaign_replays` table. See [docs/replay-system.md](docs/replay-system.md)
 
 ## SEO & Static Assets
-All resources self-hosted — no external CDN. Meta tags (OG, Twitter Card, JSON-LD). CSP: `'self'` only.
+All resources self-hosted — no external CDN. Meta tags (OG, Twitter Card, JSON-LD). CSP: `'self'` only, with Trusted Types enforced — all HTML goes through `setHtml()`/`insertHtml()` in `frontend/src/utils/html.ts` (DOMPurify + node insertion); raw `innerHTML` is an ESLint error outside that file.
 
 ## Security
 - **Email hashing**: HMAC-SHA256 with `EMAIL_PEPPER`. DB stores `email_hash` + `email_hint`. `backfill-emails.ts` migrates legacy rows on startup

@@ -9,7 +9,7 @@ import {
   UserRole,
   ServerToClientEvents,
 } from '@blast-arena/shared';
-import { escapeHtml } from '../utils/html';
+import { escapeHtml, setHtml } from '../utils/html';
 import { t } from '../i18n';
 
 export class PartyBar {
@@ -174,7 +174,9 @@ export class PartyBar {
     this.container.style.display = 'flex';
     const isLeader = this.party.leaderId === this.currentUserId;
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <span class="party-label">${t('ui:party.title')}</span>
       <div class="party-members">
         ${this.party.members
@@ -193,7 +195,8 @@ export class PartyBar {
       ${isLeader ? `<button class="btn btn-ghost" id="party-invite-btn" style="padding:4px 12px;font-size:11px;color:var(--accent);">${t('ui:party.invite')}</button>` : ''}
       ${this.canChat() ? `<button class="btn btn-ghost" id="party-chat-btn" style="padding:4px 12px;font-size:11px;">${t('ui:party.chat')}</button>` : ''}
       <button class="btn btn-ghost" id="party-leave-btn" style="padding:4px 12px;font-size:11px;color:var(--danger);">${t('ui:party.leave')}</button>
-    `;
+    `,
+    );
 
     const inviteBtn = this.container.querySelector('#party-invite-btn');
     if (inviteBtn) {
@@ -233,13 +236,16 @@ export class PartyBar {
 
     this.chatContainer = document.createElement('div');
     this.chatContainer.className = 'party-chat';
-    this.chatContainer.innerHTML = `
+    setHtml(
+      this.chatContainer,
+      `
       <div class="party-chat-messages" id="party-chat-messages"></div>
       <div class="party-chat-input">
         <input type="text" id="party-chat-input" placeholder="${t('ui:party.chatPlaceholder')}" maxlength="200" aria-label="${t('ui:party.chatAriaLabel')}">
         <button class="btn btn-primary" id="party-chat-send" style="padding:6px 12px;font-size:12px;">${t('ui:messages.send')}</button>
       </div>
-    `;
+    `,
+    );
 
     const uiOverlay = document.getElementById('ui-overlay');
     if (uiOverlay) uiOverlay.appendChild(this.chatContainer);
@@ -267,12 +273,15 @@ export class PartyBar {
     const messagesEl = this.chatContainer?.querySelector('#party-chat-messages');
     if (!messagesEl) return;
 
-    messagesEl.innerHTML = this.chatMessages
-      .map(
-        (m) =>
-          `<div class="party-chat-msg"><span class="sender">${escapeHtml(m.fromUsername)}</span><span class="text">${escapeHtml(m.message)}</span></div>`,
-      )
-      .join('');
+    setHtml(
+      messagesEl,
+      this.chatMessages
+        .map(
+          (m) =>
+            `<div class="party-chat-msg"><span class="sender">${escapeHtml(m.fromUsername)}</span><span class="text">${escapeHtml(m.message)}</span></div>`,
+        )
+        .join(''),
+    );
 
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
@@ -288,13 +297,16 @@ export class PartyBar {
       invite.type === 'party'
         ? t('ui:party.invitedToParty', { username: escapeHtml(invite.fromUsername) })
         : t('ui:party.invitedToRoom', { username: escapeHtml(invite.fromUsername) });
-    toast.innerHTML = `
+    setHtml(
+      toast,
+      `
       <div class="invite-text">${inviteMessage}</div>
       <div class="invite-actions">
         <button class="btn btn-primary invite-accept">${t('ui:party.accept')}</button>
         <button class="btn btn-ghost invite-decline" style="color:var(--danger);">${t('ui:party.decline')}</button>
       </div>
-    `;
+    `,
+    );
 
     toastContainer.appendChild(toast);
 

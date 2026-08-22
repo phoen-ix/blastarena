@@ -2,7 +2,7 @@ import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
 import { ActiveChallengeInfo, ChallengeScore, TileType, GameMode, Room } from '@blast-arena/shared';
 import { renderMapPreview } from '../../utils/mapPreview';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 export class ChallengeView implements ILobbyView {
@@ -20,29 +20,40 @@ export class ChallengeView implements ILobbyView {
 
   async render(container: HTMLElement): Promise<void> {
     this.container = container;
-    container.innerHTML = `<div class="panel-content" style="padding:1rem;"><p style="color:var(--text-muted);">${t('ui:challenge.loading')}</p></div>`;
+    setHtml(
+      container,
+      `<div class="panel-content" style="padding:1rem;"><p style="color:var(--text-muted);">${t('ui:challenge.loading')}</p></div>`,
+    );
 
     try {
       const res = await ApiClient.get<ActiveChallengeInfo | { challenge: null }>(
         '/challenges/active',
       );
       if (!res.challenge) {
-        container.innerHTML = `
+        setHtml(
+          container,
+          `
           <div class="panel-content" style="padding:2rem; text-align:center;">
             <p style="color:var(--text-muted); font-size:1.1rem;">${t('ui:challenge.noActive')}</p>
-          </div>`;
+          </div>`,
+        );
         return;
       }
       this.renderChallenge(container, res as ActiveChallengeInfo);
     } catch {
-      container.innerHTML = `<div class="panel-content" style="padding:1rem;"><p style="color:var(--danger);">${t('ui:challenge.loadError')}</p></div>`;
+      setHtml(
+        container,
+        `<div class="panel-content" style="padding:1rem;"><p style="color:var(--danger);">${t('ui:challenge.loadError')}</p></div>`,
+      );
     }
   }
 
   private renderChallenge(container: HTMLElement, info: ActiveChallengeInfo): void {
     const { challenge, mapTiles, topScores } = info;
 
-    container.innerHTML = `
+    setHtml(
+      container,
+      `
       <div style="padding:1rem; max-width:700px; margin:0 auto;">
         <div class="panel-header" style="margin-bottom:1rem;">
           <h2>${escapeHtml(challenge.title)}</h2>
@@ -102,7 +113,8 @@ export class ChallengeView implements ILobbyView {
               </table>`
             : `<p style="color:var(--text-muted); text-align:center; padding:1rem;">${t('ui:challenge.noScores')}</p>`
         }
-      </div>`;
+      </div>`,
+    );
 
     // Render map preview
     if (mapTiles) {

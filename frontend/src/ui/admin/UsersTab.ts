@@ -1,7 +1,7 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
 import { UserRole, getErrorMessage } from '@blast-arena/shared';
-import { escapeHtml, escapeAttr } from '../../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
 
@@ -59,7 +59,9 @@ export class UsersTab {
     if (!this.container) return;
 
     const isAdmin = this.role === 'admin';
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">
         <div class="admin-search" style="flex:1;margin-bottom:0;">
           <input type="text" placeholder="${escapeAttr(t('admin:users.searchPlaceholder'))}" id="admin-user-search" value="${escapeHtml(this.search)}">
@@ -69,7 +71,8 @@ export class UsersTab {
       </div>
       <div id="admin-users-table">${t('admin:users.loading')}</div>
       <div id="admin-users-pagination"></div>
-    `;
+    `,
+    );
 
     const searchInput = this.container.querySelector('#admin-user-search') as HTMLInputElement;
     searchInput.addEventListener('input', () => {
@@ -104,7 +107,9 @@ export class UsersTab {
       const result = await ApiClient.get<AdminUserListResponse>(`/admin/users?${params}`);
       const isAdmin = this.role === 'admin';
 
-      tableEl.innerHTML = `
+      setHtml(
+        tableEl,
+        `
         <table class="admin-table">
           <thead>
             <tr>
@@ -160,23 +165,27 @@ export class UsersTab {
               .join('')}
           </tbody>
         </table>
-      `;
+      `,
+      );
 
       // Pagination
       const totalPages = Math.ceil(result.total / result.limit);
-      pagEl.innerHTML = `
+      setHtml(
+        pagEl,
+        `
         <div class="admin-pagination">
           <button ${this.page <= 1 ? 'disabled' : ''} data-page="${this.page - 1}">${t('admin:users.pagination.prev')}</button>
           <span class="page-info">${t('admin:users.pagination.pageInfo', { page: this.page, totalPages, total: result.total })}</span>
           <button ${this.page >= totalPages ? 'disabled' : ''} data-page="${this.page + 1}">${t('admin:users.pagination.next')}</button>
         </div>
-      `;
+      `,
+      );
 
       // Event delegation
       this.container!.addEventListener('click', this.handleClick);
       this.container!.addEventListener('change', this.handleChange);
     } catch {
-      tableEl.innerHTML = `<div style="color:var(--danger);">${t('admin:users.loadError')}</div>`;
+      setHtml(tableEl, `<div style="color:var(--danger);">${t('admin:users.loadError')}</div>`);
     }
   }
 
@@ -221,14 +230,17 @@ export class UsersTab {
       style: 'max-width:420px;',
       parent: document.getElementById('ui-overlay')!,
     });
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <h2 style="margin-bottom:12px;color:var(--danger);">${t('admin:users.deleteModal.title')}</h2>
       <p style="color:var(--text-dim);font-size:14px;">${t('admin:users.deleteModal.description', { username: escapeHtml(username) })}</p>
       <div class="modal-actions" style="margin-top:16px;">
         <button class="btn btn-secondary" id="delete-cancel">${t('admin:users.deleteModal.cancel')}</button>
         <button class="btn-danger" style="padding:8px 16px;font-size:14px;" id="delete-confirm">${t('admin:users.deleteModal.confirm')}</button>
       </div>
-    `;
+    `,
+    );
 
     overlay.querySelector('#delete-cancel')!.addEventListener('click', close);
     overlay.querySelector('#delete-confirm')!.addEventListener('click', async () => {
@@ -243,7 +255,9 @@ export class UsersTab {
       style: 'max-width:420px;',
       parent: document.getElementById('ui-overlay')!,
     });
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <h2 style="margin-bottom:16px;">${t('admin:users.createModal.title')}</h2>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <div>
@@ -272,7 +286,8 @@ export class UsersTab {
         <button class="btn btn-secondary" id="cu-cancel">${t('admin:users.createModal.cancel')}</button>
         <button class="btn btn-primary" id="cu-submit">${t('admin:users.createModal.submit')}</button>
       </div>
-    `;
+    `,
+    );
 
     overlay.querySelector('#cu-cancel')!.addEventListener('click', close);
     overlay.querySelector('#cu-submit')!.addEventListener('click', async () => {
@@ -316,7 +331,9 @@ export class UsersTab {
       style: 'max-width:420px;',
       parent: document.getElementById('ui-overlay')!,
     });
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <h2 style="margin-bottom:12px;">${t('admin:users.resetPasswordModal.title')}</h2>
       <p style="color:var(--text-dim);font-size:14px;">${t('admin:users.resetPasswordModal.description', { username: escapeHtml(username) })}</p>
       <div style="margin-top:12px;">
@@ -332,7 +349,8 @@ export class UsersTab {
         <button class="btn btn-secondary" id="rp-cancel">${t('admin:users.resetPasswordModal.cancel')}</button>
         <button class="btn btn-primary" id="rp-submit">${t('admin:users.resetPasswordModal.submit')}</button>
       </div>
-    `;
+    `,
+    );
 
     overlay.querySelector('#rp-cancel')!.addEventListener('click', close);
     overlay.querySelector('#rp-submit')!.addEventListener('click', async () => {
@@ -381,7 +399,9 @@ export class UsersTab {
 
     const renderModal = () => {
       const needsDays = selectedType !== 'deactivated';
-      content.innerHTML = `
+      setHtml(
+        content,
+        `
         <h2 style="margin-bottom:8px;">${t('admin:users.cleanup.title')}</h2>
         <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;">${t('admin:users.cleanup.description')}</p>
         <div style="margin-bottom:12px;">
@@ -425,7 +445,8 @@ export class UsersTab {
               : ''
           }
         </div>
-      `;
+      `,
+      );
 
       // Type chip selection
       overlay.querySelectorAll('[data-cleanup-type]').forEach((chip) => {
@@ -548,14 +569,17 @@ export class UsersTab {
       style: 'max-width:420px;',
       parent: document.getElementById('ui-overlay')!,
     });
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <h2 style="margin-bottom:12px;color:var(--warning);">${t('admin:users.resetTotpModal.title')}</h2>
       <p style="color:var(--text-dim);font-size:14px;">${t('admin:users.resetTotpModal.description', { username: escapeHtml(username) })}</p>
       <div class="modal-actions" style="margin-top:16px;">
         <button class="btn btn-secondary" id="reset-totp-cancel">${t('admin:users.resetTotpModal.cancel')}</button>
         <button class="btn-warn" style="padding:8px 16px;font-size:14px;" id="reset-totp-confirm">${t('admin:users.resetTotpModal.confirm')}</button>
       </div>
-    `;
+    `,
+    );
 
     overlay.querySelector('#reset-totp-cancel')!.addEventListener('click', close);
     overlay.querySelector('#reset-totp-confirm')!.addEventListener('click', async () => {

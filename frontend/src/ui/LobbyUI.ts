@@ -4,7 +4,7 @@ import { NotificationUI } from './NotificationUI';
 import { PartyBar } from './PartyBar';
 import { LobbyChatPanel } from './LobbyChatPanel';
 import { RoomListItem, Room } from '@blast-arena/shared';
-import { escapeHtml } from '../utils/html';
+import { escapeHtml, setHtml } from '../utils/html';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { ILobbyView, ViewDeps } from './views/types';
 import { RoomsView } from './views/RoomsView';
@@ -150,7 +150,7 @@ export class LobbyUI {
     // Update main header actions
     const headerActions = this.container.querySelector('.main-header-actions') as HTMLElement;
     if (headerActions) {
-      headerActions.innerHTML = view.getHeaderActions?.() ?? '';
+      setHtml(headerActions, view.getHeaderActions?.() ?? '');
       this.bindHeaderActions(viewId);
     }
 
@@ -164,7 +164,7 @@ export class LobbyUI {
     // Clear and render main body
     const mainBody = this.container.querySelector('.main-body') as HTMLElement;
     if (mainBody) {
-      mainBody.innerHTML = '';
+      setHtml(mainBody, '');
       await view.render(mainBody);
     }
 
@@ -369,7 +369,9 @@ export class LobbyUI {
           </button>
         </div>`;
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <nav class="sidebar${collapsedClass}">
         <div class="sidebar-brand">
           <h1 class="sidebar-brand-full"><span>BLAST</span>ARENA</h1>
@@ -424,7 +426,8 @@ export class LobbyUI {
         </div>
         <div class="main-body"></div>
       </div>
-    `;
+    `,
+    );
 
     this.bindEvents();
   }
@@ -505,7 +508,7 @@ export class LobbyUI {
       sidebar.classList.toggle('collapsed', this.sidebarCollapsed);
       const ear = this.container.querySelector('#sidebar-toggle') as HTMLElement;
       const icon = ear.querySelector('.sidebar-ear-icon')!;
-      icon.innerHTML = this.sidebarCollapsed ? '&#9654;' : '&#9664;';
+      setHtml(icon, this.sidebarCollapsed ? '&#9654;' : '&#9664;');
       ear.title = this.sidebarCollapsed ? t('ui:sidebar.expand') : t('ui:sidebar.collapse');
     });
   }

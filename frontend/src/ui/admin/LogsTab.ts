@@ -1,6 +1,6 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 /** Admin action log row as returned by GET /admin/actions (snake_case DB columns). */
@@ -55,7 +55,9 @@ export class LogsTab {
       const result = await ApiClient.get<AdminActionsResponse>(`/admin/actions?${params}`);
       const totalPages = Math.ceil(result.total / result.limit);
 
-      this.container.innerHTML = `
+      setHtml(
+        this.container,
+        `
         <div class="admin-filters">
           <label style="color:var(--text-dim);font-size:13px;">${t('admin:logs.filterByAction')}</label>
           <select id="action-filter" aria-label="${t('admin:logs.filterByAction')}">
@@ -106,7 +108,8 @@ export class LogsTab {
           <span class="page-info">${t('admin:logs.pageInfo', { page: this.page, totalPages, total: result.total })}</span>
           <button ${this.page >= totalPages ? 'disabled' : ''} data-page="${this.page + 1}">${t('admin:logs.nextPage')}</button>
         </div>
-      `;
+      `,
+      );
 
       const filterSelect = this.container.querySelector('#action-filter') as HTMLSelectElement;
       filterSelect.addEventListener('change', () => {
@@ -135,7 +138,10 @@ export class LogsTab {
         }
       });
     } catch {
-      this.container.innerHTML = `<div style="color:var(--danger);">${t('admin:logs.failedToLoad')}</div>`;
+      setHtml(
+        this.container,
+        `<div style="color:var(--danger);">${t('admin:logs.failedToLoad')}</div>`,
+      );
     }
   }
 

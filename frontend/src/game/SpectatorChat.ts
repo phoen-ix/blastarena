@@ -1,6 +1,6 @@
 import { SocketClient } from '../network/SocketClient';
 import { ApiClient } from '../network/ApiClient';
-import { escapeHtml } from '../utils/html';
+import { escapeHtml, setHtml } from '../utils/html';
 import type { ChatMode, UserRole } from '@blast-arena/shared';
 import { t } from '../i18n';
 
@@ -107,19 +107,22 @@ export class SpectatorChat {
     if (!this.container) return;
 
     if (this.chatMode === 'disabled') {
-      this.container.innerHTML = '';
+      setHtml(this.container, '');
       return;
     }
 
     if (!this.expanded) {
-      this.container.innerHTML = `
+      setHtml(
+        this.container,
+        `
         <button id="spec-chat-toggle" style="
           background:var(--bg-elevated);border:1px solid var(--border);
           color:var(--text-dim);padding:6px 12px;border-radius:8px;
           cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;
           transition:color 0.15s;
         ">${t('ui:spectatorChat.title')}</button>
-      `;
+      `,
+      );
       this.toggleBtn = this.container.querySelector('#spec-chat-toggle');
       this.toggleBtn?.addEventListener('click', () => {
         this.expanded = true;
@@ -129,7 +132,9 @@ export class SpectatorChat {
     }
 
     const canSend = this.canChat();
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div style="
         width:280px;background:var(--bg-deep);border:1px solid var(--border);
         border-radius:10px;overflow:hidden;
@@ -164,7 +169,8 @@ export class SpectatorChat {
             : ''
         }
       </div>
-    `;
+    `,
+    );
 
     this.container.querySelector('#spec-chat-close')?.addEventListener('click', () => {
       this.expanded = false;
@@ -198,15 +204,18 @@ export class SpectatorChat {
 
   private renderMessages(): void {
     if (!this.messagesEl) return;
-    this.messagesEl.innerHTML = this.messages
-      .map((m) => {
-        const color = ROLE_COLORS[m.role] || 'var(--text-dim)';
-        return `<div style="margin-bottom:3px;word-break:break-word;">
+    setHtml(
+      this.messagesEl,
+      this.messages
+        .map((m) => {
+          const color = ROLE_COLORS[m.role] || 'var(--text-dim)';
+          return `<div style="margin-bottom:3px;word-break:break-word;">
           <span style="color:${color};font-weight:600;">${escapeHtml(m.fromUsername)}</span>
           <span style="color:var(--text-dim);">: ${escapeHtml(m.message)}</span>
         </div>`;
-      })
-      .join('');
+        })
+        .join(''),
+    );
     this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
   }
 }

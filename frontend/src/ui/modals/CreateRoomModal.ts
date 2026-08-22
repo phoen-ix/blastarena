@@ -12,7 +12,7 @@ import {
 import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 import { renderMapPreview } from '../../utils/mapPreview';
 import { getCustomMapTiles } from '../../utils/mapPreviewCache';
-import { trapFocus, escapeHtml } from '../../utils/html';
+import { trapFocus, escapeHtml, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 export interface CreateRoomModalDeps {
@@ -35,7 +35,9 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
   modal.setAttribute('role', 'dialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', t('ui:createRoom.title'));
-  modal.innerHTML = `
+  setHtml(
+    modal,
+    `
     <div class="modal" style="width:760px;max-width:95vw;">
       <h2>${t('ui:createRoom.title')}</h2>
 
@@ -227,7 +229,8 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
         <button class="btn btn-primary" id="modal-create">${t('ui:createRoom.create')}</button>
       </div>
     </div>
-  `;
+  `,
+  );
 
   // Apply admin-configured defaults
   if (deps.gameDefaults) {
@@ -305,14 +308,17 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
       if (previewEl) {
         if (isCustom) {
           previewEl.style.display = 'block';
-          previewEl.innerHTML = `<span style="font-size:11px;color:var(--text-muted);">${t('ui:createRoom.loadingPreview')}</span>`;
+          setHtml(
+            previewEl,
+            `<span style="font-size:11px;color:var(--text-muted);">${t('ui:createRoom.loadingPreview')}</span>`,
+          );
           const selectedVal = customMapSelect.value;
           getCustomMapTiles(parseInt(selectedVal))
             .then((data) => {
               if (customMapSelect.value !== selectedVal) return;
               const canvas = renderMapPreview(data.tiles, { maxCanvasSize: 180 });
               canvas.style.cssText = 'border:1px solid var(--border);border-radius:4px;';
-              previewEl.innerHTML = '';
+              setHtml(previewEl, '');
               previewEl.appendChild(canvas);
             })
             .catch(() => {
@@ -321,7 +327,7 @@ export function showCreateRoomModal(deps: CreateRoomModalDeps): void {
             });
         } else {
           previewEl.style.display = 'none';
-          previewEl.innerHTML = '';
+          setHtml(previewEl, '');
         }
       }
     });

@@ -12,7 +12,7 @@ import {
   AchievementImportConflict,
   getErrorMessage,
 } from '@blast-arena/shared';
-import { escapeHtml, escapeAttr } from '../../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 const CONDITION_TYPES: AchievementConditionType[] = [
@@ -88,7 +88,7 @@ export class AchievementsTab {
   }
 
   destroy(): void {
-    if (this.container) this.container.innerHTML = '';
+    if (this.container) setHtml(this.container, '');
     this.achievements = [];
     this.cosmetics = [];
   }
@@ -96,7 +96,9 @@ export class AchievementsTab {
   private async renderView(): Promise<void> {
     if (!this.container) return;
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="section-header">
         <h3 class="admin-section-title">${t('admin:achievements.sectionTitle')}</h3>
         <div class="btn-group">
@@ -105,7 +107,8 @@ export class AchievementsTab {
         </div>
       </div>
       <div id="ach-content"></div>
-    `;
+    `,
+    );
 
     this.container.querySelector('#ach-view-achievements')!.addEventListener('click', () => {
       if (this.currentView !== 'achievements') {
@@ -142,7 +145,9 @@ export class AchievementsTab {
       this.achievements = [];
     }
 
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <div class="admin-section">
         <div class="section-header">
           <span class="admin-count">${t('admin:achievements.achievementCount', { count: this.achievements.length })}</span>
@@ -169,7 +174,8 @@ export class AchievementsTab {
           </tbody>
         </table>
       </div>
-    `;
+    `,
+    );
 
     content.querySelector('#ach-create')?.addEventListener('click', () => {
       this.showAchievementModal();
@@ -264,7 +270,9 @@ export class AchievementsTab {
     const condCfg = existing?.conditionConfig || {};
     const currentCondType = existing?.conditionType || 'cumulative';
 
-    overlay.innerHTML = `
+    setHtml(
+      overlay,
+      `
       <div class="modal modal-scroll" style="max-width:520px;">
         <h2>${isEdit ? t('admin:achievements.editAchievement') : t('admin:achievements.createAchievementTitle')}</h2>
         <div class="form-stack">
@@ -318,7 +326,8 @@ export class AchievementsTab {
           <button class="btn btn-primary" id="am-submit">${isEdit ? t('admin:achievements.save') : t('admin:achievements.create')}</button>
         </div>
       </div>
-    `;
+    `,
+    );
 
     document.getElementById('ui-overlay')!.appendChild(overlay);
 
@@ -406,7 +415,9 @@ export class AchievementsTab {
     cfg: Record<string, unknown>,
   ): void {
     if (type === 'cumulative') {
-      container.innerHTML = `
+      setHtml(
+        container,
+        `
         <div class="form-row">
           <div>
             <label class="field-label">${t('admin:achievements.conditionFields.stat')}</label>
@@ -419,9 +430,12 @@ export class AchievementsTab {
             <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfg.threshold ?? 1}" min="1">
           </div>
         </div>
-      `;
+      `,
+      );
     } else if (type === 'per_game') {
-      container.innerHTML = `
+      setHtml(
+        container,
+        `
         <div class="form-row">
           <div>
             <label class="field-label">${t('admin:achievements.conditionFields.stat')}</label>
@@ -440,9 +454,12 @@ export class AchievementsTab {
             <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfg.threshold ?? 1}" min="0">
           </div>
         </div>
-      `;
+      `,
+      );
     } else if (type === 'mode_specific') {
-      container.innerHTML = `
+      setHtml(
+        container,
+        `
         <div class="form-row">
           <div>
             <label class="field-label">${t('admin:achievements.conditionFields.gameMode')}</label>
@@ -461,9 +478,12 @@ export class AchievementsTab {
             <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfg.threshold ?? 1}" min="1">
           </div>
         </div>
-      `;
+      `,
+      );
     } else if (type === 'campaign') {
-      container.innerHTML = `
+      setHtml(
+        container,
+        `
         <div class="form-row">
           <div>
             <label class="field-label">${t('admin:achievements.conditionFields.subType')}</label>
@@ -476,7 +496,8 @@ export class AchievementsTab {
             <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfg.threshold ?? 1}" min="1">
           </div>
         </div>
-      `;
+      `,
+      );
     }
   }
 
@@ -525,7 +546,9 @@ export class AchievementsTab {
       this.cosmetics = [];
     }
 
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <div class="admin-section">
         <div class="section-header">
           <span class="admin-count">${t('admin:achievements.cosmeticCount', { count: this.cosmetics.length })}</span>
@@ -550,7 +573,8 @@ export class AchievementsTab {
           </tbody>
         </table>
       </div>
-    `;
+    `,
+    );
 
     content.querySelector('#cos-create')?.addEventListener('click', () => {
       this.showCosmeticModal();
@@ -636,7 +660,9 @@ export class AchievementsTab {
     const currentType = existing?.type || 'color';
     const cfg = existing?.config || {};
 
-    overlay.innerHTML = `
+    setHtml(
+      overlay,
+      `
       <div class="modal modal-scroll" style="max-width:520px;">
         <h2>${isEdit ? t('admin:achievements.editCosmetic') : t('admin:achievements.createCosmeticTitle')}</h2>
         <div class="form-stack">
@@ -682,7 +708,8 @@ export class AchievementsTab {
           <button class="btn btn-primary" id="cm-submit">${isEdit ? t('admin:achievements.save') : t('admin:achievements.create')}</button>
         </div>
       </div>
-    `;
+    `,
+    );
 
     document.getElementById('ui-overlay')!.appendChild(overlay);
 
@@ -781,7 +808,9 @@ export class AchievementsTab {
   ): void {
     if (type === 'color') {
       const hex = typeof cfg.hex === 'string' ? cfg.hex : '#ff6b35';
-      container.innerHTML = `
+      setHtml(
+        container,
+        `
         <div>
           <label class="field-label">${t('admin:achievements.configFields.hexColor')}</label>
           <div class="color-picker-row">
@@ -789,7 +818,8 @@ export class AchievementsTab {
             <input type="text" class="admin-input flex-1" id="cm-cfg-hex-text" value="${escapeAttr(hex)}" placeholder="#ff6b35">
           </div>
         </div>
-      `;
+      `,
+      );
       const colorPicker = container.querySelector('#cm-cfg-hex') as HTMLInputElement;
       const colorText = container.querySelector('#cm-cfg-hex-text') as HTMLInputElement;
       colorPicker.addEventListener('input', () => {
@@ -802,14 +832,19 @@ export class AchievementsTab {
       });
     } else if (type === 'eyes') {
       const style = typeof cfg.style === 'string' ? cfg.style : 'round';
-      container.innerHTML = `
+      setHtml(
+        container,
+        `
         <div>
           <label class="field-label">${t('admin:achievements.configFields.eyeStyle')}</label>
           <input type="text" class="admin-input mt-label" id="cm-cfg-style" value="${escapeAttr(style)}" placeholder="${t('admin:achievements.configFields.eyeStylePlaceholder')}">
         </div>
-      `;
+      `,
+      );
     } else if (type === 'trail') {
-      container.innerHTML = `
+      setHtml(
+        container,
+        `
         <div class="form-row">
           <div>
             <label class="field-label">${t('admin:achievements.configFields.particleKey')}</label>
@@ -824,9 +859,12 @@ export class AchievementsTab {
           <label class="field-label">${t('admin:achievements.configFields.frequency')}</label>
           <input type="number" class="admin-input mt-label" id="cm-cfg-frequency" value="${cfg.frequency ?? 100}" min="1" max="1000">
         </div>
-      `;
+      `,
+      );
     } else if (type === 'bomb_skin') {
-      container.innerHTML = `
+      setHtml(
+        container,
+        `
         <div class="form-row">
           <div>
             <label class="field-label">${t('admin:achievements.configFields.baseColor')}</label>
@@ -841,7 +879,8 @@ export class AchievementsTab {
           <label class="field-label">${t('admin:achievements.configFields.label')}</label>
           <input type="text" class="admin-input mt-label" id="cm-cfg-label" value="${escapeAttr(String(cfg.label || ''))}" placeholder="${t('admin:achievements.configFields.labelPlaceholder')}">
         </div>
-      `;
+      `,
+      );
     }
   }
 
@@ -914,7 +953,9 @@ export class AchievementsTab {
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', t('admin:achievements.importAchievements'));
 
-    overlay.innerHTML = `
+    setHtml(
+      overlay,
+      `
       <div class="modal" style="max-width:520px;">
         <h2>${t('admin:achievements.importAchievements')}</h2>
         <p class="modal-desc">
@@ -928,7 +969,8 @@ export class AchievementsTab {
           <button class="btn btn-primary" id="ach-import-submit" disabled>${t('admin:achievements.import')}</button>
         </div>
       </div>
-    `;
+    `,
+    );
 
     document.getElementById('ui-overlay')!.appendChild(overlay);
 
@@ -954,7 +996,10 @@ export class AchievementsTab {
 
         if (json._format === 'blast-arena-achievement-bundle') {
           parsedData = json;
-          previewEl.innerHTML = `<span class="text-accent">${t('admin:achievements.importBundlePreview', { achievements: json.achievements?.length || 0, cosmetics: json.cosmetics?.length || 0 })}</span>`;
+          setHtml(
+            previewEl,
+            `<span class="text-accent">${t('admin:achievements.importBundlePreview', { achievements: json.achievements?.length || 0, cosmetics: json.cosmetics?.length || 0 })}</span>`,
+          );
         } else if (json._format === 'blast-arena-achievement') {
           // Wrap single achievement into bundle format
           parsedData = {
@@ -982,7 +1027,10 @@ export class AchievementsTab {
                 ]
               : [],
           };
-          previewEl.innerHTML = `<span class="text-accent">${t('admin:achievements.importSinglePreview', { name: escapeHtml(json.name) })}</span>`;
+          setHtml(
+            previewEl,
+            `<span class="text-accent">${t('admin:achievements.importSinglePreview', { name: escapeHtml(json.name) })}</span>`,
+          );
         } else {
           errorEl.textContent = t('admin:achievements.importInvalidFormat');
           errorEl.style.display = 'block';
@@ -1074,7 +1122,9 @@ export class AchievementsTab {
       })
       .join('');
 
-    overlay.innerHTML = `
+    setHtml(
+      overlay,
+      `
       <div class="modal modal-scroll" style="max-width:560px;">
         <h2>${t('admin:achievements.resolveConflicts')}</h2>
         <p class="modal-desc" style="margin-bottom:16px;">
@@ -1086,7 +1136,8 @@ export class AchievementsTab {
           <button class="btn btn-primary" id="conflict-submit">${t('admin:achievements.import')}</button>
         </div>
       </div>
-    `;
+    `,
+    );
 
     document.getElementById('ui-overlay')!.appendChild(overlay);
 
@@ -1169,7 +1220,9 @@ export class AchievementsTab {
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', t('admin:achievements.deleteEntity', { entity }));
 
-    overlay.innerHTML = `
+    setHtml(
+      overlay,
+      `
       <div class="modal" style="max-width:420px;">
         <h2 class="text-danger">${t('admin:achievements.deleteEntity', { entity: escapeHtml(entity) })}</h2>
         <p class="modal-desc" style="font-size:14px;">${t('admin:achievements.deleteConfirmMessage', { name: escapeHtml(name) })}</p>
@@ -1180,7 +1233,8 @@ export class AchievementsTab {
           <button class="btn-danger btn-confirm" id="del-confirm" style="opacity:0.5;" disabled>${t('admin:achievements.deleteBtn')}</button>
         </div>
       </div>
-    `;
+    `,
+    );
 
     document.getElementById('ui-overlay')!.appendChild(overlay);
 

@@ -4,7 +4,7 @@ import { AuthManager } from '../network/AuthManager';
 import { NotificationUI } from './NotificationUI';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { PartyBar } from './PartyBar';
-import { escapeHtml } from '../utils/html';
+import { escapeHtml, setHtml } from '../utils/html';
 import {
   getErrorMessage,
   CampaignGameState,
@@ -126,7 +126,7 @@ export class CampaignUI {
 
   destroy(): void {
     UIGamepadNavigator.getInstance().popContext('campaign');
-    this.container.innerHTML = '';
+    setHtml(this.container, '');
     this.embedded = false;
     this.worlds = [];
     this.expandedWorldId = null;
@@ -171,7 +171,7 @@ export class CampaignUI {
   }
 
   private render(): void {
-    this.container.innerHTML = '';
+    setHtml(this.container, '');
 
     // Header
     const header = document.createElement('div');
@@ -194,7 +194,7 @@ export class CampaignUI {
       letter-spacing: 3px;
       margin: 0;
     `;
-    title.innerHTML = t('campaign:titleBrand');
+    setHtml(title, t('campaign:titleBrand'));
 
     const backBtn = document.createElement('button');
     backBtn.className = 'btn btn-secondary';
@@ -661,7 +661,7 @@ export class CampaignUI {
           if (this.selectedLevelId !== level.id || !card.isConnected) return;
           const canvas = renderMapPreview(data.tiles, { palette, maxCanvasSize: 280 });
           canvas.style.cssText = 'border:1px solid var(--border);border-radius:4px;';
-          previewRow.innerHTML = '';
+          setHtml(previewRow, '');
           previewRow.appendChild(canvas);
         })
         .catch(() => {

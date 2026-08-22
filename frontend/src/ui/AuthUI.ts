@@ -4,6 +4,7 @@ import { NotificationUI } from './NotificationUI';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { getErrorMessage } from '@blast-arena/shared';
 import { i18n, t } from '../i18n';
+import { setHtml } from '../utils/html';
 
 export class AuthUI {
   private overlay: HTMLElement;
@@ -144,13 +145,15 @@ export class AuthUI {
     btn.type = 'button';
     btn.className = 'auth-close';
     btn.setAttribute('aria-label', t('common:actions.close'));
-    btn.innerHTML = '&times;';
+    setHtml(btn, '&times;');
     btn.addEventListener('click', () => this.close());
     form.appendChild(btn);
   }
 
   private renderLogin(): void {
-    this.overlay.innerHTML = `
+    setHtml(
+      this.overlay,
+      `
       <div class="auth-form">
         ${this.renderLanguagePicker()}
         <h2><span>${t('auth:login.title')}</span>${t('auth:login.titleAccent')}</h2>
@@ -176,7 +179,8 @@ export class AuthUI {
         </div>
         ${this.renderFooterLinks()}
       </div>
-    `;
+    `,
+    );
 
     this.overlay.querySelector('#login-btn')!.addEventListener('click', () => this.handleLogin());
     this.overlay.querySelector('#login-password')!.addEventListener('keydown', (e) => {
@@ -214,7 +218,9 @@ export class AuthUI {
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', t('auth:imprint.title'));
-    overlay.innerHTML = `
+    setHtml(
+      overlay,
+      `
       <div class="modal" style="max-width:600px;">
         <div class="modal-header">
           <h3>${t('auth:imprint.title')}</h3>
@@ -222,7 +228,8 @@ export class AuthUI {
         </div>
         <div class="modal-body" style="white-space:pre-wrap;font-size:14px;line-height:1.6;max-height:60vh;overflow-y:auto;">${this.escapeHtml(text)}</div>
       </div>
-    `;
+    `,
+    );
     document.body.appendChild(overlay);
     const close = () => overlay.remove();
     overlay.querySelector('.modal-close')!.addEventListener('click', close);
@@ -240,7 +247,9 @@ export class AuthUI {
   }
 
   private renderRegister(): void {
-    this.overlay.innerHTML = `
+    setHtml(
+      this.overlay,
+      `
       <div class="auth-form">
         ${this.renderLanguagePicker()}
         <h2>${t('auth:register.title')} <span>${t('auth:register.titleAccent')}</span></h2>
@@ -262,7 +271,8 @@ export class AuthUI {
           ${t('auth:register.hasAccount')} <a id="switch-login">${t('auth:register.login')}</a>
         </div>
       </div>
-    `;
+    `,
+    );
 
     this.overlay.querySelector('#reg-btn')!.addEventListener('click', () => this.handleRegister());
     this.overlay.querySelector('#reg-password')!.addEventListener('keydown', (e) => {
@@ -278,7 +288,9 @@ export class AuthUI {
   }
 
   private renderForgotPassword(): void {
-    this.overlay.innerHTML = `
+    setHtml(
+      this.overlay,
+      `
       <div class="auth-form">
         ${this.renderLanguagePicker()}
         <h2>${t('auth:forgotPassword.title')} <span>${t('auth:forgotPassword.titleAccent')}</span></h2>
@@ -292,7 +304,8 @@ export class AuthUI {
           <a id="switch-login-back">${t('auth:forgotPassword.backToLogin')}</a>
         </div>
       </div>
-    `;
+    `,
+    );
 
     this.overlay
       .querySelector('#forgot-btn')!
@@ -413,7 +426,9 @@ export class AuthUI {
   }
 
   private renderTotpVerification(): void {
-    this.overlay.innerHTML = `
+    setHtml(
+      this.overlay,
+      `
       <div class="auth-form">
         <h2>${t('auth:totp.title')}</h2>
         <p class="auth-totp-hint">${t('auth:totp.description')}</p>
@@ -428,7 +443,8 @@ export class AuthUI {
           <a id="switch-login-back">${t('auth:totp.backToLogin')}</a>
         </div>
       </div>
-    `;
+    `,
+    );
 
     this.overlay
       .querySelector('#totp-btn')!

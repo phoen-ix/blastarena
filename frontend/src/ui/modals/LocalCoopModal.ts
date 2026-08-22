@@ -13,7 +13,7 @@ import {
 import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 import { PLAYER_COLORS } from '../../scenes/BootScene';
 import { AuthManager } from '../../network/AuthManager';
-import { trapFocus } from '../../utils/html';
+import { trapFocus, setHtml } from '../../utils/html';
 import { PlayerCosmeticData } from '@blast-arena/shared';
 import { t } from '../../i18n';
 
@@ -157,7 +157,7 @@ export function showLocalCoopModal(
   }
 
   function render(): void {
-    overlay.innerHTML = '';
+    setHtml(overlay, '');
 
     const modal = document.createElement('div');
     modal.className = 'modal';
@@ -503,9 +503,12 @@ export function showLocalCoopModal(
 
     const info = document.createElement('span');
     info.style.cssText = 'font-size:14px;color:var(--text);';
-    info.innerHTML = t('campaign:localCoopModal.loggedInAs', {
-      username: escapeHtml(p2.loggedInUser!.username),
-    });
+    setHtml(
+      info,
+      t('campaign:localCoopModal.loggedInAs', {
+        username: escapeHtml(p2.loggedInUser!.username),
+      }),
+    );
 
     const logoutBtn = document.createElement('button');
     logoutBtn.className = 'btn btn-ghost btn-sm';

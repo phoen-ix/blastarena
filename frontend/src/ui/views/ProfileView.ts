@@ -1,6 +1,6 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, setHtml } from '../../utils/html';
 import { drawPlayerSprite, getPlayerColorHex } from '../../utils/playerCanvas';
 import { t } from '../../i18n';
 import type { PublicProfile, AchievementProgress } from '@blast-arena/shared';
@@ -25,7 +25,10 @@ export class ProfileView implements ILobbyView {
 
   async render(container: HTMLElement): Promise<void> {
     this.container = container;
-    this.container.innerHTML = `<div class="profile-page"><div class="profile-page-loading">${t('ui:profile.loading')}</div></div>`;
+    setHtml(
+      this.container,
+      `<div class="profile-page"><div class="profile-page-loading">${t('ui:profile.loading')}</div></div>`,
+    );
 
     try {
       const profile = await ApiClient.get<PublicProfile>(`/user/${this.userId}/public`);
@@ -44,14 +47,17 @@ export class ProfileView implements ILobbyView {
 
   private renderPrivate(): void {
     if (!this.container) return;
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="profile-page">
         <div class="profile-page-empty">
           <div class="profile-page-empty-icon">&#128274;</div>
           <div class="profile-page-empty-text">${t('ui:profile.notFound')}</div>
         </div>
       </div>
-    `;
+    `,
+    );
   }
 
   private renderProfile(p: PublicProfile): void {
@@ -89,7 +95,9 @@ export class ProfileView implements ILobbyView {
     const xpProgress = totalXp - xpForLevel;
     const pct = xpToNext > 0 ? Math.min(100, Math.round((xpProgress / xpToNext) * 100)) : 0;
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="profile-page">
         <div class="profile-page-content">
           <div class="profile-page-header-card">
@@ -133,7 +141,8 @@ export class ProfileView implements ILobbyView {
           ${!this.isOwnProfile ? this.renderActions(p) : ''}
         </div>
       </div>
-    `;
+    `,
+    );
 
     // Draw player sprite on avatar canvas
     const avatarCanvas = this.container.querySelector(
@@ -296,7 +305,9 @@ export class ProfileView implements ILobbyView {
 
       locked.sort((a, b) => b.current / b.threshold - a.current / a.threshold);
 
-      progressContainer.innerHTML = `
+      setHtml(
+        progressContainer,
+        `
         <div class="profile-page-section">
           <div class="profile-page-section-title">${t('ui:profile.inProgress')} (${locked.length})</div>
           <div class="profile-page-progress-list">
@@ -320,7 +331,8 @@ export class ProfileView implements ILobbyView {
               .join('')}
           </div>
         </div>
-      `;
+      `,
+      );
     } catch {
       // Optional — skip silently
     }

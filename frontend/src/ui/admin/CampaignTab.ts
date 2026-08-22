@@ -24,7 +24,7 @@ import {
   GameState,
   getErrorMessage,
 } from '@blast-arena/shared';
-import { escapeHtml, escapeAttr } from '../../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { EnemyTextureGenerator } from '../../game/EnemyTextureGenerator';
 import { game } from '../../main';
@@ -98,7 +98,9 @@ export class CampaignTab {
   private async renderView(): Promise<void> {
     if (!this.container) return;
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="camp-tab-header">
         <h3>${t('admin:campaign.title')}</h3>
         <div class="flex-row">
@@ -108,7 +110,8 @@ export class CampaignTab {
         </div>
       </div>
       <div id="camp-content"></div>
-    `;
+    `,
+    );
 
     this.container.querySelector('#camp-view-worlds')!.addEventListener('click', () => {
       if (this.viewMode !== 'worlds') {
@@ -171,7 +174,9 @@ export class CampaignTab {
   }
 
   private renderWorldsTable(content: HTMLElement): void {
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <div class="camp-toolbar">
         <button class="btn btn-primary" id="camp-create-world">${t('admin:campaign.worlds.createWorld')}</button>
       </div>
@@ -191,7 +196,8 @@ export class CampaignTab {
           ${this.worlds.length === 0 ? `<tr><td colspan="7" class="camp-empty-cell">${t('admin:campaign.worlds.noWorlds')}</td></tr>` : this.worlds.map((w) => this.renderWorldRow(w)).join('')}
         </tbody>
       </table>
-    `;
+    `,
+    );
 
     content.querySelector('#camp-create-world')!.addEventListener('click', () => {
       this.showWorldModal();
@@ -537,7 +543,7 @@ export class CampaignTab {
     // Re-render the levels section inline
     const levelsEl = this.container?.querySelector(`#camp-levels-${world.id}`);
     if (levelsEl) {
-      levelsEl.innerHTML = this.renderLevelsSection(world);
+      setHtml(levelsEl, this.renderLevelsSection(world));
       const content = this.container?.querySelector('#camp-content') as HTMLElement;
       if (content) this.attachLevelHandlers(content);
     }
@@ -608,7 +614,9 @@ export class CampaignTab {
       className: 'camp-modal-body md',
     });
 
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <h3 class="camp-modal-title">${isEdit ? t('admin:campaign.worldModal.editTitle') : t('admin:campaign.worldModal.createTitle')}</h3>
       <div class="camp-modal-form">
         <div class="form-group">
@@ -630,7 +638,8 @@ export class CampaignTab {
           <button class="btn btn-primary" id="world-modal-submit">${isEdit ? t('admin:campaign.worldModal.save') : t('admin:campaign.worldModal.create')}</button>
         </div>
       </div>
-    `;
+    `,
+    );
 
     overlay.querySelector('#world-modal-cancel')!.addEventListener('click', close);
 
@@ -689,7 +698,9 @@ export class CampaignTab {
   }
 
   private renderEnemyTypesTable(content: HTMLElement): void {
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <div class="camp-toolbar-multi">
         <button class="btn btn-primary" id="camp-create-enemy">${t('admin:campaign.enemies.createEnemy')}</button>
         <button class="btn btn-secondary" id="camp-import-enemy">${t('admin:campaign.enemies.importEnemy')}</button>
@@ -711,7 +722,8 @@ export class CampaignTab {
           ${this.enemyTypes.length === 0 ? `<tr><td colspan="8" class="camp-empty-cell">${t('admin:campaign.enemies.noEnemies')}</td></tr>` : this.enemyTypes.map((et) => this.renderEnemyRow(et)).join('')}
         </tbody>
       </table>
-    `;
+    `,
+    );
 
     content.querySelector('#camp-create-enemy')!.addEventListener('click', () => {
       this.showEnemyModal();
@@ -822,7 +834,9 @@ export class CampaignTab {
       className: 'camp-modal-body lg',
     });
 
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <h3 class="camp-modal-title">${isEdit ? t('admin:campaign.enemyModal.editTitle') : t('admin:campaign.enemyModal.createTitle')}</h3>
 
       <div class="camp-enemy-columns">
@@ -966,7 +980,8 @@ export class CampaignTab {
         <button class="btn btn-secondary" id="enemy-modal-cancel">${t('admin:campaign.enemyModal.cancel')}</button>
         <button class="btn btn-primary" id="enemy-modal-submit">${isEdit ? t('admin:campaign.enemyModal.save') : t('admin:campaign.enemyModal.create')}</button>
       </div>
-    `;
+    `,
+    );
 
     // Populate enemy AI dropdown
     const aiSelect = overlay.querySelector('#enemy-ai-select') as HTMLSelectElement;
@@ -1198,7 +1213,9 @@ export class CampaignTab {
       className: 'camp-modal-body md',
     });
 
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <h3 class="camp-modal-title">${t('admin:campaign.importLevelModal.title')}</h3>
       <p class="camp-import-hint">
         ${t('admin:campaign.importLevelModal.hint')}
@@ -1211,7 +1228,8 @@ export class CampaignTab {
         <button class="btn btn-secondary" id="import-level-cancel">${t('admin:campaign.importLevelModal.cancel')}</button>
         <button class="btn btn-primary" id="import-level-submit" disabled>${t('admin:campaign.importLevelModal.import')}</button>
       </div>
-    `;
+    `,
+    );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- JSON.parse result with dynamic format detection
     let parsedData: any = null;
@@ -1230,20 +1248,26 @@ export class CampaignTab {
         const format = parsedData._format || parsedData.level?._format || 'unknown';
         if (format === 'blast-arena-level-bundle') {
           const enemyCount = parsedData.enemyTypes?.length || 0;
-          statusEl.innerHTML = t('admin:campaign.importLevelModal.bundleDetected', {
-            name: escapeHtml(parsedData.level?.name || '?'),
-            count: enemyCount,
-          });
+          setHtml(
+            statusEl,
+            t('admin:campaign.importLevelModal.bundleDetected', {
+              name: escapeHtml(parsedData.level?.name || '?'),
+              count: enemyCount,
+            }),
+          );
         } else if (format === 'blast-arena-level') {
-          statusEl.innerHTML = t('admin:campaign.importLevelModal.levelDetected', {
-            name: escapeHtml(parsedData.name || '?'),
-          });
+          setHtml(
+            statusEl,
+            t('admin:campaign.importLevelModal.levelDetected', {
+              name: escapeHtml(parsedData.name || '?'),
+            }),
+          );
         } else {
-          statusEl.innerHTML = t('admin:campaign.importLevelModal.unknownFormat');
+          setHtml(statusEl, t('admin:campaign.importLevelModal.unknownFormat'));
         }
         submitBtn.disabled = false;
       } catch {
-        statusEl.innerHTML = t('admin:campaign.importLevelModal.invalidJson');
+        setHtml(statusEl, t('admin:campaign.importLevelModal.invalidJson'));
         parsedData = null;
         submitBtn.disabled = true;
       }
@@ -1336,7 +1360,9 @@ export class CampaignTab {
       className: 'camp-modal-body conflict',
     });
 
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <h3 class="camp-modal-title warning">${t('admin:campaign.conflictModal.title')}</h3>
       <p class="camp-import-hint mb-md">
         ${t('admin:campaign.conflictModal.hint')}
@@ -1346,7 +1372,8 @@ export class CampaignTab {
         <button class="btn btn-secondary" id="conflict-cancel">${t('admin:campaign.conflictModal.cancel')}</button>
         <button class="btn btn-primary" id="conflict-submit">${t('admin:campaign.conflictModal.import')}</button>
       </div>
-    `;
+    `,
+    );
 
     overlay.querySelector('#conflict-cancel')!.addEventListener('click', close);
 
@@ -1402,7 +1429,9 @@ export class CampaignTab {
       className: 'camp-modal-body sm',
     });
 
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
       <h3 class="camp-modal-title danger">${t('admin:campaign.deleteModal.title', { entity: entityLabel })}</h3>
       <p class="camp-delete-confirm-text">${warningText} <strong>${escapeHtml(name)}</strong></p>
       <p class="camp-delete-confirm-hint">${t('admin:campaign.deleteModal.confirmHint')}</p>
@@ -1411,7 +1440,8 @@ export class CampaignTab {
         <button class="btn btn-secondary" id="camp-delete-cancel">${t('admin:campaign.deleteModal.cancel')}</button>
         <button class="btn btn-danger" id="camp-delete-submit" disabled>${t('admin:campaign.deleteModal.deleteBtn')}</button>
       </div>
-    `;
+    `,
+    );
 
     const confirmInput = overlay.querySelector('#camp-delete-confirm') as HTMLInputElement;
     const deleteBtn = overlay.querySelector('#camp-delete-submit') as HTMLButtonElement;
@@ -1465,7 +1495,9 @@ export class CampaignTab {
 
       const totalPages = Math.ceil(data.total / 20) || 1;
 
-      content.innerHTML = `
+      setHtml(
+        content,
+        `
         <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
           <div class="text-dim">${t('admin:campaign.replays.totalCount', { count: data.total })}</div>
           <div class="flex-row" style="gap:6px;">
@@ -1493,7 +1525,8 @@ export class CampaignTab {
             ${data.replays.length === 0 ? `<tr><td colspan="10" style="text-align:center;color:var(--text-dim);padding:16px;">${t('admin:campaign.replays.noReplays')}</td></tr>` : data.replays.map((r) => this.renderCampaignReplayRow(r)).join('')}
           </tbody>
         </table>
-      `;
+      `,
+      );
 
       content.querySelector('#camp-replays-prev')?.addEventListener('click', () => {
         if (this.campaignReplaysPage > 1) {
@@ -1510,7 +1543,10 @@ export class CampaignTab {
 
       this.attachCampaignReplayHandlers(content as HTMLElement);
     } catch (err: unknown) {
-      content.innerHTML = `<div class="text-danger">${t('admin:campaign.replays.loadReplaysError', { error: getErrorMessage(err) })}</div>`;
+      setHtml(
+        content,
+        `<div class="text-danger">${t('admin:campaign.replays.loadReplaysError', { error: getErrorMessage(err) })}</div>`,
+      );
     }
   }
 

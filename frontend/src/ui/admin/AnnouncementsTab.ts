@@ -1,7 +1,7 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
 import { UserRole, getErrorMessage } from '@blast-arena/shared';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 /** Active banner row returned by GET /admin/announcements/banner (null when no banner). */
@@ -45,7 +45,9 @@ export class AnnouncementsTab {
       // No banner or not available
     }
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="admin-section">
         <h3>${t('admin:announcements.broadcastToastTitle')}</h3>
         <p style="color:var(--text-dim);font-size:13px;margin-bottom:12px;">${t('admin:announcements.broadcastToastDescription')}</p>
@@ -83,7 +85,8 @@ export class AnnouncementsTab {
       `
           : ''
       }
-    `;
+    `,
+    );
 
     // Toast preview
     const toastInput = this.container.querySelector('#toast-input') as HTMLInputElement;
@@ -91,9 +94,12 @@ export class AnnouncementsTab {
     if (toastInput && previewArea) {
       toastInput.addEventListener('input', () => {
         if (toastInput.value.trim()) {
-          previewArea.innerHTML = `<div class="toast-preview">${t('admin:announcements.toastPreview', { message: escapeHtml(toastInput.value) })}</div>`;
+          setHtml(
+            previewArea,
+            `<div class="toast-preview">${t('admin:announcements.toastPreview', { message: escapeHtml(toastInput.value) })}</div>`,
+          );
         } else {
-          previewArea.innerHTML = '';
+          setHtml(previewArea, '');
         }
       });
     }
@@ -109,7 +115,7 @@ export class AnnouncementsTab {
         await ApiClient.post('/admin/announcements/toast', { message: msg });
         this.notifications.success(t('admin:announcements.toastBroadcasted'));
         toastInput.value = '';
-        if (previewArea) previewArea.innerHTML = '';
+        if (previewArea) setHtml(previewArea, '');
       } catch (err: unknown) {
         this.notifications.error(getErrorMessage(err));
       }

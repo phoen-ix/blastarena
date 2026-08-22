@@ -1,7 +1,7 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
 import { DirectMessage, DMConversation, ChatMode, DM_MAX_LENGTH } from '@blast-arena/shared';
-import { escapeHtml } from '../../utils/html';
+import { escapeHtml, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 export class MessagesView implements ILobbyView {
@@ -242,7 +242,9 @@ export class MessagesView implements ILobbyView {
       'var(--accent)',
     ];
 
-    this.container.innerHTML = `
+    setHtml(
+      this.container,
+      `
       <div class="messages-page">
         <div class="messages-sidebar">
           <div class="messages-sidebar-header">${t('ui:messages.conversations')}</div>
@@ -283,7 +285,8 @@ export class MessagesView implements ILobbyView {
           }
         </div>
       </div>
-    `;
+    `,
+    );
 
     this.renderConversationList();
 
@@ -308,18 +311,20 @@ export class MessagesView implements ILobbyView {
     ];
 
     if (this.conversations.length === 0) {
-      listEl.innerHTML = `<div class="messages-conv-empty">${t('ui:messages.noConversations')}</div>`;
+      setHtml(listEl, `<div class="messages-conv-empty">${t('ui:messages.noConversations')}</div>`);
       return;
     }
 
-    listEl.innerHTML = this.conversations
-      .map((conv) => {
-        const color = avatarColors[conv.userId % avatarColors.length];
-        const isActive = this.activeConversation?.userId === conv.userId;
-        const preview =
-          conv.lastMessage.length > 40 ? conv.lastMessage.slice(0, 40) + '...' : conv.lastMessage;
+    setHtml(
+      listEl,
+      this.conversations
+        .map((conv) => {
+          const color = avatarColors[conv.userId % avatarColors.length];
+          const isActive = this.activeConversation?.userId === conv.userId;
+          const preview =
+            conv.lastMessage.length > 40 ? conv.lastMessage.slice(0, 40) + '...' : conv.lastMessage;
 
-        return `
+          return `
           <div class="messages-conv-item ${isActive ? 'active' : ''}" data-conv-user-id="${conv.userId}" data-conv-username="${escapeHtml(conv.username)}">
             <div class="messages-conv-item-avatar" style="background:${color};">
               ${escapeHtml(conv.username.charAt(0).toUpperCase())}
@@ -332,8 +337,9 @@ export class MessagesView implements ILobbyView {
             <div class="messages-conv-item-time">${this.formatTimeAgo(conv.lastMessageAt)}</div>
           </div>
         `;
-      })
-      .join('');
+        })
+        .join(''),
+    );
 
     // Click listeners are delegated via setupDelegatedListeners()
   }
@@ -343,27 +349,30 @@ export class MessagesView implements ILobbyView {
     if (!body) return;
 
     if (this.messages.length === 0) {
-      body.innerHTML = `<div class="messages-empty-chat">${t('ui:messages.noMessages')}</div>`;
+      setHtml(body, `<div class="messages-empty-chat">${t('ui:messages.noMessages')}</div>`);
       return;
     }
 
-    body.innerHTML = this.messages
-      .map((msg) => {
-        const isSent = msg.senderId === this.userId;
-        const timeStr = this.formatMessageTime(msg.createdAt);
-        const readIndicator =
-          isSent && msg.readAt
-            ? '<span class="messages-read-indicator">&#10003;&#10003;</span>'
-            : '';
+    setHtml(
+      body,
+      this.messages
+        .map((msg) => {
+          const isSent = msg.senderId === this.userId;
+          const timeStr = this.formatMessageTime(msg.createdAt);
+          const readIndicator =
+            isSent && msg.readAt
+              ? '<span class="messages-read-indicator">&#10003;&#10003;</span>'
+              : '';
 
-        return `
+          return `
           <div class="messages-msg ${isSent ? 'sent' : 'received'}">
             <div class="messages-msg-bubble">${escapeHtml(msg.message)}</div>
             <div class="messages-msg-meta">${timeStr}${readIndicator}</div>
           </div>
         `;
-      })
-      .join('');
+        })
+        .join(''),
+    );
   }
 
   private focusMessageInput(): void {

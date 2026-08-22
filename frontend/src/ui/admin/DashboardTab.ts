@@ -1,5 +1,5 @@
 import { ApiClient } from '../../network/ApiClient';
-import { escapeAttr, escapeHtml } from '../../utils/html';
+import { escapeAttr, escapeHtml, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
 import { NotificationUI } from '../NotificationUI';
@@ -161,7 +161,9 @@ export class DashboardTab {
     const card = document.createElement('div');
     card.id = 'server-settings-card';
     card.className = 'settings-card';
-    card.innerHTML = `
+    setHtml(
+      card,
+      `
       <h3>${t('admin:dashboard.serverSettings')}</h3>
       <div class="settings-grid">
         <div class="setting-item">
@@ -324,7 +326,8 @@ export class DashboardTab {
       ${this.renderEmailSettingsSection()}
       ${this.renderDefaultsSection('game')}
       ${this.renderDefaultsSection('simulation')}
-    `;
+    `,
+    );
     this.container.appendChild(card);
 
     card.querySelector('#toggle-recordings')!.addEventListener('change', async (e) => {
@@ -568,7 +571,9 @@ export class DashboardTab {
       style: 'max-width:420px;',
       parent: document.getElementById('ui-overlay')!,
     });
-    content.innerHTML = `
+    setHtml(
+      content,
+      `
         <h2 style="margin-bottom:12px;color:var(--danger);">${t('admin:dashboard.revokeAllSessions')}</h2>
         <p style="color:var(--text-dim);font-size:14px;">${t('admin:dashboard.revokeAllDescription')}</p>
         <p style="color:var(--text-dim);font-size:13px;margin-top:8px;">${t('admin:dashboard.revokeAllConfirmPrompt')}</p>
@@ -577,7 +582,8 @@ export class DashboardTab {
           <button class="btn btn-secondary" id="revoke-all-cancel">${t('admin:dashboard.revokeAllCancel')}</button>
           <button class="btn-danger" style="padding:8px 16px;font-size:14px;opacity:0.5;" id="revoke-all-confirm" disabled>${t('admin:dashboard.revokeAllConfirm')}</button>
         </div>
-    `;
+    `,
+    );
 
     const input = overlay.querySelector('#revoke-all-confirm-input') as HTMLInputElement;
     const confirmBtn = overlay.querySelector('#revoke-all-confirm') as HTMLButtonElement;
@@ -1118,7 +1124,9 @@ export class DashboardTab {
 
       const statsDiv = document.createElement('div');
       statsDiv.className = 'admin-stats';
-      statsDiv.innerHTML = `
+      setHtml(
+        statsDiv,
+        `
         <div class="stat-card">
           <div class="stat-value">${stats.totalUsers}</div>
           <div class="stat-label">${t('admin:dashboard.statTotalUsers')}</div>
@@ -1139,7 +1147,8 @@ export class DashboardTab {
           <div class="stat-value">${stats.activePlayers}</div>
           <div class="stat-label">${t('admin:dashboard.statOnlinePlayers')}</div>
         </div>
-      `;
+      `,
+      );
 
       // Insert stats at the top, before settings card
       const settingsCard = this.container.querySelector('#server-settings-card');

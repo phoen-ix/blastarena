@@ -8,6 +8,7 @@ import {
   SPECTATOR_MAX_ENERGY,
 } from '@blast-arena/shared';
 import { t } from '../i18n';
+import { setHtml } from '../utils/html';
 
 type ActionType = 'place_wall' | 'trigger_meteor' | 'drop_powerup' | 'speed_zone';
 
@@ -111,10 +112,13 @@ export class SpectatorActionBar {
         position: relative;
         opacity: 0.5;
       `;
-      btn.innerHTML = `
+      setHtml(
+        btn,
+        `
         <span style="font-size:18px; line-height:1;">${action.icon}</span>
         <span style="font-size:9px; color:var(--text-muted);">${action.hotkey} · ${action.cost}</span>
-      `;
+      `,
+      );
       btn.addEventListener('click', () => this.selectAction(action.type));
       this.buttons.set(action.type, btn);
       this.container.appendChild(btn);
