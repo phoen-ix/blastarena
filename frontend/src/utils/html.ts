@@ -67,3 +67,29 @@ export function escapeAttr(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
+
+/**
+ * Make `parent`'s children exactly `order`, in that order, reusing the elements already there.
+ *
+ * The alternative — reassigning `innerHTML` — throws away and rebuilds every node, which restarts
+ * CSS transitions, drops inline styles written by event handlers, and clears focus and selection.
+ * That is fine for a list rendered once, and wrong for one rendered at the game tick rate.
+ *
+ * Elements already in the right place are left untouched; elements that moved are re-inserted;
+ * anything not in `order` ends up in the trailing region and is removed. (audit HUD-PLAYERLIST-1)
+ */
+export function reconcileChildren(parent: Node, order: readonly Node[]): void {
+  let ref: ChildNode | null = parent.firstChild;
+  for (const node of order) {
+    if (ref === node) {
+      ref = node.nextSibling;
+    } else {
+      parent.insertBefore(node, ref);
+    }
+  }
+  while (ref) {
+    const next: ChildNode | null = ref.nextSibling;
+    parent.removeChild(ref);
+    ref = next;
+  }
+}

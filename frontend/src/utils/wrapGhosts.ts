@@ -72,3 +72,66 @@ export function wrapGhostPositions(
   }
   return positions;
 }
+
+/** A wrapped copy of the map, and the tile range within it that the camera can see. */
+export interface GhostTileSpan {
+  /** World-pixel offset of this copy from the canonical map. */
+  ox: number;
+  oy: number;
+  /** Inclusive tile bounds within the map grid. */
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * The grid counterpart to `wrapGhostOffsets`.
+ *
+ * Entity renderers ghost a single point, so an offset is either needed or not. A tile map is a
+ * whole grid, and near a seam the camera sees a *slice* of a wrapped copy — so this returns, for
+ * each of the 8 surrounding copies the camera overlaps, the inclusive tile range to draw. The
+ * canonical copy (0,0) is excluded: real tile sprites cover it.
+ *
+ * The returned ranges are disjoint in screen space, so their total tile count is bounded by the
+ * number of tiles on screen — not by the map size. (audit TILE-GHOST-1)
+ */
+export function wrapGhostTileSpans(
+  view: ViewRect,
+  cols: number,
+  rows: number,
+  tileSize: number,
+): GhostTileSpan[] {
+  const worldW = cols * tileSize;
+  const worldH = rows * tileSize;
+  if (worldW <= 0 || worldH <= 0 || view.width <= 0 || view.height <= 0) return [];
+
+  const spans: GhostTileSpan[] = [];
+  for (let oy = -worldH; oy <= worldH; oy += worldH) {
+    for (let ox = -worldW; ox <= worldW; ox += worldW) {
+      if (ox === 0 && oy === 0) continue;
+
+      // Intersect the camera with this copy's world rectangle.
+      const left = Math.max(view.x, ox);
+      const right = Math.min(view.x + view.width, ox + worldW);
+      const top = Math.max(view.y, oy);
+      const bottom = Math.min(view.y + view.height, oy + worldH);
+      if (right <= left || bottom <= top) continue;
+
+      spans.push({
+        ox,
+        oy,
+        x0: Math.max(0, Math.floor((left - ox) / tileSize)),
+        x1: Math.min(cols - 1, Math.floor((right - ox) / tileSize)),
+        y0: Math.max(0, Math.floor((top - oy) / tileSize)),
+        y1: Math.min(rows - 1, Math.floor((bottom - oy) / tileSize)),
+      });
+    }
+  }
+  return spans;
+}
+
+/** Stable identity of a span layout, so callers can skip rebuilds when nothing moved. */
+export function ghostTileSpanKey(spans: GhostTileSpan[]): string {
+  return spans.map((s) => `${s.ox},${s.oy},${s.x0},${s.y0},${s.x1},${s.y1}`).join('|');
+}

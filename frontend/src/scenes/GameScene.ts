@@ -46,6 +46,7 @@ import {
 } from '../game/LocalCoopInput';
 import { ApiClient } from '../network/ApiClient';
 import { EmoteId, EMOTES, CampaignLevelSummary } from '@blast-arena/shared';
+import type { ServerToClientEvents } from '@blast-arena/shared';
 import { audioManager } from '../game/AudioManager';
 
 export class GameScene extends Phaser.Scene {
@@ -108,6 +109,21 @@ export class GameScene extends Phaser.Scene {
   private enemyRenderer: EnemySpriteRenderer | null = null;
   private lastCampaignState: CampaignGameState | null = null;
   private campaignStateHandler: ((state: CampaignGameState) => void) | null = null;
+
+  // Simulation-spectate listeners. Kept as refs because SimulationsTab listens on the same events
+  // and a handler-less off() would remove its listeners too. (audit SOCKET-OFF-REF-1)
+  private simStateHandler: ((data: { batchId: string; state: GameState }) => void) | null = null;
+  private simTransitionHandler: ((data: { batchId: string }) => void) | null = null;
+  private simCompletedHandler: (() => void) | null = null;
+
+  // Match/open-world listeners, likewise kept as refs so teardown removes only ours.
+  // (audit SOCKET-OFF-REF-1)
+  // Payload types are derived from the socket event map rather than restated, so they cannot
+  // drift from the contract.
+  private gameStateHandler: ServerToClientEvents['game:state'] | null = null;
+  private gameOverHandler: ServerToClientEvents['game:over'] | null = null;
+  private gameEmoteHandler: ServerToClientEvents['game:emote'] | null = null;
+  private openWorldStateHandler: ServerToClientEvents['openworld:state'] | null = null;
 
   // Emotes
   private emoteRenderer: EmoteBubbleRenderer | null = null;
@@ -209,9 +225,7 @@ export class GameScene extends Phaser.Scene {
     const initialState: GameState = this.registry.get('initialGameState');
 
     // Clean up stale state from previous game
-    this.socketClient.off('game:state');
-    this.socketClient.off('game:over');
-    this.socketClient.off('game:emote');
+    this.removeGameListeners();
     this.socketClient.off('game:bombThrown');
     // Remove only OUR campaign:state handler — HUDScene also listens on this event
     if (this.campaignStateHandler) {
@@ -235,7 +249,6 @@ export class GameScene extends Phaser.Scene {
     this.cleanupRenderers();
 
     // Open world cleanup
-    this.socketClient.off('openworld:state');
     if (this.openWorldRoundEndHandler) {
       this.socketClient.off('openworld:roundEnd', this.openWorldRoundEndHandler);
       this.openWorldRoundEndHandler = null;
@@ -374,7 +387,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     // Listen for emotes from other players
-    this.socketClient.on('game:emote', (data) => {
+    this.gameEmoteHandler = (data) => {
       if (!this.lastGameState || !this.emoteRenderer) return;
       const player = this.lastGameState.players.find((p) => p.id === data.playerId);
       if (player && player.alive) {
@@ -382,7 +395,8 @@ export class GameScene extends Phaser.Scene {
         const py = player.position.y * TILE_SIZE + TILE_SIZE / 2;
         this.emoteRenderer.showEmote(data.playerId, data.emoteId, px, py);
       }
-    });
+    };
+    this.socketClient.on('game:emote', this.gameEmoteHandler);
 
     // Emote keys 1-6 quick emotes + backtick for emote wheel
     this.emoteWheel = new EmoteWheel();
@@ -519,14 +533,21 @@ export class GameScene extends Phaser.Scene {
       this.replayPlayer.seekTo(0);
       this.replayPlayer.play();
     } else if (simSpectate) {
-      // Simulation spectate mode: listen on sim:state, no input sending
+      // Simulation spectate mode: listen on sim:state, no input sending.
+      //
+      // Every off() here passes its own handler. SocketClient.off(event) with no handler removes
+      // EVERY listener for that event, and SimulationsTab keeps its own sim:state handler alive
+      // for up to 5s while waiting for a batch's first state, plus a permanent sim:completed one.
+      // The blanket removals below used to wipe both — so spectating a second batch from the admin
+      // tab silently hung. (audit SOCKET-OFF-REF-1)
       this.localPlayerDead = true; // Force spectator mode
-      this.socketClient.on('sim:state', (data) => {
+      this.simStateHandler = (data) => {
         this.updateState(data.state);
-      });
+      };
+      this.socketClient.on('sim:state', this.simStateHandler);
 
       // Handle game-to-game transitions within a batch
-      this.socketClient.on('sim:gameTransition', (data) => {
+      this.simTransitionHandler = (data) => {
         // Wait for the next game's initial state, then restart the scene
         const nextStateHandler = (stateData: { batchId: string; state: GameState }) => {
           if (stateData.batchId !== data.batchId) return;
@@ -537,21 +558,24 @@ export class GameScene extends Phaser.Scene {
           this.registry.set('simulationSpectate', { batchId: data.batchId });
           this.scene.restart();
         };
-        // Temporarily swap to the transition handler
-        this.socketClient.off('sim:state');
+        // Temporarily swap to the transition handler — remove only ours.
+        if (this.simStateHandler) {
+          this.socketClient.off('sim:state', this.simStateHandler);
+        }
+        this.simStateHandler = nextStateHandler;
         this.socketClient.on('sim:state', nextStateHandler);
-      });
+      };
+      this.socketClient.on('sim:gameTransition', this.simTransitionHandler);
 
       // When the batch completes, return to lobby
-      this.socketClient.on('sim:completed', () => {
-        this.socketClient.off('sim:state');
-        this.socketClient.off('sim:gameTransition');
-        this.socketClient.off('sim:completed');
+      this.simCompletedHandler = () => {
+        this.removeSimListeners();
         this.socketClient.emit('sim:unspectate', { batchId: simSpectate.batchId });
         this.registry.remove('simulationSpectate');
         this.scene.stop('HUDScene');
         this.scene.start('LobbyScene');
-      });
+      };
+      this.socketClient.on('sim:completed', this.simCompletedHandler);
     } else if (this.registry.get('campaignMode')) {
       // Campaign mode: listen on campaign-specific events
       this.campaignMode = true;
@@ -671,9 +695,10 @@ export class GameScene extends Phaser.Scene {
       window.addEventListener('keydown', this.pauseKeyHandler);
     } else if (this.openWorldMode) {
       // Open world uses its own state event
-      this.socketClient.on('openworld:state', (state) => {
+      this.openWorldStateHandler = (state) => {
         this.updateState(state);
-      });
+      };
+      this.socketClient.on('openworld:state', this.openWorldStateHandler);
 
       // Handle round transitions
       this.openWorldRoundEndHandler = (data) => {
@@ -745,15 +770,17 @@ export class GameScene extends Phaser.Scene {
       };
       window.addEventListener('keydown', this.pauseKeyHandler);
     } else {
-      this.socketClient.on('game:state', (state) => {
+      this.gameStateHandler = (state) => {
         this.updateState(state);
-      });
+      };
+      this.socketClient.on('game:state', this.gameStateHandler);
 
-      this.socketClient.on('game:over', (data) => {
+      this.gameOverHandler = (data) => {
         this.registry.set('gameOverData', data);
         this.scene.stop('HUDScene');
         this.scene.start('GameOverScene');
-      });
+      };
+      this.socketClient.on('game:over', this.gameOverHandler);
 
       // Escape key to toggle leave game menu (multiplayer)
       if (!this.registry.get('replayMode') && !this.registry.get('simulationSpectate')) {
@@ -903,6 +930,9 @@ export class GameScene extends Phaser.Scene {
 
     this.processInput();
     this.updateCamera();
+    // After updateCamera, so the ghosts are culled against this frame's worldView. No-ops for
+    // non-wrapping maps and when the visible tile range hasn't changed. (audit TILE-GHOST-1)
+    this.tileMap?.updateGhosts();
     this.updatePartnerArrows();
 
     // Update emote bubble positions to follow players
@@ -1807,15 +1837,56 @@ export class GameScene extends Phaser.Scene {
       });
   }
 
+  /**
+   * Remove only this scene's match/open-world listeners.
+   *
+   * SocketClient.off(event) with no handler removes EVERY listener for that event. These four are
+   * currently GameScene's alone, so the blanket form happened to be harmless — but it is one new
+   * consumer away from the bug it caused for sim:state, and the project convention is handler
+   * refs. (audit SOCKET-OFF-REF-1)
+   */
+  private removeGameListeners(): void {
+    if (this.gameStateHandler) {
+      this.socketClient.off('game:state', this.gameStateHandler);
+      this.gameStateHandler = null;
+    }
+    if (this.gameOverHandler) {
+      this.socketClient.off('game:over', this.gameOverHandler);
+      this.gameOverHandler = null;
+    }
+    if (this.gameEmoteHandler) {
+      this.socketClient.off('game:emote', this.gameEmoteHandler);
+      this.gameEmoteHandler = null;
+    }
+    if (this.openWorldStateHandler) {
+      this.socketClient.off('openworld:state', this.openWorldStateHandler);
+      this.openWorldStateHandler = null;
+    }
+  }
+
+  /** Remove only this scene's simulation listeners. (audit SOCKET-OFF-REF-1) */
+  private removeSimListeners(): void {
+    if (this.simStateHandler) {
+      this.socketClient.off('sim:state', this.simStateHandler);
+      this.simStateHandler = null;
+    }
+    if (this.simTransitionHandler) {
+      this.socketClient.off('sim:gameTransition', this.simTransitionHandler);
+      this.simTransitionHandler = null;
+    }
+    if (this.simCompletedHandler) {
+      this.socketClient.off('sim:completed', this.simCompletedHandler);
+      this.simCompletedHandler = null;
+    }
+  }
+
   shutdown(): void {
     if (this.onResize) {
       this.scale.off('resize', this.onResize);
       this.onResize = undefined;
     }
-    this.socketClient.off('game:state');
-    this.socketClient.off('game:over');
+    this.removeGameListeners();
     this.socketClient.off('game:bombThrown');
-    this.socketClient.off('openworld:state');
     if (this.openWorldRoundEndHandler) {
       this.socketClient.off('openworld:roundEnd', this.openWorldRoundEndHandler);
       this.openWorldRoundEndHandler = null;
@@ -1836,9 +1907,7 @@ export class GameScene extends Phaser.Scene {
       this.socketClient.off('openworld:scoreUpdate', this.openWorldScoreHandler);
       this.openWorldScoreHandler = null;
     }
-    this.socketClient.off('sim:state');
-    this.socketClient.off('sim:gameTransition');
-    this.socketClient.off('sim:completed');
+    this.removeSimListeners();
     // Remove only OUR campaign:state handler — HUDScene also listens on this event
     if (this.campaignStateHandler) {
       this.socketClient.off('campaign:state', this.campaignStateHandler);
@@ -1848,7 +1917,6 @@ export class GameScene extends Phaser.Scene {
     this.socketClient.off('campaign:gameOver');
     this.socketClient.off('campaign:playerLockedIn');
     this.socketClient.off('campaign:partnerLeft');
-    this.socketClient.off('game:emote');
     if (this.emoteKeyHandler) {
       window.removeEventListener('keydown', this.emoteKeyHandler);
       this.emoteKeyHandler = null;

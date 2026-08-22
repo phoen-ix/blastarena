@@ -22,6 +22,7 @@ import { EnemyTextureGenerator } from '../game/EnemyTextureGenerator';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { ApiClient } from '../network/ApiClient';
 import { generateThemedTileTextures, generateHazardTileTextures } from '../utils/campaignThemes';
+import { getTileTexture, isConveyorTile, conveyorAnimKey } from '../utils/tileTextures';
 
 type EditorTool =
   | 'empty'
@@ -357,16 +358,15 @@ export class LevelEditorScene extends Phaser.Scene {
     for (let y = 0; y < this.mapHeight; y++) {
       this.tileSprites[y] = [];
       for (let x = 0; x < this.mapWidth; x++) {
-        const texture = this.getTileTexture(this.tiles[y][x], x, y);
+        const texture = getTileTexture(this.tiles[y][x], x, y, this.worldTheme);
         const sprite = this.add.sprite(
           x * TILE_SIZE + TILE_SIZE / 2,
           y * TILE_SIZE + TILE_SIZE / 2,
           texture,
         );
         sprite.setDepth(0);
-        if (this.isConveyorType(this.tiles[y][x])) {
-          const prefix = this.worldTheme && this.worldTheme !== 'classic' ? 'themed_' : '';
-          const animKey = `${prefix}${this.tiles[y][x]}_anim`;
+        if (isConveyorTile(this.tiles[y][x])) {
+          const animKey = conveyorAnimKey(this.tiles[y][x], this.worldTheme);
           if (this.anims.exists(animKey)) sprite.play(animKey);
         }
         this.tileSprites[y][x] = sprite;
@@ -554,65 +554,6 @@ export class LevelEditorScene extends Phaser.Scene {
           this.puzzleLinkGraphics.lineBetween(sx, sy, gx, gy);
         }
       }
-    }
-  }
-
-  private getTileTexture(type: TileType, x: number, y: number): string {
-    const themed = this.worldTheme && this.worldTheme !== 'classic';
-    switch (type) {
-      case 'wall':
-        return themed ? 'themed_wall' : 'wall';
-      case 'destructible':
-        return themed ? 'themed_destructible' : 'destructible';
-      case 'destructible_cracked':
-        return themed ? 'themed_destructible_cracked' : 'destructible_cracked';
-      case 'exit':
-        return themed ? 'themed_exit' : 'exit';
-      case 'goal':
-        return themed ? 'themed_goal' : 'goal';
-      case 'teleporter_a':
-      case 'teleporter_b':
-        return themed ? `themed_${type}` : type;
-      case 'conveyor_up':
-      case 'conveyor_down':
-      case 'conveyor_left':
-      case 'conveyor_right':
-        return themed ? `themed_${type}` : type;
-      case 'switch_red':
-      case 'switch_blue':
-      case 'switch_green':
-      case 'switch_yellow':
-      case 'switch_red_active':
-      case 'switch_blue_active':
-      case 'switch_green_active':
-      case 'switch_yellow_active':
-      case 'gate_red':
-      case 'gate_blue':
-      case 'gate_green':
-      case 'gate_yellow':
-      case 'gate_red_open':
-      case 'gate_blue_open':
-      case 'gate_green_open':
-      case 'gate_yellow_open':
-        return themed ? `themed_${type}` : type;
-      case 'crumbling':
-        return themed ? 'themed_crumbling' : 'crumbling';
-      case 'pit':
-        return type;
-      // Hazard tiles — texture key matches tile type name
-      case 'vine':
-      case 'quicksand':
-      case 'ice':
-      case 'lava':
-      case 'mud':
-      case 'spikes':
-      case 'spikes_active':
-      case 'dark_rift':
-        return type;
-      case 'spawn':
-        return themed ? `themed_floor_${(x + y) % 4}` : `floor_${(x + y) % 4}`;
-      default:
-        return themed ? `themed_floor_${(x + y) % 4}` : `floor_${(x + y) % 4}`;
     }
   }
 
@@ -930,14 +871,13 @@ export class LevelEditorScene extends Phaser.Scene {
 
   private updateTileSprite(x: number, y: number, skipOverlay?: boolean): void {
     const tileType = this.tiles[y][x];
-    const texture = this.getTileTexture(tileType, x, y);
+    const texture = getTileTexture(tileType, x, y, this.worldTheme);
     const sprite = this.tileSprites[y]?.[x];
     if (sprite) {
       sprite.stop();
       sprite.setTexture(texture);
-      if (this.isConveyorType(tileType)) {
-        const prefix = this.worldTheme && this.worldTheme !== 'classic' ? 'themed_' : '';
-        const animKey = `${prefix}${tileType}_anim`;
+      if (isConveyorTile(tileType)) {
+        const animKey = conveyorAnimKey(tileType, this.worldTheme);
         if (this.anims.exists(animKey)) sprite.play(animKey);
       }
     }
@@ -980,15 +920,6 @@ export class LevelEditorScene extends Phaser.Scene {
     );
   }
 
-  private isConveyorType(type: TileType | string): boolean {
-    return (
-      type === 'conveyor_up' ||
-      type === 'conveyor_down' ||
-      type === 'conveyor_left' ||
-      type === 'conveyor_right'
-    );
-  }
-
   /** Store a special tile as covered by the destructible wall at this position */
   private setCoveredTile(x: number, y: number, type: TileType): void {
     const key = `${x},${y}`;
@@ -996,7 +927,7 @@ export class LevelEditorScene extends Phaser.Scene {
     this.coveredTileSprites.get(key)?.destroy();
     this.coveredTiles.set(key, type);
     // Create overlay sprite showing the covered tile on top of the wall
-    const texture = this.getTileTexture(type, x, y);
+    const texture = getTileTexture(type, x, y, this.worldTheme);
     if (this.textures.exists(texture)) {
       const sprite = this.add.sprite(
         x * TILE_SIZE + TILE_SIZE / 2,
@@ -1005,9 +936,8 @@ export class LevelEditorScene extends Phaser.Scene {
       );
       sprite.setDepth(4); // Above tile (3) but below entities (5+)
       sprite.setAlpha(0.7);
-      if (this.isConveyorType(type)) {
-        const prefix = this.worldTheme && this.worldTheme !== 'classic' ? 'themed_' : '';
-        const animKey = `${prefix}${type}_anim`;
+      if (isConveyorTile(type)) {
+        const animKey = conveyorAnimKey(type, this.worldTheme);
         if (this.anims.exists(animKey)) sprite.play(animKey);
       }
       this.coveredTileSprites.set(key, sprite);

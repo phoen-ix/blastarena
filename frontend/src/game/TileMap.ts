@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { TileType, Position } from '@blast-arena/shared';
 import { TILE_SIZE } from '@blast-arena/shared';
 import { getSettings } from './Settings';
+import { wrapGhostTileSpans, ghostTileSpanKey } from '../utils/wrapGhosts';
+import { getTileTexture, isConveyorTile, conveyorAnimKey } from '../utils/tileTextures';
 
 export class TileMapRenderer {
   private scene: Phaser.Scene;
@@ -12,9 +14,12 @@ export class TileMapRenderer {
   private theme?: string;
   private wrapping: boolean;
 
-  // Ghost tile sprites for wrapping maps (8 offset copies)
-  private ghostSprites: Phaser.GameObjects.Image[][][] = [];
-  private ghostOffsets: { ox: number; oy: number }[] = [];
+  // Viewport-culled ghost tiles for wrapping maps. A flat pool of Images reused across frames;
+  // `ghostsByTile` indexes the live ones by `y * width + x` so a tile texture change can patch
+  // its ghosts in O(1). (audit TILE-GHOST-1)
+  private ghostPool: Phaser.GameObjects.Image[] = [];
+  private ghostsByTile: Map<number, Phaser.GameObjects.Image[]> = new Map();
+  private ghostLayoutKey = '';
 
   constructor(
     scene: Phaser.Scene,
@@ -31,7 +36,7 @@ export class TileMapRenderer {
     this.wrapping = wrapping;
     this.createTiles(tiles);
     if (wrapping) {
-      this.createGhostTiles();
+      this.updateGhosts();
     }
   }
 
@@ -44,7 +49,7 @@ export class TileMapRenderer {
       this.previousTiles[y] = [];
       for (let x = 0; x < this.width; x++) {
         const tileType = tiles[y][x];
-        const textureKey = this.getTileTexture(tileType, x, y);
+        const textureKey = getTileTexture(tileType, x, y, this.theme);
         const sprite = this.scene.add.sprite(
           x * TILE_SIZE + TILE_SIZE / 2,
           y * TILE_SIZE + TILE_SIZE / 2,
@@ -52,130 +57,87 @@ export class TileMapRenderer {
         );
         this.tileSprites[y][x] = sprite;
         this.previousTiles[y][x] = tileType;
-        if (this.isConveyorTile(tileType)) {
+        if (isConveyorTile(tileType)) {
           this.playConveyorAnim(sprite, tileType);
         }
       }
     }
   }
 
-  private createGhostTiles(): void {
-    const worldW = this.width * TILE_SIZE;
-    const worldH = this.height * TILE_SIZE;
+  /**
+   * Rebuild the ghost tiles the camera can actually see.
+   *
+   * The old implementation eagerly built all 8 wrapped copies of the entire map in the
+   * constructor: on the 51x41 open world that is 16,728 permanent Images on top of the 2,091
+   * canonical tile sprites, of which at most a screenful is ever on camera. This computes, per
+   * wrapped copy, the tile range that intersects the camera and draws only that — the same
+   * viewport-culling the entity renderers do via wrapGhostOffsets, adapted to a grid.
+   *
+   * Cheap to call every frame: the layout only changes when the camera scrolls across a tile
+   * boundary, so a matching layout key short-circuits before any Phaser work. (audit TILE-GHOST-1)
+   */
+  updateGhosts(): void {
+    if (!this.wrapping) return;
+    const cam = this.scene.cameras?.main;
+    if (!cam) return;
 
-    // 8 surrounding copies for toroidal wrap
-    this.ghostOffsets = [
-      { ox: -worldW, oy: -worldH },
-      { ox: 0, oy: -worldH },
-      { ox: worldW, oy: -worldH },
-      { ox: -worldW, oy: 0 },
-      { ox: worldW, oy: 0 },
-      { ox: -worldW, oy: worldH },
-      { ox: 0, oy: worldH },
-      { ox: worldW, oy: worldH },
-    ];
+    const spans = wrapGhostTileSpans(cam.worldView, this.width, this.height, TILE_SIZE);
+    const key = ghostTileSpanKey(spans);
+    if (key === this.ghostLayoutKey) return;
+    this.ghostLayoutKey = key;
 
-    for (const { ox, oy } of this.ghostOffsets) {
-      const grid: Phaser.GameObjects.Image[][] = [];
-      for (let y = 0; y < this.height; y++) {
-        grid[y] = [];
-        for (let x = 0; x < this.width; x++) {
-          const img = this.scene.add.image(
-            x * TILE_SIZE + TILE_SIZE / 2 + ox,
-            y * TILE_SIZE + TILE_SIZE / 2 + oy,
-            this.tileSprites[y][x].texture.key,
+    this.ghostsByTile.clear();
+    let used = 0;
+    for (const span of spans) {
+      for (let y = span.y0; y <= span.y1; y++) {
+        for (let x = span.x0; x <= span.x1; x++) {
+          // The canonical sprite is the source of truth: the animated branches of updateTiles()
+          // destroy and re-add it, so ghosts must never hold a stale object reference.
+          const textureKey = this.tileSprites[y][x].texture.key;
+          let img = this.ghostPool[used];
+          if (!img) {
+            img = this.scene.add.image(0, 0, textureKey);
+            // Explicit, because these are added mid-game — after players, bombs and explosions —
+            // and would otherwise draw over them.
+            img.setDepth(0);
+            this.ghostPool[used] = img;
+          } else {
+            img.setTexture(textureKey);
+            img.setVisible(true);
+          }
+          img.setPosition(
+            x * TILE_SIZE + TILE_SIZE / 2 + span.ox,
+            y * TILE_SIZE + TILE_SIZE / 2 + span.oy,
           );
-          grid[y][x] = img;
+
+          const tileKey = y * this.width + x;
+          const existing = this.ghostsByTile.get(tileKey);
+          if (existing) existing.push(img);
+          else this.ghostsByTile.set(tileKey, [img]);
+          used++;
         }
       }
-      this.ghostSprites.push(grid);
     }
-  }
 
-  private isConveyorTile(type: TileType | undefined): boolean {
-    return (
-      type === 'conveyor_up' ||
-      type === 'conveyor_down' ||
-      type === 'conveyor_left' ||
-      type === 'conveyor_right'
-    );
+    for (let i = used; i < this.ghostPool.length; i++) {
+      this.ghostPool[i].setVisible(false);
+    }
   }
 
   private playConveyorAnim(sprite: Phaser.GameObjects.Sprite, type: TileType): void {
     const settings = getSettings();
     if (!settings.animations) return;
-    const prefix = this.theme && this.theme !== 'classic' ? 'themed_' : '';
-    const animKey = `${prefix}${type}_anim`;
+    const animKey = conveyorAnimKey(type, this.theme);
     if (this.scene.anims.exists(animKey)) {
       sprite.play(animKey);
     }
   }
 
-  private getTileTexture(type: TileType, x: number, y: number): string {
-    const themed = this.theme && this.theme !== 'classic';
-    switch (type) {
-      case 'wall':
-        return themed ? 'themed_wall' : 'wall';
-      case 'destructible':
-        return themed ? 'themed_destructible' : 'destructible';
-      case 'destructible_cracked' as TileType:
-        return themed ? 'themed_destructible_cracked' : 'destructible_cracked';
-      case 'teleporter_a' as TileType:
-      case 'teleporter_b' as TileType:
-        return themed ? `themed_${type}` : type;
-      case 'conveyor_up' as TileType:
-      case 'conveyor_down' as TileType:
-      case 'conveyor_left' as TileType:
-      case 'conveyor_right' as TileType:
-        return themed ? `themed_${type}` : type;
-      case 'exit' as TileType:
-        return themed ? 'themed_exit' : 'exit';
-      case 'goal' as TileType:
-        return themed ? 'themed_goal' : 'goal';
-      // Puzzle tiles
-      case 'switch_red' as TileType:
-      case 'switch_blue' as TileType:
-      case 'switch_green' as TileType:
-      case 'switch_yellow' as TileType:
-      case 'switch_red_active' as TileType:
-      case 'switch_blue_active' as TileType:
-      case 'switch_green_active' as TileType:
-      case 'switch_yellow_active' as TileType:
-      case 'gate_red' as TileType:
-      case 'gate_blue' as TileType:
-      case 'gate_green' as TileType:
-      case 'gate_yellow' as TileType:
-      case 'gate_red_open' as TileType:
-      case 'gate_blue_open' as TileType:
-      case 'gate_green_open' as TileType:
-      case 'gate_yellow_open' as TileType:
-        return themed ? `themed_${type}` : type;
-      case 'crumbling' as TileType:
-        return themed ? 'themed_crumbling' : 'crumbling';
-      case 'pit' as TileType:
-        return type;
-      // Hazard tiles — texture key matches tile type name
-      case 'vine' as TileType:
-      case 'quicksand' as TileType:
-      case 'ice' as TileType:
-      case 'lava' as TileType:
-      case 'mud' as TileType:
-      case 'spikes' as TileType:
-      case 'spikes_active' as TileType:
-      case 'dark_rift' as TileType:
-        return type;
-      case 'empty':
-      case 'spawn':
-      default:
-        return themed ? `themed_floor_${(x + y) % 4}` : `floor_${(x + y) % 4}`;
-    }
-  }
-
-  /** Sync ghost sprite texture with the canonical tile */
+  /** Sync any on-screen ghosts of this tile with the canonical texture. */
   private updateGhostTexture(x: number, y: number, textureKey: string): void {
-    for (const grid of this.ghostSprites) {
-      grid[y][x].setTexture(textureKey);
-    }
+    const ghosts = this.ghostsByTile.get(y * this.width + x);
+    if (!ghosts) return;
+    for (const img of ghosts) img.setTexture(textureKey);
   }
 
   updateTiles(tiles: TileType[][]): Position[] {
@@ -215,7 +177,7 @@ export class TileMapRenderer {
             });
 
             // Create the new floor sprite immediately underneath
-            const newTexture = this.getTileTexture(newType, x, y);
+            const newTexture = getTileTexture(newType, x, y, this.theme);
             const newSprite = this.scene.add.sprite(
               x * TILE_SIZE + TILE_SIZE / 2,
               y * TILE_SIZE + TILE_SIZE / 2,
@@ -225,7 +187,7 @@ export class TileMapRenderer {
             this.updateGhostTexture(x, y, newTexture);
           } else {
             // No animation: just swap the texture
-            const newTexture = this.getTileTexture(newType, x, y);
+            const newTexture = getTileTexture(newType, x, y, this.theme);
             this.tileSprites[y][x].setTexture(newTexture);
             this.tileSprites[y][x].setAlpha(1);
             this.tileSprites[y][x].setScale(1);
@@ -233,7 +195,7 @@ export class TileMapRenderer {
           }
         } else if (this.isGateOpening(prevType, newType)) {
           // Gate opening: scale down old bars, reveal open gate underneath
-          const newTexture = this.getTileTexture(newType, x, y);
+          const newTexture = getTileTexture(newType, x, y, this.theme);
           if (settings.animations) {
             const oldSprite = this.tileSprites[y][x];
             this.scene.tweens.add({
@@ -261,7 +223,7 @@ export class TileMapRenderer {
           this.updateGhostTexture(x, y, newTexture);
         } else if (this.isGateClosing(prevType, newType)) {
           // Gate closing: new bars scale up from small to full
-          const newTexture = this.getTileTexture(newType, x, y);
+          const newTexture = getTileTexture(newType, x, y, this.theme);
           if (settings.animations) {
             const oldSprite = this.tileSprites[y][x];
             oldSprite.destroy();
@@ -287,7 +249,7 @@ export class TileMapRenderer {
           this.updateGhostTexture(x, y, newTexture);
         } else if (prevType === ('crumbling' as TileType) && newType === ('pit' as TileType)) {
           // Crumbling floor collapses into pit
-          const newTexture = this.getTileTexture(newType, x, y);
+          const newTexture = getTileTexture(newType, x, y, this.theme);
           if (settings.animations) {
             const oldSprite = this.tileSprites[y][x];
             this.scene.tweens.add({
@@ -316,11 +278,11 @@ export class TileMapRenderer {
         } else {
           // Non-destructive tile change (e.g. conveyor placed, teleporter toggled,
           // switch state change — simple texture swap)
-          const newTexture = this.getTileTexture(newType, x, y);
+          const newTexture = getTileTexture(newType, x, y, this.theme);
           const sprite = this.tileSprites[y][x];
           sprite.stop();
           sprite.setTexture(newTexture);
-          if (this.isConveyorTile(newType)) {
+          if (isConveyorTile(newType)) {
             this.playConveyorAnim(sprite, newType);
           }
           this.updateGhostTexture(x, y, newTexture);
@@ -361,15 +323,13 @@ export class TileMapRenderer {
         this.tileSprites[y][x]?.destroy();
       }
     }
-    for (const grid of this.ghostSprites) {
-      for (let y = 0; y < grid.length; y++) {
-        for (let x = 0; x < grid[y].length; x++) {
-          grid[y][x]?.destroy();
-        }
-      }
+    for (const img of this.ghostPool) {
+      img.destroy();
     }
     this.tileSprites = [];
-    this.ghostSprites = [];
+    this.ghostPool = [];
+    this.ghostsByTile.clear();
+    this.ghostLayoutKey = '';
     this.previousTiles = [];
   }
 }

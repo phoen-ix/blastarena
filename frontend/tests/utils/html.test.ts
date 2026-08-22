@@ -4,7 +4,7 @@ import { escapeHtml, escapeAttr } from '../../src/utils/html';
 describe('escapeHtml', () => {
   it('escapes <script> tags', () => {
     expect(escapeHtml('<script>alert("xss")</script>')).toBe(
-      '&lt;script&gt;alert("xss")&lt;/script&gt;'
+      '&lt;script&gt;alert("xss")&lt;/script&gt;',
     );
   });
 
@@ -44,7 +44,7 @@ describe('escapeAttr', () => {
 
   it('handles multiple special chars in one string', () => {
     expect(escapeAttr('<div class="x">\'hi\'</div>')).toBe(
-      '&lt;div class=&quot;x&quot;&gt;&#39;hi&#39;&lt;/div&gt;'
+      '&lt;div class=&quot;x&quot;&gt;&#39;hi&#39;&lt;/div&gt;',
     );
   });
 

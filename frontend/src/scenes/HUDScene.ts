@@ -7,7 +7,7 @@ import {
   KillCause,
   OpenWorldScoreEntry,
 } from '@blast-arena/shared';
-import { escapeHtml } from '../utils/html';
+import { escapeHtml, reconcileChildren } from '../utils/html';
 import { SpectatorChat } from '../game/SpectatorChat';
 import { SpectatorActionBar } from '../game/SpectatorActionBar';
 import { t } from '../i18n';
@@ -54,7 +54,15 @@ export class HUDScene extends Phaser.Scene {
     remoteMode: HTMLElement;
   } | null = null;
   // Player list element cache for differential updates
-  private playerListCache: Map<string, HTMLElement> = new Map();
+  // Keyed player-list rows, reused across state updates instead of re-rendering the whole list
+  // at the tick rate. `sig` is the rendered signature of a row: unchanged signature => no DOM
+  // writes at all. Team headers are siblings of the rows, so they get their own pool.
+  // (audit HUD-PLAYERLIST-1)
+  private playerRows: Map<
+    number,
+    { el: HTMLElement; nameEl: HTMLElement; badgeEl: HTMLElement; sig: string }
+  > = new Map();
+  private teamHeaderPool: HTMLElement[] = [];
 
   // Campaign HUD
   private campaignMode: boolean = false;
@@ -143,7 +151,8 @@ export class HUDScene extends Phaser.Scene {
     this.killFeedEntries = [];
     this.previousStats = null;
     this.statEls = null;
-    this.playerListCache.clear();
+    this.playerRows.clear();
+    this.teamHeaderPool = [];
     this.lastCampaignLives = -1;
     this.lastCampaignEnemyCount = -1;
     this.campaignHudEl?.remove();
@@ -575,39 +584,98 @@ export class HUDScene extends Phaser.Scene {
         });
       }
 
-      playersEl.innerHTML = sorted
-        .map((p) => {
-          const dead = !p.alive;
-          const clickable = p.alive && this.localPlayerDead;
-          let teamHeader = '';
-          if (isTeamMode && p.team !== lastTeam) {
-            lastTeam = p.team ?? -1;
-            const teamName = p.team === 0 ? t('ui:hud.teamRed') : t('ui:hud.teamBlue');
-            teamHeader = `<div style="font-size:11px;font-weight:600;color:${teamColors[p.team ?? 0]};padding:4px 8px 2px;margin-top:${(p.team ?? 0) > 0 ? '6px' : '0'};">${teamName}</div>`;
+      // Reuse rows instead of rebuilding the list every state update. The old
+      // `playersEl.innerHTML = ...` ran at the tick rate, which restarted the `transition: all`
+      // on .hud-player-item every 50ms and destroyed the 300ms spectate click-flash a frame
+      // after it started. (audit HUD-PLAYERLIST-1)
+      const order: HTMLElement[] = [];
+      const seenIds = new Set<number>();
+      let headerCount = 0;
+
+      for (const p of sorted) {
+        if (isTeamMode && p.team !== lastTeam) {
+          lastTeam = p.team ?? -1;
+          const team = p.team ?? 0;
+          let header = this.teamHeaderPool[headerCount];
+          if (!header) {
+            header = document.createElement('div');
+            header.className = 'hud-team-header';
+            this.teamHeaderPool[headerCount] = header;
           }
+          headerCount++;
+          const teamName = p.team === 0 ? t('ui:hud.teamRed') : t('ui:hud.teamBlue');
+          if (header.textContent !== teamName) header.textContent = teamName;
+          header.style.cssText = `font-size:11px;font-weight:600;color:${teamColors[team]};padding:4px 8px 2px;margin-top:${team > 0 ? '6px' : '0'};`;
+          order.push(header);
+        }
+
+        seenIds.add(p.id);
+        const dead = !p.alive;
+        const clickable = p.alive && this.localPlayerDead;
+        const score = isKOTH ? (state.kothScores?.[p.id] ?? 0) : 0;
+        const isControlling = isKOTH && state.hillZone?.controllingPlayer === p.id;
+        const sig = [
+          dead,
+          clickable,
+          isTeamMode,
+          p.team,
+          p.isBot,
+          p.isBuddy,
+          p.username,
+          isKOTH,
+          score,
+          isControlling,
+        ].join('|');
+
+        let row = this.playerRows.get(p.id);
+        if (!row) {
+          const el = document.createElement('div');
+          el.setAttribute('data-player-id', String(p.id));
+          const nameEl = document.createElement('span');
+          const badgeEl = document.createElement('span');
+          el.appendChild(nameEl);
+          el.appendChild(badgeEl);
+          row = { el, nameEl, badgeEl, sig: '' };
+          this.playerRows.set(p.id, row);
+        }
+
+        if (row.sig !== sig) {
+          row.sig = sig;
+          row.el.className = `hud-player-item${dead ? ' dead' : ''}${clickable ? ' clickable' : ''}`;
+          // Individual properties, not cssText: the spectate click-flash writes
+          // el.style.background and must survive a re-render.
+          row.el.style.display = isKOTH ? 'flex' : '';
+          row.el.style.alignItems = isKOTH ? 'center' : '';
+          row.el.style.gap = isKOTH ? '4px' : '';
+
           const teamDot = isTeamMode
             ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${teamColors[p.team ?? 0]};margin-right:4px;vertical-align:middle;"></span>`
             : '';
-
-          // KOTH score badge
-          let scoreBadge = '';
-          if (isKOTH) {
-            const score = state.kothScores?.[p.id] ?? 0;
-            const isControlling = state.hillZone?.controllingPlayer === p.id;
-            const scoreColor = isControlling ? '#00e676' : '#ffaa22';
-            scoreBadge = `<span style="margin-left:auto;font-size:11px;font-weight:700;color:${scoreColor};font-family:'Chakra Petch',monospace;">${isControlling ? '👑 ' : ''}${score}</span>`;
-          }
-
           const buddyTag = p.isBuddy
             ? '<span style="color:var(--accent);font-size:10px;font-weight:700;margin-left:4px;">[BUDDY]</span>'
             : '';
+          row.nameEl.innerHTML = `${teamDot}${p.isBot ? '🤖 ' : ''}${escapeHtml(p.username)}${buddyTag}`;
 
-          return `${teamHeader}<div class="hud-player-item${dead ? ' dead' : ''}${clickable ? ' clickable' : ''}" data-player-id="${p.id}" style="${isKOTH ? 'display:flex;align-items:center;gap:4px;' : ''}">
-          <span>${teamDot}${p.isBot ? '🤖 ' : ''}${escapeHtml(p.username)}${buddyTag}</span>
-          ${scoreBadge}
-        </div>`;
-        })
-        .join('');
+          if (isKOTH) {
+            row.badgeEl.style.cssText = `margin-left:auto;font-size:11px;font-weight:700;color:${isControlling ? '#00e676' : '#ffaa22'};font-family:'Chakra Petch',monospace;`;
+            row.badgeEl.textContent = `${isControlling ? '👑 ' : ''}${score}`;
+          } else if (row.badgeEl.textContent) {
+            row.badgeEl.style.cssText = 'display:none;';
+            row.badgeEl.textContent = '';
+          }
+        }
+        order.push(row.el);
+      }
+
+      // Reconcile positions: row order is not stable (team grouping, alive status, live KOTH
+      // score), so elements move rather than just change content. Anything not in `order` ends up
+      // in the trailing region and is dropped.
+      reconcileChildren(playersEl, order);
+
+      this.teamHeaderPool.length = headerCount;
+      for (const id of this.playerRows.keys()) {
+        if (!seenIds.has(id)) this.playerRows.delete(id);
+      }
     }
 
     // Minimap
