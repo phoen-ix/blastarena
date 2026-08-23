@@ -1,6 +1,11 @@
 node_modules
 dist
 data
+# The dev stack's data dir, the counterpart to `data/` above. Without this the whole dev MariaDB
+# and Redis state is sent as build context, and once the dev stack has run the build fails
+# outright: docker-compose.dev.yml's db/redis bind mounts are owned by uid 999, which the build
+# context sender cannot read. .gitignore already excludes it. (audit DEV-STACK-ISOLATION-1)
+data-dev
 .git
 .env
 *.md
