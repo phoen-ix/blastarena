@@ -18,11 +18,41 @@ import path from 'path';
  * custom page had no path to being rendered at all.
  *
  * Both are invisible in review and neither shows up in a normal request. So: parse the config.
- * (audit NGINX-ERRORPAGE-HEADERS-1)
+ *
+ * Runs over BOTH configs. `nginx.dev.conf` was previously untested entirely, which is how it went
+ * unnoticed that it carried no security headers at all — Express was the only source in the dev
+ * stack, so moving header ownership to nginx would have silently left dev with none.
+ * (audit NGINX-ERRORPAGE-HEADERS-1, HEADER-OWNERSHIP-1)
  */
 
-const CONF = path.join(__dirname, '../../../docker/nginx/nginx.conf');
-const HEADER_INCLUDE = 'include /etc/nginx/security-headers.conf;';
+interface NginxConfig {
+  label: string;
+  file: string;
+  include: string;
+  /** Location count below which the scan is assumed broken rather than the config clean. */
+  minLocations: number;
+  /** Only production maps 429 to a named location, so only it needs the error_page pairing. */
+  expectsErrorPagePairing: boolean;
+}
+
+const CONFIGS: NginxConfig[] = [
+  {
+    label: 'production',
+    file: 'docker/nginx/nginx.conf',
+    include: 'include /etc/nginx/security-headers.conf;',
+    minLocations: 10,
+    expectsErrorPagePairing: true,
+  },
+  {
+    label: 'development',
+    file: 'docker/nginx/nginx.dev.conf',
+    // A deliberately CSP-free and HSTS-free subset — Vite's HMR client uses inline scripts, eval
+    // and a WebSocket, all of which the production policy would break.
+    include: 'include /etc/nginx/security-headers-dev.conf;',
+    minLocations: 4,
+    expectsErrorPagePairing: false,
+  },
+];
 
 interface Block {
   name: string;
@@ -58,41 +88,81 @@ function locationBlocks(source: string): Block[] {
   return blocks;
 }
 
-const conf = fs.readFileSync(CONF, 'utf-8');
-const blocks = locationBlocks(conf);
+for (const cfg of CONFIGS) {
+  const conf = fs.readFileSync(path.join(__dirname, '../../..', cfg.file), 'utf-8');
+  const blocks = locationBlocks(conf);
 
-describe('nginx security headers', () => {
-  it('finds the location blocks it is meant to be guarding', () => {
-    // Without this the file passes vacuously if the parse ever stops matching.
-    expect(blocks.length).toBeGreaterThanOrEqual(10);
-    expect(blocks.map((b) => b.name)).toEqual(
-      expect.arrayContaining(['/', '/api/', '@rate_limited']),
+  describe(`nginx security headers — ${cfg.label} (${cfg.file})`, () => {
+    it('finds the location blocks it is meant to be guarding', () => {
+      // Without this the file passes vacuously if the parse ever stops matching.
+      expect(blocks.length).toBeGreaterThanOrEqual(cfg.minLocations);
+    });
+
+    it.each(blocks.map((b) => [b.name, b.body]))(
+      'location %s includes the security headers',
+      (_name, body) => {
+        expect(body).toContain(cfg.include);
+      },
     );
-  });
 
-  it.each(locationBlocks(fs.readFileSync(CONF, 'utf-8')).map((b) => [b.name, b.body]))(
-    'location %s includes the security headers',
-    (_name, body) => {
-      expect(body).toContain(HEADER_INCLUDE);
-    },
+    it('never sets Content-Type via add_header next to a `return`, which duplicates it', () => {
+      // `return` emits default_type BEFORE add_header appends, so the response carries two
+      // Content-Type headers and clients use the first — a JSON body labelled octet-stream.
+      for (const block of blocks) {
+        if (/\breturn\s+\d{3}/.test(block.body)) {
+          expect(block.body).not.toMatch(/add_header\s+Content-Type/i);
+        }
+      }
+    });
+
+    it('declares error_page 502 in every location that declares any other error_page', () => {
+      // error_page is inherited only when the current level declares none.
+      for (const block of blocks) {
+        if (/error_page\s+429/.test(block.body)) {
+          expect(cfg.expectsErrorPagePairing).toBe(true);
+          expect(block.body).toMatch(/error_page\s+502\s+503\s+504/);
+        }
+      }
+    });
+  });
+}
+
+describe('security-headers include files', () => {
+  const prodHeaders = fs.readFileSync(
+    path.join(__dirname, '../../../docker/nginx/security-headers.conf'),
+    'utf-8',
   );
+  const devHeaders = fs.readFileSync(
+    path.join(__dirname, '../../../docker/nginx/security-headers-dev.conf'),
+    'utf-8',
+  );
+  const directives = (text: string) =>
+    text
+      .split('\n')
+      .filter((l) => l.trim().startsWith('add_header'))
+      .join('\n');
 
-  it('never sets Content-Type via add_header next to a `return`, which duplicates it', () => {
-    // `return` emits default_type BEFORE add_header appends, so the response carries two
-    // Content-Type headers and clients use the first — a JSON body labelled octet-stream.
-    for (const block of blocks) {
-      if (/\breturn\s+\d{3}/.test(block.body)) {
-        expect(block.body).not.toMatch(/add_header\s+Content-Type/i);
-      }
-    }
+  it('production enforces Trusted Types', () => {
+    expect(directives(prodHeaders)).toMatch(/require-trusted-types-for 'script'/);
+    expect(directives(prodHeaders)).toMatch(/trusted-types dompurify/);
   });
 
-  it('declares error_page 502 in every location that declares any other error_page', () => {
-    // error_page is inherited only when the current level declares none.
-    for (const block of blocks) {
-      if (/error_page\s+429/.test(block.body)) {
-        expect(block.body).toMatch(/error_page\s+502\s+503\s+504/);
-      }
+  it('development sets no CSP and no HSTS, so Vite HMR survives', () => {
+    // The only header class that breaks HMR is CSP; HSTS on a plain-HTTP dev host would pin the
+    // browser to https and is sticky and confusing to undo.
+    expect(directives(devHeaders)).not.toMatch(/Content-Security-Policy/i);
+    expect(directives(devHeaders)).not.toMatch(/Strict-Transport-Security/i);
+  });
+
+  it('both set the four headers Express stopped setting', () => {
+    for (const header of [
+      'X-Content-Type-Options',
+      'X-Frame-Options',
+      'Referrer-Policy',
+      'Permissions-Policy',
+    ]) {
+      expect(prodHeaders).toContain(`add_header ${header}`);
+      expect(devHeaders).toContain(`add_header ${header}`);
     }
   });
 });

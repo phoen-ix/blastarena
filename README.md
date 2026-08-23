@@ -13,9 +13,12 @@ cp .env.example .env
 # Production (default)
 docker compose up --build -d
 
-# Development (hot reload)
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# Development (hot reload) — or `npm run dev`
+# The `-p` is MANDATORY: without it this adopts and replaces the production containers.
+docker compose -p blast-arena-dev -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
+
+The dev stack is fully isolated from production — its own Compose project, container names, host ports (nginx `8285`, Vite `5183`, DB `3317`, Redis `6390`) and data directory (`./data-dev`) — so the two can run side by side.
 
 In production, Nginx binds to `127.0.0.1:8280` (loopback only) and is expected to sit behind a host-level reverse proxy that terminates TLS and forwards traffic to it. For local/dev use, open the app on the proxied port (or forward `127.0.0.1:8280`). See `.env.example` for all configuration options.
 

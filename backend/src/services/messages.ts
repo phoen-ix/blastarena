@@ -16,6 +16,10 @@ export async function sendMessage(
   const friends = await friendsService.areFriends(senderId, recipientId);
   if (!friends) throw new AppError('Can only message friends', 403, 'NOT_FRIENDS');
 
+  // Defensive, and effectively unreachable in sequence: `blockUser` deletes the friendship in the
+  // same transaction as the block, so a blocked pair fails the `areFriends` check above first —
+  // verified against the live deployment, where blocking then messaging returns NOT_FRIENDS, not
+  // BLOCKED. This still guards the race where a block commits between the two reads, so it stays.
   const blocked = await friendsService.isBlocked(senderId, recipientId);
   if (blocked) throw new AppError('Cannot message this user', 403, 'BLOCKED');
 

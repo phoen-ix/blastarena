@@ -8,6 +8,8 @@ build/
 
 # Docker data volumes
 data/
+# Dev stack's isolated data directory — see docker-compose.dev.yml (audit DEV-STACK-ISOLATION-1)
+data-dev/
 
 # Environment
 .env

@@ -21,8 +21,12 @@ sudo chown -R 1000:1000 data/gamelogs data/simulations data/replays data/ai data
 # Production (default)
 docker compose up --build -d
 
-# Development (hot reload)
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# Development (hot reload) — or just `npm run dev`, which passes the same flags.
+# The `-p` is MANDATORY. Without it Compose resolves to the production project name (.env sets
+# COMPOSE_PROJECT_NAME=blast-arena, which outranks the `name:` in the dev file), adopts the running
+# production containers and replaces them — silently, with no port clash to stop it.
+# Dev is isolated: nginx on 127.0.0.1:8285, Vite 5183, DB 3317, Redis 6390, data under ./data-dev.
+docker compose -p blast-arena-dev -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
 ## Tech Stack
