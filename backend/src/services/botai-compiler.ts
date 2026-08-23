@@ -31,6 +31,18 @@ const DANGEROUS_MODULES = [
   'async_hooks',
   'v8',
   'inspector',
+  // Defence in depth only — blockImportsPlugin rejects every onResolve, so no import survives the
+  // bundle step whether or not it is listed here. Kept current anyway so the list does not lag the
+  // runtime: `sqlite` graduated to a stable builtin in Node 24, and the rest were never listed.
+  'sqlite',
+  'module',
+  'process',
+  'repl',
+  'wasi',
+  'sea',
+  'http2',
+  'trace_events',
+  'diagnostics_channel',
 ];
 
 const DANGEROUS_IMPORT_PATTERNS = DANGEROUS_MODULES.flatMap((mod) => [
@@ -154,7 +166,7 @@ export async function scanAndBuildAI(source: string): Promise<CompileResult> {
       bundle: true,
       platform: 'node',
       format: 'cjs',
-      target: 'node20',
+      target: 'node24',
       write: false,
       plugins: [blockImportsPlugin],
     });
