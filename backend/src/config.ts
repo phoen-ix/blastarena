@@ -1,5 +1,32 @@
 import { z } from 'zod';
 
+/**
+ * TOTP_ENCRYPTION_KEY is consumed as `Buffer.from(key, 'hex')` and handed to `aes-256-gcm`
+ * (utils/crypto.ts:28), which requires exactly 32 bytes — that is, 64 hex characters.
+ *
+ * The previous rule was `length >= 32`, which is the wrong unit twice over:
+ *
+ *   - A 32-character key passes validation and decodes to 16 bytes, so `createCipheriv` throws
+ *     `Invalid key length` on the *first 2FA enrolment*. Startup reports the server as correctly
+ *     configured and the failure only surfaces when a user tries to turn 2FA on.
+ *   - `Buffer.from(s, 'hex')` truncates silently at the first non-hex character instead of
+ *     throwing. A 40-character passphrase therefore decodes to a handful of bytes (or none), and
+ *     a value that happened to truncate to exactly 32 bytes would be a silently weakened key
+ *     derived from only part of the secret.
+ *
+ * Requiring exact hex makes the config the single place this is caught, and matches what the
+ * documented generator (`openssl rand -hex 32`) already produces. (audit TOTP-KEY-LENGTH-1)
+ */
+const TOTP_KEY_PATTERN = /^[0-9a-fA-F]{64}$/;
+
+export function isValidTotpKey(value: string): boolean {
+  return TOTP_KEY_PATTERN.test(value);
+}
+
+const TOTP_KEY_MESSAGE =
+  'TOTP_ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes for aes-256-gcm) when set. ' +
+  'Generate one with: openssl rand -hex 32';
+
 const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3000),
@@ -21,10 +48,7 @@ const configSchema = z.object({
   TOTP_ENCRYPTION_KEY: z
     .string()
     .default('')
-    .refine(
-      (v) => v === '' || v.length >= 32,
-      'TOTP_ENCRYPTION_KEY must be at least 32 characters when set',
-    ),
+    .refine((v) => v === '' || isValidTotpKey(v), TOTP_KEY_MESSAGE),
 
   SMTP_HOST: z.string().default(''),
   SMTP_PORT: z.coerce.number().default(587),
@@ -78,7 +102,7 @@ export function loadConfig(): Config {
       // Fail fast in production: a missing key silently disables 2FA for everyone, including
       // users who already enabled it (they would be locked out). (audit TOTP-OPTIONAL-ENCRYPTION-1)
       console.error(
-        'Invalid configuration: TOTP_ENCRYPTION_KEY must be set in production (>=32 chars). ' +
+        `Invalid configuration: TOTP_ENCRYPTION_KEY must be set in production. ${TOTP_KEY_MESSAGE} ` +
           'Two-factor authentication cannot function without it.',
       );
       process.exit(1);

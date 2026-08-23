@@ -9,7 +9,9 @@ Multiplayer online grid-based explosive arena game.
 ## Running
 Production is the canonical run mode for this deployment (plain `docker compose up` = prod; nginx on `127.0.0.1:8280` behind a host-level TLS proxy).
 ```bash
-cp .env.example .env  # prod requires DB passwords, JWT_SECRET, EMAIL_PEPPER, TOTP_ENCRYPTION_KEY (>=32 chars each)
+cp .env.example .env  # prod requires DB passwords, JWT_SECRET + EMAIL_PEPPER (>=32 chars each),
+                      # and TOTP_ENCRYPTION_KEY (exactly 64 hex chars — it is an aes-256-gcm key).
+                      # openssl rand -hex 32 produces a valid value for any of them.
 
 # The backend container runs as the unprivileged `node` user (uid 1000). Its five bind-mounted
 # directories must be owned by that uid or the backend cannot write logs, replays or AI uploads.

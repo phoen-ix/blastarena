@@ -48,7 +48,7 @@ beforeAll(async () => {
   process.env.DB_PASSWORD ??= 'test-db-password';
   process.env.JWT_SECRET ??= 'x'.repeat(32);
   process.env.EMAIL_PEPPER ??= 'y'.repeat(32);
-  process.env.TOTP_ENCRYPTION_KEY ??= 'z'.repeat(32);
+  process.env.TOTP_ENCRYPTION_KEY ??= 'ab'.repeat(32); // 64 hex chars = 32 bytes
   process.env.APP_URL ??= 'http://localhost';
   loadConfig();
 

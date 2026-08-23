@@ -8,7 +8,8 @@ A multiplayer online grid-based explosive arena game built with Phaser.js and No
 # Clone and configure
 cp .env.example .env
 # Edit .env — production requires DB_PASSWORD, DB_ROOT_PASSWORD, JWT_SECRET,
-# EMAIL_PEPPER, and TOTP_ENCRYPTION_KEY (each >=32 chars; e.g. openssl rand -hex 32)
+# EMAIL_PEPPER (each >=32 chars) and TOTP_ENCRYPTION_KEY (exactly 64 hex chars,
+# because it is an aes-256-gcm key). Generate any of them with: openssl rand -hex 32
 
 # Production (default)
 docker compose up --build -d
