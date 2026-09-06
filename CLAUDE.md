@@ -75,7 +75,7 @@ Campaign with hand-crafted levels, enemies, and bosses. Solo, online co-op (2 pl
 - **Puzzle Tiles**: Switches (toggle/pressure/oneshot, 4 colors), gates (linked by color, OR logic), crumbling floors. `PuzzleTileProcessor` shared between campaign and multiplayer. Rising-edge: reacts only on first tick of explosion via `prevSwitchBlasted`. Buddy blocked by closed gates and pits
 
 ## Custom Maps
-User-created maps for multiplayer via `LevelEditorScene`. CRUD API at `/maps/`, validation in `shared/src/utils/mapValidation.ts` (odd dims 9-51, border walls, 2-8 spawns, teleporter pairing). `MatchConfig.customMapId` for room integration. Star ratings (1-5) on published maps.
+User-created maps for multiplayer via `LevelEditorScene` (a lazy chunk: `await ensureLevelEditorScene(game)` from `scenes/levelEditorLoader.ts` before `scene.start('LevelEditorScene')`). CRUD API at `/maps/`, validation in `shared/src/utils/mapValidation.ts` (odd dims 9-51, border walls, 2-8 spawns, teleporter pairing). `MatchConfig.customMapId` for room integration. Star ratings (1-5) on published maps.
 
 ## Spectator Game Master
 Dead players accumulate energy to interact: place_wall, trigger_meteor, drop_powerup, speed_zone. Admin global toggle + per-room `MatchConfig.enableSpectatorActions`. Anti-griefing: rate limited, spawn protection, no targeting allies/occupied tiles.
@@ -87,7 +87,7 @@ Weekly featured community maps with competitive leaderboards. Only one active ch
 - **Elo**: K-factor varies by games played. FFA pairwise, Teams average per team
 - **Seasons**: Admin-defined, per-user per-season Elo. Hard/soft reset
 - **Achievements**: `cumulative`, `per_game`, `mode_specific`, `campaign` conditions. Can reward cosmetics
-- **Cosmetics**: `color`, `eyes`, `trail`, `bomb_skin`. In `toState()` (NOT `toTickState()` — static per game). Color priority: cosmetic → team → index-based
+- **Cosmetics**: `color`, `eyes`, `trail`, `bomb_skin`. Static per game: in every full `toState()`, and in `toTickState()` only on a player's first tick (`Player.cosmeticsSent`). Explosion `cells` likewise go out once per explosion (empty array afterwards) and tick states carry no `spawnPoints`. `GameScene.hydrateState()` fills the gaps from per-id caches before anything renders a state; `ReplayRecorder` does the same so replay frames stay self-contained for seeking. Color priority: cosmetic → team → index-based
 - **Rematch voting**: >50% threshold. `humanPlayerIds` filters `id > 0`; solo with bots shows "Play Again"
 
 ## Social Features
@@ -127,7 +127,7 @@ Persistent bomb arena as default landing experience. Players auto-join on page l
 ## Game Reference
 
 ### Game Modes
-FFA (2-8, last standing), Teams (4-8, 2 teams, friendly fire toggle), Battle Royale (4-8, shrinking zone), Sudden Death (2-8, maxed stats, one hit), Deathmatch (2-8, respawn, first to 15 kills), King of the Hill (2-8, control zone, hill moves every 30s)
+FFA (2-8, last standing), Teams (4-8, 2 teams, friendly fire toggle), Battle Royale (4-8, shrinking zone), Sudden Death (2-8, maxed stats, one hit), Deathmatch (2-8, respawn, first to 15 kills), King of the Hill (2-8, control zone, hill moves every 30s — the picker tolerates a wall only at the window's centre cell, i.e. the pillar grid, and re-arms the timer when no spot exists)
 
 ### Power-Ups (9 types)
 bomb_up, fire_up, speed_up, shield, kick, pierce_bomb, remote_bomb (E to detonate, FIFO/ALL toggle), line_bomb, bomb_throw (Q to throw, weight 4 rare)
@@ -160,7 +160,7 @@ See [docs/performance-and-internals.md](docs/performance-and-internals.md). Key:
 
 ## Internationalization (i18n)
 Full-stack i18n via **i18next**. `t('namespace:section.key')` with `{{variable}}` interpolation.
-- **Namespaces**: shared (`common`, `game`), frontend-only (`ui`, `auth`, `hud`, `admin`, `campaign`, `help`, `editor`, `errors`), backend-only (`server`, `email`)
+- **Namespaces**: shared (`common`, `game`), frontend-only (`ui`, `auth`, `admin`, `campaign`, `errors` at boot; `help` and `editor` are loaded on demand via `i18n.loadNamespaces()` by `LobbyUI.createView` / `scenes/levelEditorLoader.ts`), backend-only (`server`, `email`). New keys go into all 12 locales (`tests/shared/localeParity.test.ts`)
 - **Locale files**: `{workspace}/src/i18n/locales/{lng}/*.json`
 - **Key conventions**: Dots are key separators — never use decimal numbers as JSON keys (use `"low30"` not `"0.3"`)
 - **Variable shadowing**: When importing `{ t }` from i18n, lambda parameters named `t` must be renamed

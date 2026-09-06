@@ -60,15 +60,11 @@ const configSchema = z.object({
   APP_URL: z.string().default('http://localhost:8080'),
   LOG_LEVEL: z.string().default('info'),
 
-  GAME_TICK_RATE: z.coerce.number().default(20),
-  MAX_ROOMS: z.coerce.number().default(50),
-  MAX_PLAYERS_PER_ROOM: z.coerce.number().default(8),
-  BOMB_TIMER_SECONDS: z.coerce.number().default(3),
-  POWERUP_DROP_CHANCE: z.coerce.number().default(0.3),
-
-  RATE_LIMIT_LOGIN: z.coerce.number().default(5),
-  RATE_LIMIT_REGISTER: z.coerce.number().default(3),
-  RATE_LIMIT_API: z.coerce.number().default(100),
+  // GAME_TICK_RATE, MAX_ROOMS, MAX_PLAYERS_PER_ROOM, BOMB_TIMER_SECONDS, POWERUP_DROP_CHANCE and
+  // RATE_LIMIT_LOGIN/REGISTER/API used to be declared here, in docker-compose.yml and in
+  // .env.example, and were read by nothing: the tick rate, room/player caps and bomb timings are
+  // constants in shared/src/constants/game.ts, and every rate limit is set at its route/socket
+  // handler. Declaring them told operators a knob existed that did nothing. (audit DEAD-CONFIG-1)
 });
 
 export type Config = z.infer<typeof configSchema>;

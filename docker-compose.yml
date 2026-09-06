@@ -83,14 +83,6 @@ services:
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
       APP_URL: ${APP_URL:-http://localhost:8080}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      GAME_TICK_RATE: ${GAME_TICK_RATE:-20}
-      MAX_ROOMS: ${MAX_ROOMS:-50}
-      MAX_PLAYERS_PER_ROOM: ${MAX_PLAYERS_PER_ROOM:-8}
-      BOMB_TIMER_SECONDS: ${BOMB_TIMER_SECONDS:-3}
-      POWERUP_DROP_CHANCE: ${POWERUP_DROP_CHANCE:-0.3}
-      RATE_LIMIT_LOGIN: ${RATE_LIMIT_LOGIN:-5}
-      RATE_LIMIT_REGISTER: ${RATE_LIMIT_REGISTER:-3}
-      RATE_LIMIT_API: ${RATE_LIMIT_API:-100}
     depends_on:
       db:
         condition: service_healthy
