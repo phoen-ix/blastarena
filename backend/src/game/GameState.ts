@@ -47,7 +47,7 @@ import { Player } from './Player';
 import { Bomb, BombType } from './Bomb';
 import { Explosion } from './Explosion';
 import { PowerUp } from './PowerUp';
-import { CollisionSystem } from './CollisionSystem';
+import { CollisionSystem, OccupantPosition } from './CollisionSystem';
 import { BattleRoyaleZone } from './BattleRoyale';
 import { generateMap } from './Map';
 import { InputBuffer } from './InputBuffer';
@@ -63,6 +63,64 @@ function mapToArray<K, V, R>(map: Map<K, V>, fn: (v: V) => R): R[] {
   const result: R[] = [];
   for (const v of map.values()) result.push(fn(v));
   return result;
+}
+
+const EMPTY_TILES: TileType[][] = [];
+const EMPTY_SPAWN_POINTS: Position[] = [];
+
+function isTeleporterTile(type: TileType): boolean {
+  return type === 'teleporter_a' || type === 'teleporter_b';
+}
+
+/** Live occupant entry for one alive, unfrozen player — mutated in place as the player moves. */
+interface PlayerPosEntry extends OccupantPosition {
+  id: number;
+}
+
+/** Counted tile occupancy ("x,y" → occupants), so two players on one tile don't cancel out. */
+class PosCounter {
+  private counts = new Map<string, number>();
+
+  add(x: number, y: number): void {
+    const key = `${x},${y}`;
+    this.counts.set(key, (this.counts.get(key) ?? 0) + 1);
+  }
+
+  remove(x: number, y: number): void {
+    const key = `${x},${y}`;
+    const count = this.counts.get(key);
+    if (count === undefined) return;
+    if (count <= 1) this.counts.delete(key);
+    else this.counts.set(key, count - 1);
+  }
+
+  move(fromX: number, fromY: number, toX: number, toY: number): void {
+    this.remove(fromX, fromY);
+    this.add(toX, toY);
+  }
+
+  hasKey(key: string): boolean {
+    return this.counts.has(key);
+  }
+}
+
+/**
+ * Per-tick occupancy shared by every processPlayerInput()/processConveyors() call.
+ *
+ * The player half used to be a snapshot of copied scalars taken before the input loop and never
+ * updated inside it, so player A moving (1,1)→(2,1) was invisible to player B processed later in
+ * the same loop: B's canMoveTo still saw A at (1,1) and A's new tile as free, and the two ended up
+ * on one tile (or swapped through each other). Bombs were already kept live (`bombPosSet.add` on
+ * placement); the player entries now are too. (audit INTRA-TICK-OCCUPANCY-1)
+ */
+interface TickOccupancy {
+  bombPositions: Position[];
+  bombPosSet: Set<string>;
+  /** Alive, unfrozen players (frozen players are walk-through, as before). Entries are live. */
+  playerPositions: PlayerPosEntry[];
+  playerEntryById: Map<number, PlayerPosEntry>;
+  /** Every alive player, frozen or not — used to keep line bombs off occupied tiles. */
+  alivePlayerPos: PosCounter;
 }
 
 // Simple seeded random for power-up drops
@@ -224,6 +282,27 @@ export class GameStateManager {
 
   // Tile diff tracking for delta state broadcasts
   private _dirtyTiles: Map<string, TileDiff> = new Map();
+  /**
+   * Append-only log of every tile mutation since the game started. Isolated (untrusted) bot AIs
+   * keep the grid inside their isolate and consume this log from where they left off, instead of
+   * receiving the whole grid on every decision. Bounded by the number of mutations in one game.
+   * (audit ISOLATE-SNAPSHOT-1)
+   */
+  public readonly tileChangeLog: TileDiff[] = [];
+
+  /** Teleporter pad positions, rebuilt lazily after a teleporter tile changes. (audit TELEPORTER-CACHE-1) */
+  private _teleporterCache: { a: Position[]; b: Position[] } | null = null;
+
+  /**
+   * Copy-on-write snapshot of the tile grid for the detonation batch in progress, or null.
+   *
+   * Chain reactions must resolve every bomb of a batch against the pre-batch wall layout. That
+   * used to deep-copy the whole grid (up to 51x41 tiles) on every tick with a detonation, and
+   * unconditionally on every remote detonate. The snapshot is now a shallow copy of the row array;
+   * a row is cloned only the first time it is mutated while the batch is active, so the cost is one
+   * row per wall destroyed instead of the whole map. (audit CHAIN-SNAPSHOT-COW-1)
+   */
+  private _activeSnapshot: TileType[][] | null = null;
 
   // Bot AI tick throttling: cache last bot inputs to reuse on skipped ticks
   private _lastBotInputs: Map<number, PlayerInput> = new Map();
@@ -394,6 +473,16 @@ export class GameStateManager {
     this.players.delete(id);
     disposeAI(this.botAIs.get(id)); // free the isolate if this was an isolated custom AI
     this.botAIs.delete(id);
+    // Every per-player map, not just the first three — the open world lives for hours and players
+    // come and go continuously, so the leftovers accumulated for the process lifetime.
+    // (audit REMOVE-PLAYER-PRUNE-1)
+    this._lastBotInputs.delete(id);
+    this.quicksandTimers.delete(id);
+    this.iceSliding.delete(id);
+    this.prevPlayerPositions.delete(id);
+    this.spectatorEnergy.delete(id);
+    this.spectatorCooldowns.delete(id);
+    this.kothScores.delete(id);
     this._alivePlayersCache = null;
   }
 
@@ -552,26 +641,25 @@ export class GameStateManager {
       }
 
       // Pre-compute shared position data once for all processPlayerInput calls
-      const sharedBombPositions: { x: number; y: number }[] = [];
-      const bombPosSet = new Set<string>();
+      const occ: TickOccupancy = {
+        bombPositions: [],
+        bombPosSet: new Set<string>(),
+        playerPositions: [],
+        playerEntryById: new Map<number, PlayerPosEntry>(),
+        alivePlayerPos: new PosCounter(),
+      };
       for (const b of this.bombs.values()) {
-        sharedBombPositions.push(b.position);
-        bombPosSet.add(`${b.position.x},${b.position.y}`);
+        occ.bombPositions.push(b.position);
+        occ.bombPosSet.add(`${b.position.x},${b.position.y}`);
       }
-
-      const sharedPlayerPositions: { x: number; y: number; id: number; buddyOwnerId?: number }[] =
-        [];
-      const alivePlayerPosSet = new Set<string>();
       for (const p of this.players.values()) {
         if (p.alive) {
-          alivePlayerPosSet.add(`${p.position.x},${p.position.y}`);
+          occ.alivePlayerPos.add(p.position.x, p.position.y);
           if (!p.frozen) {
-            sharedPlayerPositions.push({
-              x: p.position.x,
-              y: p.position.y,
-              id: p.id,
-              ...(p.isBuddy && p.buddyOwnerId != null ? { buddyOwnerId: p.buddyOwnerId } : {}),
-            });
+            const entry: PlayerPosEntry = { x: p.position.x, y: p.position.y, id: p.id };
+            if (p.isBuddy && p.buddyOwnerId != null) entry.buddyOwnerId = p.buddyOwnerId;
+            occ.playerPositions.push(entry);
+            occ.playerEntryById.set(p.id, entry);
           }
         }
       }
@@ -583,21 +671,14 @@ export class GameStateManager {
 
         const input = this.inputBuffer.getLatestInput(playerId);
         if (input) {
-          this.processPlayerInput(
-            player,
-            input,
-            sharedBombPositions,
-            sharedPlayerPositions,
-            bombPosSet,
-            alivePlayerPosSet,
-          );
+          this.processPlayerInput(player, input, occ);
         }
 
         player.tick();
       }
 
       // 1b. Process conveyor belt forced movement
-      this.processConveyors(sharedBombPositions, sharedPlayerPositions);
+      this.processConveyors(occ);
 
       // 1c. Hazard tile movement slowdown (vine, quicksand, mud)
       if (this.hazardTileTypes.length > 0) {
@@ -687,21 +768,19 @@ export class GameStateManager {
 
     // 3. Process detonations (including chain reactions)
     if (bombsToDetonate.length > 0) {
-      // Snapshot tiles whenever more than one blast will be resolved against them, so every bomb
-      // in the batch sees the same wall layout.
-      //
-      // This used to check only `this.bombs.size > bombsToDetonate.length` — i.e. "are there other
-      // bombs left that could chain". That misses the case where the last N bombs all expire on the
-      // SAME tick, which is the normal outcome for line_bomb (3 bombs placed at once, identical
-      // fuses). With no snapshot, bomb A destroys a wall and bomb B — detonating later in this very
-      // loop — propagates through the gap, killing players who were correctly in cover.
-      // (audit CHAIN-SNAPSHOT-1)
-      const tileSnapshot =
-        bombsToDetonate.length > 1 || this.bombs.size > bombsToDetonate.length
-          ? this.map.tiles.map((row) => [...row])
-          : undefined;
-      for (const bomb of bombsToDetonate) {
-        this.detonateBomb(bomb, tileSnapshot);
+      // Every bomb of the batch — including the ones it chains into — is resolved against the same
+      // pre-batch wall layout. The last N bombs expiring on the SAME tick is the normal outcome for
+      // line_bomb (identical fuses); without the snapshot, bomb A destroys a wall and bomb B,
+      // detonating later in this very loop, propagates through the gap and kills players who were
+      // correctly in cover. (audit CHAIN-SNAPSHOT-1) The snapshot is copy-on-write, so it is now
+      // taken unconditionally. (audit CHAIN-SNAPSHOT-COW-1)
+      const tileSnapshot = this.beginTileSnapshot();
+      try {
+        for (const bomb of bombsToDetonate) {
+          this.detonateBomb(bomb, tileSnapshot);
+        }
+      } finally {
+        this._activeSnapshot = null;
       }
     }
 
@@ -712,11 +791,27 @@ export class GameStateManager {
       }
     }
 
-    // 5. Check player-explosion collisions
-    for (const player of this.players.values()) {
+    // 5. Check player-explosion collisions.
+    // One lethal-cell index per tick (first explosion in map order wins a shared cell, exactly as
+    // the old nested scan did) instead of players x explosions containsCell() calls, each of which
+    // built a key string. (audit TICK-INDEX-1)
+    let lethalCells: Map<string, Explosion[]> | null = null;
+    if (this.explosions.size > 0) {
+      lethalCells = new Map();
+      for (const explosion of this.explosions.values()) {
+        // Skip damage during fade-out phase (last 3 ticks) — explosion is visually fading
+        if (explosion.ticksRemaining <= 3) continue;
+        for (const cell of explosion.cells) {
+          const key = `${cell.x},${cell.y}`;
+          const list = lethalCells.get(key);
+          if (list) list.push(explosion);
+          else lethalCells.set(key, [explosion]);
+        }
+      }
+    }
+    for (const player of lethalCells ? this.players.values() : []) {
       if (!player.alive || player.invulnerableTicks > 0) continue;
       if (player.isBuddy) continue; // Buddy is invulnerable
-      // Winner is invulnerable during grace period
       // Winner is invulnerable during the grace period. Teams mode declares the winner via
       // winnerTeam and leaves winnerId null, so an id-only check left the winning team killable
       // for the 30 ticks after the win: they could walk into a still-burning explosion and the
@@ -730,78 +825,89 @@ export class GameStateManager {
         continue;
       }
 
-      for (const explosion of this.explosions.values()) {
-        // Skip damage during fade-out phase (last 3 ticks) — explosion is visually fading
-        if (explosion.ticksRemaining <= 3) continue;
-        if (explosion.containsCell(player.position.x, player.position.y)) {
-          const owner = this.players.get(explosion.ownerId);
+      const here = lethalCells!.get(`${player.position.x},${player.position.y}`);
+      if (!here) continue;
+      // Same explosion order as before: a friendly (or own-buddy) blast is skipped in favour of the
+      // next one covering the tile, and the first that applies ends the search.
+      for (const explosion of here) {
+        const owner = this.players.get(explosion.ownerId);
 
-          // Friendly fire check: skip damage if FF is off and same team (but self-damage always applies)
-          if (
-            !this.friendlyFire &&
-            owner &&
-            owner.id !== player.id &&
-            player.team !== null &&
-            owner.team === player.team
-          ) {
-            continue;
-          }
-
-          // Buddy bombs never hurt their owner
-          if (owner && owner.isBuddy && owner.buddyOwnerId === player.id) {
-            continue;
-          }
-
-          if (player.hasShield) {
-            player.hasShield = false;
-            // Brief invulnerability so the same multi-tick explosion
-            // doesn't kill the now-unshielded player next tick
-            player.invulnerableTicks = 10;
-          } else {
-            player.die();
-            this.invalidateAliveCache();
-            player.placement = this.getAlivePlayers().length + 1;
-
-            // Credit kill or track self-kill (self-kills subtract 1 from score)
-            if (owner && owner.id !== player.id) {
-              owner.kills++;
-              this.gameLogger?.logKill(owner.id, owner.username, player.id, player.username, false);
-              this.tickEvents.playerDied.push({
-                playerId: player.id,
-                killerId: owner.id,
-                cause: 'bomb',
-              });
-            } else if (owner && owner.id === player.id) {
-              owner.selfKills++;
-              owner.kills--;
-              this.gameLogger?.logKill(owner.id, owner.username, player.id, player.username, true);
-              this.tickEvents.playerDied.push({
-                playerId: player.id,
-                killerId: owner.id,
-                cause: 'self',
-              });
-            } else {
-              this.tickEvents.playerDied.push({
-                playerId: player.id,
-                killerId: null,
-                cause: 'bomb',
-              });
-            }
-
-            // Drop one random collected power-up at death position
-            this.dropPowerUpOnDeath(player);
-          }
-          break;
+        // Friendly fire check: skip damage if FF is off and same team (but self-damage always applies)
+        if (
+          !this.friendlyFire &&
+          owner &&
+          owner.id !== player.id &&
+          player.team !== null &&
+          owner.team === player.team
+        ) {
+          continue;
         }
+
+        // Buddy bombs never hurt their owner
+        if (owner && owner.isBuddy && owner.buddyOwnerId === player.id) {
+          continue;
+        }
+
+        if (player.hasShield) {
+          player.hasShield = false;
+          // Brief invulnerability so the same multi-tick explosion
+          // doesn't kill the now-unshielded player next tick
+          player.invulnerableTicks = 10;
+        } else {
+          player.die();
+          this.invalidateAliveCache();
+          player.placement = this.getAlivePlayers().length + 1;
+
+          // Credit kill or track self-kill (self-kills subtract 1 from score)
+          if (owner && owner.id !== player.id) {
+            owner.kills++;
+            this.gameLogger?.logKill(owner.id, owner.username, player.id, player.username, false);
+            this.tickEvents.playerDied.push({
+              playerId: player.id,
+              killerId: owner.id,
+              cause: 'bomb',
+            });
+          } else if (owner && owner.id === player.id) {
+            owner.selfKills++;
+            owner.kills--;
+            this.gameLogger?.logKill(owner.id, owner.username, player.id, player.username, true);
+            this.tickEvents.playerDied.push({
+              playerId: player.id,
+              killerId: owner.id,
+              cause: 'self',
+            });
+          } else {
+            this.tickEvents.playerDied.push({
+              playerId: player.id,
+              killerId: null,
+              cause: 'bomb',
+            });
+          }
+
+          // Drop one random collected power-up at death position
+          this.dropPowerUpOnDeath(player);
+        }
+        break;
       }
     }
 
-    // 6. Check power-up pickups
-    for (const player of this.players.values()) {
-      if (!player.alive) continue;
-
-      for (const [id, powerUp] of this.powerUps) {
-        if (powerUp.position.x === player.position.x && powerUp.position.y === player.position.y) {
+    // 6. Check power-up pickups — indexed by tile once per tick instead of players x power-ups
+    // position compares. (audit TICK-INDEX-1)
+    if (this.powerUps.size > 0) {
+      const powerUpsAt = new Map<string, PowerUp[]>();
+      for (const powerUp of this.powerUps.values()) {
+        const key = `${powerUp.position.x},${powerUp.position.y}`;
+        const list = powerUpsAt.get(key);
+        if (list) list.push(powerUp);
+        else powerUpsAt.set(key, [powerUp]);
+      }
+      for (const player of this.players.values()) {
+        if (!player.alive) continue;
+        const key = `${player.position.x},${player.position.y}`;
+        const here = powerUpsAt.get(key);
+        if (!here) continue;
+        powerUpsAt.delete(key);
+        for (const powerUp of here) {
           this.tickEvents.powerupCollected.push({
             playerId: player.id,
             type: powerUp.type,
@@ -822,7 +928,7 @@ export class GameStateManager {
             powerUp.type,
             powerUp.position,
           );
-          this.powerUps.delete(id);
+          this.powerUps.delete(powerUp.id);
         }
       }
     }
@@ -852,6 +958,10 @@ export class GameStateManager {
             warningTick: this.tick,
           });
           this._mapEventsDirty = true;
+        } else {
+          // No valid destination: re-arm the timer instead of retrying the full-grid scan on every
+          // one of the remaining ticks of the match. (audit KOTH-HILL-MOVE-1)
+          this.nextHillMoveTick = this.tick + KOTH_HILL_MOVE_INTERVAL;
         }
       }
       if (this.tick >= this.nextHillMoveTick && this.pendingHillZone) {
@@ -1137,9 +1247,17 @@ export class GameStateManager {
     // match and was re-serialized into every game:state frame sent to every client. Pruning is a
     // property of the array, not of the feature that happens to fill it. (audit MAPEVENT-PRUNE-1)
     if (this.mapEvents.length > 0) {
-      const prevLen = this.mapEvents.length;
-      this.mapEvents = this.mapEvents.filter((e) => this.tick - e.tick < 200);
-      if (this.mapEvents.length !== prevLen) this._mapEventsDirty = true;
+      let expired = false;
+      for (const e of this.mapEvents) {
+        if (this.tick - e.tick >= 200) {
+          expired = true;
+          break;
+        }
+      }
+      if (expired) {
+        this.mapEvents = this.mapEvents.filter((e) => this.tick - e.tick < 200);
+        this._mapEventsDirty = true;
+      }
     }
 
     // 6.8 Spectator Game Master actions
@@ -1156,6 +1274,16 @@ export class GameStateManager {
         if (!player.alive) continue;
         if (player.isBuddy) continue; // Buddy is immune to zone damage
         if (player.invulnerableTicks > 0) continue; // respect the post-shield/respawn window
+        // Same winner protection the explosion path applies during the finish grace period: the
+        // last survivor of a battle royale could still be killed by the shrinking zone in the 30
+        // ticks after the win was declared, so game:over showed the winner dead. (audit GRACE-GATE-1)
+        if (
+          isFinishing &&
+          (this.winnerId === player.id ||
+            (this.winnerTeam !== null && player.team === this.winnerTeam))
+        ) {
+          continue;
+        }
         if (!this.zone.isInsideZone(player.position.x, player.position.y)) {
           if (player.hasShield) {
             player.hasShield = false;
@@ -1173,8 +1301,10 @@ export class GameStateManager {
       }
     }
 
-    // 7.5 Deathmatch / Open World respawns
-    if (this.gameMode === 'deathmatch' || this.isOpenWorld) {
+    // 7.5 Deathmatch / Open World respawns. Not during the finish grace period: eliminated players
+    // kept respawning after the kill target was reached, so the final placements listed players as
+    // alive who had lost. (audit GRACE-GATE-1)
+    if ((this.gameMode === 'deathmatch' || this.isOpenWorld) && this.finishTick === null) {
       const respawnDelay = this.isOpenWorld ? this.openWorldRespawnTicks : DEATHMATCH_RESPAWN_TICKS;
       for (const player of this.players.values()) {
         if (!player.alive && player.respawnTick === null) {
@@ -1761,15 +1891,35 @@ export class GameStateManager {
   }
 
   /** Set a tile type and track the change for tile diff broadcast */
+  /** Start a copy-on-write tile snapshot for a detonation batch. Caller must clear _activeSnapshot. */
+  private beginTileSnapshot(): TileType[][] {
+    const snapshot = this.map.tiles.slice();
+    this._activeSnapshot = snapshot;
+    return snapshot;
+  }
+
+  /** Preserve row `y` in the active snapshot before it is mutated for the first time in the batch. */
+  private preserveSnapshotRow(y: number): void {
+    const snapshot = this._activeSnapshot;
+    if (snapshot && snapshot[y] === this.map.tiles[y]) {
+      snapshot[y] = this.map.tiles[y].slice();
+    }
+  }
+
   setTileTracked(x: number, y: number, type: TileType): void {
     if (this.map.wrapping) {
       x = ((x % this.map.width) + this.map.width) % this.map.width;
       y = ((y % this.map.height) + this.map.height) % this.map.height;
     }
     if (x < 0 || x >= this.map.width || y < 0 || y >= this.map.height) return;
+    const previous = this.map.tiles[y][x];
+    if (isTeleporterTile(previous) || isTeleporterTile(type)) this._teleporterCache = null;
+    this.preserveSnapshotRow(y);
     this.map.tiles[y][x] = type;
-    this._dirtyTiles.set(`${x},${y}`, { x, y, type });
-    this.collisionSystem.updateTiles(this.map.tiles);
+    const diff: TileDiff = { x, y, type };
+    this._dirtyTiles.set(`${x},${y}`, diff);
+    if (previous !== type) this.tileChangeLog.push(diff);
+    // (No collisionSystem.updateTiles() here: it only reassigned the same array reference.)
   }
 
   /** Destroy a tile and track the change for delta broadcasting */
@@ -1778,27 +1928,37 @@ export class GameStateManager {
       x = ((x % this.map.width) + this.map.width) % this.map.width;
       y = ((y % this.map.height) + this.map.height) % this.map.height;
     }
+    const inBounds = x >= 0 && x < this.map.width && y >= 0 && y < this.map.height;
+    if (!inBounds) return false;
+    const previous = this.map.tiles[y][x];
+    this.preserveSnapshotRow(y);
     const result = this.collisionSystem.destroyTile(x, y);
-    // Track tile change regardless of whether it was "destroyed" (cracked counts too)
-    if (x >= 0 && x < this.map.width && y >= 0 && y < this.map.height) {
-      const currentType = this.map.tiles[y][x];
-      const key = `${x},${y}`;
-      const existing = this._dirtyTiles.get(key);
-      if (!existing || existing.type !== currentType) {
-        this._dirtyTiles.set(key, { x, y, type: currentType });
-      }
+    // Track the change when the tile actually changed (cracked counts too). This used to record a
+    // diff for every blast cell whose tile was untouched (empty floor), so each detonation shipped
+    // a no-op diff per cell to every client. (audit TICK-PAYLOAD-1)
+    const currentType = this.map.tiles[y][x];
+    if (currentType !== previous) {
+      const diff: TileDiff = { x, y, type: currentType };
+      this._dirtyTiles.set(`${x},${y}`, diff);
+      this.tileChangeLog.push(diff);
     }
     return result;
   }
 
-  private processPlayerInput(
-    player: Player,
-    input: PlayerInput,
-    sharedBombPositions: { x: number; y: number }[],
-    sharedPlayerPositions: { x: number; y: number; id: number; buddyOwnerId?: number }[],
-    bombPosSet: Set<string>,
-    alivePlayerPosSet: Set<string>,
-  ): void {
+  /** Keep the shared occupancy in sync after `player.position` changed (move and/or teleport). */
+  private syncOccupancy(player: Player, from: Position, occ: TickOccupancy): void {
+    occ.alivePlayerPos.move(from.x, from.y, player.position.x, player.position.y);
+    const entry = occ.playerEntryById.get(player.id);
+    if (entry) {
+      entry.x = player.position.x;
+      entry.y = player.position.y;
+    }
+  }
+
+  private processPlayerInput(player: Player, input: PlayerInput, occ: TickOccupancy): void {
+    // Both the array (movement blocking) and the key set (placement checks) are kept live as bombs
+    // are placed, so a player processed later in the same tick cannot step onto a fresh bomb.
+    const { bombPositions: sharedBombPositions, bombPosSet } = occ;
     // Movement (with cooldown)
     if (input.direction && player.canMove()) {
       player.direction = input.direction;
@@ -1813,17 +1973,14 @@ export class GameStateManager {
           input.direction,
         );
       } else {
-        // Filter out self and own buddy from player positions
-        const otherPlayerPositions = sharedPlayerPositions.filter(
-          (sp) => sp.id !== player.id && sp.buddyOwnerId !== player.id,
-        );
-
+        // Self and own buddy are exempted inside canMoveTo (selfId) — no filtered copy per call
         newPos = this.collisionSystem.canMoveTo(
           player.position.x,
           player.position.y,
           input.direction,
           sharedBombPositions,
-          otherPlayerPositions,
+          occ.playerPositions,
+          player.id,
         );
       }
 
@@ -1833,6 +1990,7 @@ export class GameStateManager {
         player.applyMoveCooldown();
         this.gameLogger?.logMovement(player.id, player.username, from, newPos, input.direction);
         this.applyTeleporter(player);
+        this.syncOccupancy(player, from, occ);
       } else if (player.hasKick) {
         // Try to kick a bomb in the movement direction
         const dx = input.direction === 'left' ? -1 : input.direction === 'right' ? 1 : 0;
@@ -1863,15 +2021,19 @@ export class GameStateManager {
         }
       }
       if (remoteBombs.length > 0) {
-        const tileSnapshot = this.map.tiles.map((row) => [...row]);
-        if (player.remoteDetonateMode === 'fifo') {
-          // Detonate only the oldest bomb (lowest ticksRemaining = placed earliest)
-          remoteBombs.sort((a, b) => a.ticksRemaining - b.ticksRemaining);
-          this.detonateBomb(remoteBombs[0], tileSnapshot);
-        } else {
-          for (const bomb of remoteBombs) {
-            this.detonateBomb(bomb, tileSnapshot);
+        const tileSnapshot = this.beginTileSnapshot();
+        try {
+          if (player.remoteDetonateMode === 'fifo') {
+            // Detonate only the oldest bomb (lowest ticksRemaining = placed earliest)
+            remoteBombs.sort((a, b) => a.ticksRemaining - b.ticksRemaining);
+            this.detonateBomb(remoteBombs[0], tileSnapshot);
+          } else {
+            for (const bomb of remoteBombs) {
+              this.detonateBomb(bomb, tileSnapshot);
+            }
           }
+        } finally {
+          this._activeSnapshot = null;
         }
       } else if (player.hasRemoteBomb) {
         // No remote bombs placed — toggle detonation mode
@@ -1900,6 +2062,7 @@ export class GameStateManager {
           const bomb = new Bomb(player.position, player.id, player.fireRange, bombType);
           this.bombs.set(bomb.id, bomb);
           bombPosSet.add(currentKey);
+          sharedBombPositions.push(bomb.position);
           player.bombCount++;
           player.bombsPlaced++;
           this.gameLogger?.logBomb(
@@ -1924,12 +2087,13 @@ export class GameStateManager {
           // Check if the tile is walkable, has no bomb, and has no player
           if (!this.collisionSystem.isWalkable(cx, cy)) break;
           if (bombPosSet.has(tileKey)) break;
-          if (alivePlayerPosSet.has(tileKey)) break;
+          if (occ.alivePlayerPos.hasKey(tileKey)) break;
 
           const pos: Position = { x: cx, y: cy };
           const bomb = new Bomb(pos, player.id, player.fireRange, bombType);
           this.bombs.set(bomb.id, bomb);
           bombPosSet.add(tileKey);
+          sharedBombPositions.push(bomb.position);
           player.bombCount++;
           player.bombsPlaced++;
           this.gameLogger?.logBomb('place', player.id, player.username, pos, player.fireRange);
@@ -1945,6 +2109,7 @@ export class GameStateManager {
           const bomb = new Bomb(player.position, player.id, player.fireRange, bombType);
           this.bombs.set(bomb.id, bomb);
           bombPosSet.add(posKey);
+          sharedBombPositions.push(bomb.position);
           player.bombCount++;
           player.bombsPlaced++;
           this.gameLogger?.logBomb(
@@ -2023,6 +2188,7 @@ export class GameStateManager {
         const bomb = new Bomb(landPos, player.id, player.fireRange, bombType);
         this.bombs.set(bomb.id, bomb);
         bombPosSet.add(`${landPos.x},${landPos.y}`);
+        sharedBombPositions.push(bomb.position);
         player.bombCount++;
         player.bombsPlaced++;
         this.tickEvents.bombThrown.push({
@@ -2040,15 +2206,21 @@ export class GameStateManager {
     const tile = this.collisionSystem.getTileAt(entity.position.x, entity.position.y);
     if (tile !== 'teleporter_a' && tile !== 'teleporter_b') return;
 
-    const targetType: TileType = tile === 'teleporter_a' ? 'teleporter_b' : 'teleporter_a';
-    const targets: Position[] = [];
-    for (let y = 0; y < this.map.height; y++) {
-      for (let x = 0; x < this.map.width; x++) {
-        if (this.map.tiles[y][x] === targetType) {
-          targets.push({ x, y });
+    // Partner pads come from a cache instead of a full-grid scan on every teleport step; the
+    // cache is dropped by setTileTracked whenever a teleporter tile changes. (audit TELEPORTER-CACHE-1)
+    if (!this._teleporterCache) {
+      const a: Position[] = [];
+      const b: Position[] = [];
+      for (let y = 0; y < this.map.height; y++) {
+        for (let x = 0; x < this.map.width; x++) {
+          const t = this.map.tiles[y][x];
+          if (t === 'teleporter_a') a.push({ x, y });
+          else if (t === 'teleporter_b') b.push({ x, y });
         }
       }
+      this._teleporterCache = { a, b };
     }
+    const targets = tile === 'teleporter_a' ? this._teleporterCache.b : this._teleporterCache.a;
     if (targets.length === 0) return;
 
     const dest = targets[Math.floor(this.rng.next() * targets.length)];
@@ -2057,10 +2229,8 @@ export class GameStateManager {
   }
 
   /** Push players and bombs standing on conveyor tiles in the conveyor's direction */
-  private processConveyors(
-    bombPositions: { x: number; y: number }[],
-    playerPositions: { x: number; y: number; id: number; buddyOwnerId?: number }[],
-  ): void {
+  private processConveyors(occ: TickOccupancy): void {
+    const { bombPositions, playerPositions } = occ;
     for (const player of this.players.values()) {
       if (!player.alive || !player.canMove()) continue;
 
@@ -2082,11 +2252,6 @@ export class GameStateManager {
       }
       if (!dir) continue;
 
-      // Filter out self and own buddy from player positions
-      const otherPlayerPositions = playerPositions.filter(
-        (sp) => sp.id !== player.id && sp.buddyOwnerId !== player.id,
-      );
-
       const newPos = player.isBuddy
         ? this.collisionSystem.canBuddyMoveTo(player.position.x, player.position.y, dir)
         : this.collisionSystem.canMoveTo(
@@ -2094,14 +2259,17 @@ export class GameStateManager {
             player.position.y,
             dir,
             bombPositions,
-            otherPlayerPositions,
+            playerPositions,
+            player.id,
           );
 
       if (newPos) {
+        const from = { x: player.position.x, y: player.position.y };
         player.position = newPos;
         player.direction = dir;
         player.applyMoveCooldown();
         this.applyTeleporter(player);
+        this.syncOccupancy(player, from, occ);
       }
     }
 
@@ -2266,27 +2434,39 @@ export class GameStateManager {
     return getRandomPowerUpType(() => this.rng.next(), this.enabledPowerUps);
   }
 
-  /** Pick a random valid position for the KOTH hill zone, away from current zone */
+  /**
+   * Pick a random valid position for the KOTH hill zone, away from the current zone.
+   *
+   * This used to reject any window containing an indestructible wall. On a generated map that is
+   * every window: the pillar grid puts a wall on every (even, even) cell, and any 3x3 block covers
+   * at least one of them. So the picker always returned null, the hill never moved once in the
+   * lifetime of the feature, and — because the caller only advanced the timer on success — the
+   * full-grid scan below ran on every tick from the first warning window to the end of the match.
+   * A wall is now tolerated only at the centre cell (exactly the layout of a pillar-aligned window,
+   * with eight standable tiles around it); any other wall still disqualifies the spot.
+   * (audit KOTH-HILL-MOVE-1)
+   */
   private pickNewHillZone(): { x: number; y: number; width: number; height: number } | null {
     const candidates: Position[] = [];
-    const curCenterX = this.hillZone!.x + Math.floor(KOTH_ZONE_SIZE / 2);
-    const curCenterY = this.hillZone!.y + Math.floor(KOTH_ZONE_SIZE / 2);
-    // Find valid positions: zone fits in map, avoids borders by 2 tiles, no indestructible walls in zone
+    const half = Math.floor(KOTH_ZONE_SIZE / 2);
+    const curCenterX = this.hillZone!.x + half;
+    const curCenterY = this.hillZone!.y + half;
+    // Find valid positions: zone fits in map, avoids borders by 2 tiles, walls only at the centre
     for (let y = 2; y <= this.map.height - KOTH_ZONE_SIZE - 2; y++) {
       for (let x = 2; x <= this.map.width - KOTH_ZONE_SIZE - 2; x++) {
-        const centerX = x + Math.floor(KOTH_ZONE_SIZE / 2);
-        const centerY = y + Math.floor(KOTH_ZONE_SIZE / 2);
+        const centerX = x + half;
+        const centerY = y + half;
         // Must be at least 4 tiles from current center
         const dist = Math.abs(centerX - curCenterX) + Math.abs(centerY - curCenterY);
         if (dist < 4) continue;
-        // Check no indestructible walls in the zone area
-        let hasWall = false;
-        for (let dy = 0; dy < KOTH_ZONE_SIZE && !hasWall; dy++) {
-          for (let dx = 0; dx < KOTH_ZONE_SIZE && !hasWall; dx++) {
-            if (this.map.tiles[y + dy][x + dx] === 'wall') hasWall = true;
+        let blocked = false;
+        for (let dy = 0; dy < KOTH_ZONE_SIZE && !blocked; dy++) {
+          for (let dx = 0; dx < KOTH_ZONE_SIZE && !blocked; dx++) {
+            if (this.map.tiles[y + dy][x + dx] !== 'wall') continue;
+            if (dx !== half || dy !== half) blocked = true;
           }
         }
-        if (!hasWall) candidates.push({ x, y });
+        if (!blocked) candidates.push({ x, y });
       }
     }
     if (candidates.length === 0) return null;
@@ -2440,22 +2620,26 @@ export class GameStateManager {
     };
   }
 
-  /** Delta state for per-tick broadcasts — omits full tile grid, sends only tile diffs */
+  /**
+   * Delta state for per-tick broadcasts — omits the full tile grid (tile diffs instead), the spawn
+   * points, each player's cosmetics after their first tick and each explosion's cells after its
+   * first tick. Every full state (toState) still carries all of it. (audit TICK-PAYLOAD-1)
+   */
   toTickState(): GameStateType {
     const tileDiffs = this._dirtyTiles.size > 0 ? Array.from(this._dirtyTiles.values()) : undefined;
     this._dirtyTiles.clear();
 
     return {
       tick: this.tick,
-      players: mapToArray(this.players, (p) => p.toState()),
+      players: mapToArray(this.players, (p) => p.toTickState()),
       bombs: mapToArray(this.bombs, (b) => b.toState()),
-      explosions: mapToArray(this.explosions, (e) => e.toState()),
+      explosions: mapToArray(this.explosions, (e) => e.toTickState()),
       powerUps: mapToArray(this.powerUps, (p) => p.toState()),
       map: {
         width: this.map.width,
         height: this.map.height,
-        tiles: [], // Empty — client uses stored map from game:start
-        spawnPoints: this.map.spawnPoints,
+        tiles: EMPTY_TILES, // Empty — client uses stored map from game:start
+        spawnPoints: EMPTY_SPAWN_POINTS, // static — sent with the full state only
         seed: this.map.seed,
         ...(this.map.wrapping ? { wrapping: true } : {}),
       },

@@ -233,67 +233,10 @@ export interface CampaignGameState {
 
 // --- Export/Import Formats ---
 
-export interface LevelExportData {
-  _format: 'blast-arena-level';
-  _version: 1;
-  name: string;
-  description: string;
-  mapWidth: number;
-  mapHeight: number;
-  tiles: TileType[][];
-  fillMode: string;
-  wallDensity: number;
-  playerSpawns: Position[];
-  enemyPlacements: EnemyPlacement[];
-  powerupPlacements: PowerUpPlacement[];
-  winCondition: CampaignWinCondition;
-  winConditionConfig: WinConditionConfig | null;
-  lives: number;
-  timeLimit: number;
-  parTime: number;
-  carryOverPowerups: boolean;
-  startingPowerups: StartingPowerUps | null;
-  availablePowerupTypes: PowerUpType[] | null;
-  powerupDropRate: number;
-  reinforcedWalls: boolean;
-  hazardTiles: boolean;
-  puzzleConfig?: PuzzleConfig | null;
-}
-
-export interface EnemyTypeExportData {
-  _format: 'blast-arena-enemy-type';
-  _version: 1 | 2;
-  name: string;
-  description: string;
-  config: EnemyTypeConfig;
-  enemyAiSource?: string;
-  enemyAiName?: string;
-}
-
-export interface LevelBundleExportData {
-  _format: 'blast-arena-level-bundle';
-  _version: 1 | 2;
-  level: Omit<LevelExportData, '_format' | '_version'>;
-  enemyTypes: {
-    originalId: number;
-    name: string;
-    description: string;
-    config: EnemyTypeConfig;
-    enemyAiSource?: string;
-    enemyAiName?: string;
-  }[];
-}
-
 export interface ImportConflict {
   originalId: number;
   name: string;
   existingId?: number;
-  existingName?: string;
-}
-
-export interface EnemyAIImportConflict {
-  aiName: string;
-  existingId?: string;
   existingName?: string;
 }
 

@@ -3,6 +3,9 @@ import * as path from 'path';
 import * as zlib from 'zlib';
 import {
   GameState,
+  ExplosionState,
+  PlayerState,
+  Position,
   TileType,
   ReplayData,
   ReplayFrame,
@@ -130,6 +133,14 @@ export class ReplayRecorder {
   private frames: ReplayFrame[] = [];
   private logEntries: ReplayLogEntry[] = [];
   private currentTick: number = 0;
+  /**
+   * Static per-entity data that tick states carry only once (a player's cosmetics on their first
+   * tick, an explosion's cells on its first tick — see GameStateManager.toTickState). Frames must
+   * stay self-contained because the player seeks, so the recorder fills the gaps from these caches.
+   * (audit TICK-PAYLOAD-1)
+   */
+  private cosmeticsById = new Map<number, PlayerState['cosmetics']>();
+  private explosionCellsById = new Map<string, Position[]>();
 
   constructor(roomCode: string, gameMode: string, initialState: GameState) {
     this.roomCode = roomCode;
@@ -183,15 +194,27 @@ export class ReplayRecorder {
   recordTick(state: GameState, tickEvents: TickEvents): void {
     this.currentTick = state.tick;
 
-    // Compute tile diffs
+    // Tile diffs: taken from the tick state when the engine tracked them (GameStateManager records
+    // every mutation in _dirtyTiles), so the whole grid no longer has to be re-compared on every
+    // recorded tick. The scan remains for callers that hand over a full grid without diffs
+    // (simulations, full-state frames). (audit REPLAY-DIFF-1)
     let tileDiffs: ReplayTileDiff[] | undefined;
-    const currentTiles = state.map.tiles;
-    for (let y = 0; y < currentTiles.length; y++) {
-      for (let x = 0; x < currentTiles[y].length; x++) {
-        if (currentTiles[y][x] !== this.previousTiles[y][x]) {
-          if (!tileDiffs) tileDiffs = [];
-          tileDiffs.push({ x, y, type: currentTiles[y][x] });
-          this.previousTiles[y][x] = currentTiles[y][x];
+    if (state.tileDiffs !== undefined) {
+      for (const diff of state.tileDiffs) {
+        if (this.previousTiles[diff.y]?.[diff.x] === diff.type) continue;
+        if (!tileDiffs) tileDiffs = [];
+        tileDiffs.push({ x: diff.x, y: diff.y, type: diff.type });
+        this.previousTiles[diff.y][diff.x] = diff.type;
+      }
+    } else if (state.map.tiles.length > 0) {
+      const currentTiles = state.map.tiles;
+      for (let y = 0; y < currentTiles.length; y++) {
+        for (let x = 0; x < currentTiles[y].length; x++) {
+          if (currentTiles[y][x] !== this.previousTiles[y][x]) {
+            if (!tileDiffs) tileDiffs = [];
+            tileDiffs.push({ x, y, type: currentTiles[y][x] });
+            this.previousTiles[y][x] = currentTiles[y][x];
+          }
         }
       }
     }
@@ -216,9 +239,9 @@ export class ReplayRecorder {
 
     const frame: ReplayFrame = {
       tick: state.tick,
-      players: state.players,
+      players: this.hydratePlayers(state.players),
       bombs: state.bombs,
-      explosions: state.explosions,
+      explosions: this.hydrateExplosions(state.explosions),
       powerUps: state.powerUps,
       status: state.status,
       winnerId: state.winnerId,
@@ -235,6 +258,47 @@ export class ReplayRecorder {
     if (events) frame.events = events;
 
     this.frames.push(frame);
+  }
+
+  /** Players with their cosmetics restored from the cache when a tick state omitted them. */
+  private hydratePlayers(players: PlayerState[]): PlayerState[] {
+    let out: PlayerState[] | null = null;
+    for (let i = 0; i < players.length; i++) {
+      const p = players[i];
+      if (p.cosmetics) {
+        this.cosmeticsById.set(p.id, p.cosmetics);
+        continue;
+      }
+      const cached = this.cosmeticsById.get(p.id);
+      if (!cached) continue;
+      if (!out) out = players.slice();
+      out[i] = { ...p, cosmetics: cached };
+    }
+    return out ?? players;
+  }
+
+  /** Explosions with their cell lists restored from the cache when a tick state omitted them. */
+  private hydrateExplosions(explosions: ExplosionState[]): ExplosionState[] {
+    let out: ExplosionState[] | null = null;
+    for (let i = 0; i < explosions.length; i++) {
+      const e = explosions[i];
+      if (e.cells.length > 0) {
+        this.explosionCellsById.set(e.id, e.cells);
+        continue;
+      }
+      const cached = this.explosionCellsById.get(e.id);
+      if (!cached) continue;
+      if (!out) out = explosions.slice();
+      out[i] = { ...e, cells: cached };
+    }
+    // Forget explosions that are gone so the cache cannot grow for the life of a long session.
+    if (this.explosionCellsById.size > explosions.length) {
+      const live = new Set(explosions.map((e) => e.id));
+      for (const id of this.explosionCellsById.keys()) {
+        if (!live.has(id)) this.explosionCellsById.delete(id);
+      }
+    }
+    return out ?? explosions;
   }
 
   addLogEntry(event: ReplayLogEventType, data: Record<string, unknown>): void {

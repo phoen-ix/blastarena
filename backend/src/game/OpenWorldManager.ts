@@ -197,7 +197,7 @@ class OpenWorldManager {
 
     this.gameLoop = new GameLoop(
       this.gameState,
-      (state) => this.onTick(state),
+      (serialize) => this.onTick(serialize),
       () => {}, // Open world never calls onGameOver
       TICK_RATE,
       true, // skip countdown
@@ -205,9 +205,10 @@ class OpenWorldManager {
     this.gameLoop.start();
   }
 
-  private onTick(state: GameStateType): void {
+  private onTick(serialize: () => GameStateType = () => this.gameState!.toTickState()): void {
     if (!this.gameState || !this.io) return;
 
+    const state = serialize();
     const tick = this.gameState.tick;
 
     // Broadcast discrete game events for EffectSystem (sounds, screen shake)
@@ -276,9 +277,9 @@ class OpenWorldManager {
       }
     }
 
-    // Flush stats periodically
+    // Flush stats periodically (fire-and-forget from the tick, but never an unhandled rejection)
     if (tick - this.lastStatsFlushTick >= OPENWORLD_STATS_FLUSH_TICKS) {
-      this.flushStats();
+      void this.flushStats().catch((err) => logger.error({ err }, 'Open world stats flush failed'));
       this.lastStatsFlushTick = tick;
     }
 
@@ -337,8 +338,9 @@ class OpenWorldManager {
   private completeRoundTransition(): void {
     if (!this.io) return;
 
-    // Flush remaining stats
-    this.flushStats();
+    // Flush remaining stats. The batch is detached from pendingStats synchronously inside
+    // flushStats, so the new round's kills cannot bleed into it. (audit OPENWORLD-FLUSH-1)
+    void this.flushStats().catch((err) => logger.error({ err }, 'Open world stats flush failed'));
 
     // Save replay for this round (if any frames were recorded)
     this.finalizeReplay();
@@ -432,13 +434,8 @@ class OpenWorldManager {
     };
     this.players.set(userId, playerData);
     this.socketToPlayer.set(socketId, userId);
-
-    // Notify others
-    this.io?.to('openworld').emit('openworld:playerJoined', {
-      id: userId,
-      username,
-      isGuest,
-    });
+    // (No openworld:playerJoined broadcast: nothing ever listened for it; the next openworld:info
+    // carries the roster. (audit DEAD-SOCKET-EVENTS-1))
 
     const state = this.gameState.toState();
     return { success: true, playerId: userId, username, state };
@@ -453,7 +450,9 @@ class OpenWorldManager {
 
     // Flush stats for this player
     if (!playerData.isGuest && userId > 0) {
-      this.flushPlayerStats(userId);
+      void this.flushPlayerStats(userId).catch((err) =>
+        logger.error({ err, userId }, 'Open world player stats flush failed'),
+      );
     }
 
     // Remove from game state
@@ -461,12 +460,8 @@ class OpenWorldManager {
     this.players.delete(userId);
     this.socketToPlayer.delete(socketId);
 
-    // Notify others
-    this.io?.to('openworld').emit('openworld:playerLeft', {
-      id: userId,
-      username: playerData.username,
-    });
     // Player count + leaderboard changed — refresh both without waiting for the periodic tick
+    // (the openworld:playerLeft broadcast that used to precede this had no listener).
     this.broadcastInfo();
   }
 
@@ -499,7 +494,7 @@ class OpenWorldManager {
       logger.info('Open world enabled');
     } else if (wasEnabled && !settings.enabled) {
       // Disable open world
-      this.shutdown();
+      await this.shutdown();
       logger.info('Open world disabled');
     } else if (this.enabled) {
       // Update settings (apply on next round for map changes, immediately for limits)
@@ -590,10 +585,31 @@ class OpenWorldManager {
     return this.socketToPlayer.get(socketId);
   }
 
-  shutdown(): void {
-    this.flushStats();
-    this.finalizeReplay();
+  /**
+   * Stop the world and persist what is pending. Awaitable: the process shutdown path used to fire
+   * flushStats() and call process.exit() in the same tick, so every deploy dropped the current
+   * 10 s window of open-world kills/deaths/XP. (audit OPENWORLD-FLUSH-1)
+   */
+  async shutdown(): Promise<void> {
+    // Both the socket layer's signal handler and the process shutdown call this; the second caller
+    // must await the first flush rather than find an already-empty batch.
+    if (this.shutdownPromise) return this.shutdownPromise;
+    this.shutdownPromise = this.doShutdown().finally(() => {
+      this.shutdownPromise = null;
+    });
+    return this.shutdownPromise;
+  }
+
+  private shutdownPromise: Promise<void> | null = null;
+
+  private async doShutdown(): Promise<void> {
     this.gameLoop?.stop();
+    try {
+      await this.flushStats();
+    } catch (err) {
+      logger.error({ err }, 'Open world stats flush failed during shutdown');
+    }
+    this.finalizeReplay();
     this.gameLoop = null;
     this.gameState = null;
     this.players.clear();

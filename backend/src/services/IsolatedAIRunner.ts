@@ -1,5 +1,5 @@
 import ivm from 'isolated-vm';
-import type { PlayerInput } from '@blast-arena/shared';
+import type { PlayerInput, TileDiff } from '@blast-arena/shared';
 import type { EnemyAIContext, EnemyAIResult, IEnemyAI } from '../game/EnemyAI';
 import type { Player } from '../game/Player';
 import type { GameStateManager } from '../game/GameState';
@@ -161,8 +161,28 @@ function buildBotBootstrap(compiledCode: string, argsLiteral: string): string {
     CLASS_DISCOVERY('generateInput') +
     `
   var __instance = new __AIClass(${argsLiteral});
+  // The tile grid lives in the isolate: it arrives once (snap.map.tiles) and is patched from
+  // snap.map.tileDiffs afterwards, instead of being re-serialised and re-parsed on every decision.
+  // Rows are frozen so a guest that scribbles on state.map.tiles cannot corrupt later decisions.
+  var __tiles = null;
+  function __syncTiles(map) {
+    if (map.tiles) {
+      __tiles = map.tiles;
+      for (var r = 0; r < __tiles.length; r++) Object.freeze(__tiles[r]);
+    } else {
+      var diffs = map.tileDiffs || [];
+      for (var i = 0; i < diffs.length; i++) {
+        var d = diffs[i];
+        var row = __tiles[d.y].slice();
+        row[d.x] = d.type;
+        __tiles[d.y] = Object.freeze(row);
+      }
+    }
+    map.tiles = __tiles;
+  }
   globalThis.__invoke = function (snapshotJson) {
     var snap = JSON.parse(snapshotJson);
+    __syncTiles(snap.map);
     var self = __ai.buildPlayer(snap.self);
     var state = __ai.buildState(snap);
     var out = __instance.generateInput(self, state, __ai.NOOP_LOGGER);
@@ -313,7 +333,20 @@ function playerSnap(p: Player) {
   };
 }
 
-export function buildBotSnapshotJson(self: Player, state: GameStateManager): string {
+/**
+ * Which form of the tile grid to ship with a snapshot: the whole grid (first decision of an
+ * isolate) or only the entries of GameStateManager.tileChangeLog the isolate has not seen yet.
+ * (audit ISOLATE-SNAPSHOT-1)
+ */
+export type TileSync =
+  | { tiles: readonly (readonly string[])[] }
+  | { tileDiffs: readonly TileDiff[] };
+
+export function buildBotSnapshotJson(
+  self: Player,
+  state: GameStateManager,
+  tileSync: TileSync = { tiles: state.map.tiles },
+): string {
   const players = [];
   for (const p of state.players.values()) players.push(playerSnap(p));
   const bombs = [];
@@ -341,7 +374,7 @@ export function buildBotSnapshotJson(self: Player, state: GameStateManager): str
   for (const pu of state.powerUps.values()) {
     powerUps.push({ id: pu.id, position: { x: pu.position.x, y: pu.position.y }, type: pu.type });
   }
-  const map = state.map as { width: number; height: number; tiles: unknown; wrapping?: boolean };
+  const map = state.map as { width: number; height: number; wrapping?: boolean };
   return JSON.stringify({
     tick: state.tick,
     roundTime: state.roundTime,
@@ -349,7 +382,7 @@ export function buildBotSnapshotJson(self: Player, state: GameStateManager): str
     map: {
       width: map.width,
       height: map.height,
-      tiles: map.tiles,
+      ...tileSync,
       wrapping: !!map.wrapping,
       reinforcedWalls: state.reinforcedWalls,
     },
@@ -366,6 +399,8 @@ export function buildBotSnapshotJson(self: Player, state: GameStateManager): str
 /** Untrusted bot AI: implements IBotAI by running generateInput inside an isolate. */
 export class IsolatedBotAI implements IBotAI {
   private runner: IsolatedAIRunner;
+  /** Entries of the host's tileChangeLog already applied inside the isolate; -1 = grid not sent yet. */
+  private tileLogIndex = -1;
 
   constructor(
     compiledCode: string,
@@ -380,7 +415,14 @@ export class IsolatedBotAI implements IBotAI {
     state: GameStateManager,
     _logger?: GameLogger | null,
   ): PlayerInput | null {
-    const out = this.runner.invoke(buildBotSnapshotJson(self, state)); // throws on timeout/error → caller fallback
+    // A state without a change log (hand-built test doubles) always gets the full grid.
+    const log = state.tileChangeLog as TileDiff[] | undefined;
+    const tileSync: TileSync =
+      this.tileLogIndex < 0 || !log
+        ? { tiles: state.map.tiles }
+        : { tileDiffs: this.tileLogIndex < log.length ? log.slice(this.tileLogIndex) : [] };
+    const out = this.runner.invoke(buildBotSnapshotJson(self, state, tileSync)); // throws on timeout/error → caller fallback
+    if (log) this.tileLogIndex = log.length;
     return out ? (JSON.parse(out) as PlayerInput) : null;
   }
 

@@ -66,17 +66,46 @@ async function main(): Promise<void> {
   reapRefreshTokens();
   const refreshTokenReaper = setInterval(reapRefreshTokens, 24 * 60 * 60 * 1000);
 
-  // Graceful shutdown
+  // Graceful shutdown. Order matters: the open world flushes its pending stats BEFORE the sockets
+  // are closed (so per-player leave flushes have nothing left to do), and the DB pool is drained
+  // before exit so in-flight match persistence completes. This used to call process.exit() in the
+  // same tick as the flush was started. (audit OPENWORLD-FLUSH-1)
+  const { openWorldManager } = await import('./game/OpenWorldManager');
+  const { getPool } = await import('./db/connection');
+  const { getRedis } = await import('./db/redis');
+  let shuttingDown = false;
   const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     logger.info('Shutting down...');
     clearInterval(refreshTokenReaper);
+    const forceExit = setTimeout(() => {
+      logger.warn('Shutdown timed out, exiting');
+      process.exit(1);
+    }, 10_000);
+    forceExit.unref();
+    try {
+      await openWorldManager.shutdown();
+    } catch (err) {
+      logger.error({ err }, 'Open world shutdown failed');
+    }
     io.close();
     httpServer.close();
+    try {
+      await getPool().end();
+    } catch (err) {
+      logger.error({ err }, 'DB pool close failed');
+    }
+    try {
+      await getRedis().quit();
+    } catch (err) {
+      logger.error({ err }, 'Redis close failed');
+    }
     process.exit(0);
   };
 
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', () => void shutdown());
+  process.on('SIGINT', () => void shutdown());
 
   // Last-resort safety nets: log unhandled async failures instead of letting them crash the
   // process (or be silently swallowed). Individual handlers still do their own error handling. (audit ERR-004)

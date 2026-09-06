@@ -9,6 +9,7 @@ import { IsolatedBotAI } from './IsolatedAIRunner';
 type BotAIConstructor = new (
   difficulty: 'easy' | 'normal' | 'hard',
   mapSize?: { width: number; height: number },
+  seed?: number,
 ) => IBotAI;
 
 /**
@@ -25,7 +26,7 @@ export class BotAIRegistry {
 
   constructor() {
     // Always register built-in AI so it's available even without initialize()
-    this.loaded.set('builtin', { kind: 'class', ctor: BotAI as unknown as BotAIConstructor });
+    this.loaded.set('builtin', { kind: 'class', ctor: BotAI });
   }
 
   async initialize(): Promise<void> {
@@ -68,7 +69,10 @@ export class BotAIRegistry {
       return new BotAI(difficulty, mapSize, seed);
     }
     if (entry.kind === 'class') {
-      return new entry.ctor(difficulty, mapSize);
+      // The seed was accepted here and then dropped, so every built-in bot in every match ran on
+      // SeededRandom(1) — one shared RNG stream for all of them — while GameState carefully derived
+      // `map.seed + id` per bot. Threaded through now. (audit BOTAI-SEED-1)
+      return new entry.ctor(difficulty, mapSize, seed);
     }
     // Untrusted custom AI — run it in an isolate. If the isolate fails to build/instantiate the
     // class, fall back to the built-in so a broken upload can't break game creation.

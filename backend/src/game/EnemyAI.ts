@@ -63,7 +63,6 @@ export function processEnemyAI(
   players: Player[],
   collisionSystem: CollisionSystem,
   bombPositions: Position[],
-  tiles: TileType[][],
   rng: () => number,
 ): EnemyAIResult {
   if (!enemy.alive) return { direction: null, placeBomb: false };
@@ -78,16 +77,16 @@ export function processEnemyAI(
   if (enemy.canMove()) {
     switch (enemy.typeConfig.movementPattern) {
       case 'random_walk':
-        direction = randomWalk(enemy, collisionSystem, bombPositions, tiles, rng);
+        direction = randomWalk(enemy, collisionSystem, bombPositions, rng);
         break;
       case 'chase_player':
-        direction = chasePlayer(enemy, alivePlayers, collisionSystem, bombPositions, tiles, rng);
+        direction = chasePlayer(enemy, alivePlayers, collisionSystem, bombPositions, rng);
         break;
       case 'patrol_path':
-        direction = patrolPath(enemy, collisionSystem, bombPositions, tiles);
+        direction = patrolPath(enemy, collisionSystem, bombPositions);
         break;
       case 'wall_follow':
-        direction = wallFollow(enemy, collisionSystem, bombPositions, tiles);
+        direction = wallFollow(enemy, collisionSystem, bombPositions);
         break;
       case 'stationary':
         direction = null;
@@ -123,7 +122,6 @@ function getWalkableDirs(
   pos: Position,
   collisionSystem: CollisionSystem,
   bombPositions: Position[],
-  tiles: TileType[][],
   canPassWalls: boolean,
   canPassBombs: boolean,
 ): Direction[] {
@@ -156,14 +154,12 @@ function randomWalk(
   enemy: Enemy,
   collisionSystem: CollisionSystem,
   bombPositions: Position[],
-  tiles: TileType[][],
   rng: () => number,
 ): Direction | null {
   const walkable = getWalkableDirs(
     enemy.position,
     collisionSystem,
     bombPositions,
-    tiles,
     enemy.typeConfig.canPassWalls,
     enemy.typeConfig.canPassBombs,
   );
@@ -182,7 +178,6 @@ function chasePlayer(
   players: Player[],
   collisionSystem: CollisionSystem,
   bombPositions: Position[],
-  tiles: TileType[][],
   rng: () => number,
 ): Direction | null {
   const nearest = findNearestPlayer(enemy.position, players);
@@ -195,7 +190,6 @@ function chasePlayer(
       nearest.position,
       collisionSystem,
       bombPositions,
-      tiles,
       enemy.typeConfig.canPassWalls,
       enemy.typeConfig.canPassBombs,
       20,
@@ -204,14 +198,13 @@ function chasePlayer(
   }
 
   // Fallback to random
-  return randomWalk(enemy, collisionSystem, bombPositions, tiles, rng);
+  return randomWalk(enemy, collisionSystem, bombPositions, rng);
 }
 
 function patrolPath(
   enemy: Enemy,
   collisionSystem: CollisionSystem,
   bombPositions: Position[],
-  tiles: TileType[][],
 ): Direction | null {
   if (enemy.patrolPath.length === 0) return null;
 
@@ -239,7 +232,6 @@ function patrolPath(
     nextTarget,
     collisionSystem,
     bombPositions,
-    tiles,
     enemy.typeConfig.canPassWalls,
     enemy.typeConfig.canPassBombs,
   );
@@ -249,7 +241,6 @@ function wallFollow(
   enemy: Enemy,
   collisionSystem: CollisionSystem,
   bombPositions: Position[],
-  _tiles: TileType[][],
 ): Direction | null {
   // Right-hand rule wall following
   const rightOf: Record<Direction, Direction> = {
@@ -294,7 +285,6 @@ function moveToward(
   to: Position,
   collisionSystem: CollisionSystem,
   bombPositions: Position[],
-  tiles: TileType[][],
   canPassWalls: boolean,
   canPassBombs: boolean,
 ): Direction | null {
@@ -339,7 +329,6 @@ function bfsToTarget(
   to: Position,
   collisionSystem: CollisionSystem,
   bombPositions: Position[],
-  tiles: TileType[][],
   canPassWalls: boolean,
   canPassBombs: boolean,
   maxDepth: number,

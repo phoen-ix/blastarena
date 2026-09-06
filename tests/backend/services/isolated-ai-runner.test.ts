@@ -303,3 +303,45 @@ describe('IsolatedAIRunner — lifecycle', () => {
     expect(true).toBe(true);
   });
 });
+
+// The tile grid is shipped to the isolate once and then patched from GameStateManager.tileChangeLog
+// (audit ISOLATE-SNAPSHOT-1). A real GameStateManager is used so the log is populated by the
+// engine's own tracked mutations.
+describe('IsolatedAIRunner — incremental tile sync', () => {
+  const BOT_READ_TILE = `module.exports = class {
+    generateInput(player, state) {
+      const t = state.collisionSystem.getTileAt(3, 3);
+      try { state.map.tiles[3][3] = 'lava'; } catch (e) {}
+      return { seq: 1, tick: state.tick, direction: t === 'wall' ? 'up' : t === 'ice' ? 'down' : null, action: null };
+    }
+  };`;
+
+  it('sees tracked tile changes on later decisions without re-sending the grid', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { GameStateManager } = require('../../../backend/src/game/GameState');
+    const gs = new GameStateManager({
+      mapWidth: 9,
+      mapHeight: 9,
+      mapSeed: 1,
+      gameMode: 'ffa',
+      wallDensity: 0,
+      powerUpDropRate: 0,
+    });
+    const self = gs.addPlayer(1, 'a');
+    gs.setTileTracked(3, 3, 'wall');
+    const ai = new IsolatedBotAI(BOT_READ_TILE, 'normal', { width: 9, height: 9 });
+    try {
+      expect(ai.generateInput(self, gs)!.direction).toBe('up');
+      // Guest scribbling on state.map.tiles must not stick (rows are frozen)…
+      expect(ai.generateInput(self, gs)!.direction).toBe('up');
+      // …but a tracked host change arrives as a diff
+      gs.setTileTracked(3, 3, 'ice');
+      expect(ai.generateInput(self, gs)!.direction).toBe('down');
+      expect((ai as unknown as { tileLogIndex: number }).tileLogIndex).toBe(
+        gs.tileChangeLog.length,
+      );
+    } finally {
+      ai.dispose();
+    }
+  });
+});

@@ -85,7 +85,7 @@ describe('EnemyAI — processEnemyAI', () => {
       const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig());
       enemy.alive = false;
       const player = new Player(1, 'Alice', { x: 3, y: 3 });
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(result.direction).toBeNull();
       expect(result.placeBomb).toBe(false);
     });
@@ -94,14 +94,14 @@ describe('EnemyAI — processEnemyAI', () => {
       const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig());
       const deadPlayer = new Player(1, 'Alice', { x: 3, y: 3 });
       deadPlayer.alive = false;
-      const result = processEnemyAI(enemy, [deadPlayer], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [deadPlayer], collision, [], fixedRng(0.5));
       expect(result.direction).toBeNull();
       expect(result.placeBomb).toBe(false);
     });
 
     it('should return no action when players array is empty', () => {
       const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig());
-      const result = processEnemyAI(enemy, [], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [], collision, [], fixedRng(0.5));
       expect(result.direction).toBeNull();
       expect(result.placeBomb).toBe(false);
     });
@@ -115,7 +115,7 @@ describe('EnemyAI — processEnemyAI', () => {
       const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig());
       enemy.moveCooldown = 3;
       const player = new Player(1, 'Alice', { x: 3, y: 3 });
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(result.direction).toBeNull();
     });
 
@@ -123,7 +123,7 @@ describe('EnemyAI — processEnemyAI', () => {
       const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig());
       enemy.moveCooldown = 0;
       const player = new Player(1, 'Alice', { x: 3, y: 3 });
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(result.direction).not.toBeNull();
     });
   });
@@ -133,22 +133,11 @@ describe('EnemyAI — processEnemyAI', () => {
   // ───────────────────────────────────────────────
   describe('stationary pattern', () => {
     it('should never move when pattern is stationary', () => {
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'stationary' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'stationary' }));
       const player = new Player(1, 'Alice', { x: 3, y: 3 });
 
       for (let i = 0; i < 20; i++) {
-        const result = processEnemyAI(
-          enemy,
-          [player],
-          collision,
-          [],
-          tiles,
-          fixedRng(Math.random()),
-        );
+        const result = processEnemyAI(enemy, [player], collision, [], fixedRng(Math.random()));
         expect(result.direction).toBeNull();
       }
     });
@@ -159,44 +148,32 @@ describe('EnemyAI — processEnemyAI', () => {
   // ───────────────────────────────────────────────
   describe('random_walk pattern', () => {
     it('should pick a walkable direction', () => {
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'random_walk' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'random_walk' }));
       const player = new Player(1, 'Alice', { x: 3, y: 3 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(result.direction).not.toBeNull();
       expect(['up', 'down', 'left', 'right']).toContain(result.direction);
     });
 
     it('should continue current direction 60% of the time when possible', () => {
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'random_walk' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'random_walk' }));
       enemy.direction = 'right';
       const player = new Player(1, 'Alice', { x: 3, y: 3 });
 
       // rng < 0.6 => continue current direction
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.3));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.3));
       expect(result.direction).toBe('right');
     });
 
     it('should pick random direction when rng >= 0.6', () => {
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'random_walk' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'random_walk' }));
       enemy.direction = 'right';
       const player = new Player(1, 'Alice', { x: 3, y: 3 });
 
       // rng >= 0.6 => pick random from walkable
       // With rng=0.7 for the first call, then rng=0.0 for floor() => picks first walkable dir
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.7));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.7));
       expect(result.direction).not.toBeNull();
     });
 
@@ -208,14 +185,10 @@ describe('EnemyAI — processEnemyAI', () => {
       tiles[1][2] = 'wall'; // right
       collision = new CollisionSystem(tiles, mapWidth, mapHeight);
 
-      const enemy = new Enemy(
-        1,
-        { x: 1, y: 1 },
-        makeConfig({ movementPattern: 'random_walk' }),
-      );
+      const enemy = new Enemy(1, { x: 1, y: 1 }, makeConfig({ movementPattern: 'random_walk' }));
       const player = new Player(1, 'Alice', { x: 5, y: 5 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(result.direction).toBeNull();
     });
 
@@ -235,14 +208,7 @@ describe('EnemyAI — processEnemyAI', () => {
       ];
       // Only right is open
       // Use rng=0.7 (skip continue-direction) and rng=0.0 (pick first walkable)
-      const result = processEnemyAI(
-        enemy,
-        [player],
-        collision,
-        bombs,
-        tiles,
-        fixedRng(0.7),
-      );
+      const result = processEnemyAI(enemy, [player], collision, bombs, fixedRng(0.7));
       expect(result.direction).toBe('right');
     });
 
@@ -260,14 +226,7 @@ describe('EnemyAI — processEnemyAI', () => {
         { x: 4, y: 5 }, // left
       ];
       // All 4 dirs are walkable since canPassBombs
-      const result = processEnemyAI(
-        enemy,
-        [player],
-        collision,
-        bombs,
-        tiles,
-        seqRng([0.7, 0.0]),
-      );
+      const result = processEnemyAI(enemy, [player], collision, bombs, seqRng([0.7, 0.0]));
       expect(result.direction).not.toBeNull();
     });
   });
@@ -278,90 +237,49 @@ describe('EnemyAI — processEnemyAI', () => {
   describe('chase_player pattern', () => {
     it('should chase the nearest player via BFS (70% of the time)', () => {
       // Enemy at (5,5), player at (5,3) — directly above
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'chase_player' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'chase_player' }));
       const player = new Player(1, 'Alice', { x: 5, y: 3 });
 
       // rng < 0.7 => follow BFS
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.1));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.1));
       expect(result.direction).toBe('up');
     });
 
     it('should chase the closest player when multiple are present', () => {
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'chase_player' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'chase_player' }));
       const farPlayer = new Player(1, 'Alice', { x: 9, y: 9 });
       const nearPlayer = new Player(2, 'Bob', { x: 5, y: 3 });
 
-      const result = processEnemyAI(
-        enemy,
-        [farPlayer, nearPlayer],
-        collision,
-        [],
-        tiles,
-        fixedRng(0.1),
-      );
+      const result = processEnemyAI(enemy, [farPlayer, nearPlayer], collision, [], fixedRng(0.1));
       // Should chase Bob (closer), direction = up
       expect(result.direction).toBe('up');
     });
 
     it('should chase horizontally when player is to the side', () => {
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'chase_player' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'chase_player' }));
       const player = new Player(1, 'Alice', { x: 8, y: 5 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.1));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.1));
       expect(result.direction).toBe('right');
     });
 
     it('should fall back to random walk when rng >= 0.7', () => {
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'chase_player' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'chase_player' }));
       const player = new Player(1, 'Alice', { x: 5, y: 3 });
 
       // rng >= 0.7 => random walk fallback
-      const result = processEnemyAI(
-        enemy,
-        [player],
-        collision,
-        [],
-        tiles,
-        fixedRng(0.8),
-      );
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.8));
       // Should still return some valid direction
       expect(result.direction).not.toBeNull();
     });
 
     it('should ignore dead players in nearest calculation', () => {
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'chase_player' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'chase_player' }));
       const deadPlayer = new Player(1, 'Alice', { x: 5, y: 4 }); // very close
       deadPlayer.alive = false;
       const alivePlayer = new Player(2, 'Bob', { x: 5, y: 3 }); // farther
 
-      const result = processEnemyAI(
-        enemy,
-        [deadPlayer, alivePlayer],
-        collision,
-        [],
-        tiles,
-        fixedRng(0.1),
-      );
+      const result = processEnemyAI(enemy, [deadPlayer, alivePlayer], collision, [], fixedRng(0.1));
       expect(result.direction).toBe('up');
     });
 
@@ -371,14 +289,10 @@ describe('EnemyAI — processEnemyAI', () => {
       tiles[4][5] = 'wall';
       collision = new CollisionSystem(tiles, mapWidth, mapHeight);
 
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'chase_player' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'chase_player' }));
       const player = new Player(1, 'Alice', { x: 5, y: 3 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.1));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.1));
       // Can't go up directly, BFS should route around (left or right)
       expect(result.direction).not.toBeNull();
       expect(result.direction).not.toBe('up');
@@ -398,7 +312,7 @@ describe('EnemyAI — processEnemyAI', () => {
       );
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(result.direction).toBeNull();
     });
 
@@ -416,7 +330,7 @@ describe('EnemyAI — processEnemyAI', () => {
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
       // Start at waypoint 0, which is (5,5). At that waypoint already, advance to next.
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       // After advancing, target is (7,5), so should move right
       expect(result.direction).toBe('right');
     });
@@ -437,7 +351,7 @@ describe('EnemyAI — processEnemyAI', () => {
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
       // At waypoint 2 (7,5) which is end. Should reverse to forward=false and go to index 1.
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(enemy.patrolForward).toBe(false);
       // Target is now patrolPath[1] = (5,5), should move left
       expect(result.direction).toBe('left');
@@ -460,7 +374,7 @@ describe('EnemyAI — processEnemyAI', () => {
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
       // At waypoint 0 going backward. Should reverse to forward=true and go to index 1.
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(enemy.patrolForward).toBe(true);
       // Target is patrolPath[1] = (5,5), should move right
       expect(result.direction).toBe('right');
@@ -478,7 +392,7 @@ describe('EnemyAI — processEnemyAI', () => {
 
       // At the only waypoint — forward advance wraps, reverse wraps back
       // This tests the edge case behavior
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       // With single waypoint, after reaching it the index stays clamped at 0
       expect(result.direction).toBeNull(); // at target, no movement needed
     });
@@ -489,15 +403,11 @@ describe('EnemyAI — processEnemyAI', () => {
   // ───────────────────────────────────────────────
   describe('wall_follow pattern', () => {
     it('should follow right-hand rule', () => {
-      const enemy = new Enemy(
-        1,
-        { x: 1, y: 1 },
-        makeConfig({ movementPattern: 'wall_follow' }),
-      );
+      const enemy = new Enemy(1, { x: 1, y: 1 }, makeConfig({ movementPattern: 'wall_follow' }));
       enemy.direction = 'down'; // facing down, right of down = left
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       // Try order for facing down: left, down, right, up
       // (1,1) — left would be (0,1) = wall, down = (1,2) = empty
       expect(result.direction).toBe('down');
@@ -505,15 +415,11 @@ describe('EnemyAI — processEnemyAI', () => {
 
     it('should try right-of-current first', () => {
       // Facing up, right of up = right
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'wall_follow' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'wall_follow' }));
       enemy.direction = 'up';
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       // right of up = right. (6,5) is empty, so should go right
       expect(result.direction).toBe('right');
     });
@@ -529,7 +435,7 @@ describe('EnemyAI — processEnemyAI', () => {
 
       // Block right (the preferred right-hand direction)
       const bombs: Position[] = [{ x: 6, y: 5 }];
-      const result = processEnemyAI(enemy, [player], collision, bombs, tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, bombs, fixedRng(0.5));
       // right blocked by bomb, try current (up), which is (5,4) = empty
       expect(result.direction).toBe('up');
     });
@@ -541,14 +447,10 @@ describe('EnemyAI — processEnemyAI', () => {
       tiles[5][6] = 'wall'; // right
       collision = new CollisionSystem(tiles, mapWidth, mapHeight);
 
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'wall_follow' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'wall_follow' }));
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(result.direction).toBeNull();
     });
 
@@ -560,15 +462,11 @@ describe('EnemyAI — processEnemyAI', () => {
       }
       collision = new CollisionSystem(tiles, mapWidth, mapHeight);
 
-      const enemy = new Enemy(
-        1,
-        { x: 3, y: 5 },
-        makeConfig({ movementPattern: 'wall_follow' }),
-      );
+      const enemy = new Enemy(1, { x: 3, y: 5 }, makeConfig({ movementPattern: 'wall_follow' }));
       enemy.direction = 'right';
       const player = new Player(1, 'Alice', { x: 9, y: 5 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       // Facing right, right-of-right = down. Down (3,6) is wall. Try current = right (4,5) = empty.
       expect(result.direction).toBe('right');
     });
@@ -594,7 +492,7 @@ describe('EnemyAI — processEnemyAI', () => {
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
       // rng >= 0.6 => random pick. With rng=0.7 and floor(0.7*4)=2, picks 3rd direction
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.7));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.7));
       expect(result.direction).not.toBeNull();
     });
 
@@ -613,7 +511,7 @@ describe('EnemyAI — processEnemyAI', () => {
       );
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(result.direction).toBeNull();
     });
 
@@ -629,7 +527,7 @@ describe('EnemyAI — processEnemyAI', () => {
       );
       const player = new Player(1, 'Alice', { x: 5, y: 3 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.1));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.1));
       // BFS with canPassWalls should go through destructible, so direction = up
       expect(result.direction).toBe('up');
     });
@@ -640,14 +538,10 @@ describe('EnemyAI — processEnemyAI', () => {
   // ───────────────────────────────────────────────
   describe('bomb triggers', () => {
     it('should not place bomb when canBomb is false', () => {
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ canBomb: false }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ canBomb: false }));
       const player = new Player(1, 'Alice', { x: 5, y: 6 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(result.placeBomb).toBe(false);
     });
 
@@ -663,7 +557,7 @@ describe('EnemyAI — processEnemyAI', () => {
       enemy.bombCooldown = 10;
       const player = new Player(1, 'Alice', { x: 5, y: 6 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(result.placeBomb).toBe(false);
     });
 
@@ -679,7 +573,7 @@ describe('EnemyAI — processEnemyAI', () => {
         );
         const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-        const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+        const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
         expect(result.placeBomb).toBe(true);
       });
     });
@@ -691,13 +585,18 @@ describe('EnemyAI — processEnemyAI', () => {
           { x: 5, y: 5 },
           makeConfig({
             canBomb: true,
-            bombConfig: { fireRange: 2, cooldownTicks: 20, trigger: 'proximity', proximityRange: 3 },
+            bombConfig: {
+              fireRange: 2,
+              cooldownTicks: 20,
+              trigger: 'proximity',
+              proximityRange: 3,
+            },
           }),
         );
         // Manhattan distance from (5,5) to (5,7) = 2, within range 3
         const player = new Player(1, 'Alice', { x: 5, y: 7 });
 
-        const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+        const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
         expect(result.placeBomb).toBe(true);
       });
 
@@ -707,13 +606,18 @@ describe('EnemyAI — processEnemyAI', () => {
           { x: 5, y: 5 },
           makeConfig({
             canBomb: true,
-            bombConfig: { fireRange: 2, cooldownTicks: 20, trigger: 'proximity', proximityRange: 2 },
+            bombConfig: {
+              fireRange: 2,
+              cooldownTicks: 20,
+              trigger: 'proximity',
+              proximityRange: 2,
+            },
           }),
         );
         // Manhattan distance from (5,5) to (9,9) = 8, outside range 2
         const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-        const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+        const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
         expect(result.placeBomb).toBe(false);
       });
 
@@ -729,7 +633,7 @@ describe('EnemyAI — processEnemyAI', () => {
         // Distance = 3, exactly at boundary
         const player = new Player(1, 'Alice', { x: 5, y: 8 });
 
-        const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+        const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
         expect(result.placeBomb).toBe(true);
       });
 
@@ -745,7 +649,7 @@ describe('EnemyAI — processEnemyAI', () => {
         // Distance = 4, outside default range 3
         const player = new Player(1, 'Alice', { x: 5, y: 9 });
 
-        const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+        const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
         expect(result.placeBomb).toBe(false);
       });
 
@@ -755,20 +659,18 @@ describe('EnemyAI — processEnemyAI', () => {
           { x: 5, y: 5 },
           makeConfig({
             canBomb: true,
-            bombConfig: { fireRange: 2, cooldownTicks: 20, trigger: 'proximity', proximityRange: 2 },
+            bombConfig: {
+              fireRange: 2,
+              cooldownTicks: 20,
+              trigger: 'proximity',
+              proximityRange: 2,
+            },
           }),
         );
         const farPlayer = new Player(1, 'Alice', { x: 9, y: 9 });
         const nearPlayer = new Player(2, 'Bob', { x: 5, y: 6 }); // distance 1
 
-        const result = processEnemyAI(
-          enemy,
-          [farPlayer, nearPlayer],
-          collision,
-          [],
-          tiles,
-          fixedRng(0.5),
-        );
+        const result = processEnemyAI(enemy, [farPlayer, nearPlayer], collision, [], fixedRng(0.5));
         expect(result.placeBomb).toBe(true);
       });
     });
@@ -787,7 +689,7 @@ describe('EnemyAI — processEnemyAI', () => {
 
         // Need rng for movement decision first, then for bomb decision
         // The bomb trigger rng() call is separate from the movement ones
-        const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.1));
+        const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.1));
         expect(result.placeBomb).toBe(true);
       });
 
@@ -802,7 +704,7 @@ describe('EnemyAI — processEnemyAI', () => {
         );
         const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-        const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+        const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
         expect(result.placeBomb).toBe(false);
       });
     });
@@ -824,7 +726,7 @@ describe('EnemyAI — processEnemyAI', () => {
       );
       const player = new Player(1, 'Alice', { x: 5, y: 3 }); // distance 2
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.1));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.1));
       expect(result.direction).toBe('up');
       expect(result.placeBomb).toBe(true);
     });
@@ -837,7 +739,7 @@ describe('EnemyAI — processEnemyAI', () => {
       );
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(result.direction).not.toBeNull();
       expect(result.placeBomb).toBe(false);
     });
@@ -854,7 +756,7 @@ describe('EnemyAI — processEnemyAI', () => {
       enemy.moveCooldown = 5;
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(result.direction).toBeNull();
       expect(result.placeBomb).toBe(true);
     });
@@ -865,16 +767,12 @@ describe('EnemyAI — processEnemyAI', () => {
   // ───────────────────────────────────────────────
   describe('BFS pathfinding', () => {
     it('should return null when enemy is already at the target', () => {
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'chase_player' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'chase_player' }));
       // Player at same position
       const player = new Player(1, 'Alice', { x: 5, y: 5 });
 
       // rng < 0.7 => follow BFS, BFS returns null when from === to
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.1));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.1));
       // BFS returns null, falls through to random walk fallback
       // Random walk with rng(0.1) < 0.6 => continue current direction (down)
       // (5,6) is empty, so should return 'down'
@@ -882,28 +780,20 @@ describe('EnemyAI — processEnemyAI', () => {
     });
 
     it('should find adjacent target immediately', () => {
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'chase_player' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'chase_player' }));
       const player = new Player(1, 'Alice', { x: 6, y: 5 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.1));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.1));
       expect(result.direction).toBe('right');
     });
 
     it('should respect maxDepth BFS limit', () => {
       // Create a very long maze (though BFS maxDepth is 20 by default)
       // This tests that BFS doesn't go too deep. Hard to force failure with 11x11 map.
-      const enemy = new Enemy(
-        1,
-        { x: 1, y: 1 },
-        makeConfig({ movementPattern: 'chase_player' }),
-      );
+      const enemy = new Enemy(1, { x: 1, y: 1 }, makeConfig({ movementPattern: 'chase_player' }));
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.1));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.1));
       // Should still find a path (distance < 20 on 11x11 map)
       expect(result.direction).not.toBeNull();
     });
@@ -917,16 +807,12 @@ describe('EnemyAI — processEnemyAI', () => {
       tiles[4][5] = 'spawn';
       collision = new CollisionSystem(tiles, mapWidth, mapHeight);
 
-      const enemy = new Enemy(
-        1,
-        { x: 5, y: 5 },
-        makeConfig({ movementPattern: 'random_walk' }),
-      );
+      const enemy = new Enemy(1, { x: 5, y: 5 }, makeConfig({ movementPattern: 'random_walk' }));
       enemy.direction = 'up';
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
       // rng < 0.6 => continue current direction (up to spawn tile)
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.3));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.3));
       expect(result.direction).toBe('up');
     });
 
@@ -944,7 +830,7 @@ describe('EnemyAI — processEnemyAI', () => {
       );
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       expect(result.direction).toBeNull();
     });
   });
@@ -967,7 +853,7 @@ describe('EnemyAI — processEnemyAI', () => {
       );
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       // At waypoint 0, advance to 1. Target is (7,3). dx=4 > dy=2, prefer right
       expect(result.direction).toBe('right');
     });
@@ -985,7 +871,7 @@ describe('EnemyAI — processEnemyAI', () => {
       );
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       // Target is (6,8). dy=5 > dx=1, prefer down
       expect(result.direction).toBe('down');
     });
@@ -1008,7 +894,7 @@ describe('EnemyAI — processEnemyAI', () => {
       );
       const player = new Player(1, 'Alice', { x: 9, y: 9 });
 
-      const result = processEnemyAI(enemy, [player], collision, [], tiles, fixedRng(0.5));
+      const result = processEnemyAI(enemy, [player], collision, [], fixedRng(0.5));
       // Right is blocked, should go up (second preferred)
       expect(result.direction).toBe('up');
     });

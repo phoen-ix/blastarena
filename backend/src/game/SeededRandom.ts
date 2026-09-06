@@ -17,7 +17,11 @@ export class SeededRandom {
   /** Next value in [0, 1). */
   next(): number {
     this.seed = (this.seed * 1664525 + 1013904223) & 0xffffffff;
-    return (this.seed >>> 0) / 0xffffffff;
+    // Divide by 2^32, not 2^32 - 1: the old divisor made the range [0, 1] inclusive, so once per
+    // 2^32 draws `Math.floor(next() * arr.length)` indexed one past the end and every consumer
+    // (`emptyTiles[…].x`, spawn picks, power-up drops) would throw inside processTick.
+    // (audit SEEDED-RANDOM-RANGE-1)
+    return (this.seed >>> 0) / 0x100000000;
   }
 
   /** Random integer in [0, max). */

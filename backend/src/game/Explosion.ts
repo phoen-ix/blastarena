@@ -8,6 +8,8 @@ export class Explosion {
   public readonly ownerId: number;
   public ticksRemaining: number;
   private readonly cellSet: Set<string>;
+  /** Set once the cell list has gone out in a tick state — see toTickState(). */
+  private cellsSent = false;
 
   constructor(cells: Position[], ownerId: number) {
     this.id = uuidv4();
@@ -34,4 +36,24 @@ export class Explosion {
       ticksRemaining: this.ticksRemaining,
     };
   }
+
+  /**
+   * Per-tick form: the cell list is immutable for the explosion's lifetime, so it is sent once —
+   * on the first tick the explosion appears — and as an empty array on the remaining ~9 ticks. A
+   * client keeps the cells by id (an explosion always has at least its origin cell, so an empty
+   * list is unambiguous). This used to re-send every cell of every live explosion on every tick.
+   * (audit TICK-PAYLOAD-1)
+   */
+  toTickState(): ExplosionState {
+    const cells = this.cellsSent ? EMPTY_CELLS : this.cells;
+    this.cellsSent = true;
+    return {
+      id: this.id,
+      cells,
+      ownerId: this.ownerId,
+      ticksRemaining: this.ticksRemaining,
+    };
+  }
 }
+
+const EMPTY_CELLS: Position[] = [];

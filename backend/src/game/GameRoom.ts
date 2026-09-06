@@ -30,7 +30,7 @@ type TypedServer = Server<
 import { GameStateManager, GameConfig } from './GameState';
 import { GameLoop } from './GameLoop';
 import type { RowDataPacket } from 'mysql2';
-import { execute, query } from '../db/connection';
+import { execute, withTransaction } from '../db/connection';
 import { logger } from '../utils/logger';
 import { GameLogger } from '../utils/gameLogger';
 import { ReplayRecorder } from '../utils/replayRecorder';
@@ -44,8 +44,9 @@ import * as challengesService from '../services/challenges';
 const DISCONNECT_GRACE_TICKS = 200; // 10 seconds at 20 tps
 const BOT_ONLY_TICK_RATE = 100; // 5x speed when only bots remain
 
-/** Row shape for the post-game `SELECT total_xp, level FROM user_stats` query */
+/** Row shape for the post-game `SELECT user_id, total_xp, level FROM user_stats` query */
 interface UserStatsXpRow extends RowDataPacket {
+  user_id: number;
   total_xp: number;
   level: number;
 }
@@ -194,7 +195,7 @@ export class GameRoom {
 
     this.gameLoop = new GameLoop(
       this.gameState,
-      (state) => this.broadcastState(state),
+      (serialize) => this.broadcastState(serialize()),
       () => this.onGameOver(),
     );
   }
@@ -218,14 +219,16 @@ export class GameRoom {
       this.matchId = result.insertId;
       this.replayRecorder?.setMatchId(this.matchId);
 
-      // Insert match_players (skip bots)
-      for (const player of this.gameState.players.values()) {
-        if (player.isBot) continue;
-        await execute('INSERT INTO match_players (match_id, user_id, team) VALUES (?, ?, ?)', [
-          this.matchId,
-          player.id,
-          player.team,
-        ]);
+      // Insert match_players (skip bots) — one multi-row statement, this sits on the game-start
+      // latency path before game:start is broadcast. (audit GAME-END-BATCH-1)
+      const humans = [...this.gameState.players.values()].filter((p) => !p.isBot);
+      if (humans.length > 0) {
+        await execute(
+          `INSERT INTO match_players (match_id, user_id, team) VALUES ${humans
+            .map(() => '(?, ?, ?)')
+            .join(', ')}`,
+          humans.flatMap((p) => [this.matchId, p.id, p.team]),
+        );
       }
     } catch (err) {
       logger.error({ err }, 'Failed to create match record');
@@ -418,9 +421,11 @@ export class GameRoom {
       this.io.to(room).emit('game:powerupCollected', pickup);
     }
 
-    // Record frame for replay — pass raw tile grid reference for diff computation
-    // (broadcast state has empty tiles for bandwidth savings, but replays need actual tiles)
-    if (this.replayRecorder) {
+    // Record frame for replay. Not during the countdown: the tick stays at 0 for 36 broadcasts,
+    // which used to land as 36 duplicate frames all stamped tick 0 (campaign already skipped
+    // them). (audit REPLAY-COUNTDOWN-FRAMES-1) The recorder takes the tile diffs straight from the
+    // tick state and only needs the live grid as a fallback. (audit REPLAY-DIFF-1)
+    if (this.replayRecorder && state.status === 'playing') {
       const replayState =
         state.tileDiffs !== undefined
           ? { ...state, map: { ...state.map, tiles: this.gameState.map.tiles } }
@@ -430,6 +435,23 @@ export class GameRoom {
   }
 
   private async onGameOver(): Promise<void> {
+    // Everything here runs after GameLoop has stopped, from a fire-and-forget callback; nothing may
+    // escape as an unhandled rejection, and the room must reach 'finished' in Redis whatever the DB
+    // did. (audit GAME-OVER-ASYNC-1)
+    try {
+      await this.persistGameOver();
+    } catch (err) {
+      logger.error({ err, code: this.code }, 'Failed to save match results');
+    }
+    try {
+      await lobbyService.updateRoomStatus(this.code, 'finished');
+    } catch (err) {
+      logger.error({ err, code: this.code }, 'Failed to mark room finished');
+    }
+    logger.info({ code: this.code, winnerId: this.gameState.winnerId }, 'Game over');
+  }
+
+  private async persistGameOver(): Promise<void> {
     const state = this.gameState.toState();
 
     // Build placements sorted by kills (descending), tiebreak by survival placement
@@ -473,86 +495,129 @@ export class GameRoom {
     // Save replay
     this.replayRecorder?.finalize(gameOverData);
 
-    // Save match results
-    if (this.matchId) {
-      try {
-        const duration = Math.floor(state.timeElapsed);
-        // Don't store bot IDs (negative) as winner_id in DB
-        const dbWinnerId = state.winnerId && state.winnerId > 0 ? state.winnerId : null;
-        // A match everyone walked out of does not count. `aborted` is driven by real departure
-        // bookkeeping (departedHumans), not by a magic finishReason string — the previous
-        // incarnation compared against a literal that was assigned nowhere, so the status could
-        // never be 'aborted' and the guards below were unreachable. Bot-only rooms are excluded:
-        // with no humans there is nothing to abandon. (audit MATCH-ABORTED-1)
-        const aborted = this.isAbandoned();
-        const matchStatus = aborted ? 'aborted' : 'finished';
-        if (aborted) {
-          logger.info(
-            { code: this.code, matchId: this.matchId },
-            'Match abandoned by every human player — skipping rating, XP and achievements',
-          );
-        }
-        await execute(
-          `UPDATE matches SET status = ?, finished_at = NOW(), duration = ?, winner_id = ? WHERE id = ?`,
-          [matchStatus, duration, dbWinnerId, this.matchId],
+    if (!this.matchId) return;
+
+    const duration = Math.floor(state.timeElapsed);
+    // Don't store bot IDs (negative) as winner_id in DB
+    const dbWinnerId = state.winnerId && state.winnerId > 0 ? state.winnerId : null;
+    // A match everyone walked out of does not count. `aborted` is driven by real departure
+    // bookkeeping (departedHumans), not by a magic finishReason string — the previous
+    // incarnation compared against a literal that was assigned nowhere, so the status could
+    // never be 'aborted' and the guards below were unreachable. Bot-only rooms are excluded:
+    // with no humans there is nothing to abandon. (audit MATCH-ABORTED-1)
+    const aborted = this.isAbandoned();
+    const matchStatus = aborted ? 'aborted' : 'finished';
+    if (aborted) {
+      logger.info(
+        { code: this.code, matchId: this.matchId },
+        'Match abandoned by every human player — skipping rating, XP and achievements',
+      );
+    }
+    const humans = [...this.gameState.players.values()].filter((p) => !p.isBot);
+
+    // Who won. Teams mode sets `winnerTeam` and leaves `winnerId` null, so an id-only check
+    // reports every player as a loser — which is exactly what user_stats used to do while Elo
+    // and achievements honoured the team, leaving the three systems disagreeing about the same
+    // match. One predicate, used by all of them. (audit TEAMS-WIN-1)
+    const isWinningPlayer = (p: { id: number; team: number | null }): boolean =>
+      p.id === state.winnerId || (state.winnerTeam !== null && p.team === state.winnerTeam);
+
+    // 1. Match record + per-player match rows, atomically. The per-player rows go out as one
+    // multi-row upsert instead of N sequential UPDATEs. (audit GAME-END-BATCH-1)
+    await withTransaction(async (conn) => {
+      await conn.execute(
+        `UPDATE matches SET status = ?, finished_at = NOW(), duration = ?, winner_id = ? WHERE id = ?`,
+        [matchStatus, duration, dbWinnerId, this.matchId],
+      );
+      if (humans.length > 0) {
+        await conn.execute(
+          `INSERT INTO match_players
+             (match_id, user_id, team, placement, kills, deaths, bombs_placed, powerups_collected, survived_seconds)
+           VALUES ${humans.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}
+           ON DUPLICATE KEY UPDATE
+             placement = VALUES(placement), kills = VALUES(kills), deaths = VALUES(deaths),
+             bombs_placed = VALUES(bombs_placed), powerups_collected = VALUES(powerups_collected),
+             survived_seconds = VALUES(survived_seconds)`,
+          humans.flatMap((p) => [
+            this.matchId,
+            p.id,
+            p.team,
+            p.placement,
+            p.kills,
+            p.deaths,
+            p.bombsPlaced,
+            p.powerupsCollected,
+            duration,
+          ]),
         );
+      }
+    });
 
-        // Update match_players (skip bots)
-        for (const player of this.gameState.players.values()) {
-          if (player.isBot) continue;
-          await execute(
-            `UPDATE match_players SET placement = ?, kills = ?, deaths = ?, bombs_placed = ?, powerups_collected = ?, survived_seconds = ? WHERE match_id = ? AND user_id = ?`,
-            [
-              player.placement,
-              player.kills,
-              player.deaths,
-              player.bombsPlaced,
-              player.powerupsCollected,
-              Math.floor(state.timeElapsed),
-              this.matchId,
-              player.id,
-            ],
-          );
-        }
+    if (aborted) return;
 
-        // Who won. Teams mode sets `winnerTeam` and leaves `winnerId` null, so an id-only check
-        // reports every player as a loser — which is exactly what user_stats used to do while Elo
-        // and achievements honoured the team, leaving the three systems disagreeing about the same
-        // match. One predicate, used by all of them. (audit TEAMS-WIN-1)
-        const isWinningPlayer = (p: { id: number; team: number | null }): boolean =>
-          p.id === state.winnerId || (state.winnerTeam !== null && p.team === state.winnerTeam);
+    // 2. Elo MUST read user_stats before total_matches is incremented below, so the K-factor uses
+    // the pre-match match count (K=32 for <30 games). (audit ELO-1) It runs in its own transaction
+    // on another pooled connection, so it also has to run before ours holds the user_stats rows.
+    let eloResults: import('@blast-arena/shared').EloResult[] = [];
+    try {
+      eloResults = await eloService.processMatchElo(
+        this.room.config.gameMode,
+        humans.map((p) => ({
+          userId: p.id,
+          placement: p.placement ?? 999,
+          team: p.team,
+          isWinner: isWinningPlayer(p),
+        })),
+        this.matchId,
+      );
+    } catch (eloErr) {
+      logger.error({ err: eloErr }, 'Failed to process Elo');
+    }
 
-        // Elo calculation MUST read user_stats before total_matches is incremented below, so the
-        // K-factor uses the pre-match match count (K=32 for <30 games). (audit ELO-1)
-        // Results are emitted later, after stats are updated (so cumulative achievements see the new totals).
-        let eloResults: import('@blast-arena/shared').EloResult[] = [];
-        if (!aborted) {
-          try {
-            const eloPlayers = [...this.gameState.players.values()]
-              .filter((p) => !p.isBot)
-              .map((p) => ({
-                userId: p.id,
-                placement: p.placement ?? 999,
-                team: p.team,
-                isWinner: isWinningPlayer(p),
-              }));
+    // 3. Cumulative stats + XP + level in ONE UPDATE per player, all in one transaction. This used
+    // to be UPDATE user_stats, then SELECT total_xp/level, then UPDATE total_xp/level — three
+    // round-trips per player, sequentially. (audit GAME-END-BATCH-1)
+    const xpResults: XpUpdateResult[] = [];
+    const levelUps: { userId: number; newLevel: number }[] = [];
+    if (humans.length > 0) {
+      const xpMultiplier = parseFloat((await settingsService.getSetting('xp_multiplier')) ?? '1');
+      await withTransaction(async (conn) => {
+        const [statsRows] = await conn.execute<UserStatsXpRow[]>(
+          `SELECT user_id, total_xp, level FROM user_stats WHERE user_id IN (${humans
+            .map(() => '?')
+            .join(',')}) FOR UPDATE`,
+          humans.map((p) => p.id),
+        );
+        const statsById = new Map(statsRows.map((r) => [r.user_id, r]));
 
-            eloResults = await eloService.processMatchElo(
-              this.room.config.gameMode,
-              eloPlayers,
-              this.matchId!,
-            );
-          } catch (eloErr) {
-            logger.error({ err: eloErr }, 'Failed to process Elo');
-          }
-        }
-
-        // Update user_stats (skip bots, and skip entirely for an abandoned match — it should
-        // leave no trace on anyone's record). (audit MATCH-ABORTED-1)
-        for (const player of this.gameState.players.values()) {
-          if (player.isBot || aborted) continue;
+        const updates = humans.map((player) => {
           const isWinner = isWinningPlayer(player);
-          await execute(
+          const statsRow = statsById.get(player.id);
+          const currentXp = statsRow?.total_xp ?? 0;
+          const oldLevel = statsRow?.level ?? 1;
+          const xpGained = calculateXpGained(
+            {
+              kills: player.kills,
+              bombsPlaced: player.bombsPlaced,
+              powerupsCollected: player.powerupsCollected,
+              placement: player.placement || 0,
+              isWinner,
+            },
+            xpMultiplier,
+          );
+          const newTotalXp = currentXp + xpGained;
+          const newLevel = getLevelForXp(newTotalXp);
+          if (newLevel > oldLevel) levelUps.push({ userId: player.id, newLevel });
+          xpResults.push({
+            userId: player.id,
+            xpGained,
+            totalXp: newTotalXp,
+            oldLevel,
+            newLevel,
+            xpForNextLevel: getXpToNextLevel(newLevel),
+            xpProgress: newTotalXp - getXpForLevel(newLevel),
+          });
+          return conn.execute(
             `UPDATE user_stats SET
               total_matches = total_matches + 1,
               total_wins = total_wins + ?,
@@ -562,7 +627,9 @@ export class GameRoom {
               total_powerups = total_powerups + ?,
               total_playtime = total_playtime + ?,
               win_streak = IF(?, win_streak + 1, 0),
-              best_win_streak = GREATEST(best_win_streak, IF(?, win_streak + 1, 0))
+              best_win_streak = GREATEST(best_win_streak, IF(?, win_streak + 1, 0)),
+              total_xp = ?,
+              level = ?
             WHERE user_id = ?`,
             [
               isWinner ? 1 : 0,
@@ -570,136 +637,83 @@ export class GameRoom {
               player.deaths,
               player.bombsPlaced,
               player.powerupsCollected,
-              Math.floor(state.timeElapsed),
+              duration,
               isWinner,
               isWinner,
+              newTotalXp,
+              newLevel,
               player.id,
             ],
           );
-        }
-
-        // Emit Elo results (computed above, before the stats increment) and evaluate achievements
-        // (which read the now-incremented cumulative stats).
-        if (eloResults.length > 0) {
-          this.io.to(`room:${this.code}`).emit('game:eloUpdate', eloResults);
-        }
-
-        // Achievement evaluation for each human player (skipped for abandoned matches).
-        // (audit MATCH-ABORTED-1)
-        for (const player of this.gameState.players.values()) {
-          if (player.isBot || aborted) continue;
-          try {
-            const unlocked = await achievementsService.evaluateAfterGame({
-              userId: player.id,
-              gameMode: this.room.config.gameMode,
-              isWinner: isWinningPlayer(player),
-              kills: player.kills,
-              deaths: player.deaths,
-              selfKills: player.selfKills,
-              bombsPlaced: player.bombsPlaced,
-              powerupsCollected: player.powerupsCollected,
-              survivedSeconds: Math.floor(state.timeElapsed),
-              placement: player.placement ?? 999,
-              playerCount: this.gameState.players.size,
-            });
-
-            if (unlocked.achievements.length > 0) {
-              this.io.to(`user:${player.id}`).emit('achievement:unlocked', unlocked);
-            }
-          } catch (achErr) {
-            logger.error({ err: achErr, userId: player.id }, 'Failed to evaluate achievements');
-          }
-        }
-
-        // --- XP & Level ---
-        try {
-          const xpMultiplier = parseFloat(
-            (await settingsService.getSetting('xp_multiplier')) ?? '1',
-          );
-          const xpResults: XpUpdateResult[] = [];
-
-          for (const p of placements) {
-            if (p.isBot || p.userId < 0 || aborted) continue;
-
-            const [statsRow] = await query<UserStatsXpRow[]>(
-              'SELECT total_xp, level FROM user_stats WHERE user_id = ?',
-              [p.userId],
-            );
-            const currentXp = statsRow?.total_xp ?? 0;
-            const oldLevel = statsRow?.level ?? 1;
-
-            const player = this.gameState.players.get(p.userId);
-            const xpGained = calculateXpGained(
-              {
-                kills: p.kills,
-                bombsPlaced: player?.bombsPlaced ?? 0,
-                powerupsCollected: player?.powerupsCollected ?? 0,
-                placement: p.placement,
-                isWinner: isWinningPlayer({ id: p.userId, team: p.team }),
-              },
-              xpMultiplier,
-            );
-
-            const newTotalXp = currentXp + xpGained;
-            const newLevel = getLevelForXp(newTotalXp);
-
-            await execute('UPDATE user_stats SET total_xp = ?, level = ? WHERE user_id = ?', [
-              newTotalXp,
-              newLevel,
-              p.userId,
-            ]);
-
-            if (newLevel > oldLevel) {
-              await cosmeticsService.checkLevelMilestoneUnlocks(p.userId, newLevel);
-            }
-
-            xpResults.push({
-              userId: p.userId,
-              xpGained,
-              totalXp: newTotalXp,
-              oldLevel,
-              newLevel,
-              xpForNextLevel: getXpToNextLevel(newLevel),
-              xpProgress: newTotalXp - getXpForLevel(newLevel),
-            });
-          }
-
-          if (xpResults.length > 0) {
-            this.io.to(`room:${this.code}`).emit('game:xpUpdate', xpResults);
-          }
-        } catch (xpErr) {
-          logger.error({ err: xpErr }, 'Failed to process XP');
-        }
-
-        // --- Challenge scoring ---
-        if (this.room.config.customMapId) {
-          try {
-            const activeChallenge = await challengesService.getActiveChallenge();
-            if (activeChallenge && activeChallenge.customMapId === this.room.config.customMapId) {
-              for (const p of placements) {
-                if (p.isBot || p.userId < 0 || aborted) continue;
-                const player = this.gameState.players.get(p.userId);
-                await challengesService.recordChallengeResult(
-                  activeChallenge.id,
-                  p.userId,
-                  isWinningPlayer({ id: p.userId, team: p.team }),
-                  player?.kills ?? 0,
-                  player?.deaths ?? 0,
-                  p.placement,
-                );
-              }
-            }
-          } catch (challengeErr) {
-            logger.error({ err: challengeErr }, 'Failed to record challenge results');
-          }
-        }
-      } catch (err) {
-        logger.error({ err }, 'Failed to save match results');
-      }
+        });
+        await Promise.all(updates);
+      });
     }
 
-    await lobbyService.updateRoomStatus(this.code, 'finished');
-    logger.info({ code: this.code, winnerId: state.winnerId }, 'Game over');
+    // Emit Elo results (computed above, before the stats increment) and evaluate achievements
+    // (which read the now-incremented cumulative stats).
+    if (eloResults.length > 0) {
+      this.io.to(`room:${this.code}`).emit('game:eloUpdate', eloResults);
+    }
+
+    // 4. Achievements per human player, concurrently (independent rows). (audit GAME-END-BATCH-1)
+    await Promise.all(
+      humans.map(async (player) => {
+        try {
+          const unlocked = await achievementsService.evaluateAfterGame({
+            userId: player.id,
+            gameMode: this.room.config.gameMode,
+            isWinner: isWinningPlayer(player),
+            kills: player.kills,
+            deaths: player.deaths,
+            selfKills: player.selfKills,
+            bombsPlaced: player.bombsPlaced,
+            powerupsCollected: player.powerupsCollected,
+            survivedSeconds: duration,
+            placement: player.placement ?? 999,
+            playerCount: this.gameState.players.size,
+          });
+          if (unlocked.achievements.length > 0) {
+            this.io.to(`user:${player.id}`).emit('achievement:unlocked', unlocked);
+          }
+        } catch (achErr) {
+          logger.error({ err: achErr, userId: player.id }, 'Failed to evaluate achievements');
+        }
+      }),
+    );
+
+    // 5. Level-milestone cosmetics + XP broadcast
+    for (const { userId, newLevel } of levelUps) {
+      try {
+        await cosmeticsService.checkLevelMilestoneUnlocks(userId, newLevel);
+      } catch (cosErr) {
+        logger.error({ err: cosErr, userId }, 'Failed to unlock level milestone cosmetics');
+      }
+    }
+    if (xpResults.length > 0) {
+      this.io.to(`room:${this.code}`).emit('game:xpUpdate', xpResults);
+    }
+
+    // 6. Challenge scoring
+    if (this.room.config.customMapId) {
+      try {
+        const activeChallenge = await challengesService.getActiveChallenge();
+        if (activeChallenge && activeChallenge.customMapId === this.room.config.customMapId) {
+          for (const player of humans) {
+            await challengesService.recordChallengeResult(
+              activeChallenge.id,
+              player.id,
+              isWinningPlayer(player),
+              player.kills,
+              player.deaths,
+              player.placement || 0,
+            );
+          }
+        }
+      } catch (challengeErr) {
+        logger.error({ err: challengeErr }, 'Failed to record challenge results');
+      }
+    }
   }
 
   stop(): void {

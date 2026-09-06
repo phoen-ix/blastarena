@@ -20,6 +20,26 @@ const DIR_DELTA: Record<Direction, { dx: number; dy: number }> = {
 };
 /** Pre-computed direction delta array — avoids Object.values() allocation per call */
 const DIR_DELTA_ARRAY = Object.values(DIR_DELTA);
+/** DIRECTIONS with the given direction first — one frozen array per direction. */
+const ORDERED_DIRS: Record<Direction, Direction[]> = {
+  up: ['up', 'down', 'left', 'right'],
+  down: ['down', 'up', 'left', 'right'],
+  left: ['left', 'up', 'down', 'right'],
+  right: ['right', 'up', 'down', 'left'],
+};
+
+/**
+ * "x,y" keys of every bomb and player tile, built once per search so the BFS loops below can use
+ * CollisionSystem.canMoveToKeyed (one hash lookup per step) instead of canMoveTo's two linear scans
+ * per step. countEscapeRoutes alone runs once per candidate direction with a depth-15 frontier, so
+ * a single decision issued thousands of those scans. (audit COLLISION-HOTPATH-1)
+ */
+function blockedKeys(bombPositions: Position[], otherPlayers: Position[]): Set<string> {
+  const keys = new Set<string>();
+  for (const b of bombPositions) keys.add(`${b.x},${b.y}`);
+  for (const p of otherPlayers) keys.add(`${p.x},${p.y}`);
+  return keys;
+}
 
 function isDestructibleTile(tile: TileType): boolean {
   return tile === 'destructible' || tile === ('destructible_cracked' as TileType);
@@ -198,7 +218,6 @@ export class BotAI implements IBotAI {
 
   // Hunt persistence: once hunting, stay in hunt mode for several ticks
   private huntLockTicks: number = 0;
-  private huntTargetId: number | null = null;
   private wasHunting: boolean = false;
 
   // Track max fire range seen on map for dynamic escape depth
@@ -272,8 +291,9 @@ export class BotAI implements IBotAI {
    * This gives BFS a stable tie-break without any commitment mechanism.
    */
   private orderedDirs(): Direction[] {
-    if (!this.lastDirection) return DIRECTIONS;
-    return [this.lastDirection, ...DIRECTIONS.filter((d) => d !== this.lastDirection)];
+    // Precomputed per direction: this seeds four BFS routines per decision and used to allocate a
+    // filtered array plus a spread copy each time. (audit COLLISION-HOTPATH-1)
+    return ORDERED_DIRS[this.lastDirection];
   }
 
   /**
@@ -910,7 +930,7 @@ export class BotAI implements IBotAI {
           player.canMove() &&
           this.isNearDestructible(pos, state)
         ) {
-          const wallDir = this.findWallTowardEnemy(pos, state, player, bombPositions, otherPlayers);
+          const wallDir = this.findWallTowardEnemy(pos, state, player);
           if (wallDir) {
             const canEscapeWall =
               !this.config.escapeCheckBeforeBomb ||
@@ -990,7 +1010,6 @@ export class BotAI implements IBotAI {
           bombPositions,
           otherPlayers,
           lateGame || this.huntLockTicks > 0,
-          explosionCells,
         );
         if (huntDir) {
           // Track hunt position for oscillation detection (Fix C)
@@ -1042,13 +1061,7 @@ export class BotAI implements IBotAI {
           player.canMove() &&
           !this.hasOwnBombNearby(pos, state, player)
         ) {
-          const bombPathDir = this.findWallTowardEnemy(
-            pos,
-            state,
-            player,
-            bombPositions,
-            otherPlayers,
-          );
+          const bombPathDir = this.findWallTowardEnemy(pos, state, player);
           if (bombPathDir) {
             const canEscapePath =
               !this.config.escapeCheckBeforeBomb ||
@@ -1086,13 +1099,7 @@ export class BotAI implements IBotAI {
         !this.hasOwnBombNearby(pos, state, player) &&
         this.isNearDestructible(pos, state)
       ) {
-        const wallToward = this.findWallTowardEnemy(
-          pos,
-          state,
-          player,
-          bombPositions,
-          otherPlayers,
-        );
+        const wallToward = this.findWallTowardEnemy(pos, state, player);
         if (wallToward) {
           const canEscapeRoam =
             !this.config.escapeCheckBeforeBomb ||
@@ -1232,15 +1239,18 @@ export class BotAI implements IBotAI {
         if (manhattanDist > safeDistance) continue;
       }
 
-      // Collect blast cells for this bomb
-      const blastCells: string[] = [`${bomb.position.x},${bomb.position.y}`];
+      // Collect blast cells for this bomb (as coordinates — they used to be formatted into strings
+      // and parsed straight back for the distance check below). (audit COLLISION-HOTPATH-1)
+      const blastX: number[] = [bomb.position.x];
+      const blastY: number[] = [bomb.position.y];
       for (const { dx, dy } of DIR_DELTA_ARRAY) {
         for (let i = 1; i <= bomb.fireRange; i++) {
           const cx = bomb.position.x + dx * i;
           const cy = bomb.position.y + dy * i;
           const tile = state.collisionSystem.getTileAt(cx, cy);
           if (tile === 'wall') break;
-          blastCells.push(`${cx},${cy}`);
+          blastX.push(cx);
+          blastY.push(cy);
           if (isDestructibleTile(tile) && !bomb.isPierce) break;
         }
       }
@@ -1249,16 +1259,15 @@ export class BotAI implements IBotAI {
       if (!ignoreDangerThreshold && this.config.enableReachabilityFilter) {
         const movesBeforeDetonation = Math.floor(bomb.ticksRemaining / MOVE_COOLDOWN_BASE);
         let minDist = Infinity;
-        for (const cellKey of blastCells) {
-          const [cx, cy] = cellKey.split(',');
-          const dist = Math.abs(Number(cx) - botPos.x) + Math.abs(Number(cy) - botPos.y);
+        for (let i = 0; i < blastX.length; i++) {
+          const dist = Math.abs(blastX[i] - botPos.x) + Math.abs(blastY[i] - botPos.y);
           if (dist < minDist) minDist = dist;
         }
         if (minDist > movesBeforeDetonation + 1) continue;
       }
 
-      for (const cellKey of blastCells) {
-        danger.add(cellKey);
+      for (let i = 0; i < blastX.length; i++) {
+        danger.add(`${blastX[i]},${blastY[i]}`);
       }
     }
 
@@ -1292,6 +1301,7 @@ export class BotAI implements IBotAI {
     otherPlayers: Position[],
     explosionCells?: Set<string>,
   ): { dir: Direction; depth: number } | null {
+    const blocked = blockedKeys(bombPositions, otherPlayers);
     // Active explosion cells kill on contact — never path through them
     const lethal = explosionCells ?? this.getActiveExplosionCells(state);
     const visited = new Set<string>();
@@ -1299,13 +1309,7 @@ export class BotAI implements IBotAI {
     let frontier: { pos: Position; firstDir: Direction }[] = [];
 
     for (const dir of DIRECTIONS) {
-      const newPos = state.collisionSystem.canMoveTo(
-        pos.x,
-        pos.y,
-        dir,
-        bombPositions,
-        otherPlayers,
-      );
+      const newPos = state.collisionSystem.canMoveToKeyed(pos.x, pos.y, dir, blocked);
       if (!newPos) continue;
       const key = `${newPos.x},${newPos.y}`;
       if (visited.has(key)) continue;
@@ -1325,12 +1329,11 @@ export class BotAI implements IBotAI {
       const next: { pos: Position; firstDir: Direction }[] = [];
       for (const entry of frontier) {
         for (const dir of DIRECTIONS) {
-          const newPos = state.collisionSystem.canMoveTo(
+          const newPos = state.collisionSystem.canMoveToKeyed(
             entry.pos.x,
             entry.pos.y,
             dir,
-            bombPositions,
-            otherPlayers,
+            blocked,
           );
           if (!newPos) continue;
           const key = `${newPos.x},${newPos.y}`;
@@ -1355,6 +1358,7 @@ export class BotAI implements IBotAI {
     otherPlayers: Position[],
     cachedExplosionCells?: Set<string>,
   ): number {
+    const blocked = blockedKeys(bombPositions, otherPlayers);
     const explosionCells = cachedExplosionCells ?? this.getActiveExplosionCells(state);
     const visited = new Set<string>();
     visited.add(`${pos.x},${pos.y}`);
@@ -1365,13 +1369,7 @@ export class BotAI implements IBotAI {
       const next: Position[] = [];
       for (const p of frontier) {
         for (const dir of DIRECTIONS) {
-          const newPos = state.collisionSystem.canMoveTo(
-            p.x,
-            p.y,
-            dir,
-            bombPositions,
-            otherPlayers,
-          );
+          const newPos = state.collisionSystem.canMoveToKeyed(p.x, p.y, dir, blocked);
           if (!newPos) continue;
           const key = `${newPos.x},${newPos.y}`;
           if (visited.has(key) || explosionCells.has(key)) continue;
@@ -1457,7 +1455,7 @@ export class BotAI implements IBotAI {
     }
 
     // ignoreDangerThreshold=true: escape check must see ALL bombs, not just nearby/imminent ones
-    const futureDanger = new Set(this.getDangerCells(state, 999, pos, true));
+    const futureDanger = this.getDangerCells(state, 999, pos, true);
 
     // Add danger cells for ALL future bomb positions (not just the player's position)
     for (const bombPos of futureBombPositions) {
@@ -1615,6 +1613,8 @@ export class BotAI implements IBotAI {
     }
     if (powerUpScores.size === 0) return null;
 
+    const blocked = blockedKeys(bombPositions, otherPlayers);
+    const bombKeys = blockedKeys(bombPositions, []);
     const visited = new Set<string>();
     visited.add(`${pos.x},${pos.y}`);
     let frontier: { pos: Position; firstDir: Direction }[] = [];
@@ -1623,13 +1623,7 @@ export class BotAI implements IBotAI {
     let bestDir: Direction | null = null;
     let bestScore = 0;
     for (const dir of this.orderedDirs()) {
-      const newPos = state.collisionSystem.canMoveTo(
-        pos.x,
-        pos.y,
-        dir,
-        bombPositions,
-        otherPlayers,
-      );
+      const newPos = state.collisionSystem.canMoveToKeyed(pos.x, pos.y, dir, blocked);
       if (!newPos) continue;
       const key = `${newPos.x},${newPos.y}`;
       if (danger.has(key)) continue;
@@ -1651,12 +1645,11 @@ export class BotAI implements IBotAI {
       let depthBestScore = 0;
       for (const entry of frontier) {
         for (const dir of DIRECTIONS) {
-          const newPos = state.collisionSystem.canMoveTo(
+          const newPos = state.collisionSystem.canMoveToKeyed(
             entry.pos.x,
             entry.pos.y,
             dir,
-            bombPositions,
-            [],
+            bombKeys,
           );
           if (!newPos) continue;
           const key = `${newPos.x},${newPos.y}`;
@@ -1697,19 +1690,14 @@ export class BotAI implements IBotAI {
       return null;
     }
 
+    const blocked = blockedKeys(bombPositions, otherPlayers);
     const targetX = hill.x + Math.floor(hill.width / 2);
     const targetY = hill.y + Math.floor(hill.height / 2);
     const currentDist = Math.abs(pos.x - targetX) + Math.abs(pos.y - targetY);
 
     const candidates: { dir: Direction; distReduction: number; escape: number }[] = [];
     for (const dir of this.orderedDirs()) {
-      const newPos = state.collisionSystem.canMoveTo(
-        pos.x,
-        pos.y,
-        dir,
-        bombPositions,
-        otherPlayers,
-      );
+      const newPos = state.collisionSystem.canMoveToKeyed(pos.x, pos.y, dir, blocked);
       if (!newPos) continue;
       const key = `${newPos.x},${newPos.y}`;
       if (danger.has(key)) continue;
@@ -1745,7 +1733,6 @@ export class BotAI implements IBotAI {
     bombPositions: Position[],
     otherPlayers: Position[],
     aggressive: boolean = false,
-    _explosionCells?: Set<string>,
   ): Direction | null {
     const enemyPositions = new Set<string>();
     for (const other of state.players.values()) {
@@ -1755,18 +1742,14 @@ export class BotAI implements IBotAI {
     }
     if (enemyPositions.size === 0) return null;
 
+    const blocked = blockedKeys(bombPositions, otherPlayers);
+    const bombKeys = blockedKeys(bombPositions, []);
     const visited = new Set<string>();
     visited.add(`${pos.x},${pos.y}`);
     let frontier: { pos: Position; firstDir: Direction }[] = [];
 
     for (const dir of this.orderedDirs()) {
-      const newPos = state.collisionSystem.canMoveTo(
-        pos.x,
-        pos.y,
-        dir,
-        bombPositions,
-        otherPlayers,
-      );
+      const newPos = state.collisionSystem.canMoveToKeyed(pos.x, pos.y, dir, blocked);
       if (!newPos) continue;
       const key = `${newPos.x},${newPos.y}`;
       if (danger.has(key)) continue;
@@ -1793,12 +1776,11 @@ export class BotAI implements IBotAI {
       const next: { pos: Position; firstDir: Direction }[] = [];
       for (const entry of frontier) {
         for (const dir of DIRECTIONS) {
-          const newPos = state.collisionSystem.canMoveTo(
+          const newPos = state.collisionSystem.canMoveToKeyed(
             entry.pos.x,
             entry.pos.y,
             dir,
-            bombPositions,
-            [],
+            bombKeys,
           );
           if (!newPos) continue;
           const key = `${newPos.x},${newPos.y}`;
@@ -1840,16 +1822,11 @@ export class BotAI implements IBotAI {
     }
     if (!nearestEnemy) return null;
 
+    const blocked = blockedKeys(bombPositions, otherPlayers);
     const candidates: { dir: Direction; distReduction: number; escape: number; osc: boolean }[] =
       [];
     for (const dir of DIRECTIONS) {
-      const newPos = state.collisionSystem.canMoveTo(
-        pos.x,
-        pos.y,
-        dir,
-        bombPositions,
-        otherPlayers,
-      );
+      const newPos = state.collisionSystem.canMoveToKeyed(pos.x, pos.y, dir, blocked);
       if (!newPos) continue;
       const key = `${newPos.x},${newPos.y}`;
       if (danger.has(key)) continue;
@@ -1893,8 +1870,6 @@ export class BotAI implements IBotAI {
     pos: Position,
     state: GameStateManager,
     player: Player,
-    _bombPositions: Position[],
-    _otherPlayers: Position[],
   ): Direction | null {
     let nearestEnemy: Position | null = null;
     let nearestDist = Infinity;
@@ -1944,10 +1919,13 @@ export class BotAI implements IBotAI {
     bombPositions: Position[],
     otherPlayers: Position[],
   ): Direction | null {
+    const blocked = blockedKeys(bombPositions, otherPlayers);
     let nearestEnemy: Position | null = null;
     let nearestDist = Infinity;
     for (const other of state.players.values()) {
-      if (other.id !== player.id && other.alive) {
+      // Teammate filter, as in every sibling target search — without it a teams-mode bot tunnelled
+      // walls toward its own teammate. (audit BOT-TEAMMATE-FILTER-1)
+      if (other.id !== player.id && other.alive && !isTeammate(player, other)) {
         const dist = Math.abs(other.position.x - pos.x) + Math.abs(other.position.y - pos.y);
         if (dist < nearestDist) {
           nearestDist = dist;
@@ -1962,13 +1940,7 @@ export class BotAI implements IBotAI {
     const wallCandidates: { dir: Direction; depth: number; distToEnemy: number }[] = [];
 
     for (const dir of this.orderedDirs()) {
-      const newPos = state.collisionSystem.canMoveTo(
-        pos.x,
-        pos.y,
-        dir,
-        bombPositions,
-        otherPlayers,
-      );
+      const newPos = state.collisionSystem.canMoveToKeyed(pos.x, pos.y, dir, blocked);
       if (!newPos) continue;
       const key = `${newPos.x},${newPos.y}`;
       if (danger.has(key)) continue;
@@ -1977,7 +1949,7 @@ export class BotAI implements IBotAI {
       // Skip dead-end destinations — bot won't be able to bomb there (walkableDirs < 2)
       let destWalkable = 0;
       for (const d of DIRECTIONS) {
-        if (state.collisionSystem.canMoveTo(newPos.x, newPos.y, d, bombPositions, otherPlayers)) {
+        if (state.collisionSystem.canMoveToKeyed(newPos.x, newPos.y, d, blocked)) {
           destWalkable++;
         }
       }
@@ -2007,12 +1979,11 @@ export class BotAI implements IBotAI {
       const next: { pos: Position; firstDir: Direction }[] = [];
       for (const entry of frontier) {
         for (const dir of DIRECTIONS) {
-          const newPos = state.collisionSystem.canMoveTo(
+          const newPos = state.collisionSystem.canMoveToKeyed(
             entry.pos.x,
             entry.pos.y,
             dir,
-            bombPositions,
-            otherPlayers,
+            blocked,
           );
           if (!newPos) continue;
           const key = `${newPos.x},${newPos.y}`;
@@ -2060,16 +2031,11 @@ export class BotAI implements IBotAI {
     otherPlayers: Position[],
     explosionCells?: Set<string>,
   ): Direction | null {
+    const blocked = blockedKeys(bombPositions, otherPlayers);
     const candidates: { dir: Direction; escape: number; osc: boolean }[] = [];
 
     for (const dir of DIRECTIONS) {
-      const newPos = state.collisionSystem.canMoveTo(
-        pos.x,
-        pos.y,
-        dir,
-        bombPositions,
-        otherPlayers,
-      );
+      const newPos = state.collisionSystem.canMoveToKeyed(pos.x, pos.y, dir, blocked);
       if (!newPos) continue;
       if (danger.has(`${newPos.x},${newPos.y}`)) continue;
       const escapeCount = this.countEscapeRoutes(
@@ -2087,13 +2053,7 @@ export class BotAI implements IBotAI {
 
     if (candidates.length === 0) {
       for (const dir of DIRECTIONS) {
-        const newPos = state.collisionSystem.canMoveTo(
-          pos.x,
-          pos.y,
-          dir,
-          bombPositions,
-          otherPlayers,
-        );
+        const newPos = state.collisionSystem.canMoveToKeyed(pos.x, pos.y, dir, blocked);
         if (newPos && !danger.has(`${newPos.x},${newPos.y}`)) return dir;
       }
       return null;

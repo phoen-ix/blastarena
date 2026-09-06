@@ -11,6 +11,7 @@ import {
   PowerUpType,
   Direction,
   CampaignReplayMeta,
+  GameState as GameStateType,
 } from '@blast-arena/shared';
 import {
   TICK_RATE,
@@ -63,6 +64,13 @@ export interface CampaignSessionCallbacks {
   onGameOver: (reason: string) => void;
 }
 
+/** Mix two integers into a 31-bit seed (multiplicative hashing; order-sensitive). */
+function mixSeed(a: number, b: number): number {
+  let h = (Math.imul(a | 0, 0x9e3779b1) ^ Math.imul((b | 0) + 1, 0x85ebca6b)) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0;
+  return (h ^ (h >>> 13)) & 0x7fffffff;
+}
+
 export class CampaignGame {
   public readonly sessionId: string;
   public readonly userIds: number[];
@@ -70,11 +78,6 @@ export class CampaignGame {
   public readonly coopMode: boolean;
   public readonly buddyMode: boolean;
   public readonly level: CampaignLevel;
-
-  /** @deprecated Use userIds[0] instead. Kept for backward compat with CampaignGameManager. */
-  public get userId(): number {
-    return this.userIds[0];
-  }
 
   public getGameState(): GameStateManager {
     return this.gameState;
@@ -145,6 +148,9 @@ export class CampaignGame {
   private maxLives: number;
   private exitOpen: boolean = false;
   private rng: SeededRandom;
+  /** Session seed — see the constructor. Recorded as the map seed. */
+  private readonly seed: number;
+  private static nextSessionOrdinal = 0;
   private callbacks: CampaignSessionCallbacks;
   private playerDeaths: number = 0;
   private finished: boolean = false;
@@ -178,7 +184,6 @@ export class CampaignGame {
   private prevEnemyPositions: Map<number, string> = new Map();
 
   // Enemy bombs tracked separately (they participate in standard bomb mechanics)
-  private enemyBombIds: Set<string> = new Set();
 
   // Custom AI instances per enemy
   private enemyAIs: Map<number, IEnemyAI> = new Map();
@@ -210,7 +215,12 @@ export class CampaignGame {
     this.callbacks = callbacks;
     this.lives = level.lives;
     this.maxLives = level.lives;
-    this.rng = new SeededRandom(Date.now());
+    // Deterministic per session (level id mixed with a per-process ordinal, 31-bit) and recorded
+    // as the map seed, so a campaign replay names the seed that reproduces its enemy AI, drops and
+    // rift teleports. Date.now() made every run unreproducible — and, at ~1.7e12, overflowed 2^53
+    // in the generator's first multiply. (audit CAMPAIGN-SEED-1)
+    this.seed = mixSeed(level.id, CampaignGame.nextSessionOrdinal++);
+    this.rng = new SeededRandom(this.seed);
     this.worldTheme = (theme as CampaignWorldTheme) || 'classic';
 
     // Build GameMap from level tiles (includes co-op P2 spawn fallback)
@@ -316,7 +326,7 @@ export class CampaignGame {
     // Create game loop with countdown
     this.gameLoop = new GameLoop(
       this.gameState,
-      (state) => this.onTick(state),
+      (serialize) => this.onTick(serialize),
       () => this.onTimeUp(),
       TICK_RATE,
     );
@@ -457,7 +467,7 @@ export class CampaignGame {
       height: level.mapHeight,
       tiles,
       spawnPoints,
-      seed: Date.now(),
+      seed: this.seed,
     };
   }
 
@@ -510,11 +520,11 @@ export class CampaignGame {
     if (powerups.bombThrow) player.applyPowerUp('bomb_throw');
   }
 
-  private onTick(_tickState: unknown): void {
+  private onTick(serialize: () => GameStateType = () => this.gameState.toTickState()): void {
     if (this.finished) return;
     if (this.gameState.status !== 'playing') {
       // Still broadcast state during countdown so frontend shows the countdown overlay
-      const state = this.toCampaignState();
+      const state = this.toCampaignState(serialize());
       this.callbacks.onStateUpdate(state);
       // Skip recording during countdown — tick stays at 0 and would create duplicate frames
       return;
@@ -541,8 +551,10 @@ export class CampaignGame {
       });
     }
 
-    // Broadcast combined state
-    const state = this.toCampaignState();
+    // Broadcast combined state. Serialized once, here, after campaignTick() — the per-tick form
+    // with tile diffs; the full tile grid used to go out on every one of the 20 ticks per second.
+    // (audit CAMPAIGN-DOUBLE-SERIALIZE-1)
+    const state = this.toCampaignState(serialize());
     this.callbacks.onStateUpdate(state);
     this.recordReplayTick(state);
   }
@@ -692,7 +704,6 @@ export class CampaignGame {
               Array.from(this.gameState.players.values()),
               this.gameState.collisionSystem,
               bombPositions,
-              this.gameState.map.tiles,
               () => this.rng.next(),
             );
           }
@@ -702,7 +713,6 @@ export class CampaignGame {
             Array.from(this.gameState.players.values()),
             this.gameState.collisionSystem,
             bombPositions,
-            this.gameState.map.tiles,
             () => this.rng.next(),
           );
         }
@@ -773,8 +783,9 @@ export class CampaignGame {
       const [x, y] = key.split(',').map(Number);
       const tile = this.gameState.collisionSystem.getTileAt(x, y);
       if (tile === 'empty') {
-        this.gameState.map.tiles[y][x] = type;
-        this.gameState.collisionSystem.updateTiles(this.gameState.map.tiles);
+        // Through setTileTracked so the reveal reaches clients as a tile diff (the campaign no
+        // longer broadcasts the full grid every tick). (audit CAMPAIGN-DOUBLE-SERIALIZE-1)
+        this.gameState.setTileTracked(x, y, type);
         this.coveredTiles.delete(key);
       }
     }
@@ -969,7 +980,6 @@ export class CampaignGame {
       'normal',
     );
     this.gameState.bombs.set(bomb.id, bomb);
-    this.enemyBombIds.add(bomb.id);
     enemy.applyBombCooldown();
   }
 
@@ -1107,9 +1117,8 @@ export class CampaignGame {
     this.exitOpen = true;
     const exitPos = this.level.winConditionConfig?.exitPosition;
     if (exitPos) {
-      // Swap exit tile to walkable
-      this.gameState.map.tiles[exitPos.y][exitPos.x] = 'exit';
-      this.gameState.collisionSystem.updateTiles(this.gameState.map.tiles);
+      // Swap exit tile to walkable (tracked, so it goes out as a tile diff)
+      this.gameState.setTileTracked(exitPos.x, exitPos.y, 'exit');
       this.callbacks.onExitOpened(exitPos);
     }
   }
@@ -1164,8 +1173,8 @@ export class CampaignGame {
     this.callbacks.onGameOver(reason);
   }
 
-  private toCampaignState(): CampaignGameState {
-    const state = this.gameState.toState();
+  /** Wrap a serialized engine state (full for the start ack/reconnect, per-tick otherwise). */
+  private toCampaignState(state: GameStateType = this.gameState.toState()): CampaignGameState {
     const enemies: CampaignEnemyState[] = [];
     for (const enemy of this.enemies.values()) {
       enemies.push(enemy.toState());

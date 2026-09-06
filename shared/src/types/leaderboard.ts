@@ -18,14 +18,6 @@ export interface Season {
   isActive: boolean;
 }
 
-export interface SeasonElo {
-  userId: number;
-  seasonId: number;
-  eloRating: number;
-  peakElo: number;
-  matchesPlayed: number;
-}
-
 export interface LeaderboardEntry {
   rank: number;
   userId: number;

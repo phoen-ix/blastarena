@@ -53,6 +53,8 @@ export class Player {
 
   // Cosmetics (set once at game start, not per-tick)
   public cosmetics?: PlayerCosmeticData;
+  /** Set once the cosmetics went out in a tick state — see toTickState(). */
+  private cosmeticsSent = false;
 
   // Deathmatch respawn
   public respawnTick: number | null = null;
@@ -165,6 +167,28 @@ export class Player {
     }
     // movedThisTick is set by applyMoveCooldown() earlier in processTick(),
     // consumed by campaignTick() after processTick(), then reset next tick
+  }
+
+  /**
+   * Per-tick form: identical to toState() except that `cosmetics` — static for the whole game and
+   * the largest field of the entry — is included only until it has been sent once. Every full
+   * state (game:start, join, reconnect) still carries it, and a player added mid-game carries it on
+   * their first tick, so a client can cache it by id. CLAUDE.md always documented cosmetics as
+   * "in toState(), NOT toTickState()", but the tick path called toState(). (audit TICK-PAYLOAD-1)
+   */
+  toTickState(): PlayerState {
+    const state = this.toState();
+    if (this.cosmeticsSent) {
+      delete state.cosmetics;
+    } else if (this.cosmetics) {
+      this.cosmeticsSent = true;
+    }
+    return state;
+  }
+
+  /** Re-send cosmetics on the next tick (e.g. after they were loaded or changed). */
+  markCosmeticsDirty(): void {
+    this.cosmeticsSent = false;
   }
 
   toState(): PlayerState {

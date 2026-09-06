@@ -117,8 +117,4 @@ export class CampaignGameManager {
     game.resume();
     return true;
   }
-
-  getActiveSessionCount(): number {
-    return this.sessions.size;
-  }
 }

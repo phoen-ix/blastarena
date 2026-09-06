@@ -35,7 +35,6 @@ export interface GameLoggerOptions {
 
 export class GameLogger {
   private stream: fs.WriteStream;
-  private roomCode: string;
   private filename: string;
   private verbosity: LogVerbosity;
   private lastActivityTick = 0;
@@ -52,7 +51,6 @@ export class GameLogger {
     playerCount: number,
     options?: GameLoggerOptions,
   ) {
-    this.roomCode = roomCode;
     this.verbosity = options?.verbosity ?? 'normal';
     this.peakPlayerCount = playerCount;
 

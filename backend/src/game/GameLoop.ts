@@ -1,4 +1,4 @@
-import { TICK_RATE } from '@blast-arena/shared';
+import { TICK_RATE, GameState as GameStateType } from '@blast-arena/shared';
 import { GameStateManager } from './GameState';
 import { logger } from '../utils/logger';
 
@@ -12,8 +12,14 @@ const MAX_CONSECUTIVE_ERRORS = 10;
 export class GameLoop {
   private gameState: GameStateManager;
   private interval: ReturnType<typeof setInterval> | null = null;
-  private onTick: (state: ReturnType<GameStateManager['toState']>) => void;
-  private onGameOver: () => void;
+  /**
+   * Receives a serializer rather than a state: consumers that run their own per-tick logic after
+   * processTick (the campaign) serialize once, afterwards, instead of discarding the state built
+   * here and building a second, full one. toTickState() also drains the tile-diff buffer, so it
+   * must run exactly once per tick — by whoever consumes it. (audit CAMPAIGN-DOUBLE-SERIALIZE-1)
+   */
+  private onTick: (serialize: () => GameStateType) => void;
+  private onGameOver: () => unknown;
   private tickRate: number;
   private running: boolean = false;
   private countdownTicksRemaining: number = COUNTDOWN_TICKS;
@@ -22,8 +28,8 @@ export class GameLoop {
 
   constructor(
     gameState: GameStateManager,
-    onTick: (state: ReturnType<GameStateManager['toState']>) => void,
-    onGameOver: () => void,
+    onTick: (serialize: () => GameStateType) => void,
+    onGameOver: () => unknown,
     tickRate: number = TICK_RATE,
     skipCountdown: boolean = false,
   ) {
@@ -42,42 +48,65 @@ export class GameLoop {
       this.gameState.status = 'playing';
     }
 
-    const tickMs = 1000 / this.tickRate;
-
-    this.interval = setInterval(() => {
-      try {
-        // Countdown phase: broadcast state but don't process game ticks
-        if (this.countdownTicksRemaining > 0) {
-          this.countdownTicksRemaining--;
-          if (this.countdownTicksRemaining <= 0) {
-            this.gameState.status = 'playing';
-          }
-          const state = this.gameState.toTickState();
-          this.onTick(state);
-          return;
-        }
-
-        this.gameState.processTick();
-        const state = this.gameState.toTickState();
-        this.onTick(state);
-        this.consecutiveErrors = 0;
-
-        if (this.gameState.status === 'finished') {
-          this.stop();
-          this.onGameOver();
-        }
-      } catch (err) {
-        this.consecutiveErrors++;
-        logger.error({ err, consecutiveErrors: this.consecutiveErrors }, 'Game loop error');
-        if (this.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-          logger.error('Game loop circuit breaker tripped — stopping game');
-          this.stop();
-          this.onGameOver();
-        }
-      }
-    }, tickMs);
-
+    this.schedule();
     logger.info({ tickRate: this.tickRate }, 'Game loop started');
+  }
+
+  private readonly serialize = (): GameStateType => this.gameState.toTickState();
+
+  /** Arm the interval. start()/resume()/setTickRate() used to carry three identical copies of the tick body. */
+  private schedule(): void {
+    this.interval = setInterval(() => this.runTick(), 1000 / this.tickRate);
+  }
+
+  /** One tick: countdown or simulation step, then broadcast; trips the circuit breaker on repeated errors. */
+  private runTick(): void {
+    try {
+      // Countdown phase: broadcast state but don't process game ticks
+      if (this.countdownTicksRemaining > 0) {
+        this.countdownTicksRemaining--;
+        if (this.countdownTicksRemaining <= 0) {
+          this.gameState.status = 'playing';
+        }
+        this.onTick(this.serialize);
+        return;
+      }
+
+      this.gameState.processTick();
+      this.onTick(this.serialize);
+      this.consecutiveErrors = 0;
+
+      if (this.gameState.status === 'finished') {
+        this.stop();
+        this.fireGameOver();
+      }
+    } catch (err) {
+      this.consecutiveErrors++;
+      logger.error({ err, consecutiveErrors: this.consecutiveErrors }, 'Game loop error');
+      if (this.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        logger.error('Game loop circuit breaker tripped — stopping game');
+        this.stop();
+        this.fireGameOver();
+      }
+    }
+  }
+
+  /**
+   * The game-over callback is async in GameRoom (DB writes, Elo, achievements). It was typed
+   * `() => void` and its promise discarded, so a rejection surfaced as an unhandled rejection.
+   * (audit GAME-OVER-ASYNC-1)
+   */
+  private fireGameOver(): void {
+    try {
+      const result = this.onGameOver();
+      if (result && typeof (result as Promise<unknown>).then === 'function') {
+        (result as Promise<unknown>).catch((err) =>
+          logger.error({ err }, 'Game over handler failed'),
+        );
+      }
+    } catch (err) {
+      logger.error({ err }, 'Game over handler failed');
+    }
   }
 
   stop(): void {
@@ -101,38 +130,7 @@ export class GameLoop {
 
   resume(): void {
     if (!this.running || this.interval) return;
-    const tickMs = 1000 / this.tickRate;
-    this.interval = setInterval(() => {
-      try {
-        if (this.countdownTicksRemaining > 0) {
-          this.countdownTicksRemaining--;
-          if (this.countdownTicksRemaining <= 0) {
-            this.gameState.status = 'playing';
-          }
-          const state = this.gameState.toTickState();
-          this.onTick(state);
-          return;
-        }
-
-        this.gameState.processTick();
-        const state = this.gameState.toTickState();
-        this.onTick(state);
-        this.consecutiveErrors = 0;
-
-        if (this.gameState.status === 'finished') {
-          this.stop();
-          this.onGameOver();
-        }
-      } catch (err) {
-        this.consecutiveErrors++;
-        logger.error({ err, consecutiveErrors: this.consecutiveErrors }, 'Game loop error');
-        if (this.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-          logger.error('Game loop circuit breaker tripped — stopping game');
-          this.stop();
-          this.onGameOver();
-        }
-      }
-    }, tickMs);
+    this.schedule();
     logger.info('Game loop resumed');
   }
 
@@ -155,9 +153,5 @@ export class GameLoop {
 
   isRunning(): boolean {
     return this.running;
-  }
-
-  getState(): GameStateManager {
-    return this.gameState;
   }
 }

@@ -34,13 +34,6 @@ export interface ChallengeScore {
   bestPlacement: number | null;
 }
 
-export interface ChallengeLeaderboardResponse {
-  scores: ChallengeScore[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
 export interface ActiveChallengeInfo {
   challenge: MapChallengeSummary;
   mapTiles: string[][] | null;

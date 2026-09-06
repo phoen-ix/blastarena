@@ -45,7 +45,7 @@ export interface ClientToServerEvents {
   ) => void;
   'game:input': (input: PlayerInput) => void;
   'room:setTeam': (data: { userId: number; team: number | null }) => void;
-  'room:setBotTeam': (data: { botIndex: number; team: number }) => void;
+  'room:setBotTeam': (data: { botIndex: number; team: number | null }) => void;
   'admin:kick': (
     data: { roomCode: string; userId: number; reason?: string },
     callback: (response: { success: boolean; error?: string }) => void,
@@ -324,11 +324,6 @@ export interface ServerToClientEvents {
   }) => void;
 
   // Spectator Game Master
-  'spectator:actionApplied': (data: {
-    type: 'place_wall' | 'trigger_meteor' | 'drop_powerup' | 'speed_zone';
-    position: { x: number; y: number };
-  }) => void;
-
   // Elo, XP & Achievements
   'game:eloUpdate': (results: EloResult[]) => void;
   'game:xpUpdate': (results: XpUpdateResult[]) => void;
@@ -344,8 +339,6 @@ export interface ServerToClientEvents {
 
   // Open world
   'openworld:state': (state: GameState) => void;
-  'openworld:playerJoined': (data: { id: number; username: string; isGuest: boolean }) => void;
-  'openworld:playerLeft': (data: { id: number; username: string }) => void;
   'openworld:roundEnd': (data: {
     roundNumber: number;
     leaderboard: OpenWorldScoreEntry[];

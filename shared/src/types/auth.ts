@@ -37,17 +37,6 @@ export interface AuthPayload {
   emailVerified?: boolean;
 }
 
-export interface LoginRequest {
-  username: string;
-  password: string;
-}
-
-export interface RegisterRequest {
-  username: string;
-  email: string;
-  password: string;
-}
-
 export interface AuthResponse {
   user: PublicUser;
   accessToken: string;
@@ -60,15 +49,6 @@ export interface AuthResponse {
  */
 export interface RegisterResponse {
   emailVerificationRequired: true;
-}
-
-export interface RefreshToken {
-  id: number;
-  userId: number;
-  tokenHash: string;
-  expiresAt: Date;
-  revoked: boolean;
-  createdAt: Date;
 }
 
 export interface TotpChallengeResponse {

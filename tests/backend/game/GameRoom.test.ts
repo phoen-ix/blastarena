@@ -6,9 +6,31 @@ type AnyFn = (...args: any[]) => any;
 // --- Mock setup (jest.mock is hoisted before imports) ---
 
 const mockExecute = jest.fn<AnyFn>();
+/** Statements issued on the transaction connection, in order. */
+const mockConnExecute = jest.fn<AnyFn>();
+const mockWithTransaction = jest.fn<AnyFn>(async (fn: AnyFn) => fn({ execute: mockConnExecute }));
 jest.mock('../../../backend/src/db/connection', () => ({
   query: jest.fn(),
   execute: mockExecute,
+  withTransaction: mockWithTransaction,
+}));
+
+const mockProcessMatchElo = jest.fn<AnyFn>();
+jest.mock('../../../backend/src/services/elo', () => ({
+  processMatchElo: mockProcessMatchElo,
+}));
+const mockEvaluateAfterGame = jest.fn<AnyFn>();
+jest.mock('../../../backend/src/services/achievements', () => ({
+  evaluateAfterGame: mockEvaluateAfterGame,
+}));
+const mockCheckLevelMilestoneUnlocks = jest.fn<AnyFn>();
+jest.mock('../../../backend/src/services/cosmetics', () => ({
+  getPlayerCosmeticsForGame: jest.fn<AnyFn>().mockResolvedValue(new Map()),
+  checkLevelMilestoneUnlocks: mockCheckLevelMilestoneUnlocks,
+}));
+jest.mock('../../../backend/src/services/challenges', () => ({
+  getActiveChallenge: jest.fn<AnyFn>().mockResolvedValue(null),
+  recordChallengeResult: jest.fn(),
 }));
 
 const mockUpdateRoomStatus = jest.fn<AnyFn>();
@@ -84,6 +106,7 @@ jest.mock('../../../backend/src/utils/gameLogger', () => ({
 }));
 
 import { GameRoom } from '../../../backend/src/game/GameRoom';
+import { GameStateManager } from '../../../backend/src/game/GameState';
 import { TICK_RATE } from '@blast-arena/shared';
 
 // --- Helpers ---
@@ -156,6 +179,19 @@ describe('GameRoom', () => {
     mockEmit = ioSetup.mockEmit;
     mockExecute.mockResolvedValue({ insertId: 1, affectedRows: 1 });
     mockUpdateRoomStatus.mockResolvedValue(undefined);
+    mockConnExecute.mockImplementation(async (sql: string) =>
+      sql.startsWith('SELECT')
+        ? [
+            [
+              { user_id: 1, total_xp: 90, level: 1 },
+              { user_id: 2, total_xp: 0, level: 1 },
+            ],
+          ]
+        : [{ affectedRows: 1 }],
+    );
+    mockProcessMatchElo.mockResolvedValue([]);
+    mockEvaluateAfterGame.mockResolvedValue({ achievements: [], cosmetics: [] });
+    mockCheckLevelMilestoneUnlocks.mockResolvedValue([]);
   });
 
   describe('constructor', () => {
@@ -235,10 +271,15 @@ describe('GameRoom', () => {
 
       await gameRoom.start();
 
+      // One multi-row INSERT for both humans. (audit GAME-END-BATCH-1)
       const matchPlayerCalls = mockExecute.mock.calls.filter(
         (call) => typeof call[0] === 'string' && (call[0] as string).includes('match_players'),
       );
-      expect(matchPlayerCalls.length).toBe(2);
+      expect(matchPlayerCalls.length).toBe(1);
+      expect((matchPlayerCalls[0][0] as string).match(/\(\?, \?, \?\)/g)).toHaveLength(2);
+      const params = matchPlayerCalls[0][1] as unknown[];
+      expect(params).toHaveLength(6);
+      expect(params.filter((v) => v === 1 || v === 2)).toEqual(expect.arrayContaining([1, 2]));
     });
 
     it('should emit game:start event via io.to()', async () => {
@@ -304,8 +345,13 @@ describe('GameRoom', () => {
       const matchPlayerCalls = mockExecute.mock.calls.filter(
         (call) => typeof call[0] === 'string' && (call[0] as string).includes('match_players'),
       );
-      // Only 2 human players, not 4 (2 humans + 2 bots)
-      expect(matchPlayerCalls.length).toBe(2);
+      // One statement with 2 value tuples (humans only), not 4 (2 humans + 2 bots)
+      expect(matchPlayerCalls.length).toBe(1);
+      expect((matchPlayerCalls[0][0] as string).match(/\(\?, \?, \?\)/g)).toHaveLength(2);
+      const botIds = (matchPlayerCalls[0][1] as unknown[]).filter(
+        (v) => typeof v === 'number' && v < 0,
+      );
+      expect(botIds).toHaveLength(0);
     });
   });
 
@@ -393,6 +439,98 @@ describe('GameRoom', () => {
       const gr = await makeRoom();
       for (const p of gr.gameState.players.values()) p.isBot = true;
       expect(gr.isAbandoned()).toBe(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────────
+  // Game over persistence
+  // ─────────────────────────────────────────────────
+  // The post-match writes used to be ~5 sequential round-trips per player with no transaction, and
+  // the whole handler ran fire-and-forget from GameLoop with its last await outside the try/catch.
+  // (audit GAME-END-BATCH-1, GAME-OVER-ASYNC-1)
+  describe('game over persistence', () => {
+    async function finishGame(gameRoom: GameRoom): Promise<void> {
+      const gr = gameRoom as unknown as {
+        gameState: GameStateManager;
+        onGameOver(): Promise<void>;
+      };
+      const [p1, p2] = [...gr.gameState.players.values()];
+      p1.kills = 3;
+      p1.placement = 1;
+      p2.alive = false;
+      p2.placement = 2;
+      gr.gameState.winnerId = p1.id;
+      await gr.onGameOver();
+    }
+
+    it('writes the match rows and the stats in two transactions with batched statements', async () => {
+      const gameRoom = new GameRoom(mockIo, createMockRoom() as any);
+      await gameRoom.start();
+      mockConnExecute.mockClear();
+
+      await finishGame(gameRoom);
+
+      expect(mockWithTransaction).toHaveBeenCalledTimes(2);
+      const sqls = mockConnExecute.mock.calls.map((c) => (c[0] as string).replace(/\s+/g, ' '));
+      expect(sqls[0]).toMatch(/^UPDATE matches SET status = \?/);
+      expect(sqls[1]).toMatch(/^INSERT INTO match_players/);
+      expect(sqls[1]).toContain('ON DUPLICATE KEY UPDATE');
+      expect(sqls[1].match(/\(\?, \?, \?, \?, \?, \?, \?, \?, \?\)/g)).toHaveLength(2);
+      expect(sqls[2]).toMatch(/^SELECT user_id, total_xp, level FROM user_stats .* FOR UPDATE$/);
+      const statUpdates = sqls.filter((q) => q.startsWith('UPDATE user_stats'));
+      expect(statUpdates).toHaveLength(2);
+      // XP and level are folded into the cumulative-stats UPDATE — no second read/write pair.
+      for (const q of statUpdates) {
+        expect(q).toContain('total_matches = total_matches + 1');
+        expect(q).toContain('total_xp = ?');
+        expect(q).toContain('level = ?');
+      }
+      expect(mockExecute.mock.calls.some((c) => (c[0] as string).includes('user_stats'))).toBe(
+        false,
+      );
+    });
+
+    it('runs Elo before the stats increment and evaluates achievements for every human', async () => {
+      const order: string[] = [];
+      mockProcessMatchElo.mockImplementation(async () => {
+        order.push('elo');
+        return [];
+      });
+      mockWithTransaction.mockImplementation(async (fn: AnyFn) => {
+        order.push('tx');
+        return fn({ execute: mockConnExecute });
+      });
+      const gameRoom = new GameRoom(mockIo, createMockRoom() as any);
+      await gameRoom.start();
+
+      await finishGame(gameRoom);
+
+      expect(order).toEqual(['tx', 'elo', 'tx']);
+      expect(mockEvaluateAfterGame).toHaveBeenCalledTimes(2);
+      expect(mockEmit).toHaveBeenCalledWith('game:over', expect.objectContaining({ winnerId: 1 }));
+      expect(mockEmit).toHaveBeenCalledWith(
+        'game:xpUpdate',
+        expect.arrayContaining([expect.objectContaining({ userId: 1, oldLevel: 1 })]),
+      );
+      expect(mockUpdateRoomStatus).toHaveBeenCalledWith('ABC123', 'finished');
+    });
+
+    it('still marks the room finished when the DB writes fail, and never rejects', async () => {
+      mockWithTransaction.mockRejectedValueOnce(new Error('db down'));
+      const gameRoom = new GameRoom(mockIo, createMockRoom() as any);
+      await gameRoom.start();
+
+      await expect(finishGame(gameRoom)).resolves.toBeUndefined();
+
+      expect(mockUpdateRoomStatus).toHaveBeenCalledWith('ABC123', 'finished');
+    });
+
+    it('never rejects when the room status update fails', async () => {
+      const gameRoom = new GameRoom(mockIo, createMockRoom() as any);
+      await gameRoom.start();
+      mockUpdateRoomStatus.mockRejectedValueOnce(new Error('redis down'));
+
+      await expect(finishGame(gameRoom)).resolves.toBeUndefined();
     });
   });
 });

@@ -193,7 +193,7 @@ describe('OpenWorldManager', () => {
     function tickWithDeath(playerId: number, killerId: number | null, cause: KillCause = 'bomb') {
       const state = internalState();
       state.tickEvents.playerDied.push({ playerId, killerId, cause });
-      mockTickRef.current!(state.toTickState());
+      mockTickRef.current!(() => state.toTickState());
     }
 
     it('emits a score update for both the killer and the victim', () => {

@@ -1,5 +1,12 @@
 import { ZoneState } from '@blast-arena/shared';
-import { BR_ZONE_INITIAL_DELAY_SECONDS, BR_ZONE_SHRINK_INTERVAL_SECONDS, BR_ZONE_SHRINK_AMOUNT, BR_ZONE_DAMAGE_PER_TICK, BR_ZONE_MIN_RADIUS, TICK_RATE } from '@blast-arena/shared';
+import {
+  BR_ZONE_INITIAL_DELAY_SECONDS,
+  BR_ZONE_SHRINK_INTERVAL_SECONDS,
+  BR_ZONE_SHRINK_AMOUNT,
+  BR_ZONE_DAMAGE_PER_TICK,
+  BR_ZONE_MIN_RADIUS,
+  TICK_RATE,
+} from '@blast-arena/shared';
 
 export class BattleRoyaleZone {
   private centerX: number;
@@ -9,12 +16,8 @@ export class BattleRoyaleZone {
   private shrinkRate: number = 0.1;
   private damagePerTick: number = BR_ZONE_DAMAGE_PER_TICK;
   private nextShrinkTick: number;
-  private mapWidth: number;
-  private mapHeight: number;
 
   constructor(mapWidth: number, mapHeight: number) {
-    this.mapWidth = mapWidth;
-    this.mapHeight = mapHeight;
     this.centerX = Math.floor(mapWidth / 2);
     this.centerY = Math.floor(mapHeight / 2);
     this.currentRadius = Math.max(mapWidth, mapHeight);
@@ -25,18 +28,12 @@ export class BattleRoyaleZone {
   tick(currentTick: number): void {
     // Shrink towards target
     if (this.currentRadius > this.targetRadius) {
-      this.currentRadius = Math.max(
-        this.targetRadius,
-        this.currentRadius - this.shrinkRate
-      );
+      this.currentRadius = Math.max(this.targetRadius, this.currentRadius - this.shrinkRate);
     }
 
     // Check if it's time for next shrink phase
     if (currentTick >= this.nextShrinkTick && this.targetRadius > BR_ZONE_MIN_RADIUS) {
-      this.targetRadius = Math.max(
-        BR_ZONE_MIN_RADIUS,
-        this.targetRadius - BR_ZONE_SHRINK_AMOUNT
-      );
+      this.targetRadius = Math.max(BR_ZONE_MIN_RADIUS, this.targetRadius - BR_ZONE_SHRINK_AMOUNT);
       this.nextShrinkTick = currentTick + BR_ZONE_SHRINK_INTERVAL_SECONDS * TICK_RATE;
     }
   }

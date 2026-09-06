@@ -20,7 +20,13 @@ Bot AI runs full `generateInput()` every other tick (even ticks only); odd ticks
 
 - `_dirtyTiles: Map<string, TileDiff>` in `GameStateManager` tracks tile mutations per tick
 - `destroyTileTracked()` wraps `CollisionSystem.destroyTile()` and records the change — used in bomb detonation and meteor impacts
-- `toTickState()` drains `_dirtyTiles` into `tileDiffs` array, then clears the map
+- `toTickState()` drains `_dirtyTiles` into `tileDiffs` array, then clears the map. Only real changes are recorded — a blast cell whose tile was already floor produces no diff. `tileChangeLog` keeps every change for the game's lifetime so isolated bot AIs can sync their in-isolate grid incrementally
+- `GameLoop` hands consumers a lazy serializer (`onTick(serialize)`), so the campaign serializes once, after its own `campaignTick()`, instead of discarding the loop's state and building a full one; `toTickState()` must run exactly once per tick because it drains the diff buffer
+- Tick entries omit static data after it has been sent once: `Player.toTickState()` drops `cosmetics` after the first tick, `Explosion.toTickState()` sends `cells` once, `map.spawnPoints` is empty. `GameScene.hydrateState()` and `ReplayRecorder` fill the gaps from per-id caches
+- Chain-reaction tile snapshot is copy-on-write (`beginTileSnapshot()` / `preserveSnapshotRow()`): a shallow copy of the row array, rows cloned only when first mutated inside the batch
+- Per-tick indexes replace the O(players × N) scans: a lethal-cell map for explosion damage, a position map for power-up pickups; teleporter pads are cached and invalidated by `setTileTracked`
+- Player occupancy inside a tick is live (`TickOccupancy`): entries are mutated as players move so later-processed players see earlier moves; `CollisionSystem.canMoveTo` exempts the mover and its own buddy via `selfId` instead of callers filtering copies
+- `CollisionSystem.isWalkable` is a Set lookup; the bot BFS uses `canMoveToKeyed(x, y, dir, blockedKeys)` (one hash lookup per step) with the blocked set built once per search
 
 ## Per-Tick Caching
 
@@ -56,7 +62,8 @@ Bot AI runs full `generateInput()` every other tick (even ticks only); odd ticks
 - Admin dashboard stats consolidated into single SQL query with subselects (3 queries -> 1)
 - Match history uses pre-aggregated JOIN for player count instead of correlated subquery per row
 - `friendships(user_id, status)` composite index (migration 022) — covers all friend list, count, and status queries
-- Connection pool `queueLimit: 50` prevents unbounded memory growth under sustained DB pressure
+- Connection pool `queueLimit: 100` prevents unbounded memory growth under sustained DB pressure
+- `ReplayRecorder.recordTick()` takes tile diffs from the tick state (full-grid rescan only for callers without diffs); countdown ticks are not recorded
 - `listReplays()` uses async `fs.promises.readdir()` + `Promise.all(stat())` — unblocks event loop for servers with many replays
 - Presence updates batched via `setPresenceBatch()` Redis pipeline — 1 round-trip instead of N on game/campaign start
 - Socket room handlers (leave, ready, start, restart, setTeam, setBotTeam, rematch:vote, disconnect) use `socket.data.activeRoomCode` instead of `getPlayerRoom()` Redis lookup

@@ -182,11 +182,11 @@ describe('CampaignGame', () => {
       expect(game.sessionId.length).toBeGreaterThan(0);
     });
 
-    it('should store userId and level reference', () => {
+    it('should store userIds and level reference', () => {
       const level = createMinimalLevel();
       const game = new CampaignGame([42], ['Player42'], level, new Map(), callbacks);
 
-      expect(game.userId).toBe(42);
+      expect(game.userIds).toEqual([42]);
       expect(game.level).toBe(level);
     });
 
@@ -1027,7 +1027,7 @@ describe('CampaignGame', () => {
       // so the ONLY thing that could move the enemy is conveyor logic
       for (let i = 0; i < 20; i++) {
         game.getGameState().tick++;
-        capturedOnTick!({});
+        capturedOnTick!();
       }
 
       // canPassWalls enemy should NOT have been pushed by the conveyor
@@ -1070,7 +1070,7 @@ describe('CampaignGame', () => {
       // Simulate enough ticks for the enemy to be pushed (cooldown must expire first)
       for (let i = 0; i < 20; i++) {
         game.getGameState().tick++;
-        capturedOnTick!({});
+        capturedOnTick!();
       }
 
       // Normal enemy SHOULD have been pushed right by conveyor
