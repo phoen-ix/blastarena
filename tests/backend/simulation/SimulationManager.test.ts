@@ -22,22 +22,77 @@ jest.mock('../../../backend/src/game/registry', () => ({
   }),
 }));
 
-// Mock fs module
-const mockExistsSync = jest.fn<AnyFn>().mockReturnValue(false);
+// gunzip is promisified at module load; mock the promisified form directly.
+const mockGunzip = jest.fn<AnyFn>();
+jest.mock('util', () => ({
+  ...jest.requireActual<typeof import('util')>('util'),
+  promisify: () => mockGunzip,
+}));
+
+// Mock fs module. The manager reads the simulations directory through fs.promises only
+// (audit E3); the sync functions stay mocked so a regression to them is caught (they would
+// return nothing useful).
 const mockReaddirSync = jest.fn<AnyFn>().mockReturnValue([]);
 const mockReadFileSync = jest.fn<AnyFn>().mockReturnValue('{}');
-const mockMkdirSync = jest.fn<AnyFn>();
-const mockWriteFileSync = jest.fn<AnyFn>();
+const mockExistsSync = jest.fn<AnyFn>().mockReturnValue(false);
 const mockRmSync = jest.fn<AnyFn>();
+const mockReaddir = jest.fn<AnyFn>();
+const mockReadFile = jest.fn<AnyFn>();
+const mockRm = jest.fn<AnyFn>();
+
+const enoent = () =>
+  Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
 
 jest.mock('fs', () => ({
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
   readdirSync: (...args: unknown[]) => mockReaddirSync(...args),
   readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
-  mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
-  writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
+  mkdirSync: jest.fn(),
+  writeFileSync: jest.fn(),
   rmSync: (...args: unknown[]) => mockRmSync(...args),
+  promises: {
+    readdir: (...args: unknown[]) => mockReaddir(...args),
+    readFile: (...args: unknown[]) => mockReadFile(...args),
+    rm: (...args: unknown[]) => mockRm(...args),
+  },
 }));
+
+/**
+ * Describe a simulations directory: { gameMode: { batchDirName: { 'batch_config.json': {...},
+ * 'batch_summary.json'?: {...}, other files... } } }. Missing SIM_LOG_DIR = pass `null`.
+ */
+type FakeTree = Record<string, Record<string, Record<string, unknown>>> | null;
+function mockDisk(tree: FakeTree): void {
+  mockReaddir.mockImplementation(async (dirPath: string, opts?: { withFileTypes?: boolean }) => {
+    const dir = String(dirPath);
+    if (tree === null) throw enoent();
+    const segments = dir.split('/');
+    const asDirents = (names: string[], dirs: Set<string>) =>
+      opts?.withFileTypes
+        ? names.map((name) => ({ name, isDirectory: () => dirs.has(name) }))
+        : names;
+    if (dir.endsWith('simulations')) {
+      return asDirents(Object.keys(tree), new Set(Object.keys(tree)));
+    }
+    const mode = segments[segments.length - 1];
+    if (tree[mode]) {
+      return asDirents(Object.keys(tree[mode]), new Set(Object.keys(tree[mode])));
+    }
+    const batch = segments[segments.length - 1];
+    const modeOfBatch = segments[segments.length - 2];
+    const files = tree[modeOfBatch]?.[batch];
+    if (files) return asDirents(Object.keys(files), new Set());
+    throw enoent();
+  });
+  mockReadFile.mockImplementation(async (filePath: string) => {
+    if (tree === null) throw enoent();
+    const segments = String(filePath).split('/');
+    const [mode, batch, file] = segments.slice(-3);
+    const content = tree[mode]?.[batch]?.[file];
+    if (content === undefined) throw enoent();
+    return typeof content === 'string' ? content : JSON.stringify(content);
+  });
+}
 
 // Mock SimulationRunner
 const mockRunnerRun = jest.fn<AnyFn>().mockResolvedValue(undefined);
@@ -108,9 +163,10 @@ describe('SimulationManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     manager = new SimulationManager();
-    // Default: no runner is active
+    // Default: no runner is active, and no simulations directory on disk yet
     mockRunnerIsActive.mockReturnValue(false);
-    mockExistsSync.mockReturnValue(false);
+    mockDisk(null);
+    mockRm.mockResolvedValue(undefined);
   });
 
   // ─────────────────────────────────────────────────
@@ -220,6 +276,38 @@ describe('SimulationManager', () => {
 
       // Runner.on should have been called with 'completed'
       expect(mockRunnerOn).toHaveBeenCalledWith('completed', expect.any(Function));
+    });
+
+    // (audit B6) — socket.ts used to attach three per-socket listeners for immediately-started
+    // batches that were never removed; the manager now wires the sim:admin room broadcast for
+    // every batch, started immediately or from the queue.
+    it('wires the sim:admin broadcast for an immediately-started batch', () => {
+      mockRunnerIsActive.mockReturnValue(false);
+      manager.startBatch(createSimConfig(), 1);
+
+      const events = mockRunnerOn.mock.calls.map((c) => c[0]);
+      expect(events).toEqual(expect.arrayContaining(['progress', 'gameResult', 'completed']));
+      // 'completed' twice: auto-advance + broadcast
+      expect(events.filter((e) => e === 'completed')).toHaveLength(2);
+    });
+
+    it('wires the same broadcast for a batch started from the queue', () => {
+      mockRunnerIsActive.mockReturnValue(false);
+      manager.startBatch(createSimConfig(), 1);
+      const completedHandlers = mockRunnerOn.mock.calls
+        .filter(([event]) => event === 'completed')
+        .map(([, handler]) => handler as AnyFn);
+      mockRunnerIsActive.mockReturnValue(true);
+      manager.startBatch(createSimConfig(), 2);
+      mockRunnerOn.mockClear();
+
+      // First runner finishes → the queued batch starts with its own listeners.
+      mockRunnerIsActive.mockReturnValue(false);
+      for (const h of completedHandlers) h(mockRunnerGetStatus());
+
+      const events = mockRunnerOn.mock.calls.map((c) => c[0]);
+      expect(events).toEqual(expect.arrayContaining(['progress', 'gameResult', 'completed']));
+      expect(events.filter((e) => e === 'completed')).toHaveLength(2);
     });
   });
 
@@ -403,32 +491,32 @@ describe('SimulationManager', () => {
   // 7. getHistory (pagination)
   // ─────────────────────────────────────────────────
   describe('getHistory', () => {
-    it('should return empty history when no batches exist and no disk data', () => {
-      const result = manager.getHistory();
+    it('should return empty history when no batches exist and no disk data', async () => {
+      const result = await manager.getHistory();
       expect(result.batches).toEqual([]);
       expect(result.total).toBe(0);
     });
 
-    it('should include queued entries in history', () => {
+    it('should include queued entries in history', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       manager.startBatch(createSimConfig(), 1);
       mockRunnerIsActive.mockReturnValue(true);
       manager.startBatch(createSimConfig(), 2);
 
-      const result = manager.getHistory();
+      const result = await manager.getHistory();
       // Should include 1 runner + 1 queued
       expect(result.total).toBe(2);
     });
 
-    it('should include in-memory runner batches', () => {
+    it('should include in-memory runner batches', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       manager.startBatch(createSimConfig(), 1);
 
-      const result = manager.getHistory();
+      const result = await manager.getHistory();
       expect(result.total).toBeGreaterThanOrEqual(1);
     });
 
-    it('should paginate results correctly (page 1)', () => {
+    it('should paginate results correctly (page 1)', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       // Create several batches
       for (let i = 0; i < 5; i++) {
@@ -436,144 +524,215 @@ describe('SimulationManager', () => {
         manager.startBatch(createSimConfig(), 100 + i);
       }
 
-      const result = manager.getHistory(1, 2);
+      const result = await manager.getHistory(1, 2);
       expect(result.batches).toHaveLength(2);
       expect(result.total).toBe(5);
     });
 
-    it('should paginate results correctly (page 2)', () => {
+    it('should paginate results correctly (page 2)', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       for (let i = 0; i < 5; i++) {
         mockRunnerIsActive.mockReturnValue(false);
         manager.startBatch(createSimConfig(), 100 + i);
       }
 
-      const result = manager.getHistory(2, 2);
+      const result = await manager.getHistory(2, 2);
       expect(result.batches).toHaveLength(2);
       expect(result.total).toBe(5);
     });
 
-    it('should handle last page with fewer items', () => {
+    it('should handle last page with fewer items', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       for (let i = 0; i < 5; i++) {
         mockRunnerIsActive.mockReturnValue(false);
         manager.startBatch(createSimConfig(), 100 + i);
       }
 
-      const result = manager.getHistory(3, 2);
+      const result = await manager.getHistory(3, 2);
       expect(result.batches).toHaveLength(1);
       expect(result.total).toBe(5);
     });
 
-    it('should return empty batches for out-of-range page', () => {
+    it('should return empty batches for out-of-range page', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       manager.startBatch(createSimConfig(), 1);
 
-      const result = manager.getHistory(99, 10);
+      const result = await manager.getHistory(99, 10);
       expect(result.batches).toEqual([]);
       expect(result.total).toBe(1);
     });
 
-    it('should default to page 1 and limit 20', () => {
-      const result = manager.getHistory();
+    it('should default to page 1 and limit 20', async () => {
+      const result = await manager.getHistory();
       expect(result.batches).toEqual([]);
       expect(result.total).toBe(0);
     });
 
-    it('should scan disk for past batches', () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockImplementation((dirPath: string) => {
-        const dir = String(dirPath);
-        if (dir.endsWith('simulations')) {
-          return [{ name: 'ffa', isDirectory: () => true }];
-        }
-        if (dir.endsWith('ffa')) {
-          return [{ name: 'batch_2026-01-01_sim_1', isDirectory: () => true }];
-        }
-        return [];
-      });
-      mockReadFileSync.mockImplementation((filePath: string) => {
-        const fp = String(filePath);
-        if (fp.endsWith('batch_config.json')) {
-          return JSON.stringify({
-            batchId: 'sim_disk_1',
-            config: createSimConfig(),
-            startedAt: '2026-01-01T00:00:00.000Z',
-          });
-        }
-        if (fp.endsWith('batch_summary.json')) {
-          return JSON.stringify({
-            status: 'completed',
-            totalGamesRun: 5,
-            completedAt: '2026-01-01T00:01:00.000Z',
-          });
-        }
-        return '{}';
+    it('should scan disk for past batches', async () => {
+      mockDisk({
+        ffa: {
+          'batch_2026-01-01_sim_1': {
+            'batch_config.json': {
+              batchId: 'sim_disk_1',
+              config: createSimConfig(),
+              startedAt: '2026-01-01T00:00:00.000Z',
+            },
+            'batch_summary.json': {
+              status: 'completed',
+              totalGamesRun: 5,
+              completedAt: '2026-01-01T00:01:00.000Z',
+            },
+          },
+        },
       });
 
-      const result = manager.getHistory();
+      const result = await manager.getHistory();
       expect(result.total).toBe(1);
       expect(result.batches[0].batchId).toBe('sim_disk_1');
       expect(result.batches[0].status).toBe('completed');
+      expect(result.batches[0].gamesCompleted).toBe(5);
+      expect(result.batches[0].completedAt).toBe('2026-01-01T00:01:00.000Z');
     });
 
-    it('should skip disk batches that are already in memory', () => {
+    it('never touches the synchronous fs API (audit E3)', async () => {
+      mockDisk({
+        ffa: {
+          batch_a: {
+            'batch_config.json': { batchId: 'a', config: createSimConfig(), startedAt: 't' },
+          },
+        },
+      });
+      await manager.getHistory();
+      expect(mockReaddirSync).not.toHaveBeenCalled();
+      expect(mockReadFileSync).not.toHaveBeenCalled();
+      expect(mockExistsSync).not.toHaveBeenCalled();
+    });
+
+    it('caches the directory scan across pages instead of rewalking the tree (audit E3)', async () => {
+      mockDisk({
+        ffa: {
+          batch_a: {
+            'batch_config.json': {
+              batchId: 'a',
+              config: createSimConfig(),
+              startedAt: '2026-01-02T00:00:00.000Z',
+            },
+          },
+          batch_b: {
+            'batch_config.json': {
+              batchId: 'b',
+              config: createSimConfig(),
+              startedAt: '2026-01-01T00:00:00.000Z',
+            },
+          },
+        },
+      });
+
+      const page1 = await manager.getHistory(1, 1);
+      const page2 = await manager.getHistory(2, 1);
+      expect(page1.batches.map((b) => b.batchId)).toEqual(['a']);
+      expect(page2.batches.map((b) => b.batchId)).toEqual(['b']);
+
+      // One walk: root readdir + one mode readdir; two config reads.
+      expect(mockReaddir).toHaveBeenCalledTimes(2);
+      expect(
+        mockReadFile.mock.calls.filter(([f]) => String(f).endsWith('batch_config.json')),
+      ).toHaveLength(2);
+    });
+
+    it('coalesces concurrent callers into a single scan', async () => {
+      mockDisk({
+        ffa: {
+          batch_a: {
+            'batch_config.json': { batchId: 'a', config: createSimConfig(), startedAt: 't' },
+          },
+        },
+      });
+      await Promise.all([
+        manager.getHistory(),
+        manager.getHistory(),
+        manager.getBatchResults('zzz'),
+      ]);
+      expect(
+        mockReaddir.mock.calls.filter(([d]) => String(d).endsWith('simulations')),
+      ).toHaveLength(1);
+    });
+
+    it('rescans after a batch completes, so the fresh summary is picked up', async () => {
+      mockRunnerIsActive.mockReturnValue(false);
+      const started = manager.startBatch(createSimConfig(), 1) as { batchId: string };
+      const completedHandlers = mockRunnerOn.mock.calls
+        .filter(([event]) => event === 'completed')
+        .map(([, handler]) => handler as AnyFn);
+
+      mockDisk({ ffa: {} });
+      await manager.getHistory();
+      expect(
+        mockReaddir.mock.calls.filter(([d]) => String(d).endsWith('simulations')),
+      ).toHaveLength(1);
+
+      // Batch finishes: summary written, runner reports itself inactive, cleanup evicts it.
+      mockDisk({
+        ffa: {
+          batch_x: {
+            'batch_config.json': {
+              batchId: started.batchId,
+              config: createSimConfig(),
+              startedAt: 't',
+            },
+            'batch_summary.json': { status: 'completed', totalGamesRun: 5, completedAt: 'c' },
+          },
+        },
+      });
+      for (const h of completedHandlers) h(mockRunnerGetStatus());
+      (manager as unknown as { runners: Map<string, unknown> }).runners.clear();
+
+      const result = await manager.getHistory();
+      expect(
+        mockReaddir.mock.calls.filter(([d]) => String(d).endsWith('simulations')),
+      ).toHaveLength(2);
+      expect(result.batches[0]).toMatchObject({ batchId: started.batchId, status: 'completed' });
+    });
+
+    it('should skip disk batches that are already in memory', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       const started = manager.startBatch(createSimConfig(), 1) as { batchId: string };
 
-      // Mock disk data with same batchId as the in-memory runner
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockImplementation((dirPath: string) => {
-        const dir = String(dirPath);
-        if (dir.endsWith('simulations')) {
-          return [{ name: 'ffa', isDirectory: () => true }];
-        }
-        if (dir.endsWith('ffa')) {
-          return [{ name: 'batch_dup', isDirectory: () => true }];
-        }
-        return [];
+      // Disk data with same batchId as the in-memory runner
+      mockDisk({
+        ffa: {
+          batch_dup: {
+            'batch_config.json': {
+              batchId: started.batchId,
+              config: createSimConfig(),
+              startedAt: new Date().toISOString(),
+            },
+          },
+        },
       });
-      mockReadFileSync.mockReturnValue(
-        JSON.stringify({
-          batchId: started.batchId,
-          config: createSimConfig(),
-          startedAt: new Date().toISOString(),
-        }),
-      );
 
-      const result = manager.getHistory();
+      const result = await manager.getHistory();
       // Should only count the in-memory one, not the duplicate on disk
       expect(result.total).toBe(1);
     });
 
-    it('should handle missing SIM_LOG_DIR gracefully', () => {
-      mockExistsSync.mockReturnValue(false);
+    it('should handle missing SIM_LOG_DIR gracefully', async () => {
+      mockDisk(null);
 
-      const result = manager.getHistory();
+      const result = await manager.getHistory();
       expect(result.batches).toEqual([]);
       expect(result.total).toBe(0);
     });
 
-    it('should skip malformed config files on disk', () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockImplementation((dirPath: string) => {
-        const dir = String(dirPath);
-        if (dir.endsWith('simulations')) {
-          return [{ name: 'ffa', isDirectory: () => true }];
-        }
-        if (dir.endsWith('ffa')) {
-          return [{ name: 'batch_bad', isDirectory: () => true }];
-        }
-        return [];
-      });
-      mockReadFileSync.mockReturnValue('not valid json{{{');
+    it('should skip malformed config files on disk', async () => {
+      mockDisk({ ffa: { batch_bad: { 'batch_config.json': 'not valid json{{{' } } });
 
       // Should not throw
-      const result = manager.getHistory();
+      const result = await manager.getHistory();
       expect(result.total).toBe(0);
     });
 
-    it('should sort queued entries first, then running, then completed', () => {
+    it('should sort queued entries first, then running, then completed', async () => {
       // Create a running batch
       mockRunnerIsActive.mockReturnValue(false);
       manager.startBatch(createSimConfig(), 1);
@@ -583,7 +742,7 @@ describe('SimulationManager', () => {
       manager.startBatch(createSimConfig(), 2);
       manager.startBatch(createSimConfig(), 3);
 
-      const result = manager.getHistory();
+      const result = await manager.getHistory();
       // Queued entries should come first in sorted order
       const statuses = result.batches.map((b) => b.status);
       // queued < running < completed
@@ -599,14 +758,14 @@ describe('SimulationManager', () => {
       }
     });
 
-    it('should include queuePosition in queued history entries', () => {
+    it('should include queuePosition in queued history entries', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       manager.startBatch(createSimConfig(), 1);
       mockRunnerIsActive.mockReturnValue(true);
       manager.startBatch(createSimConfig(), 2);
       manager.startBatch(createSimConfig(), 3);
 
-      const result = manager.getHistory();
+      const result = await manager.getHistory();
       const queued = result.batches.filter((b) => b.status === 'queued');
       expect(queued.length).toBe(2);
       expect(queued[0].queuePosition).toBe(1);
@@ -619,7 +778,7 @@ describe('SimulationManager', () => {
     // millisecond; the moment the clock ticked between them they came back reversed. That made
     // the test above pass or fail depending on machine speed, and it was a genuine ordering bug in
     // the admin history view. Forcing the timestamps apart pins it. (audit SIMHISTORY-ORDER-1)
-    it('orders queued entries by queue position even when they were queued milliseconds apart', () => {
+    it('orders queued entries by queue position even when they were queued milliseconds apart', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       manager.startBatch(createSimConfig(), 1);
       mockRunnerIsActive.mockReturnValue(true);
@@ -635,11 +794,11 @@ describe('SimulationManager', () => {
         entry.queuedAt = new Date(Date.now() + i * 1000);
       });
 
-      const queued = manager.getHistory().batches.filter((b) => b.status === 'queued');
+      const queued = (await manager.getHistory()).batches.filter((b) => b.status === 'queued');
       expect(queued.map((b) => b.queuePosition)).toEqual([1, 2, 3]);
     });
 
-    it('puts queued entries ahead of the running one regardless of timestamps', () => {
+    it('puts queued entries ahead of the running one regardless of timestamps', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       manager.startBatch(createSimConfig(), 1);
       mockRunnerIsActive.mockReturnValue(true);
@@ -651,44 +810,32 @@ describe('SimulationManager', () => {
         entry.queuedAt = new Date(Date.now() - 60_000);
       });
 
-      const statuses = manager.getHistory().batches.map((b) => b.status);
+      const statuses = (await manager.getHistory()).batches.map((b) => b.status);
       expect(statuses[0]).toBe('queued');
     });
 
-    it('should handle disk batches without summary file', () => {
-      mockExistsSync.mockImplementation((p: string) => {
-        const fp = String(p);
-        if (fp.endsWith('batch_summary.json')) return false;
-        return true;
+    it('should handle disk batches without summary file', async () => {
+      mockDisk({
+        ffa: {
+          batch_nosummary: {
+            'batch_config.json': {
+              batchId: 'sim_nosummary_1',
+              config: createSimConfig(),
+              startedAt: '2026-01-01T00:00:00.000Z',
+            },
+          },
+        },
       });
-      mockReaddirSync.mockImplementation((dirPath: string) => {
-        const dir = String(dirPath);
-        if (dir.endsWith('simulations')) {
-          return [{ name: 'ffa', isDirectory: () => true }];
-        }
-        if (dir.endsWith('ffa')) {
-          return [{ name: 'batch_nosummary', isDirectory: () => true }];
-        }
-        return [];
-      });
-      mockReadFileSync.mockReturnValue(
-        JSON.stringify({
-          batchId: 'sim_nosummary_1',
-          config: createSimConfig(),
-          startedAt: '2026-01-01T00:00:00.000Z',
-        }),
-      );
 
-      const result = manager.getHistory();
+      const result = await manager.getHistory();
       expect(result.total).toBe(1);
       // Without summary, status defaults to 'error'
       expect(result.batches[0].status).toBe('error');
       expect(result.batches[0].gamesCompleted).toBe(0);
     });
 
-    it('should skip non-directory entries in game mode scan', () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockImplementation((dirPath: string) => {
+    it('should skip non-directory entries in game mode scan', async () => {
+      mockReaddir.mockImplementation(async (dirPath: string) => {
         const dir = String(dirPath);
         if (dir.endsWith('simulations')) {
           return [
@@ -696,19 +843,17 @@ describe('SimulationManager', () => {
             { name: 'readme.txt', isDirectory: () => false },
           ];
         }
-        if (dir.endsWith('ffa')) {
-          return [];
-        }
         return [];
       });
 
-      const result = manager.getHistory();
+      const result = await manager.getHistory();
       expect(result.total).toBe(0); // No actual batch dirs found
+      // readme.txt was never descended into
+      expect(mockReaddir.mock.calls.some(([d]) => String(d).endsWith('readme.txt'))).toBe(false);
     });
 
-    it('should skip non-directory entries in batch dir scan', () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockImplementation((dirPath: string) => {
+    it('should skip non-directory entries in batch dir scan', async () => {
+      mockReaddir.mockImplementation(async (dirPath: string) => {
         const dir = String(dirPath);
         if (dir.endsWith('simulations')) {
           return [{ name: 'ffa', isDirectory: () => true }];
@@ -719,8 +864,9 @@ describe('SimulationManager', () => {
         return [];
       });
 
-      const result = manager.getHistory();
+      const result = await manager.getHistory();
       expect(result.total).toBe(0);
+      expect(mockReadFile).not.toHaveBeenCalled();
     });
   });
 
@@ -728,83 +874,88 @@ describe('SimulationManager', () => {
   // 8. getBatchResults
   // ─────────────────────────────────────────────────
   describe('getBatchResults', () => {
-    it('should return results from in-memory runner', () => {
+    it('should return results from in-memory runner', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       const started = manager.startBatch(createSimConfig(), 1) as { batchId: string };
 
       mockRunnerGetResults.mockReturnValue([{ gameIndex: 0, winnerId: -1, winnerName: 'BotA' }]);
 
-      const results = manager.getBatchResults(started.batchId);
+      const results = await manager.getBatchResults(started.batchId);
       expect(results).not.toBeNull();
       expect(results!.results).toHaveLength(1);
       expect(results!.summary).toBeDefined();
+      expect(mockReaddir).not.toHaveBeenCalled();
     });
 
-    it('should return null for non-existent batch (no disk)', () => {
-      mockExistsSync.mockReturnValue(false);
+    it('should return null for non-existent batch (no disk)', async () => {
+      mockDisk(null);
 
-      const results = manager.getBatchResults('nonexistent');
+      const results = await manager.getBatchResults('nonexistent');
       expect(results).toBeNull();
     });
 
-    it('should search disk for batch results when not in memory', () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockImplementation((dirPath: string) => {
-        const dir = String(dirPath);
-        if (dir.endsWith('simulations')) {
-          return [{ name: 'ffa', isDirectory: () => true }];
-        }
-        if (dir.endsWith('ffa')) {
-          return [{ name: 'batch_disk', isDirectory: () => true }];
-        }
-        return [];
+    it('should search disk for batch results when not in memory', async () => {
+      mockDisk({
+        ffa: {
+          batch_disk: {
+            'batch_config.json': {
+              batchId: 'sim_disk_results',
+              config: createSimConfig(),
+              startedAt: 't',
+            },
+            'batch_summary.json': {
+              batchId: 'sim_disk_results',
+              status: 'completed',
+              results: [{ gameIndex: 0, winnerId: -1 }],
+            },
+          },
+        },
       });
-      mockReadFileSync.mockReturnValue(
-        JSON.stringify({
-          batchId: 'sim_disk_results',
-          results: [{ gameIndex: 0, winnerId: -1 }],
-        }),
-      );
 
-      const results = manager.getBatchResults('sim_disk_results');
+      const results = await manager.getBatchResults('sim_disk_results');
       expect(results).not.toBeNull();
       expect(results!.results).toHaveLength(1);
+      expect(results!.summary).toMatchObject({ batchId: 'sim_disk_results', status: 'completed' });
     });
 
-    it('should return null when disk search finds no matching batch', () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockImplementation((dirPath: string) => {
-        const dir = String(dirPath);
-        if (dir.endsWith('simulations')) {
-          return [{ name: 'ffa', isDirectory: () => true }];
-        }
-        if (dir.endsWith('ffa')) {
-          return [{ name: 'batch_other', isDirectory: () => true }];
-        }
-        return [];
+    it('should return null when disk search finds no matching batch', async () => {
+      mockDisk({
+        ffa: {
+          batch_other: {
+            'batch_config.json': { batchId: 'other_id', config: createSimConfig(), startedAt: 't' },
+            'batch_summary.json': { batchId: 'other_id', results: [] },
+          },
+        },
       });
-      mockReadFileSync.mockReturnValue(JSON.stringify({ batchId: 'other_id', results: [] }));
 
-      const results = manager.getBatchResults('wrong_id');
+      const results = await manager.getBatchResults('wrong_id');
       expect(results).toBeNull();
     });
 
-    it('should handle malformed summary files on disk', () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockImplementation((dirPath: string) => {
-        const dir = String(dirPath);
-        if (dir.endsWith('simulations')) {
-          return [{ name: 'ffa', isDirectory: () => true }];
-        }
-        if (dir.endsWith('ffa')) {
-          return [{ name: 'batch_bad', isDirectory: () => true }];
-        }
-        return [];
+    it('should return null for a batch on disk whose summary is malformed', async () => {
+      mockDisk({
+        ffa: {
+          batch_bad: {
+            'batch_config.json': { batchId: 'whatever', config: createSimConfig(), startedAt: 't' },
+            'batch_summary.json': '{{broken json',
+          },
+        },
       });
-      mockReadFileSync.mockReturnValue('{{broken json');
 
-      const results = manager.getBatchResults('whatever');
+      const results = await manager.getBatchResults('whatever');
       expect(results).toBeNull();
+    });
+
+    it('should return null for a batch on disk that has no summary yet', async () => {
+      mockDisk({
+        ffa: {
+          batch_running: {
+            'batch_config.json': { batchId: 'r1', config: createSimConfig(), startedAt: 't' },
+          },
+        },
+      });
+
+      expect(await manager.getBatchResults('r1')).toBeNull();
     });
   });
 
@@ -813,54 +964,74 @@ describe('SimulationManager', () => {
   // ─────────────────────────────────────────────────
   describe('getSimulationReplay', () => {
     it('should return null when SIM_LOG_DIR does not exist', async () => {
-      mockExistsSync.mockReturnValue(false);
+      mockDisk(null);
 
       const result = await manager.getSimulationReplay('batch1', 0);
       expect(result).toBeNull();
     });
 
     it('should return null when batch is not found on disk', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockImplementation((dirPath: string) => {
-        const dir = String(dirPath);
-        if (dir.endsWith('simulations')) {
-          return [{ name: 'ffa', isDirectory: () => true }];
-        }
-        if (dir.endsWith('ffa')) {
-          return [{ name: 'batch_nope', isDirectory: () => true }];
-        }
-        return [];
+      mockDisk({
+        ffa: {
+          batch_nope: {
+            'batch_config.json': {
+              batchId: 'other_batch',
+              config: createSimConfig(),
+              startedAt: 't',
+            },
+          },
+        },
       });
-      mockReadFileSync.mockReturnValue(JSON.stringify({ batchId: 'other_batch' }));
 
       const result = await manager.getSimulationReplay('batch1', 0);
       expect(result).toBeNull();
     });
 
     it('should return null when replay file is not found', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockImplementation((dirPath: string) => {
-        const dir = String(dirPath);
-        if (dir.endsWith('simulations')) {
-          return [{ name: 'ffa', isDirectory: () => true }];
-        }
-        if (dir.endsWith('ffa')) {
-          return [{ name: 'batch_found', isDirectory: () => true }];
-        }
-        // Return files without a replay match
-        return ['batch_config.json', 'batch_summary.json'];
+      mockDisk({
+        ffa: {
+          batch_found: {
+            'batch_config.json': {
+              batchId: 'target_batch',
+              config: createSimConfig(),
+              startedAt: 't',
+            },
+            'batch_summary.json': {},
+          },
+        },
       });
-      mockReadFileSync.mockReturnValue(JSON.stringify({ batchId: 'target_batch' }));
 
       const result = await manager.getSimulationReplay('target_batch', 0);
       expect(result).toBeNull();
     });
 
-    it('should handle errors gracefully', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockImplementation(() => {
-        throw new Error('Disk error');
+    it('reads the matching replay file for the game index', async () => {
+      mockDisk({
+        ffa: {
+          batch_found: {
+            'batch_config.json': {
+              batchId: 'target_batch',
+              config: createSimConfig(),
+              startedAt: 't',
+            },
+            '0_ABCDEF_ffa.replay.json.gz': 'gz0',
+            '1_ABCDEF_ffa.replay.json.gz': 'gz1',
+          },
+        },
       });
+      mockGunzip.mockResolvedValue(Buffer.from(JSON.stringify({ matchId: 1, frames: [] })));
+
+      const result = await manager.getSimulationReplay('target_batch', 1);
+
+      expect(result).toEqual({ matchId: 1, frames: [] });
+      expect(mockReadFile).toHaveBeenCalledWith(
+        expect.stringContaining('1_ABCDEF_ffa.replay.json.gz'),
+      );
+      expect(mockGunzip).toHaveBeenCalledWith('gz1');
+    });
+
+    it('should handle errors gracefully', async () => {
+      mockReaddir.mockRejectedValue(new Error('Disk error'));
 
       const result = await manager.getSimulationReplay('batch1', 0);
       expect(result).toBeNull();
@@ -871,94 +1042,119 @@ describe('SimulationManager', () => {
   // 10. deleteBatch
   // ─────────────────────────────────────────────────
   describe('deleteBatch', () => {
-    it('should delete a queued batch (no disk cleanup needed)', () => {
+    it('should delete a queued batch (no disk cleanup needed)', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       manager.startBatch(createSimConfig(), 1);
       mockRunnerIsActive.mockReturnValue(true);
 
       const queued = manager.startBatch(createSimConfig(), 2) as { batchId: string };
 
-      const deleted = manager.deleteBatch(queued.batchId);
+      const deleted = await manager.deleteBatch(queued.batchId);
       expect(deleted).toBe(true);
       expect(manager.isQueued(queued.batchId)).toBe(false);
+      expect(mockRm).not.toHaveBeenCalled();
     });
 
-    it('should remove runner from memory and delete from disk', () => {
+    it('should remove runner from memory and delete from disk', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       const started = manager.startBatch(createSimConfig(), 1) as { batchId: string };
 
-      // Mock disk with matching batch
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockImplementation((dirPath: string) => {
-        const dir = String(dirPath);
-        if (dir.endsWith('simulations')) {
-          return [{ name: 'ffa', isDirectory: () => true }];
-        }
-        if (dir.endsWith('ffa')) {
-          return [{ name: 'batch_dir', isDirectory: () => true }];
-        }
-        return [];
+      mockDisk({
+        ffa: {
+          batch_dir: {
+            'batch_config.json': {
+              batchId: started.batchId,
+              config: createSimConfig(),
+              startedAt: 't',
+            },
+          },
+        },
       });
-      mockReadFileSync.mockReturnValue(JSON.stringify({ batchId: started.batchId }));
 
-      const deleted = manager.deleteBatch(started.batchId);
+      const deleted = await manager.deleteBatch(started.batchId);
       expect(deleted).toBe(true);
 
       // Should have been removed from memory
       expect(manager.getBatch(started.batchId)).toBeUndefined();
 
-      // Should have called rmSync
-      expect(mockRmSync).toHaveBeenCalledWith(
-        expect.any(String),
+      // Async rm, never rmSync (audit E3)
+      expect(mockRm).toHaveBeenCalledWith(
+        expect.stringContaining('batch_dir'),
         expect.objectContaining({ recursive: true, force: true }),
       );
+      expect(mockRmSync).not.toHaveBeenCalled();
     });
 
-    it('should return false when batch not found anywhere', () => {
-      mockExistsSync.mockReturnValue(false);
-      const deleted = manager.deleteBatch('ghost_batch');
+    it('drops a deleted batch from the cached index without rescanning', async () => {
+      mockDisk({
+        ffa: {
+          batch_a: {
+            'batch_config.json': { batchId: 'a', config: createSimConfig(), startedAt: 't' },
+          },
+          batch_b: {
+            'batch_config.json': { batchId: 'b', config: createSimConfig(), startedAt: 't' },
+          },
+        },
+      });
+
+      expect((await manager.getHistory()).total).toBe(2);
+      expect(await manager.deleteBatch('a')).toBe(true);
+      const after = await manager.getHistory();
+      expect(after.batches.map((b) => b.batchId)).toEqual(['b']);
+      expect(
+        mockReaddir.mock.calls.filter(([d]) => String(d).endsWith('simulations')),
+      ).toHaveLength(1);
+      // A second delete of the same id is a miss, still without a rescan.
+      expect(await manager.deleteBatch('a')).toBe(false);
+      expect(
+        mockReaddir.mock.calls.filter(([d]) => String(d).endsWith('simulations')),
+      ).toHaveLength(1);
+    });
+
+    it('should return false when batch not found anywhere', async () => {
+      mockDisk(null);
+      const deleted = await manager.deleteBatch('ghost_batch');
       expect(deleted).toBe(false);
     });
 
-    it('should return false when SIM_LOG_DIR does not exist', () => {
-      mockExistsSync.mockReturnValue(false);
+    it('should return false when SIM_LOG_DIR does not exist', async () => {
+      mockDisk(null);
 
-      const deleted = manager.deleteBatch('no_dir_batch');
+      const deleted = await manager.deleteBatch('no_dir_batch');
       expect(deleted).toBe(false);
     });
 
-    it('should handle disk errors gracefully', () => {
+    it('should handle disk errors gracefully', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       const started = manager.startBatch(createSimConfig(), 1) as { batchId: string };
 
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockImplementation(() => {
-        throw new Error('Disk read error');
-      });
+      mockReaddir.mockRejectedValue(new Error('Disk read error'));
 
-      const deleted = manager.deleteBatch(started.batchId);
+      const deleted = await manager.deleteBatch(started.batchId);
       // Returns false because disk lookup failed
       expect(deleted).toBe(false);
     });
 
-    it('should skip malformed configs on disk during delete', () => {
+    it('returns false and logs when the removal itself fails', async () => {
+      mockDisk({
+        ffa: {
+          batch_a: {
+            'batch_config.json': { batchId: 'a', config: createSimConfig(), startedAt: 't' },
+          },
+        },
+      });
+      mockRm.mockRejectedValue(new Error('EACCES'));
+
+      expect(await manager.deleteBatch('a')).toBe(false);
+    });
+
+    it('should skip malformed configs on disk during delete', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       const started = manager.startBatch(createSimConfig(), 1) as { batchId: string };
 
-      mockExistsSync.mockReturnValue(true);
-      mockReaddirSync.mockImplementation((dirPath: string) => {
-        const dir = String(dirPath);
-        if (dir.endsWith('simulations')) {
-          return [{ name: 'ffa', isDirectory: () => true }];
-        }
-        if (dir.endsWith('ffa')) {
-          return [{ name: 'batch_bad', isDirectory: () => true }];
-        }
-        return [];
-      });
-      mockReadFileSync.mockReturnValue('not json');
+      mockDisk({ ffa: { batch_bad: { 'batch_config.json': 'not json' } } });
 
-      const deleted = manager.deleteBatch(started.batchId);
+      const deleted = await manager.deleteBatch(started.batchId);
       // Malformed config means no match found
       expect(deleted).toBe(false);
     });
@@ -1063,7 +1259,7 @@ describe('SimulationManager', () => {
       expect(manager.isQueued(q3.batchId)).toBe(true);
     });
 
-    it('should handle rapid queue/cancel operations', () => {
+    it('should handle rapid queue/cancel operations', async () => {
       mockRunnerIsActive.mockReturnValue(false);
       manager.startBatch(createSimConfig(), 1);
       mockRunnerIsActive.mockReturnValue(true);
@@ -1074,7 +1270,7 @@ describe('SimulationManager', () => {
       }
 
       // Queue should be empty after all removes
-      const history = manager.getHistory();
+      const history = await manager.getHistory();
       const queued = history.batches.filter((b) => b.status === 'queued');
       expect(queued).toHaveLength(0);
     });
@@ -1108,7 +1304,7 @@ describe('SimulationManager', () => {
   // 13. Integration scenarios
   // ─────────────────────────────────────────────────
   describe('Integration scenarios', () => {
-    it('should handle full batch lifecycle', () => {
+    it('should handle full batch lifecycle', async () => {
       // Start a batch
       mockRunnerIsActive.mockReturnValue(false);
       const result = manager.startBatch(createSimConfig(), 1) as { batchId: string };
@@ -1119,7 +1315,7 @@ describe('SimulationManager', () => {
       expect(batch).toBeDefined();
 
       // Get history
-      const history = manager.getHistory();
+      const history = await manager.getHistory();
       expect(history.total).toBeGreaterThanOrEqual(1);
 
       // Simulate completion — cancel the batch

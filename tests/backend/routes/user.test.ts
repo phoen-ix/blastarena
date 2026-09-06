@@ -30,8 +30,13 @@ jest.mock('../../../backend/src/middleware/auth', () => ({
   authMiddleware: jest.fn((_req: any, _res: any, next: any) => next()),
 }));
 
+const mockRateLimiterMiddleware = jest.fn((_req: any, _res: any, next: any) => next());
 jest.mock('../../../backend/src/middleware/rateLimiter', () => ({
-  rateLimiter: jest.fn(() => (_req: any, _res: any, next: any) => next()),
+  rateLimiter: jest.fn(() => mockRateLimiterMiddleware),
+}));
+
+jest.mock('../../../backend/src/config', () => ({
+  getConfig: () => ({ APP_URL: 'http://localhost:8080' }),
 }));
 
 jest.mock('../../../backend/src/middleware/validation', () => ({
@@ -63,13 +68,24 @@ function getHandler(method: string, path: string) {
 }
 
 function mockRes() {
-  const data: { _status: number; _json: unknown } = { _status: 200, _json: null };
+  const data: { _status: number; _json: unknown; _redirect: string | null } = {
+    _status: 200,
+    _json: null,
+    _redirect: null,
+  };
   const res: any = {
     get _status() {
       return data._status;
     },
     get _json() {
       return data._json;
+    },
+    get _redirect() {
+      return data._redirect;
+    },
+    redirect(url: string) {
+      data._redirect = url;
+      return res;
     },
     status(code: number) {
       data._status = code;
@@ -375,7 +391,7 @@ describe('User routes', () => {
   describe('GET /user/confirm-email/:token', () => {
     const handler = getHandler('get', '/user/confirm-email/:token');
 
-    it('calls confirmEmailChange with token and returns success message', async () => {
+    it('confirms the change and redirects into the app, like verify-email (audit B15)', async () => {
       mockConfirmEmailChange.mockResolvedValue(undefined);
 
       const req = mockReq({ params: { token: 'abc123token' } });
@@ -383,7 +399,17 @@ describe('User routes', () => {
       await handler(req, res, jest.fn());
 
       expect(mockConfirmEmailChange).toHaveBeenCalledWith('abc123token');
-      expect(res._json).toEqual({ message: 'Email address updated successfully' });
+      expect(res._redirect).toBe('http://localhost:8080?emailChanged=true');
+      expect(res._json).toBeNull();
+    });
+
+    it('is rate limited (audit B15)', () => {
+      const stack = (userRouter as any).stack as RouteLayer[];
+      const layer = stack.find(
+        (l) => l.route?.path === '/user/confirm-email/:token' && l.route.methods.get,
+      );
+      const handlers = layer!.route.stack.map((s) => s.handle);
+      expect(handlers).toContain(mockRateLimiterMiddleware);
     });
 
     it('passes error to next() on service failure', async () => {
@@ -416,6 +442,16 @@ describe('User routes', () => {
 
         const handlers = layer!.route.stack.map((s) => s.handle);
         expect(handlers).toContain(authMiddleware);
+      }
+    });
+
+    it('totp/confirm and totp/disable carry the same rate limiter as totp/setup (audit B16)', () => {
+      const stack = (userRouter as any).stack as RouteLayer[];
+      for (const path of ['/user/totp/setup', '/user/totp/confirm', '/user/totp/disable']) {
+        const layer = stack.find((l) => l.route?.path === path && l.route.methods.post);
+        expect(layer).toBeDefined();
+        const handlers = layer!.route.stack.map((s) => s.handle);
+        expect(handlers).toContain(mockRateLimiterMiddleware);
       }
     });
 

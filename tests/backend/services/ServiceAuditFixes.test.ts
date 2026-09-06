@@ -53,17 +53,26 @@ describe('refresh token reaping', () => {
   // Rows were inserted on every login and every rotation and only ever flagged revoked — nothing
   // removed them, despite idx_refresh_tokens_expires existing for the job.
   // (audit REFRESH-TOKEN-REAP-1)
-  it('deletes rows that are expired or revoked', async () => {
-    mockExecute.mockResolvedValue({ affectedRows: 12 });
+  // Two indexed predicates, each deleted in bounded chunks, instead of one `expires_at < NOW()
+  // OR revoked = TRUE` full scan. The chunk loop itself is covered in auth-refresh-reaper.test.ts.
+  // (audit E8)
+  it('deletes expired rows and stale revoked rows as two indexed deletes', async () => {
+    mockExecute
+      .mockResolvedValueOnce({ affectedRows: 12 })
+      .mockResolvedValueOnce({ affectedRows: 3 });
     const { cleanupExpiredRefreshTokens } = await import('../../../backend/src/services/auth');
 
     const removed = await cleanupExpiredRefreshTokens();
 
-    expect(removed).toBe(12);
-    const sql = String(mockExecute.mock.calls[0][0]);
-    expect(sql).toContain('DELETE FROM refresh_tokens');
-    expect(sql).toContain('expires_at < NOW()');
-    expect(sql).toContain('revoked = TRUE');
+    expect(removed).toBe(15);
+    expect(mockExecute).toHaveBeenCalledTimes(2);
+    const expiredSql = String(mockExecute.mock.calls[0][0]);
+    expect(expiredSql).toContain('DELETE FROM refresh_tokens');
+    expect(expiredSql).toContain('expires_at < NOW()');
+    expect(expiredSql).not.toContain(' OR ');
+    const revokedSql = String(mockExecute.mock.calls[1][0]);
+    expect(revokedSql).toContain('revoked = TRUE AND created_at <');
+    expect(revokedSql).not.toContain(' OR ');
   });
 
   it('reports zero when the driver omits affectedRows', async () => {

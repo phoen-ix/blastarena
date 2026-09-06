@@ -89,7 +89,8 @@ describe('paginated queries have a total order', () => {
       (n, p) => n + paginatedQueriesIn(fs.readFileSync(p, 'utf-8')).length,
       0,
     );
-    expect(total).toBeGreaterThanOrEqual(12);
+    // 11 since GET /challenges/:id/leaderboard and its service function were removed (audit G6).
+    expect(total).toBeGreaterThanOrEqual(11);
   });
 
   for (const file of serviceFiles) {

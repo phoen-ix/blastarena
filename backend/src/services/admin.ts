@@ -1,6 +1,8 @@
-import { query, execute } from '../db/connection';
+import { query, execute, isDuplicateKeyError } from '../db/connection';
+import { logAdminAction } from './admin-audit';
 import { AppError } from '../middleware/errorHandler';
-import { UserRole, RoomListItem, ReplayData } from '@blast-arena/shared';
+import { UserRole, RoomListItem, ReplayData, getErrorMessage } from '@blast-arena/shared';
+import { logger } from '../utils/logger';
 import { getRoomManager, getIO } from '../game/registry';
 import { hashPassword, hashEmail, generateEmailHint } from '../utils/crypto';
 import { getConfig } from '../config';
@@ -38,16 +40,28 @@ export async function createUser(
   const passwordHash = await hashPassword(password);
   const userRole = role || 'user';
 
-  const result = await execute(
-    'INSERT INTO users (username, email_hash, email_hint, password_hash, role, email_verified) VALUES (?, ?, ?, ?, ?, TRUE)',
-    [username, emailHash, emailHint, passwordHash, userRole],
-  );
+  let result;
+  try {
+    result = await execute(
+      'INSERT INTO users (username, email_hash, email_hint, password_hash, role, email_verified) VALUES (?, ?, ?, ?, ?, TRUE)',
+      [username, emailHash, emailHint, passwordHash, userRole],
+    );
+  } catch (err) {
+    // A concurrent registration/create won the race after the SELECT above. (audit B13)
+    if (isDuplicateKeyError(err)) {
+      throw new AppError('Username or email already taken', 409, 'CONFLICT');
+    }
+    throw err;
+  }
 
   await execute('INSERT INTO user_stats (user_id) VALUES (?)', [result.insertId]);
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'create_user', 'user', result.insertId, `${username} (${userRole})`],
+  await logAdminAction(
+    adminId,
+    'create_user',
+    'user',
+    result.insertId,
+    `${username} (${userRole})`,
   );
 
   return { id: result.insertId, username };
@@ -116,10 +130,7 @@ export async function changeUserRole(
 
   await execute('UPDATE users SET role = ? WHERE id = ?', [role, userId]);
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'role_change', 'user', userId, role],
-  );
+  await logAdminAction(adminId, 'role_change', 'user', userId, role);
 }
 
 export async function deactivateUser(
@@ -137,18 +148,17 @@ export async function deactivateUser(
     userId,
   ]);
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, deactivated ? 'deactivate' : 'reactivate', 'user', userId, null],
-  );
+  await logAdminAction(adminId, deactivated ? 'deactivate' : 'reactivate', 'user', userId, null);
 
   if (deactivated) {
     await execute('UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = ?', [userId]);
     // Force-disconnect active sockets immediately
     try {
       getIO().in(`user:${userId}`).disconnectSockets(true);
-    } catch {
-      // Socket server may not be available in tests
+    } catch (err) {
+      // Socket server may not be available (tests, or a CLI context) — the DB change stands and
+      // the sessions lapse with their tokens. (audit B17)
+      logger.warn({ err: getErrorMessage(err), userId }, 'Could not disconnect deactivated user');
     }
   }
 }
@@ -166,14 +176,12 @@ export async function revokeUserSessions(adminId: number, userId: number): Promi
     const sockets = await io.in(`user:${userId}`).fetchSockets();
     socketCount = sockets.length;
     io.in(`user:${userId}`).disconnectSockets(true);
-  } catch {
-    // Socket server may not be available in tests
+  } catch (err) {
+    // Socket server may not be available; the tokens are revoked regardless. (audit B17)
+    logger.warn({ err: getErrorMessage(err), userId }, 'Could not disconnect revoked sessions');
   }
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'revoke_sessions', 'user', userId, JSON.stringify({ socketCount })],
-  );
+  await logAdminAction(adminId, 'revoke_sessions', 'user', userId, JSON.stringify({ socketCount }));
 }
 
 export async function revokeAllSessions(adminId: number): Promise<void> {
@@ -190,13 +198,17 @@ export async function revokeAllSessions(adminId: number): Promise<void> {
         s.disconnect(true);
       }
     }
-  } catch {
-    // Socket server may not be available in tests
+  } catch (err) {
+    // Socket server may not be available; the tokens are revoked regardless. (audit B17)
+    logger.warn({ err: getErrorMessage(err) }, 'Could not disconnect sockets after revoke-all');
   }
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'revoke_all_sessions', 'system', 0, JSON.stringify({ socketCount })],
+  await logAdminAction(
+    adminId,
+    'revoke_all_sessions',
+    'system',
+    0,
+    JSON.stringify({ socketCount }),
   );
 }
 
@@ -214,10 +226,7 @@ export async function deleteUser(adminId: number, userId: number): Promise<void>
   const username = rows[0].username;
 
   // Log action before deletion (FK cascade would remove the log if admin is the target)
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'delete', 'user', userId, username],
-  );
+  await logAdminAction(adminId, 'delete', 'user', userId, username);
 
   // Hard delete — FK cascades handle refresh_tokens, user_stats, match_players
   await execute('DELETE FROM users WHERE id = ?', [userId]);
@@ -239,10 +248,7 @@ export async function resetUserPassword(
   // Revoke all refresh tokens so user must re-login
   await execute('UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = ?', [userId]);
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'reset_password', 'user', userId, rows[0].username],
-  );
+  await logAdminAction(adminId, 'reset_password', 'user', userId, rows[0].username);
 }
 
 export async function resetUserTotp(adminId: number, userId: number): Promise<void> {
@@ -262,10 +268,7 @@ export async function resetUserTotp(adminId: number, userId: number): Promise<vo
     [userId],
   );
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'reset_totp', 'user', userId, rows[0].username],
-  );
+  await logAdminAction(adminId, 'reset_totp', 'user', userId, rows[0].username);
 }
 
 export async function getServerStats() {
@@ -289,8 +292,10 @@ export async function getServerStats() {
       const socketRoom = io.sockets.adapter.rooms.get(`room:${room.code}`);
       return sum + (socketRoom ? socketRoom.size : 0);
     }, 0);
-  } catch {
-    // Registry not yet initialized
+  } catch (err) {
+    // Registry not yet initialised (startup) or io unavailable — report zero live rooms, but
+    // say why, so a persistent zero on the dashboard is diagnosable. (audit B17)
+    logger.warn({ err: getErrorMessage(err) }, 'Live room stats unavailable');
   }
 
   return {
@@ -304,14 +309,16 @@ export async function getServerStats() {
 
 export async function getMatchHistory(page: number = 1, limit: number = 20) {
   const offset = (page - 1) * limit;
+  // Player count as a correlated subquery, evaluated only for the page's rows. The previous
+  // derived table `(SELECT match_id, COUNT(*) … GROUP BY match_id)` aggregated ALL of
+  // match_players before the LIMIT — a full scan per page. (audit E1)
   const rows = await query<MatchRow[]>(
     `SELECT m.id, m.room_code, m.game_mode, m.status, m.duration,
             m.started_at, m.finished_at,
             u.username as winner_username,
-            COALESCE(pc.player_count, 0) as player_count
+            (SELECT COUNT(*) FROM match_players mp2 WHERE mp2.match_id = m.id) as player_count
      FROM matches m
      LEFT JOIN users u ON u.id = m.winner_id
-     LEFT JOIN (SELECT match_id, COUNT(*) as player_count FROM match_players GROUP BY match_id) pc ON pc.match_id = m.id
      ORDER BY m.created_at DESC, m.id DESC
      LIMIT ? OFFSET ?`,
     [limit, offset],
@@ -428,7 +435,10 @@ export async function getActiveRooms() {
       gameMode: r.gameMode,
       status: r.status,
     }));
-  } catch {
+  } catch (err) {
+    // Redis down: an empty list is the right answer for the dashboard, but not silently — this
+    // used to be indistinguishable from "no rooms". (audit B17)
+    logger.error({ err: getErrorMessage(err) }, 'Failed to list active rooms');
     return [];
   }
 }
@@ -441,10 +451,7 @@ export async function sendToast(adminId: number, message: string): Promise<void>
     throw new AppError('Socket server not available', 500);
   }
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'toast', 'broadcast', 0, message],
-  );
+  await logAdminAction(adminId, 'toast', 'broadcast', 0, message);
 }
 
 export async function setBanner(adminId: number, message: string): Promise<void> {
@@ -462,14 +469,12 @@ export async function setBanner(adminId: number, message: string): Promise<void>
   try {
     const io = getIO();
     io.emit('admin:banner', { message });
-  } catch {
-    // Socket not available, banner still saved in DB
+  } catch (err) {
+    // Socket not available, banner still saved in DB and shown on next load. (audit B17)
+    logger.warn({ err: getErrorMessage(err) }, 'Banner saved but not broadcast');
   }
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'set_banner', 'broadcast', 0, message],
-  );
+  await logAdminAction(adminId, 'set_banner', 'broadcast', 0, message);
 }
 
 export async function clearBanner(adminId: number): Promise<void> {
@@ -480,14 +485,12 @@ export async function clearBanner(adminId: number): Promise<void> {
   try {
     const io = getIO();
     io.emit('admin:banner', { message: null });
-  } catch {
-    // Socket not available
+  } catch (err) {
+    // Socket not available; the banner is cleared in the DB. (audit B17)
+    logger.warn({ err: getErrorMessage(err) }, 'Banner cleared but not broadcast');
   }
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'clear_banner', 'broadcast', 0, null],
-  );
+  await logAdminAction(adminId, 'clear_banner', 'broadcast', 0, null);
 }
 
 export async function getActiveBanner() {
@@ -564,10 +567,7 @@ export async function executeCleanup(
 
   // Audit log before deletion (FK cascade would remove if admin is in the set)
   const details = JSON.stringify({ type, days: days ?? null, count: userIds.length });
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'bulk_delete', 'user', 0, details],
-  );
+  await logAdminAction(adminId, 'bulk_delete', 'user', 0, details);
 
   // Disconnect sockets for affected users
   try {
@@ -575,8 +575,9 @@ export async function executeCleanup(
     for (const id of userIds) {
       io.in(`user:${id}`).disconnectSockets(true);
     }
-  } catch {
-    // Socket server may not be available
+  } catch (err) {
+    // Socket server may not be available; the rows are deleted regardless. (audit B17)
+    logger.warn({ err: getErrorMessage(err) }, 'Could not disconnect cleaned-up users');
   }
 
   // Bulk delete in chunks — FK CASCADE handles related tables.

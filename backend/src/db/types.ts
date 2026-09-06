@@ -298,33 +298,6 @@ export interface SeasonRow extends RowDataPacket {
   updated_at: Date;
 }
 
-/** Season Elo row */
-export interface SeasonEloRow extends RowDataPacket {
-  id: number;
-  user_id: number;
-  season_id: number;
-  elo_rating: number;
-  peak_elo: number;
-  matches_played: number;
-  // Joined fields
-  username?: string;
-  total_wins?: number;
-  total_kills?: number;
-}
-
-/** Elo history row */
-export interface EloHistoryRow extends RowDataPacket {
-  id: number;
-  user_id: number;
-  match_id: number;
-  season_id: number | null;
-  old_elo: number;
-  new_elo: number;
-  delta: number;
-  game_mode: string;
-  created_at: Date;
-}
-
 /** Public profile row */
 export interface PublicProfileRow extends RowDataPacket {
   id: number;

@@ -135,9 +135,11 @@ jest.mock('../../../backend/src/game/registry', () => ({
 
 // --- db connection ---
 const mockExecute = jest.fn<AnyFn>();
+const mockQuery = jest.fn<AnyFn>();
 
 jest.mock('../../../backend/src/db/connection', () => ({
   execute: mockExecute,
+  query: mockQuery,
 }));
 
 // --- config ---
@@ -1328,39 +1330,58 @@ describe('DELETE /admin/matches (bulk)', () => {
   const handler = getHandler('delete', '/admin/matches');
 
   it('deletes all matches with replay cleanup and returns count', async () => {
-    mockGetMatchHistory.mockResolvedValue({
-      matches: [{ id: 1 }, { id: 2 }, { id: 3 }],
-      total: 3,
-    });
-    mockDeleteReplay.mockReturnValueOnce(true).mockReturnValueOnce(false).mockReturnValueOnce(true);
+    // Ids come from a plain `SELECT id FROM matches`, not the full history query. (audit E10)
+    mockQuery.mockResolvedValue([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    mockDeleteReplay.mockImplementation(async (id: number) => id !== 2);
     mockExecute.mockResolvedValue({ affectedRows: 3 });
     const req = mockReq();
     const res = mockRes();
     await handler(req, res, jest.fn());
-    expect(mockGetMatchHistory).toHaveBeenCalledWith(1, 100000);
+    expect(mockQuery).toHaveBeenCalledWith('SELECT id FROM matches');
+    expect(mockGetMatchHistory).not.toHaveBeenCalled();
     expect(mockDeleteReplay).toHaveBeenCalledTimes(3);
     expect(mockExecute).toHaveBeenCalledWith('DELETE FROM matches');
     expect(res._json).toEqual({ message: 'All matches deleted', count: 3, replaysCleaned: 2 });
   });
 
-  it('logs admin action with match count and replays cleaned', async () => {
-    mockGetMatchHistory.mockResolvedValue({
-      matches: [{ id: 1 }],
-      total: 1,
+  it('deletes replays with bounded concurrency (chunks of 20)', async () => {
+    // (audit E10) — 45 ids → 3 chunks; never more than 20 unlinks in flight at once.
+    mockQuery.mockResolvedValue(Array.from({ length: 45 }, (_, i) => ({ id: i + 1 })));
+    let inFlight = 0;
+    let peak = 0;
+    mockDeleteReplay.mockImplementation(async () => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setImmediate(r));
+      inFlight--;
+      return true;
     });
-    mockDeleteReplay.mockReturnValue(true);
+    mockExecute.mockResolvedValue({ affectedRows: 45 });
+    const res = mockRes();
+    await handler(mockReq(), res, jest.fn());
+    expect(mockDeleteReplay).toHaveBeenCalledTimes(45);
+    expect(peak).toBe(20);
+    expect(res._json).toEqual({ message: 'All matches deleted', count: 45, replaysCleaned: 45 });
+  });
+
+  it('logs admin action with match count and replays cleaned', async () => {
+    mockQuery.mockResolvedValue([{ id: 1 }]);
+    mockDeleteReplay.mockResolvedValue(true);
     mockExecute.mockResolvedValue({ affectedRows: 1 });
     const req = mockReq();
     const res = mockRes();
     await handler(req, res, jest.fn());
-    expect(mockExecute).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO admin_actions'),
-      expect.arrayContaining([1, 'delete_all_matches', 'match', 0]),
-    );
+    expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO admin_actions'), [
+      1,
+      'delete_all_matches',
+      'match',
+      0,
+      JSON.stringify({ count: 1, replaysCleaned: 1 }),
+    ]);
   });
 
   it('handles empty match list gracefully', async () => {
-    mockGetMatchHistory.mockResolvedValue({ matches: [], total: 0 });
+    mockQuery.mockResolvedValue([]);
     mockExecute.mockResolvedValue({ affectedRows: 0 });
     const req = mockReq();
     const res = mockRes();
@@ -1375,7 +1396,7 @@ describe('DELETE /admin/matches (bulk)', () => {
 
   it('passes error to next() on failure', async () => {
     const err = new Error('DB error');
-    mockGetMatchHistory.mockRejectedValue(err);
+    mockQuery.mockRejectedValue(err);
     const req = mockReq();
     const res = mockRes();
     const next = jest.fn();
@@ -1709,46 +1730,55 @@ describe('DELETE /admin/replays/:matchId', () => {
 describe('GET /admin/simulations', () => {
   const handler = getHandler('get', '/admin/simulations');
 
-  it('returns simulation history with pagination', () => {
+  // getHistory is async now that it reads the simulations directory with fs.promises. (audit E3)
+  it('returns simulation history with pagination', async () => {
     const history = { batches: [{ id: 'batch1' }], total: 1 };
-    mockGetHistory.mockReturnValue(history);
+    mockGetHistory.mockResolvedValue(history);
     const req = mockReq({ query: { page: '2', limit: '10' } });
     const res = mockRes();
-    handler(req, res, jest.fn());
+    await handler(req, res, jest.fn());
     expect(mockGetHistory).toHaveBeenCalledWith(2, 10);
     expect(res._json).toEqual(history);
   });
 
-  it('clamps page to minimum 1', () => {
-    mockGetHistory.mockReturnValue({ batches: [], total: 0 });
+  it('passes error to next() when the manager fails', async () => {
+    const err = new Error('disk error');
+    mockGetHistory.mockRejectedValue(err);
+    const next = jest.fn();
+    await handler(mockReq(), mockRes(), next);
+    expect(next).toHaveBeenCalledWith(err);
+  });
+
+  it('clamps page to minimum 1', async () => {
+    mockGetHistory.mockResolvedValue({ batches: [], total: 0 });
     const req = mockReq({ query: { page: '0' } });
     const res = mockRes();
-    handler(req, res, jest.fn());
+    await handler(req, res, jest.fn());
     expect(mockGetHistory).toHaveBeenCalledWith(1, 20);
   });
 
-  it('clamps limit to 1-100 range', () => {
-    mockGetHistory.mockReturnValue({ batches: [], total: 0 });
+  it('clamps limit to 1-100 range', async () => {
+    mockGetHistory.mockResolvedValue({ batches: [], total: 0 });
     const req = mockReq({ query: { limit: '200' } });
     const res = mockRes();
-    handler(req, res, jest.fn());
+    await handler(req, res, jest.fn());
     expect(mockGetHistory).toHaveBeenCalledWith(1, 100);
   });
 
-  it('treats limit 0 as falsy and falls back to default 20, then clamps to 20', () => {
-    mockGetHistory.mockReturnValue({ batches: [], total: 0 });
+  it('treats limit 0 as falsy and falls back to default 20, then clamps to 20', async () => {
+    mockGetHistory.mockResolvedValue({ batches: [], total: 0 });
     const req = mockReq({ query: { limit: '0' } });
     const res = mockRes();
-    handler(req, res, jest.fn());
+    await handler(req, res, jest.fn());
     // parseInt('0') is 0 which is falsy, so || 20 yields 20
     expect(mockGetHistory).toHaveBeenCalledWith(1, 20);
   });
 
-  it('defaults to page 1, limit 20 on invalid input', () => {
-    mockGetHistory.mockReturnValue({ batches: [], total: 0 });
+  it('defaults to page 1, limit 20 on invalid input', async () => {
+    mockGetHistory.mockResolvedValue({ batches: [], total: 0 });
     const req = mockReq({ query: { page: 'abc', limit: 'xyz' } });
     const res = mockRes();
-    handler(req, res, jest.fn());
+    await handler(req, res, jest.fn());
     expect(mockGetHistory).toHaveBeenCalledWith(1, 20);
   });
 
@@ -1760,21 +1790,21 @@ describe('GET /admin/simulations', () => {
 describe('GET /admin/simulations/:batchId', () => {
   const handler = getHandler('get', '/admin/simulations/:batchId');
 
-  it('returns batch results on success', () => {
+  it('returns batch results on success', async () => {
     const data = { results: [{ winner: 'bot1' }], summary: { total: 1 } };
-    mockGetBatchResults.mockReturnValue(data);
+    mockGetBatchResults.mockResolvedValue(data);
     const req = mockReq({ params: { batchId: 'batch-123' } });
     const res = mockRes();
-    handler(req, res, jest.fn());
+    await handler(req, res, jest.fn());
     expect(mockGetBatchResults).toHaveBeenCalledWith('batch-123');
     expect(res._json).toEqual(data);
   });
 
-  it('returns 404 when batch not found', () => {
-    mockGetBatchResults.mockReturnValue(null);
+  it('returns 404 when batch not found', async () => {
+    mockGetBatchResults.mockResolvedValue(null);
     const req = mockReq({ params: { batchId: 'nonexistent' } });
     const res = mockRes();
-    handler(req, res, jest.fn());
+    await handler(req, res, jest.fn());
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'Batch not found' });
   });
@@ -1880,33 +1910,33 @@ describe('POST /admin/simulations', () => {
 describe('DELETE /admin/simulations/:batchId', () => {
   const handler = getHandler('delete', '/admin/simulations/:batchId');
 
-  it('cancels and deletes batch, returns success message', () => {
+  it('cancels and deletes batch, returns success message', async () => {
     mockCancelBatch.mockReturnValue(true);
-    mockDeleteBatch.mockReturnValue(true);
+    mockDeleteBatch.mockResolvedValue(true);
     const req = mockReq({ params: { batchId: 'batch-123' } });
     const res = mockRes();
-    handler(req, res, jest.fn());
+    await handler(req, res, jest.fn());
     expect(mockCancelBatch).toHaveBeenCalledWith('batch-123');
     expect(mockDeleteBatch).toHaveBeenCalledWith('batch-123');
     expect(res._json).toEqual({ message: 'Batch deleted' });
   });
 
-  it('returns 404 when batch not found for deletion', () => {
+  it('returns 404 when batch not found for deletion', async () => {
     mockCancelBatch.mockReturnValue(false);
-    mockDeleteBatch.mockReturnValue(false);
+    mockDeleteBatch.mockResolvedValue(false);
     const req = mockReq({ params: { batchId: 'nonexistent' } });
     const res = mockRes();
-    handler(req, res, jest.fn());
+    await handler(req, res, jest.fn());
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'Batch not found' });
   });
 
-  it('tries cancel even if batch is completed (not running)', () => {
+  it('tries cancel even if batch is completed (not running)', async () => {
     mockCancelBatch.mockReturnValue(false);
-    mockDeleteBatch.mockReturnValue(true);
+    mockDeleteBatch.mockResolvedValue(true);
     const req = mockReq({ params: { batchId: 'completed-batch' } });
     const res = mockRes();
-    handler(req, res, jest.fn());
+    await handler(req, res, jest.fn());
     expect(mockCancelBatch).toHaveBeenCalledWith('completed-batch');
     expect(mockDeleteBatch).toHaveBeenCalledWith('completed-batch');
     expect(res._json).toEqual({ message: 'Batch deleted' });

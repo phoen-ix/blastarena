@@ -8,6 +8,8 @@ import { getConfig } from './config';
 
 export function createApp(): express.Express {
   const app = express();
+  // No `X-Powered-By: Express` on every API response. (audit E12)
+  app.disable('x-powered-by');
 
   const allowedOrigin = new URL(getConfig().APP_URL).origin;
   app.use(

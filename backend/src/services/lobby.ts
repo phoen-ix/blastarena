@@ -237,38 +237,6 @@ redis.call('SET', KEYS[1], updated, 'EX', ${ROOM_TTL_SECONDS})
 return updated
 `;
 
-// Lua script for atomic team assignment
-// KEYS[1] = room key
-// ARGV[1] = userId, ARGV[2] = team number or "null"
-// Returns: updated room JSON or ERR:*
-const SET_TEAM_LUA = `
-local data = redis.call('GET', KEYS[1])
-if not data then
-  return 'ERR:NOT_FOUND'
-end
-
-local room = cjson.decode(data)
-local found = false
-local userId = tonumber(ARGV[1])
-local team = ARGV[2] == 'null' and cjson.null or tonumber(ARGV[2])
-
-for _, p in ipairs(room.players) do
-  if p.user.id == userId then
-    p.team = team
-    found = true
-    break
-  end
-end
-
-if not found then
-  return 'ERR:NOT_IN_ROOM'
-end
-
-local updated = cjson.encode(room)
-redis.call('SET', KEYS[1], updated, 'EX', ${ROOM_TTL_SECONDS})
-return updated
-`;
-
 // Lua script for atomic host-checked team assignment
 // KEYS[1] = room key
 // ARGV[1] = hostUserId, ARGV[2] = targetUserId, ARGV[3] = team number or "null"
@@ -399,28 +367,6 @@ export async function setPlayerReady(code: string, userId: number, ready: boolea
   return JSON.parse(result);
 }
 
-export async function setPlayerTeam(
-  code: string,
-  targetUserId: number,
-  team: number | null,
-): Promise<Room> {
-  const redis = getRedis();
-
-  const result = (await redis.eval(
-    SET_TEAM_LUA,
-    1,
-    `room:${code}`,
-    String(targetUserId),
-    team === null ? 'null' : String(team),
-  )) as string;
-
-  if (result === 'ERR:NOT_FOUND') throw new AppError('Room not found', 404, 'NOT_FOUND');
-  if (result === 'ERR:NOT_IN_ROOM')
-    throw new AppError('Player not in this room', 400, 'NOT_IN_ROOM');
-
-  return JSON.parse(result);
-}
-
 export async function setPlayerTeamAsHost(
   code: string,
   hostUserId: number,
@@ -529,11 +475,9 @@ export async function getPlayerRoom(userId: number): Promise<string | null> {
 export async function deleteRoom(code: string): Promise<void> {
   const redis = getRedis();
   const room = await getRoom(code);
-  if (room) {
-    for (const player of room.players) {
-      await redis.del(`player:${player.user.id}:room`);
-    }
-  }
-  await redis.del(`room:${code}`);
+  // One DEL for every key plus the index removal, instead of a Redis round-trip per player
+  // followed by two more. (audit E11)
+  const keys = [`room:${code}`, ...(room?.players ?? []).map((p) => `player:${p.user.id}:room`)];
+  await redis.del(...keys);
   await redis.srem(ROOM_INDEX_KEY, code);
 }

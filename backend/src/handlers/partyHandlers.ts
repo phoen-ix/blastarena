@@ -34,6 +34,9 @@ type TypedSocket = Socket<
 
 const partyChatLimiter = createSocketRateLimiter(5);
 const inviteLimiter = createSocketRateLimiter(3);
+// party:create / acceptInvite / leave / kick and invite:acceptRoom each cost a Redis Lua call or
+// a fetchSockets() and were the only party events with no limiter at all. (audit B16)
+const partyActionLimiter = createSocketRateLimiter(5);
 
 export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
   const userId = socket.data.userId;
@@ -41,6 +44,8 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Create party
   socket.on('party:create', async (callback) => {
+    if (!partyActionLimiter.isAllowed(socket.id))
+      return callback({ success: false, error: 'Rate limited' }); // audit B16
     try {
       const party = await partyService.createParty(userId, username);
       socket.data.activePartyId = party.id;
@@ -101,6 +106,8 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Accept party invite
   socket.on('party:acceptInvite', async (data, callback) => {
+    if (!partyActionLimiter.isAllowed(socket.id))
+      return callback({ success: false, error: 'Rate limited' }); // audit B16
     try {
       const parsed = validateSocket(inviteIdSchema, data, callback);
       if (!parsed) return;
@@ -141,6 +148,8 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Leave party
   socket.on('party:leave', async (callback) => {
+    if (!partyActionLimiter.isAllowed(socket.id))
+      return callback({ success: false, error: 'Rate limited' }); // audit B16
     try {
       const partyId = socket.data.activePartyId;
       if (!partyId) return callback({ success: false, error: 'Not in a party' });
@@ -173,6 +182,8 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Kick from party
   socket.on('party:kick', async (data, callback) => {
+    if (!partyActionLimiter.isAllowed(socket.id))
+      return callback({ success: false, error: 'Rate limited' }); // audit B16
     try {
       const partyId = socket.data.activePartyId;
       if (!partyId) return callback({ success: false, error: 'Not in a party' });
@@ -278,6 +289,8 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Accept room invite
   socket.on('invite:acceptRoom', async (data, callback) => {
+    if (!partyActionLimiter.isAllowed(socket.id))
+      return callback({ success: false, error: 'Rate limited' }); // audit B16
     try {
       const parsed = validateSocket(inviteIdSchema, data, callback);
       if (!parsed) return;
@@ -339,4 +352,5 @@ export async function handlePartyDisconnect(socket: TypedSocket, io: TypedServer
 export function cleanupPartyLimiters(socketId: string): void {
   partyChatLimiter.remove(socketId);
   inviteLimiter.remove(socketId);
+  partyActionLimiter.remove(socketId);
 }

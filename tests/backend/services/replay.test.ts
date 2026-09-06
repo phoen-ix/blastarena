@@ -1,11 +1,13 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
 const mockQuery = jest.fn<AnyFn>();
+const mockExecute = jest.fn<AnyFn>();
 jest.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
+  execute: mockExecute,
 }));
 
 jest.mock('../../../backend/src/utils/logger', () => ({
@@ -20,6 +22,7 @@ const mockUnlink = jest.fn<AnyFn>();
 const mockAccess = jest.fn<AnyFn>();
 const mockReaddir = jest.fn<AnyFn>();
 const mockStat = jest.fn<AnyFn>();
+const mockReadFile = jest.fn<AnyFn>();
 jest.mock('fs', () => ({
   existsSync: mockExistsSync,
   readdirSync: mockReaddirSync,
@@ -31,6 +34,7 @@ jest.mock('fs', () => ({
     readdir: mockReaddir,
     stat: mockStat,
     unlink: mockUnlink,
+    readFile: mockReadFile,
   },
 }));
 
@@ -49,7 +53,7 @@ import {
   deleteReplay,
   hasReplay,
   getReplayPlacements,
-  invalidateReplayIndex,
+  deleteCampaignReplay,
 } from '../../../backend/src/services/replay';
 import { logger } from '../../../backend/src/utils/logger';
 
@@ -112,13 +116,25 @@ function makeReplayData(overrides: Record<string, unknown> = {}) {
 }
 
 describe('Replay Service', () => {
+  // The directory listing is cached for a few seconds so a bulk delete does not re-scan. The
+  // service exposes no reset hook (the one it had was dead code — audit G5), so each test moves
+  // the clock past the index TTL instead, which is what happens in production too.
+  let clock = 1_000_000_000_000;
+  let dateNowSpy: jest.SpiedFunction<typeof Date.now>;
+  const advancePastIndexTtl = () => {
+    clock += 60_000;
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
-    // The directory listing is cached for a few seconds so a bulk delete does not re-scan;
-    // each test needs a clean index.
-    invalidateReplayIndex();
+    dateNowSpy = jest.spyOn(Date, 'now').mockImplementation(() => clock);
+    advancePastIndexTtl();
     mockReaddir.mockResolvedValue([]);
     mockUnlink.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    dateNowSpy.mockRestore();
   });
 
   describe('listReplays', () => {
@@ -298,13 +314,15 @@ describe('Replay Service', () => {
 
       const replayData = makeReplayData({ matchId: 42 });
       const jsonBuffer = Buffer.from(JSON.stringify(replayData));
-      mockReadFileSync.mockReturnValue(Buffer.from('compressed'));
+      mockReadFile.mockResolvedValue(Buffer.from('compressed'));
       mockGunzip.mockResolvedValue(jsonBuffer);
 
       const result = await getReplay(42);
 
       expect(result).toEqual(replayData);
-      expect(mockReadFileSync).toHaveBeenCalled();
+      // Async read — never the sync API on the game-loop thread. (audit E3)
+      expect(mockReadFile).toHaveBeenCalled();
+      expect(mockReadFileSync).not.toHaveBeenCalled();
       expect(mockGunzip).toHaveBeenCalledWith(Buffer.from('compressed'));
     });
 
@@ -314,7 +332,7 @@ describe('Replay Service', () => {
       const result = await getReplay(999);
 
       expect(result).toBeNull();
-      expect(mockReadFileSync).not.toHaveBeenCalled();
+      expect(mockReadFile).not.toHaveBeenCalled();
     });
 
     it('should return null when replay dir does not exist', async () => {
@@ -327,7 +345,7 @@ describe('Replay Service', () => {
 
     it('should return null and log error on decompression failure', async () => {
       mockReaddir.mockResolvedValue(['1_room.replay.json.gz']);
-      mockReadFileSync.mockReturnValue(Buffer.from('corrupted'));
+      mockReadFile.mockResolvedValue(Buffer.from('corrupted'));
       mockGunzip.mockRejectedValue(new Error('decompression failed'));
 
       const result = await getReplay(1);
@@ -341,7 +359,7 @@ describe('Replay Service', () => {
 
     it('should return null and log error on invalid JSON', async () => {
       mockReaddir.mockResolvedValue(['1_room.replay.json.gz']);
-      mockReadFileSync.mockReturnValue(Buffer.from('data'));
+      mockReadFile.mockResolvedValue(Buffer.from('data'));
       mockGunzip.mockResolvedValue(Buffer.from('not valid json {{{'));
 
       const result = await getReplay(1);
@@ -423,7 +441,7 @@ describe('Replay Service', () => {
       mockReaddir.mockResolvedValue(['3_room.replay.json.gz']);
 
       const replayData = makeReplayData({ matchId: 3 });
-      mockReadFileSync.mockReturnValue(Buffer.from('compressed'));
+      mockReadFile.mockResolvedValue(Buffer.from('compressed'));
       mockGunzip.mockResolvedValue(Buffer.from(JSON.stringify(replayData)));
 
       const result = await getReplayPlacements(3);
@@ -447,7 +465,7 @@ describe('Replay Service', () => {
       const replayData = makeReplayData();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (replayData as any).gameOver;
-      mockReadFileSync.mockReturnValue(Buffer.from('data'));
+      mockReadFile.mockResolvedValue(Buffer.from('data'));
       mockGunzip.mockResolvedValue(Buffer.from(JSON.stringify(replayData)));
 
       const result = await getReplayPlacements(4);
@@ -461,7 +479,7 @@ describe('Replay Service', () => {
       const replayData = makeReplayData();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (replayData as any).gameOver = { winnerId: null, reason: 'timeout' };
-      mockReadFileSync.mockReturnValue(Buffer.from('data'));
+      mockReadFile.mockResolvedValue(Buffer.from('data'));
       mockGunzip.mockResolvedValue(Buffer.from(JSON.stringify(replayData)));
 
       const result = await getReplayPlacements(4);
@@ -471,9 +489,7 @@ describe('Replay Service', () => {
 
     it('should return null and log error on read failure', async () => {
       mockReaddir.mockResolvedValue(['6_room.replay.json.gz']);
-      mockReadFileSync.mockImplementation(() => {
-        throw new Error('read error');
-      });
+      mockReadFile.mockRejectedValue(new Error('read error'));
 
       const result = await getReplayPlacements(6);
 
@@ -486,7 +502,7 @@ describe('Replay Service', () => {
 
     it('should return null and log error on decompression failure', async () => {
       mockReaddir.mockResolvedValue(['6_room.replay.json.gz']);
-      mockReadFileSync.mockReturnValue(Buffer.from('data'));
+      mockReadFile.mockResolvedValue(Buffer.from('data'));
       mockGunzip.mockRejectedValue(new Error('gunzip failed'));
 
       const result = await getReplayPlacements(6);
@@ -558,12 +574,61 @@ describe('Replay Service', () => {
       expect(mockReaddir).toHaveBeenCalledTimes(1);
     });
 
-    it('re-reads the directory after invalidation', async () => {
+    it('re-reads the directory once the index TTL has elapsed', async () => {
       mockReaddir.mockResolvedValue(['7_room.replay.json.gz']);
       await hasReplay(7);
-      invalidateReplayIndex();
+      advancePastIndexTtl();
       await hasReplay(7);
       expect(mockReaddir).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('deleteCampaignReplay', () => {
+    // (audit B17) — the session must leave the cached index, and the result must say whether a
+    // file actually went away.
+    it('unlinks the file, evicts the session from the index and returns true', async () => {
+      mockReaddir.mockResolvedValue(['campaign_sess-1.replay.json.gz']);
+      mockExecute.mockResolvedValue({ affectedRows: 1 });
+
+      expect(await deleteCampaignReplay('sess-1')).toBe(true);
+      expect(mockUnlink).toHaveBeenCalledWith(expect.stringContaining('campaign_sess-1'));
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM campaign_replays'),
+        ['sess-1'],
+      );
+
+      // A second delete within the TTL finds nothing to unlink — and does not rescan.
+      mockUnlink.mockClear();
+      expect(await deleteCampaignReplay('sess-1')).toBe(false);
+      expect(mockUnlink).not.toHaveBeenCalled();
+      expect(mockReaddir).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns false but still deletes the DB row when there is no file', async () => {
+      mockReaddir.mockResolvedValue([]);
+      mockExecute.mockResolvedValue({ affectedRows: 1 });
+
+      expect(await deleteCampaignReplay('ghost')).toBe(false);
+      expect(mockUnlink).not.toHaveBeenCalled();
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM campaign_replays'),
+        ['ghost'],
+      );
+    });
+
+    it('returns false, logs, and evicts when the unlink fails', async () => {
+      mockReaddir.mockResolvedValue(['campaign_sess-2.replay.json.gz']);
+      mockUnlink.mockRejectedValue(new Error('EACCES'));
+      mockExecute.mockResolvedValue({ affectedRows: 1 });
+
+      expect(await deleteCampaignReplay('sess-2')).toBe(false);
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionId: 'sess-2' }),
+        'Failed to delete campaign replay file',
+      );
+      mockUnlink.mockClear();
+      expect(await deleteCampaignReplay('sess-2')).toBe(false);
+      expect(mockUnlink).not.toHaveBeenCalled();
     });
   });
 });

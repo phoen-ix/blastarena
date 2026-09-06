@@ -30,7 +30,7 @@ router.get('/maps/mine', authMiddleware, emailVerifiedMiddleware, async (req, re
 });
 
 // List all published maps
-router.get('/maps/published', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
+router.get('/maps/published', authMiddleware, emailVerifiedMiddleware, async (_req, res, next) => {
   try {
     const maps = await customMapsService.listPublishedMaps();
     res.json({ maps });

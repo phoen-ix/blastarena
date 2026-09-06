@@ -1,7 +1,7 @@
 import { query, withTransaction } from '../db/connection';
 import { EloResult } from '@blast-arena/shared';
-import { SeasonRow } from '../db/types';
 import { RowDataPacket } from 'mysql2';
+import { getActiveSeason } from './season';
 
 interface PlayerEloInput {
   userId: number;
@@ -95,11 +95,6 @@ export function calculateTeamElo(
   }
 
   return results;
-}
-
-async function getActiveSeason(): Promise<SeasonRow | null> {
-  const rows = await query<SeasonRow[]>('SELECT * FROM seasons WHERE is_active = TRUE LIMIT 1');
-  return rows.length > 0 ? rows[0] : null;
 }
 
 async function applyEloResults(

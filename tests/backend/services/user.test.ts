@@ -10,6 +10,10 @@ jest.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
   withTransaction: mockWithTransaction,
+  // Real predicate: the tests below hand it the driver's ER_DUP_ENTRY shape. (audit B13)
+  isDuplicateKeyError: (err: unknown) =>
+    (err as { code?: unknown } | null)?.code === 'ER_DUP_ENTRY' ||
+    (err as { errno?: unknown } | null)?.errno === 1062,
 }));
 
 const mockComparePassword = jest.fn<AnyFn>();
@@ -56,6 +60,7 @@ jest.mock('../../../backend/src/utils/logger', () => ({
 import {
   getUserProfile,
   updateUsername,
+  updateEmailDirect,
   requestEmailChange,
   confirmEmailChange,
   changePassword,
@@ -217,6 +222,42 @@ describe('user service', () => {
         code: 'CONFLICT',
       });
       expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    // (audit B13) — the SELECT saw no row, but a concurrent writer won the race to the UPDATE.
+    it('maps a lost race (ER_DUP_ENTRY on the UPDATE) to the same 409', async () => {
+      mockQuery.mockResolvedValueOnce([]);
+      mockExecute.mockRejectedValueOnce(
+        Object.assign(new Error('Duplicate entry'), { code: 'ER_DUP_ENTRY', errno: 1062 }),
+      );
+
+      await expect(updateUsername(1, 'taken')).rejects.toMatchObject({
+        statusCode: 409,
+        code: 'CONFLICT',
+        message: 'Username is already taken',
+      });
+    });
+
+    it('rethrows other driver errors untouched', async () => {
+      mockQuery.mockResolvedValueOnce([]);
+      mockExecute.mockRejectedValueOnce(new Error('ER_LOCK_WAIT_TIMEOUT'));
+
+      await expect(updateUsername(1, 'x')).rejects.toThrow('ER_LOCK_WAIT_TIMEOUT');
+    });
+  });
+
+  describe('updateEmailDirect', () => {
+    it('maps a lost race (ER_DUP_ENTRY on the UPDATE) to a 409 (audit B13)', async () => {
+      mockQuery.mockResolvedValueOnce([]);
+      mockExecute.mockRejectedValueOnce(
+        Object.assign(new Error('Duplicate entry'), { code: 'ER_DUP_ENTRY', errno: 1062 }),
+      );
+
+      await expect(updateEmailDirect(1, 'Taken@Example.com')).rejects.toMatchObject({
+        statusCode: 409,
+        code: 'CONFLICT',
+        message: 'Email is already in use',
+      });
     });
   });
 

@@ -1,7 +1,7 @@
 import { query, execute, withTransaction } from '../db/connection';
 import { FriendshipRow, UserBlockRow, CountRow, UserRow } from '../db/types';
 import { Friend, FriendRequest, MAX_FRIENDS, ActivityStatus } from '@blast-arena/shared';
-import { RowDataPacket } from 'mysql2';
+import { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import * as presenceService from './presence';
 import { AppError } from '../middleware/errorHandler';
 
@@ -34,69 +34,106 @@ export async function sendFriendRequest(fromUserId: number, toUsername: string):
     throw new AppError('Cannot send friend request to this user', 403, 'BLOCKED');
   }
 
-  // Check existing friendship
-  const [existing] = await query<FriendshipRow[]>(
-    'SELECT id, status FROM friendships WHERE user_id = ? AND friend_id = ?',
-    [fromUserId, targetUser.id],
-  );
-  if (existing) {
-    if (existing.status === 'accepted')
-      throw new AppError('Already friends', 409, 'ALREADY_FRIENDS');
-    throw new AppError('Friend request already sent', 409, 'REQUEST_PENDING');
+  // The friendship reads and the write happen in one transaction, with the two directional rows
+  // locked (SELECT … FOR UPDATE; the gap lock on uk_friendship covers the not-yet-existing row).
+  // As separate statements, A->B and B->A sent at the same moment both saw "no existing, no
+  // incoming" and inserted two pending rows that could never be reconciled. Now one of the two
+  // wins; the other is rolled back by InnoDB as a deadlock and told to retry — its retry then
+  // sees the incoming request and auto-accepts. (audit B11)
+  try {
+    await sendFriendRequestLocked(fromUserId, targetUser.id);
+  } catch (err) {
+    if ((err as { code?: unknown } | null)?.code === 'ER_LOCK_DEADLOCK') {
+      throw new AppError('Friend request already in progress, please retry', 409, 'RETRY');
+    }
+    throw err;
   }
-
-  // Check if they already sent us a request — auto-accept
-  const [incoming] = await query<FriendshipRow[]>(
-    'SELECT id FROM friendships WHERE user_id = ? AND friend_id = ? AND status = ?',
-    [targetUser.id, fromUserId, 'pending'],
-  );
-  if (incoming) {
-    await acceptFriendRequest(fromUserId, targetUser.id);
-    return targetUser.id;
-  }
-
-  // Check max friends
-  const [countRow] = await query<CountRow[]>(
-    'SELECT COUNT(*) as total FROM friendships WHERE user_id = ? AND status = ?',
-    [fromUserId, 'accepted'],
-  );
-  if (countRow.total >= MAX_FRIENDS) {
-    throw new AppError('Friend list is full', 409, 'FRIEND_LIST_FULL');
-  }
-
-  // Insert pending request
-  await execute('INSERT INTO friendships (user_id, friend_id, status) VALUES (?, ?, ?)', [
-    fromUserId,
-    targetUser.id,
-    'pending',
-  ]);
   return targetUser.id;
+}
+
+async function sendFriendRequestLocked(fromUserId: number, targetUserId: number): Promise<void> {
+  await withTransaction(async (conn) => {
+    // Check existing friendship
+    const [existingRows] = await conn.query<FriendshipRow[]>(
+      'SELECT id, status FROM friendships WHERE user_id = ? AND friend_id = ? FOR UPDATE',
+      [fromUserId, targetUserId],
+    );
+    const existing = existingRows[0];
+    if (existing) {
+      if (existing.status === 'accepted')
+        throw new AppError('Already friends', 409, 'ALREADY_FRIENDS');
+      throw new AppError('Friend request already sent', 409, 'REQUEST_PENDING');
+    }
+
+    // Check if they already sent us a request — auto-accept
+    const [incomingRows] = await conn.query<FriendshipRow[]>(
+      'SELECT id FROM friendships WHERE user_id = ? AND friend_id = ? AND status = ? FOR UPDATE',
+      [targetUserId, fromUserId, 'pending'],
+    );
+    if (incomingRows[0]) {
+      await acceptWithin(conn, fromUserId, targetUserId);
+      return;
+    }
+
+    // Check max friends
+    await assertFriendCapacity(conn, fromUserId);
+
+    // Insert pending request
+    await conn.execute('INSERT INTO friendships (user_id, friend_id, status) VALUES (?, ?, ?)', [
+      fromUserId,
+      targetUserId,
+      'pending',
+    ]);
+  });
 }
 
 export async function acceptFriendRequest(userId: number, fromUserId: number): Promise<void> {
   await withTransaction(async (conn) => {
     // Verify pending request exists
     const [rows] = await conn.query<FriendshipRow[]>(
-      'SELECT id FROM friendships WHERE user_id = ? AND friend_id = ? AND status = ?',
+      'SELECT id FROM friendships WHERE user_id = ? AND friend_id = ? AND status = ? FOR UPDATE',
       [fromUserId, userId, 'pending'],
     );
     if (rows.length === 0) {
       throw new AppError('No pending friend request found', 404, 'REQUEST_NOT_FOUND');
     }
-
-    // Update to accepted
-    await conn.execute('UPDATE friendships SET status = ? WHERE user_id = ? AND friend_id = ?', [
-      'accepted',
-      fromUserId,
-      userId,
-    ]);
-
-    // Insert reciprocal accepted row
-    await conn.execute(
-      'INSERT INTO friendships (user_id, friend_id, status) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE status = ?',
-      [userId, fromUserId, 'accepted', 'accepted'],
-    );
+    await acceptWithin(conn, userId, fromUserId);
   });
+}
+
+/**
+ * Flip a pending request into a mutual friendship, inside the caller's transaction.
+ *
+ * MAX_FRIENDS is enforced for BOTH sides here. The sender's list was checked when the request
+ * went out, but that was possibly long ago, and the recipient's was never checked at all — so an
+ * accept could push either list past the cap. (audit B11)
+ */
+async function acceptWithin(conn: PoolConnection, userId: number, fromUserId: number) {
+  await assertFriendCapacity(conn, userId);
+  await assertFriendCapacity(conn, fromUserId);
+
+  // Update to accepted
+  await conn.execute('UPDATE friendships SET status = ? WHERE user_id = ? AND friend_id = ?', [
+    'accepted',
+    fromUserId,
+    userId,
+  ]);
+
+  // Insert reciprocal accepted row
+  await conn.execute(
+    'INSERT INTO friendships (user_id, friend_id, status) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE status = ?',
+    [userId, fromUserId, 'accepted', 'accepted'],
+  );
+}
+
+async function assertFriendCapacity(conn: PoolConnection, userId: number): Promise<void> {
+  const [countRows] = await conn.query<CountRow[]>(
+    'SELECT COUNT(*) as total FROM friendships WHERE user_id = ? AND status = ?',
+    [userId, 'accepted'],
+  );
+  if ((countRows[0]?.total ?? 0) >= MAX_FRIENDS) {
+    throw new AppError('Friend list is full', 409, 'FRIEND_LIST_FULL');
+  }
 }
 
 export async function declineFriendRequest(userId: number, fromUserId: number): Promise<void> {
@@ -272,14 +309,6 @@ export async function getBlockedUsers(
     [userId],
   );
   return rows.map((r) => ({ userId: r.blocked_id, username: r.username! }));
-}
-
-export async function getFriendCount(userId: number): Promise<number> {
-  const [row] = await query<CountRow[]>(
-    'SELECT COUNT(*) as total FROM friendships WHERE user_id = ? AND status = ?',
-    [userId, 'accepted'],
-  );
-  return row.total;
 }
 
 export async function searchUsers(

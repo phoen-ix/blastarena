@@ -3,6 +3,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { BotAIEntry } from '@blast-arena/shared';
 import { query, execute } from '../db/connection';
+import { logAdminAction } from './admin-audit';
 import { BotAIRow } from '../db/types';
 import { compileBotAI } from './botai-compiler';
 import { getBotAIRegistry } from './botai-registry';
@@ -99,9 +100,12 @@ export async function uploadAI(
   getBotAIRegistry().loadAI(id);
 
   // Log
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [uploadedBy, 'upload_ai', 'bot_ai', 0, JSON.stringify({ aiId: id, name, filename })],
+  await logAdminAction(
+    uploadedBy,
+    'upload_ai',
+    'bot_ai',
+    0,
+    JSON.stringify({ aiId: id, name, filename }),
   );
 
   logger.info({ aiId: id, name }, 'Custom BotAI uploaded');
@@ -156,10 +160,7 @@ export async function updateAI(
     }
   }
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'update_ai', 'bot_ai', 0, JSON.stringify({ aiId: id, updates })],
-  );
+  await logAdminAction(adminId, 'update_ai', 'bot_ai', 0, JSON.stringify({ aiId: id, updates }));
 }
 
 export async function reuploadAI(
@@ -196,10 +197,7 @@ export async function reuploadAI(
     }
   }
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'reupload_ai', 'bot_ai', 0, JSON.stringify({ aiId: id, filename })],
-  );
+  await logAdminAction(adminId, 'reupload_ai', 'bot_ai', 0, JSON.stringify({ aiId: id, filename }));
 
   return { success: true };
 }
@@ -221,9 +219,12 @@ export async function deleteAI(id: string, adminId: number): Promise<void> {
   // Delete DB row
   await execute('DELETE FROM bot_ais WHERE id = ?', [id]);
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'delete_ai', 'bot_ai', 0, JSON.stringify({ aiId: id, name: rows[0].name })],
+  await logAdminAction(
+    adminId,
+    'delete_ai',
+    'bot_ai',
+    0,
+    JSON.stringify({ aiId: id, name: rows[0].name }),
   );
 
   logger.info({ aiId: id, name: rows[0].name }, 'Custom BotAI deleted');

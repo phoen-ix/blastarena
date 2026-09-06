@@ -438,6 +438,7 @@ paths:
     get:
       tags: [User]
       summary: Confirm email change
+      description: The link sent by email. On success the browser is redirected to `{APP_URL}?emailChanged=true`, like `/auth/verify-email`.
       security: []
       operationId: confirmEmailChange
       parameters:
@@ -447,18 +448,16 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: Email updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Message'
+        '302':
+          description: Email updated; redirect to the app with `?emailChanged=true`
         '400':
           description: Invalid or expired token
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   # ===================== Lobby =====================
   /lobby/rooms:
@@ -475,60 +474,6 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/RoomListItem'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-    post:
-      tags: [Lobby]
-      summary: Create a new room
-      operationId: createRoom
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [name, config]
-              properties:
-                name:
-                  type: string
-                  minLength: 3
-                  maxLength: 30
-                config:
-                  type: object
-                  required: [gameMode, maxPlayers]
-                  properties:
-                    gameMode:
-                      $ref: '#/components/schemas/GameMode'
-                    maxPlayers:
-                      type: integer
-                      minimum: 2
-                      maximum: 8
-                    mapWidth:
-                      type: integer
-                      minimum: 11
-                      maximum: 21
-                      default: 15
-                    mapHeight:
-                      type: integer
-                      minimum: 9
-                      maximum: 17
-                      default: 13
-                    mapSeed:
-                      type: integer
-                    roundTime:
-                      type: integer
-                      minimum: 60
-                      maximum: 600
-                      default: 180
-      responses:
-        '201':
-          description: Room created
-          content:
-            application/json:
-              schema:
-                type: object
-        '400':
-          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -2806,26 +2751,6 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /messages/unread:
-    get:
-      tags: [Messages]
-      summary: Get unread message counts per sender
-      operationId: getUnreadCounts
-      responses:
-        '200':
-          description: Map of senderId to unread count
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  counts:
-                    type: object
-                    additionalProperties:
-                      type: integer
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
   /messages/{userId}:
     get:
       tags: [Messages]
@@ -4211,8 +4136,6 @@ paths:
                 endDate:
                   type: string
                   format: date
-                isActive:
-                  type: boolean
       responses:
         '200':
           description: Updated season
@@ -4220,6 +4143,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Season'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

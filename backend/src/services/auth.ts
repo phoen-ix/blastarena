@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
+import type { ResultSetHeader } from 'mysql2';
 import { getConfig } from '../config';
-import { query, execute } from '../db/connection';
+import { query, execute, withTransaction } from '../db/connection';
 import {
   hashPassword,
   comparePassword,
@@ -330,17 +331,6 @@ export async function refreshAccessToken(
     throw new AppError('Account has been deactivated', 403, 'DEACTIVATED');
   }
 
-  // Atomically revoke old token — prevents race condition with concurrent refresh calls
-  const revokeResult = await execute(
-    'UPDATE refresh_tokens SET revoked = TRUE WHERE id = ? AND revoked = FALSE',
-    [row.id],
-  );
-  if (revokeResult.affectedRows === 0) {
-    // Another concurrent request already revoked this token — treat as reuse
-    await execute('UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = ?', [row.user_id]);
-    throw new AppError('Token reuse detected', 401, 'TOKEN_REUSE');
-  }
-
   // Issue new refresh token (rotation)
   const newRefreshToken = generateToken();
   const newHash = hashToken(newRefreshToken);
@@ -348,11 +338,30 @@ export async function refreshAccessToken(
   const expiresMs = parseExpiresIn(config.JWT_REFRESH_EXPIRES_IN);
   const expiresAt = new Date(Date.now() + expiresMs);
 
-  await execute('INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)', [
-    row.user_id,
-    newHash,
-    expiresAt,
-  ]);
+  // Revoke-old and insert-new in one transaction. As two statements, an INSERT failure after a
+  // successful revoke left the user with no valid refresh token at all — logged out by a
+  // transient DB error. The compare-and-swap on `revoked = FALSE` is unchanged: a concurrent
+  // rotation of the same token still loses and is treated as reuse. (audit B12)
+  let reuseDetected = false;
+  await withTransaction(async (conn) => {
+    const [revokeResult] = await conn.execute<ResultSetHeader>(
+      'UPDATE refresh_tokens SET revoked = TRUE WHERE id = ? AND revoked = FALSE',
+      [row.id],
+    );
+    if (revokeResult.affectedRows === 0) {
+      reuseDetected = true;
+      return;
+    }
+    await conn.execute(
+      'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
+      [row.user_id, newHash, expiresAt],
+    );
+  });
+  if (reuseDetected) {
+    // Another concurrent request already revoked this token — treat as reuse
+    await execute('UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = ?', [row.user_id]);
+    throw new AppError('Token reuse detected', 401, 'TOKEN_REUSE');
+  }
 
   const publicUser = toPublicUser(row);
   const accessToken = generateAccessToken({
@@ -416,12 +425,21 @@ export async function resendVerificationEmail(
 
   const newToken = generateToken();
   const verifyExpires = new Date(Date.now() + EMAIL_VERIFY_TTL_MS);
-  await execute(
-    'UPDATE users SET email_verify_token = ?, email_verify_expires = ?, verification_resend_count = verification_resend_count + 1 WHERE id = ?',
-    [hashToken(newToken), verifyExpires, userId],
-  );
+  await execute('UPDATE users SET email_verify_token = ?, email_verify_expires = ? WHERE id = ?', [
+    hashToken(newToken),
+    verifyExpires,
+    userId,
+  ]);
 
   await sendVerificationEmail(normalizedEmail, newToken, user.language || 'en');
+
+  // Counted only once the mail has actually gone out. The increment used to be folded into the
+  // token UPDATE above, so an SMTP failure (which propagates as an error) still burned one of the
+  // three attempts. (audit B14)
+  await execute(
+    'UPDATE users SET verification_resend_count = verification_resend_count + 1 WHERE id = ?',
+    [userId],
+  );
 
   return { remainingResends: MAX_VERIFICATION_RESENDS - resendCount - 1 };
 }
@@ -464,11 +482,34 @@ export async function forgotPassword(email: string): Promise<void> {
  * 15 minute access token, one active user writes ~96 rows a day, forever, and the token_hash
  * lookup on /auth/refresh degrades along with the table. (audit REFRESH-TOKEN-REAP-1)
  */
+/** Rows per DELETE in cleanupExpiredRefreshTokens — bounds the write lock per statement. */
+const REFRESH_TOKEN_REAP_CHUNK = 10000;
+/** Revoked tokens are kept this long so a replayed old token still trips reuse detection. */
+const REVOKED_TOKEN_RETENTION = 'INTERVAL 1 DAY';
+
 export async function cleanupExpiredRefreshTokens(): Promise<number> {
-  const result = await execute(
-    'DELETE FROM refresh_tokens WHERE expires_at < NOW() OR revoked = TRUE',
+  // Two indexed predicates, each deleted in bounded chunks. The single
+  // `WHERE expires_at < NOW() OR revoked = TRUE` defeated idx_refresh_tokens_expires (an OR across
+  // two columns is a full scan) and took one long write lock on a table that grows by ~96 rows
+  // per active user per day. Each predicate here has its own index (expires_at from 001;
+  // (revoked, created_at) from 040). (audit E8)
+  let total = 0;
+  total += await deleteInChunks('DELETE FROM refresh_tokens WHERE expires_at < NOW() LIMIT ?');
+  total += await deleteInChunks(
+    `DELETE FROM refresh_tokens WHERE revoked = TRUE AND created_at < NOW() - ${REVOKED_TOKEN_RETENTION} LIMIT ?`,
   );
-  return result.affectedRows ?? 0;
+  return total;
+}
+
+/** Run a `DELETE … LIMIT ?` until it affects fewer rows than the chunk size. */
+async function deleteInChunks(sql: string): Promise<number> {
+  let total = 0;
+  for (;;) {
+    const result = await execute(sql, [REFRESH_TOKEN_REAP_CHUNK]);
+    const affected = result.affectedRows ?? 0;
+    total += affected;
+    if (affected < REFRESH_TOKEN_REAP_CHUNK) return total;
+  }
 }
 
 export async function resetPassword(token: string, newPassword: string): Promise<void> {

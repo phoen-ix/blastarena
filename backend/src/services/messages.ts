@@ -77,6 +77,9 @@ export async function getConversation(
   };
 }
 
+// The two halves of the conversation (sent / received) are each an indexed range scan, combined
+// with UNION ALL. The previous `WHERE sender_id = ? OR recipient_id = ?` could not use either
+// index and scanned the whole DM table per request; there was also no LIMIT. (audit E7)
 export async function getConversationList(userId: number): Promise<DMConversation[]> {
   // Get the latest message for each conversation partner + unread count
   const rows = await query<
@@ -90,18 +93,25 @@ export async function getConversationList(userId: number): Promise<DMConversatio
        sub.unread_count
      FROM (
        SELECT
-         IF(dm2.sender_id = ?, dm2.recipient_id, dm2.sender_id) AS other_id,
+         h.other_id,
          u.username AS other_username,
-         MAX(dm2.id) AS latest_id,
-         SUM(CASE WHEN dm2.recipient_id = ? AND dm2.read_at IS NULL THEN 1 ELSE 0 END) AS unread_count
-       FROM direct_messages dm2
-       JOIN users u ON u.id = IF(dm2.sender_id = ?, dm2.recipient_id, dm2.sender_id)
-       WHERE dm2.sender_id = ? OR dm2.recipient_id = ?
-       GROUP BY other_id, other_username
+         MAX(h.id) AS latest_id,
+         SUM(h.unread) AS unread_count
+       FROM (
+         SELECT dm2.id, dm2.recipient_id AS other_id, 0 AS unread
+         FROM direct_messages dm2 WHERE dm2.sender_id = ?
+         UNION ALL
+         SELECT dm2.id, dm2.sender_id AS other_id,
+                CASE WHEN dm2.read_at IS NULL THEN 1 ELSE 0 END AS unread
+         FROM direct_messages dm2 WHERE dm2.recipient_id = ?
+       ) h
+       JOIN users u ON u.id = h.other_id
+       GROUP BY h.other_id, u.username
      ) sub
      JOIN direct_messages dm ON dm.id = sub.latest_id
-     ORDER BY dm.created_at DESC`,
-    [userId, userId, userId, userId, userId],
+     ORDER BY dm.created_at DESC, dm.id DESC
+     LIMIT 100`,
+    [userId, userId],
   );
 
   return rows.map((r) => ({
@@ -118,22 +128,6 @@ export async function markRead(recipientId: number, senderId: number): Promise<v
     'UPDATE direct_messages SET read_at = NOW() WHERE recipient_id = ? AND sender_id = ? AND read_at IS NULL',
     [recipientId, senderId],
   );
-}
-
-export async function getUnreadCounts(userId: number): Promise<Record<number, number>> {
-  const rows = await query<(CountRow & { sender_id: number })[]>(
-    `SELECT sender_id, COUNT(*) as total
-     FROM direct_messages
-     WHERE recipient_id = ? AND read_at IS NULL
-     GROUP BY sender_id`,
-    [userId],
-  );
-
-  const counts: Record<number, number> = {};
-  for (const row of rows) {
-    counts[row.sender_id] = row.total;
-  }
-  return counts;
 }
 
 function toDirectMessage(row: DirectMessageRow): DirectMessage {

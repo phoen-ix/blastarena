@@ -13,7 +13,6 @@ jest.mock('../../../backend/src/db/connection', () => ({
 import {
   getUserState,
   getProgress,
-  getAllProgress,
   recordAttempt,
   recordCompletion,
   updateCarriedPowerups,
@@ -130,7 +129,9 @@ describe('Campaign Progress Service', () => {
 
       expect(result).toBeNull();
       expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM campaign_progress WHERE user_id = ? AND level_id = ?'),
+        expect.stringContaining(
+          'SELECT * FROM campaign_progress WHERE user_id = ? AND level_id = ?',
+        ),
         [1, 10],
       );
     });
@@ -201,83 +202,6 @@ describe('Campaign Progress Service', () => {
       const result = await getProgress(7, 1);
 
       expect(result!.completed).toBe(true);
-    });
-  });
-
-  describe('getAllProgress', () => {
-    it('should return empty array when no progress rows exist', async () => {
-      mockQuery.mockResolvedValue([]);
-
-      const result = await getAllProgress(1);
-
-      expect(result).toEqual([]);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM campaign_progress WHERE user_id = ?'),
-        [1],
-      );
-    });
-
-    it('should map all rows to LevelProgress objects', async () => {
-      mockQuery.mockResolvedValue([
-        {
-          id: 1,
-          user_id: 3,
-          level_id: 1,
-          completed: 1,
-          best_time_seconds: 20,
-          stars: 3,
-          attempts: 2,
-          completed_at: new Date(),
-          updated_at: new Date(),
-        },
-        {
-          id: 2,
-          user_id: 3,
-          level_id: 2,
-          completed: 0,
-          best_time_seconds: null,
-          stars: 0,
-          attempts: 5,
-          completed_at: null,
-          updated_at: new Date(),
-        },
-        {
-          id: 3,
-          user_id: 3,
-          level_id: 3,
-          completed: 1,
-          best_time_seconds: 60,
-          stars: 1,
-          attempts: 10,
-          completed_at: new Date(),
-          updated_at: new Date(),
-        },
-      ]);
-
-      const result = await getAllProgress(3);
-
-      expect(result).toHaveLength(3);
-      expect(result[0]).toEqual({
-        levelId: 1,
-        completed: true,
-        bestTimeSeconds: 20,
-        stars: 3,
-        attempts: 2,
-      });
-      expect(result[1]).toEqual({
-        levelId: 2,
-        completed: false,
-        bestTimeSeconds: null,
-        stars: 0,
-        attempts: 5,
-      });
-      expect(result[2]).toEqual({
-        levelId: 3,
-        completed: true,
-        bestTimeSeconds: 60,
-        stars: 1,
-        attempts: 10,
-      });
     });
   });
 

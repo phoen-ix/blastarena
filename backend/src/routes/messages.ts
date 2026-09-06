@@ -15,16 +15,6 @@ router.get('/messages', authMiddleware, emailVerifiedMiddleware, async (req, res
   }
 });
 
-// GET /messages/unread — unread counts per user
-router.get('/messages/unread', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
-  try {
-    const counts = await messageService.getUnreadCounts(req.user!.userId);
-    res.json({ counts });
-  } catch (err) {
-    next(err);
-  }
-});
-
 // GET /messages/:userId — paginated conversation history
 router.get('/messages/:userId', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {

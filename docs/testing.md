@@ -100,7 +100,7 @@ Business logic layer — each service is tested with mocked database and Redis.
 | `services/friends.test.ts` | 26 | Send/accept/decline/cancel/remove/block/unblock, getFriends with presence, isBlocked, search |
 | `services/custom-maps.test.ts` | 25 | Full CRUD, JSON parsing with safeJsonParse fallback, snake_case→camelCase mapping, ownership enforcement |
 | `services/party.test.ts` | 24 | Create/join/leave/kick/disband, Lua script atomic join, invite CRUD |
-| `services/messages.test.ts` | 22 | sendMessage (friendship/block checks, truncation), getConversation (pagination), markRead, getUnreadCounts |
+| `services/messages.test.ts` | 22 | sendMessage (friendship/block checks, truncation), getConversation (pagination), markRead |
 | `services/botai-sandbox.test.ts` | 22 | Source scan, global access blocking, vm sandbox, import blocking, eval/Function blocking |
 | `services/season.test.ts` | 21 | CRUD, activate/deactivate, end with hard/soft reset, user history |
 | `services/auth.test.ts` | 20 | Register, login, refresh, logout, verify email, forgot/reset password, atomic reset |

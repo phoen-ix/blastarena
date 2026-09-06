@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from './logger';
-import { getErrorMessage } from '@blast-arena/shared';
+import { getErrorMessage, USERNAME_MAX_LENGTH } from '@blast-arena/shared';
 
 /** Longest message we will hand to a socket client. */
 const MAX_CLIENT_ERROR_LENGTH = 200;
@@ -80,6 +80,17 @@ export const adminCloseRoomSchema = z.object({
 });
 
 /**
+ * Shape of a lobby room code: `generateRoomCode()` in services/lobby.ts takes the first six hex
+ * characters of a UUID and upper-cases them. `admin:spectate` used to `socket.join()` whatever it
+ * was handed with no type check at all. (audit B16)
+ */
+export const ROOM_CODE_REGEX = /^[A-Z0-9]{6}$/;
+
+export const adminSpectateSchema = z.object({
+  roomCode: z.string().regex(ROOM_CODE_REGEX),
+});
+
+/**
  * Validate socket event data against a Zod schema.
  * Returns parsed data on success, or null on failure.
  * If a callback is provided, sends an error response on failure.
@@ -121,6 +132,31 @@ export function isValidPlayerInput(input: unknown): boolean {
       i.direction === 'right') &&
     (i.action === null || i.action === 'bomb' || i.action === 'detonate' || i.action === 'throw')
   );
+}
+
+/**
+ * Complement of the USERNAME_REGEX character class. Kept explicit for readability; the unit test
+ * asserts that every sanitised name still satisfies USERNAME_REGEX, so the two cannot drift apart
+ * unnoticed. (audit B2)
+ */
+const GUEST_NAME_DISALLOWED = /[^a-zA-Z0-9_-]/g;
+
+/**
+ * Reduce a guest's self-chosen open-world name to something safe to store and broadcast.
+ *
+ * `openworld:join` accepted `_data?.username || ''` verbatim from an unauthenticated socket: no
+ * type check and no length cap, so a ~60 KB string (or an object) was stored on the player and
+ * re-serialised into every `openworld:state` frame at 20 Hz to every player in the world.
+ *
+ * Non-strings become ''. Strings are trimmed, stripped of every character outside the account
+ * username alphabet (USERNAME_REGEX: letters, digits, `_`, `-`), and cut to USERNAME_MAX_LENGTH.
+ * An empty result is returned as '' so OpenWorldManager.handleJoin generates its usual
+ * `Guest_…` name. Deliberately lenient (sanitise, not reject): a guest typing "Bob!" should get
+ * "Bob", not an error. (audit B2)
+ */
+export function sanitizeGuestUsername(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  return raw.trim().replace(GUEST_NAME_DISALLOWED, '').slice(0, USERNAME_MAX_LENGTH);
 }
 
 /**

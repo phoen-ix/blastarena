@@ -4,13 +4,11 @@ type AnyFn = (...args: any[]) => any;
 
 // Mock services
 const mockGetConversationList = jest.fn<AnyFn>();
-const mockGetUnreadCounts = jest.fn<AnyFn>();
 const mockGetConversation = jest.fn<AnyFn>();
 const mockMarkRead = jest.fn<AnyFn>();
 
 jest.mock('../../../backend/src/services/messages', () => ({
   getConversationList: mockGetConversationList,
-  getUnreadCounts: mockGetUnreadCounts,
   getConversation: mockGetConversation,
   markRead: mockMarkRead,
 }));
@@ -95,13 +93,6 @@ describe('Messages Routes', () => {
       expect(middlewareFns).toContain(mockEmailVerifiedMiddleware);
     });
 
-    it('authMiddleware and emailVerifiedMiddleware on GET /messages/unread', () => {
-      const stack = getRouteStack('get', '/messages/unread');
-      const middlewareFns = stack.slice(0, -1).map((entry: any) => entry.handle);
-      expect(middlewareFns).toContain(mockAuthMiddleware);
-      expect(middlewareFns).toContain(mockEmailVerifiedMiddleware);
-    });
-
     it('authMiddleware and emailVerifiedMiddleware on GET /messages/:userId', () => {
       const stack = getRouteStack('get', '/messages/:userId');
       const middlewareFns = stack.slice(0, -1).map((entry: any) => entry.handle);
@@ -135,33 +126,6 @@ describe('Messages Routes', () => {
       mockGetConversationList.mockRejectedValue(new Error('DB error'));
 
       const handler = getHandler('get', '/messages');
-      const req = mockReq();
-      const res = mockRes();
-      const next = jest.fn();
-      await handler(req, res, next);
-
-      expect(next).toHaveBeenCalledWith(expect.any(Error));
-    });
-  });
-
-  describe('GET /messages/unread', () => {
-    it('returns unread counts for current user', async () => {
-      const counts = { 2: 3, 5: 1 };
-      mockGetUnreadCounts.mockResolvedValue(counts);
-
-      const handler = getHandler('get', '/messages/unread');
-      const req = mockReq();
-      const res = mockRes();
-      await handler(req, res, jest.fn());
-
-      expect(mockGetUnreadCounts).toHaveBeenCalledWith(1);
-      expect(res._json).toEqual({ counts });
-    });
-
-    it('passes error to next on failure', async () => {
-      mockGetUnreadCounts.mockRejectedValue(new Error('DB error'));
-
-      const handler = getHandler('get', '/messages/unread');
       const req = mockReq();
       const res = mockRes();
       const next = jest.fn();

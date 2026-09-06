@@ -8,6 +8,10 @@ const mockExecute = jest.fn<AnyFn>();
 jest.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
+  // Real predicate: the createUser race test hands it the driver's ER_DUP_ENTRY shape. (audit B13)
+  isDuplicateKeyError: (err: unknown) =>
+    (err as { code?: unknown } | null)?.code === 'ER_DUP_ENTRY' ||
+    (err as { errno?: unknown } | null)?.errno === 1062,
 }));
 
 const mockHashPassword = jest.fn<AnyFn>();
@@ -108,6 +112,23 @@ describe('admin service', () => {
         'hashed_pw',
         'user',
       ]);
+    });
+
+    // (audit B13) — the SELECT saw no row, but a concurrent registration won the race to INSERT.
+    it('maps a lost race (ER_DUP_ENTRY on the INSERT) to the same 409 as the pre-check', async () => {
+      mockQuery.mockResolvedValueOnce([]);
+      mockHashPassword.mockResolvedValueOnce('hashed_pw');
+      mockExecute.mockRejectedValueOnce(
+        Object.assign(new Error('Duplicate entry'), { code: 'ER_DUP_ENTRY', errno: 1062 }),
+      );
+
+      await expect(createUser(1, 'newuser', 'new@example.com', 'pw')).rejects.toMatchObject({
+        statusCode: 409,
+        code: 'CONFLICT',
+        message: 'Username or email already taken',
+      });
+      // No user_stats row and no audit entry for a user that was never created.
+      expect(mockExecute).toHaveBeenCalledTimes(1);
     });
 
     it('creates a user with a specified role', async () => {

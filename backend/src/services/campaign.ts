@@ -171,20 +171,22 @@ export async function reorderWorld(id: number, newOrder: number): Promise<void> 
 
 // --- Levels ---
 
+/** Columns levelRowToSummary actually reads — see the note in listLevelsWithProgressForWorlds. */
+const LEVEL_SUMMARY_COLUMNS = `id, world_id, name, description, sort_order, map_width, map_height,
+       win_condition, lives, time_limit, par_time, enemy_placements, is_published`;
+
 export async function listLevels(
   worldId: number,
   includeUnpublished = false,
 ): Promise<CampaignLevelSummary[]> {
+  // Summary columns only — this still selected `*` (tiles, spawns, puzzle config…) although the
+  // constant for exactly this purpose sat a few lines away. (audit E6)
   const sql = includeUnpublished
-    ? `SELECT * FROM campaign_levels WHERE world_id = ? ORDER BY sort_order ASC`
-    : `SELECT * FROM campaign_levels WHERE world_id = ? AND is_published = TRUE ORDER BY sort_order ASC`;
+    ? `SELECT ${LEVEL_SUMMARY_COLUMNS} FROM campaign_levels WHERE world_id = ? ORDER BY sort_order ASC`
+    : `SELECT ${LEVEL_SUMMARY_COLUMNS} FROM campaign_levels WHERE world_id = ? AND is_published = TRUE ORDER BY sort_order ASC`;
   const rows = await query<CampaignLevelRow[]>(sql, [worldId]);
   return rows.map(levelRowToSummary);
 }
-
-/** Columns levelRowToSummary actually reads — see the note in listLevelsWithProgressForWorlds. */
-const LEVEL_SUMMARY_COLUMNS = `id, world_id, name, description, sort_order, map_width, map_height,
-       win_condition, lives, time_limit, par_time, enemy_placements, is_published`;
 
 /**
  * Level summaries with the user's progress, for several worlds at once.
@@ -268,13 +270,17 @@ export async function createLevel(
   );
   const sortOrder = (maxOrder?.total ?? -1) + 1;
 
+  // covered_tiles is written here as well as in updateLevel. The INSERT used to omit it, so
+  // covered tiles were silently dropped on level create and on import — both of which come
+  // through this function. (audit B3)
   const result = await execute(
     `INSERT INTO campaign_levels
      (world_id, name, description, sort_order, map_width, map_height, tiles, fill_mode, wall_density,
       player_spawns, enemy_placements, powerup_placements, win_condition, win_condition_config,
       lives, time_limit, par_time, carry_over_powerups, starting_powerups, available_powerup_types,
-      powerup_drop_rate, reinforced_walls, hazard_tiles, puzzle_config, is_published, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      powerup_drop_rate, reinforced_walls, hazard_tiles, covered_tiles, puzzle_config, is_published,
+      created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       worldId,
       data.name ?? 'Untitled Level',
@@ -299,6 +305,7 @@ export async function createLevel(
       data.powerupDropRate ?? 0.3,
       data.reinforcedWalls ?? false,
       data.hazardTiles ?? false,
+      JSON.stringify(data.coveredTiles ?? []),
       data.puzzleConfig ? JSON.stringify(data.puzzleConfig) : null,
       data.isPublished ?? false,
       createdBy,

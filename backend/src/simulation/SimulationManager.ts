@@ -16,12 +16,34 @@ const gunzip = promisify(zlib.gunzip);
 
 const SIM_LOG_DIR = process.env.SIMULATION_LOG_DIR || '/app/simulations';
 const MAX_QUEUE_SIZE = 10;
+/** How long a scan of the simulations directory is reused before being redone. (audit E3) */
+const DISK_INDEX_TTL_MS = 30_000;
 
 interface QueueEntry {
   batchId: string;
   config: SimulationConfig;
   adminId: number;
   queuedAt: Date;
+}
+
+/**
+ * One batch directory on disk, as far as the history listing needs to know it.
+ *
+ * `batch_summary.json` is read once, at scan time, and only its headline fields are kept — the
+ * file also carries every game result, which getBatchResults re-reads on demand.
+ */
+interface DiskBatch {
+  batchId: string;
+  dirPath: string;
+  config: SimulationConfig;
+  startedAt: string;
+  status: SimulationBatchStatus['status'];
+  gamesCompleted: number;
+  completedAt: string | null;
+}
+
+function isMissingFile(err: unknown): boolean {
+  return (err as NodeJS.ErrnoException | null)?.code === 'ENOENT';
 }
 
 /**
@@ -57,6 +79,18 @@ export class SimulationManager {
   private runners: Map<string, SimulationRunner> = new Map();
   private batchCounter: number = 0;
   private queue: QueueEntry[] = [];
+  /**
+   * Cached scan of SIM_LOG_DIR. Every history page, result lookup, replay load and delete used to
+   * walk the whole tree synchronously — `readdirSync` per mode directory, `existsSync` +
+   * `readFileSync` + `JSON.parse` per batch — on the thread that also runs every game loop. The
+   * tree only changes when a batch finishes or is deleted, and both paths invalidate the cache;
+   * the TTL covers files changed behind the process's back. (audit E3)
+   */
+  private diskIndex: { builtAt: number; batches: Map<string, DiskBatch> } | null = null;
+  /** In-flight scan, so concurrent callers share one walk instead of each starting their own. */
+  private diskScan: Promise<Map<string, DiskBatch>> | null = null;
+  /** Bumped by invalidateDiskIndex so a scan that was in flight at that moment is not cached. */
+  private diskGeneration = 0;
 
   startBatch(
     config: SimulationConfig,
@@ -74,10 +108,13 @@ export class SimulationManager {
     }
 
     if (!hasActive) {
-      // Start immediately
+      // Start immediately. The `sim:admin` room broadcast is wired here exactly as it is for a
+      // batch started from the queue; immediately-started batches used to rely on socket.ts
+      // attaching per-socket listeners instead, which leaked. (audit B6)
       const runner = new SimulationRunner(config, batchId);
       this.runners.set(batchId, runner);
       this.setupRunnerAutoAdvance(runner);
+      this.setupRunnerBroadcast(runner, batchId);
 
       logger.info(
         { batchId, adminId, config: config.gameMode, totalGames: config.totalGames },
@@ -145,10 +182,10 @@ export class SimulationManager {
     return statuses;
   }
 
-  getHistory(
+  async getHistory(
     page: number = 1,
     limit: number = 20,
-  ): { batches: SimulationBatchStatus[]; total: number } {
+  ): Promise<{ batches: SimulationBatchStatus[]; total: number }> {
     const history: SimulationBatchStatus[] = [];
 
     // Include queued entries
@@ -173,79 +210,34 @@ export class SimulationManager {
       history.push(runner.getStatus());
     }
 
-    // Scan disk for past batches not in memory
+    // Past batches known only from disk — served from the cached index. (audit E3)
     const memoryBatchIds = new Set([...this.runners.keys(), ...this.queue.map((e) => e.batchId)]);
-    try {
-      if (!fs.existsSync(SIM_LOG_DIR)) {
-        // Same ordering as the main path below. This used to sort by startedAt alone, so before
-        // any batch had been written to disk the queue came back newest-first instead of in queue
-        // order — queuePosition 2 ahead of 1 whenever two batches were queued in different
-        // milliseconds, and in queue order whenever they happened to land in the same one. That
-        // is a real ordering bug in the admin history view, and the reason the test covering it
-        // failed intermittently. (audit SIMHISTORY-ORDER-1)
-        history.sort(compareHistoryEntries);
-        return { batches: history.slice((page - 1) * limit, page * limit), total: history.length };
-      }
-
-      const gameModes = fs.readdirSync(SIM_LOG_DIR, { withFileTypes: true });
-      for (const modeDir of gameModes) {
-        if (!modeDir.isDirectory()) continue;
-        const modePath = path.join(SIM_LOG_DIR, modeDir.name);
-        const batchDirs = fs.readdirSync(modePath, { withFileTypes: true });
-
-        for (const batchDir of batchDirs) {
-          if (!batchDir.isDirectory()) continue;
-          const configPath = path.join(modePath, batchDir.name, 'batch_config.json');
-          const summaryPath = path.join(modePath, batchDir.name, 'batch_summary.json');
-
-          if (!fs.existsSync(configPath)) continue;
-
-          try {
-            const configData = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-            const diskBatchId = configData.batchId;
-
-            // Skip if already in memory
-            if (memoryBatchIds.has(diskBatchId)) continue;
-
-            let status: SimulationBatchStatus['status'] = 'error';
-            let gamesCompleted = 0;
-            let completedAt: string | null = null;
-
-            if (fs.existsSync(summaryPath)) {
-              const summaryData = JSON.parse(fs.readFileSync(summaryPath, 'utf-8'));
-              status = summaryData.status || 'completed';
-              gamesCompleted = summaryData.totalGamesRun || 0;
-              completedAt = summaryData.completedAt || null;
-            }
-
-            history.push({
-              batchId: diskBatchId,
-              config: configData.config,
-              status,
-              gamesCompleted,
-              totalGames: configData.config.totalGames,
-              currentGameTick: null,
-              currentGameMaxTicks: null,
-              startedAt: configData.startedAt,
-              completedAt,
-            });
-          } catch {
-            // Skip malformed config files
-          }
-        }
-      }
-    } catch (err) {
-      logger.error({ err }, 'Failed to scan simulation history');
+    for (const batch of (await this.getDiskIndex()).values()) {
+      if (memoryBatchIds.has(batch.batchId)) continue;
+      history.push({
+        batchId: batch.batchId,
+        config: batch.config,
+        status: batch.status,
+        gamesCompleted: batch.gamesCompleted,
+        totalGames: batch.config.totalGames,
+        currentGameTick: null,
+        currentGameMaxTicks: null,
+        startedAt: batch.startedAt,
+        completedAt: batch.completedAt,
+      });
     }
 
+    // One ordering for every path. This used to have two exit paths that had drifted — the early
+    // one (taken when the simulations directory did not exist yet) ignored status and
+    // queuePosition entirely. (audit SIMHISTORY-ORDER-1)
     history.sort(compareHistoryEntries);
 
     return { batches: history.slice((page - 1) * limit, page * limit), total: history.length };
   }
 
-  getBatchResults(
+  async getBatchResults(
     batchId: string,
-  ): { results: SimulationGameResult[]; summary: SimulationBatchStatus } | null {
+  ): Promise<{ results: SimulationGameResult[]; summary: SimulationBatchStatus } | null> {
     // Check in-memory first
     const runner = this.runners.get(batchId);
     if (runner) {
@@ -253,73 +245,31 @@ export class SimulationManager {
     }
 
     // Check disk
-    try {
-      if (!fs.existsSync(SIM_LOG_DIR)) return null;
-
-      const gameModes = fs.readdirSync(SIM_LOG_DIR, { withFileTypes: true });
-      for (const modeDir of gameModes) {
-        if (!modeDir.isDirectory()) continue;
-        const modePath = path.join(SIM_LOG_DIR, modeDir.name);
-        const batchDirs = fs.readdirSync(modePath, { withFileTypes: true });
-
-        for (const batchDir of batchDirs) {
-          if (!batchDir.isDirectory()) continue;
-          const summaryPath = path.join(modePath, batchDir.name, 'batch_summary.json');
-          if (!fs.existsSync(summaryPath)) continue;
-
-          try {
-            const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf-8'));
-            if (summary.batchId === batchId) {
-              return { results: summary.results || [], summary };
-            }
-          } catch {
-            // Skip
-          }
-        }
-      }
-    } catch {
-      // Not found
-    }
-
-    return null;
+    const batch = (await this.getDiskIndex()).get(batchId);
+    if (!batch) return null;
+    const summary = await this.readSummary(batch.dirPath);
+    if (!summary) return null;
+    return {
+      results: (summary.results as SimulationGameResult[] | undefined) || [],
+      summary: summary as unknown as SimulationBatchStatus,
+    };
   }
 
   async getSimulationReplay(batchId: string, gameIndex: number): Promise<ReplayData | null> {
-    // Find the batch directory on disk
     try {
-      if (!fs.existsSync(SIM_LOG_DIR)) return null;
+      const batch = (await this.getDiskIndex()).get(batchId);
+      if (!batch) return null;
 
-      const gameModes = fs.readdirSync(SIM_LOG_DIR, { withFileTypes: true });
-      for (const modeDir of gameModes) {
-        if (!modeDir.isDirectory()) continue;
-        const modePath = path.join(SIM_LOG_DIR, modeDir.name);
-        const batchDirs = fs.readdirSync(modePath, { withFileTypes: true });
+      // Look for the replay file starting with gameIndex_
+      const files = await fs.promises.readdir(batch.dirPath);
+      const replayFile = files.find(
+        (f) => f.startsWith(`${gameIndex}_`) && f.endsWith('.replay.json.gz'),
+      );
+      if (!replayFile) return null;
 
-        for (const batchDir of batchDirs) {
-          if (!batchDir.isDirectory()) continue;
-          const configPath = path.join(modePath, batchDir.name, 'batch_config.json');
-          if (!fs.existsSync(configPath)) continue;
-
-          try {
-            const configData = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-            if (configData.batchId !== batchId) continue;
-
-            // Found the batch dir — look for replay file starting with gameIndex_
-            const batchPath = path.join(modePath, batchDir.name);
-            const files = fs.readdirSync(batchPath);
-            const replayFile = files.find(
-              (f) => f.startsWith(`${gameIndex}_`) && f.endsWith('.replay.json.gz'),
-            );
-            if (!replayFile) return null;
-
-            const compressed = fs.readFileSync(path.join(batchPath, replayFile));
-            const decompressed = await gunzip(compressed);
-            return JSON.parse(decompressed.toString()) as ReplayData;
-          } catch {
-            // Skip malformed
-          }
-        }
-      }
+      const compressed = await fs.promises.readFile(path.join(batch.dirPath, replayFile));
+      const decompressed = await gunzip(compressed);
+      return JSON.parse(decompressed.toString()) as ReplayData;
     } catch (err) {
       logger.error({ err, batchId, gameIndex }, 'Failed to load simulation replay');
     }
@@ -327,7 +277,7 @@ export class SimulationManager {
     return null;
   }
 
-  deleteBatch(batchId: string): boolean {
+  async deleteBatch(batchId: string): Promise<boolean> {
     // Check queue first — no disk cleanup needed
     if (this.removeFromQueue(batchId)) {
       return true;
@@ -338,37 +288,119 @@ export class SimulationManager {
 
     // Find and delete from disk
     try {
-      if (!fs.existsSync(SIM_LOG_DIR)) return false;
-
-      const gameModes = fs.readdirSync(SIM_LOG_DIR, { withFileTypes: true });
-      for (const modeDir of gameModes) {
-        if (!modeDir.isDirectory()) continue;
-        const modePath = path.join(SIM_LOG_DIR, modeDir.name);
-        const batchDirs = fs.readdirSync(modePath, { withFileTypes: true });
-
-        for (const batchDir of batchDirs) {
-          if (!batchDir.isDirectory()) continue;
-          const configPath = path.join(modePath, batchDir.name, 'batch_config.json');
-          if (!fs.existsSync(configPath)) continue;
-
-          try {
-            const configData = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-            if (configData.batchId === batchId) {
-              const dirPath = path.join(modePath, batchDir.name);
-              fs.rmSync(dirPath, { recursive: true, force: true });
-              logger.info({ batchId, path: dirPath }, 'Simulation batch deleted from disk');
-              return true;
-            }
-          } catch {
-            // Skip malformed
-          }
-        }
-      }
+      const index = await this.getDiskIndex();
+      const batch = index.get(batchId);
+      if (!batch) return false;
+      await fs.promises.rm(batch.dirPath, { recursive: true, force: true });
+      // Keep the index in step so a run of deletes costs one scan, not one per delete.
+      index.delete(batchId);
+      logger.info({ batchId, path: batch.dirPath }, 'Simulation batch deleted from disk');
+      return true;
     } catch (err) {
       logger.error({ err, batchId }, 'Failed to delete simulation batch');
     }
 
     return false;
+  }
+
+  /** Drop the cached directory scan so the next lookup re-reads the tree. (audit E3) */
+  private invalidateDiskIndex(): void {
+    this.diskIndex = null;
+    this.diskGeneration++;
+  }
+
+  private getDiskIndex(): Promise<Map<string, DiskBatch>> {
+    const now = Date.now();
+    if (this.diskIndex && now - this.diskIndex.builtAt < DISK_INDEX_TTL_MS) {
+      return Promise.resolve(this.diskIndex.batches);
+    }
+    if (this.diskScan) return this.diskScan;
+    const generation = this.diskGeneration;
+    this.diskScan = this.scanDisk()
+      .then((batches) => {
+        // A batch that completed while this walk was running may have been read without its
+        // summary; the invalidation bumped the generation, so leave the cache empty and let the
+        // next caller rescan.
+        if (generation === this.diskGeneration) {
+          this.diskIndex = { builtAt: Date.now(), batches };
+        }
+        return batches;
+      })
+      .finally(() => {
+        this.diskScan = null;
+      });
+    return this.diskScan;
+  }
+
+  /** Walk SIM_LOG_DIR/{gameMode}/{batchDir} once, asynchronously. */
+  private async scanDisk(): Promise<Map<string, DiskBatch>> {
+    const batches = new Map<string, DiskBatch>();
+
+    let modeDirs: fs.Dirent[];
+    try {
+      modeDirs = await fs.promises.readdir(SIM_LOG_DIR, { withFileTypes: true });
+    } catch (err) {
+      // No directory yet means no history — not an error.
+      if (!isMissingFile(err)) logger.error({ err }, 'Failed to scan simulation history');
+      return batches;
+    }
+
+    for (const modeDir of modeDirs) {
+      if (!modeDir.isDirectory()) continue;
+      const modePath = path.join(SIM_LOG_DIR, modeDir.name);
+      let batchDirs: fs.Dirent[];
+      try {
+        batchDirs = await fs.promises.readdir(modePath, { withFileTypes: true });
+      } catch (err) {
+        logger.error({ err, modePath }, 'Failed to scan simulation history');
+        continue;
+      }
+
+      for (const batchDir of batchDirs) {
+        if (!batchDir.isDirectory()) continue;
+        const dirPath = path.join(modePath, batchDir.name);
+        const batch = await this.readDiskBatch(dirPath);
+        if (batch) batches.set(batch.batchId, batch);
+      }
+    }
+
+    return batches;
+  }
+
+  /** Read one batch directory's config (+ summary, if finished). Null for a malformed one. */
+  private async readDiskBatch(dirPath: string): Promise<DiskBatch | null> {
+    let configData: { batchId?: unknown; config?: SimulationConfig; startedAt?: string };
+    try {
+      configData = JSON.parse(
+        await fs.promises.readFile(path.join(dirPath, 'batch_config.json'), 'utf-8'),
+      );
+    } catch {
+      // Missing or malformed batch_config.json — skip the directory
+      return null;
+    }
+    if (typeof configData?.batchId !== 'string' || !configData.config) return null;
+
+    const summary = await this.readSummary(dirPath);
+    return {
+      batchId: configData.batchId,
+      dirPath,
+      config: configData.config,
+      startedAt: configData.startedAt ?? '',
+      status: (summary?.status as SimulationBatchStatus['status'] | undefined) || 'error',
+      gamesCompleted: (summary?.totalGamesRun as number | undefined) || 0,
+      completedAt: (summary?.completedAt as string | undefined) || null,
+    };
+  }
+
+  private async readSummary(dirPath: string): Promise<Record<string, unknown> | null> {
+    try {
+      return JSON.parse(
+        await fs.promises.readFile(path.join(dirPath, 'batch_summary.json'), 'utf-8'),
+      );
+    } catch {
+      // Not finished yet, or malformed
+      return null;
+    }
   }
 
   cleanup(): void {
@@ -385,6 +417,8 @@ export class SimulationManager {
 
   private setupRunnerAutoAdvance(runner: SimulationRunner): void {
     runner.on('completed', () => {
+      // batch_summary.json has just been written — the cached scan is stale. (audit E3)
+      this.invalidateDiskIndex();
       this.processQueue();
     });
   }

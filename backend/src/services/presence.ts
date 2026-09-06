@@ -72,11 +72,6 @@ export async function removePresence(userId: number): Promise<void> {
   await redis.del(`${KEY_PREFIX}${userId}`);
 }
 
-export async function refreshPresence(userId: number): Promise<void> {
-  const redis = getRedis();
-  await redis.expire(`${KEY_PREFIX}${userId}`, PRESENCE_TTL);
-}
-
 /**
  * Extend the presence TTL for a batch of connected users.
  *

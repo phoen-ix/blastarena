@@ -327,15 +327,16 @@ describe('Messages Service', () => {
       expect(result).toEqual([]);
     });
 
-    it('should pass userId five times to the conversation list query', async () => {
+    it('queries each indexed half (sent / received) once and caps the list', async () => {
+      // (audit E7) — UNION ALL of two indexed range scans instead of an OR across both columns.
       mockQuery.mockResolvedValue([]);
 
       await messageService.getConversationList(10);
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('direct_messages'),
-        [10, 10, 10, 10, 10],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UNION ALL'), [10, 10]);
+      const sql = mockQuery.mock.calls[0][0] as string;
+      expect(sql).not.toMatch(/sender_id = \? OR/);
+      expect(sql).toContain('LIMIT 100');
     });
   });
 
@@ -360,31 +361,6 @@ describe('Messages Service', () => {
         expect.stringContaining('read_at IS NULL'),
         [20, 10],
       );
-    });
-  });
-
-  describe('getUnreadCounts', () => {
-    it('should return count per sender', async () => {
-      mockQuery.mockResolvedValue([
-        { sender_id: 20, total: 3 },
-        { sender_id: 30, total: 1 },
-      ]);
-
-      const result = await messageService.getUnreadCounts(10);
-
-      expect(result).toEqual({
-        20: 3,
-        30: 1,
-      });
-      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('GROUP BY sender_id'), [10]);
-    });
-
-    it('should return empty object when no unread messages', async () => {
-      mockQuery.mockResolvedValue([]);
-
-      const result = await messageService.getUnreadCounts(10);
-
-      expect(result).toEqual({});
     });
   });
 });

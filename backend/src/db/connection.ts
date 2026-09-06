@@ -68,6 +68,20 @@ export async function execute(sql: string, params?: unknown[]): Promise<mysql.Re
 }
 
 /**
+ * True when `err` is MySQL's unique-key violation (ER_DUP_ENTRY, errno 1062).
+ *
+ * The check-then-write pattern on unique columns (username, email_hash) leaves a window in which a
+ * concurrent duplicate reaches the INSERT/UPDATE and surfaces as a driver error — a 500 — instead
+ * of the 409 the preceding SELECT was meant to produce. Callers catch this and rethrow the same
+ * AppError they would have thrown had the SELECT seen the row. (audit B13)
+ */
+export function isDuplicateKeyError(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const e = err as { code?: unknown; errno?: unknown };
+  return e.code === 'ER_DUP_ENTRY' || e.errno === 1062;
+}
+
+/**
  * Execute a function within a database transaction.
  * Automatically commits on success, rolls back on error.
  */

@@ -1,4 +1,4 @@
-import { query, execute, withTransaction } from '../db/connection';
+import { query, execute, withTransaction, isDuplicateKeyError } from '../db/connection';
 import { AppError } from '../middleware/errorHandler';
 import {
   comparePassword,
@@ -81,7 +81,13 @@ export async function updateUsername(userId: number, newUsername: string): Promi
     throw new AppError('Username is already taken', 409, 'CONFLICT');
   }
 
-  await execute('UPDATE users SET username = ? WHERE id = ?', [newUsername, userId]);
+  try {
+    await execute('UPDATE users SET username = ? WHERE id = ?', [newUsername, userId]);
+  } catch (err) {
+    // Lost the race against a concurrent rename/registration to the same name. (audit B13)
+    if (isDuplicateKeyError(err)) throw new AppError('Username is already taken', 409, 'CONFLICT');
+    throw err;
+  }
 }
 
 export async function updateEmailDirect(userId: number, newEmail: string): Promise<void> {
@@ -98,10 +104,16 @@ export async function updateEmailDirect(userId: number, newEmail: string): Promi
     throw new AppError('Email is already in use', 409, 'CONFLICT');
   }
 
-  await execute(
-    'UPDATE users SET email_hash = ?, email_hint = ?, email_verified = TRUE, pending_email_hash = NULL, pending_email_hint = NULL, email_change_token = NULL, email_change_expires = NULL WHERE id = ?',
-    [emailHash, emailHint, userId],
-  );
+  try {
+    await execute(
+      'UPDATE users SET email_hash = ?, email_hint = ?, email_verified = TRUE, pending_email_hash = NULL, pending_email_hint = NULL, email_change_token = NULL, email_change_expires = NULL WHERE id = ?',
+      [emailHash, emailHint, userId],
+    );
+  } catch (err) {
+    // Lost the race against a concurrent change to the same address. (audit B13)
+    if (isDuplicateKeyError(err)) throw new AppError('Email is already in use', 409, 'CONFLICT');
+    throw err;
+  }
 }
 
 export async function requestEmailChange(
@@ -281,16 +293,18 @@ export async function deleteAccount(userId: number, password: string): Promise<v
 
 export async function getMatchHistory(userId: number, page: number = 1, limit: number = 20) {
   const offset = (page - 1) * limit;
+  // Player count as a correlated subquery, evaluated only for the page's rows. The previous
+  // derived table `(SELECT match_id, COUNT(*) … GROUP BY match_id)` aggregated ALL of
+  // match_players before the LIMIT — a full scan per page. (audit E1)
   const rows = await query<(MatchRow & { placement: number; kills: number; deaths: number })[]>(
     `SELECT m.id, m.room_code, m.game_mode, m.status, m.duration,
             m.started_at, m.finished_at,
             u.username as winner_username,
-            COALESCE(pc.player_count, 0) as player_count,
+            (SELECT COUNT(*) FROM match_players mp2 WHERE mp2.match_id = m.id) as player_count,
             mp.placement, mp.kills, mp.deaths
      FROM match_players mp
      JOIN matches m ON m.id = mp.match_id
      LEFT JOIN users u ON u.id = m.winner_id
-     LEFT JOIN (SELECT match_id, COUNT(*) as player_count FROM match_players GROUP BY match_id) pc ON pc.match_id = m.id
      WHERE mp.user_id = ? AND m.status = 'finished'
      ORDER BY m.finished_at DESC, m.id DESC
      LIMIT ? OFFSET ?`,

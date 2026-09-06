@@ -64,20 +64,25 @@ function rowToSummary(row: CustomMapSummaryRow): CustomMapSummary {
   };
 }
 
+/** Upper bound on the browse-maps and my-maps listings. Generous, but not unbounded. */
+const PUBLISHED_MAPS_LIMIT = 200;
+
 export async function listMyMaps(userId: number): Promise<CustomMapSummary[]> {
+  // Summary columns only, capped — the same treatment listPublishedMaps got; this one still
+  // pulled `m.*` (every map's full tiles JSON) with no LIMIT. (audit E6)
   const rows = await query<CustomMapRow[]>(
-    `SELECT m.*, u.username AS creator_username
+    `SELECT m.id, m.name, m.map_width, m.map_height, m.spawn_points, m.is_published,
+            m.created_by, m.play_count,
+            u.username AS creator_username
      FROM custom_maps m
      JOIN users u ON u.id = m.created_by
      WHERE m.created_by = ?
-     ORDER BY m.updated_at DESC`,
+     ORDER BY m.updated_at DESC, m.id DESC
+     LIMIT ${PUBLISHED_MAPS_LIMIT}`,
     [userId],
   );
   return rows.map(rowToSummary);
 }
-
-/** Upper bound on the browse-maps listing. Generous, but not unbounded. */
-const PUBLISHED_MAPS_LIMIT = 200;
 
 export async function listPublishedMaps(): Promise<CustomMapSummary[]> {
   // Selects only what rowToSummary reads, and caps the result.

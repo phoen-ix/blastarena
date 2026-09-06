@@ -23,7 +23,9 @@ export async function getUserState(userId: number): Promise<CampaignUserState> {
     currentWorldId: row.current_world_id,
     currentLevelId: row.current_level_id,
     carriedPowerups: row.carried_powerups
-      ? (typeof row.carried_powerups === 'string' ? JSON.parse(row.carried_powerups) : row.carried_powerups)
+      ? typeof row.carried_powerups === 'string'
+        ? JSON.parse(row.carried_powerups)
+        : row.carried_powerups
       : null,
     totalLevelsCompleted: row.total_levels_completed,
     totalStars: row.total_stars,
@@ -44,20 +46,6 @@ export async function getProgress(userId: number, levelId: number): Promise<Leve
     stars: row.stars,
     attempts: row.attempts,
   };
-}
-
-export async function getAllProgress(userId: number): Promise<LevelProgress[]> {
-  const rows = await query<CampaignProgressRow[]>(
-    `SELECT * FROM campaign_progress WHERE user_id = ?`,
-    [userId],
-  );
-  return rows.map((row) => ({
-    levelId: row.level_id,
-    completed: !!row.completed,
-    bestTimeSeconds: row.best_time_seconds,
-    stars: row.stars,
-    attempts: row.attempts,
-  }));
 }
 
 export async function recordAttempt(userId: number, levelId: number): Promise<void> {

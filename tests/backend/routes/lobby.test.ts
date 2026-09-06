@@ -14,9 +14,6 @@ jest.mock('../../../backend/src/services/lobby', () => ({
 jest.mock('../../../backend/src/middleware/auth', () => ({
   authMiddleware: jest.fn((_req: any, _res: any, next: any) => next()),
 }));
-jest.mock('../../../backend/src/middleware/validation', () => ({
-  validate: jest.fn(() => (_req: any, _res: any, next: any) => next()),
-}));
 
 jest.mock('../../../backend/src/utils/logger', () => ({
   logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
@@ -24,7 +21,6 @@ jest.mock('../../../backend/src/utils/logger', () => ({
 
 import lobbyRouter from '../../../backend/src/routes/lobby';
 import { authMiddleware } from '../../../backend/src/middleware/auth';
-import { validate } from '../../../backend/src/middleware/validation';
 import { Request, Response, NextFunction } from 'express';
 
 type HandlerFn = (req: Request, res: Response, next: NextFunction) => Promise<void>;
@@ -123,133 +119,6 @@ describe('GET /lobby/rooms', () => {
   });
 });
 
-describe('POST /lobby/rooms', () => {
-  let handler: (req: Request, res: Response, next: NextFunction) => Promise<void>;
-
-  beforeEach(() => {
-    handler = getHandler('post', '/lobby/rooms');
-    jest.clearAllMocks();
-  });
-
-  it('returns 201 with created room on success', async () => {
-    const createdRoom = { id: 'room-abc', name: 'My Room', hostId: 1 };
-    mockCreateRoom.mockResolvedValue(createdRoom);
-
-    const req = {
-      user: { userId: 1, username: 'alice', role: 'user' },
-      body: {
-        name: 'My Room',
-        config: { gameMode: 'ffa', maxPlayers: 4 },
-      },
-    } as unknown as Request;
-
-    const res = mockRes();
-    const next = jest.fn();
-    await handler(req, res as unknown as Response, next as NextFunction);
-
-    expect(res._status).toBe(201);
-    expect(res._json).toEqual(createdRoom);
-    expect(next).not.toHaveBeenCalled();
-  });
-
-  it('passes user info (userId, username, role) from req.user to createRoom', async () => {
-    mockCreateRoom.mockResolvedValue({ id: 'room-xyz' });
-
-    const req = {
-      user: { userId: 42, username: 'bob', role: 'admin' },
-      body: {
-        name: 'Admin Room',
-        config: { gameMode: 'teams', maxPlayers: 8 },
-      },
-    } as unknown as Request;
-
-    const res = mockRes();
-    const next = jest.fn();
-    await handler(req, res as unknown as Response, next as NextFunction);
-
-    expect(mockCreateRoom).toHaveBeenCalledWith(
-      {
-        id: 42,
-        username: 'bob',
-        role: 'admin',
-        language: 'en',
-        emailVerified: true,
-        twoFactorEnabled: false,
-      },
-      'Admin Room',
-      { gameMode: 'teams', maxPlayers: 8 },
-    );
-  });
-
-  it('passes name and config from req.body to createRoom', async () => {
-    mockCreateRoom.mockResolvedValue({ id: 'room-123' });
-
-    const config = {
-      gameMode: 'battle_royale',
-      maxPlayers: 6,
-      mapWidth: 19,
-      mapHeight: 15,
-      roundTime: 300,
-    };
-    const req = {
-      user: { userId: 1, username: 'eve', role: 'user' },
-      body: { name: 'BR Match', config },
-    } as unknown as Request;
-
-    const res = mockRes();
-    const next = jest.fn();
-    await handler(req, res as unknown as Response, next as NextFunction);
-
-    expect(mockCreateRoom).toHaveBeenCalledWith(expect.anything(), 'BR Match', config);
-  });
-
-  it('constructs user object with id mapped from userId', async () => {
-    mockCreateRoom.mockResolvedValue({ id: 'room-999' });
-
-    const req = {
-      user: { userId: 77, username: 'charlie', role: 'moderator' },
-      body: {
-        name: 'Mod Room',
-        config: { gameMode: 'ffa', maxPlayers: 2 },
-      },
-    } as unknown as Request;
-
-    const res = mockRes();
-    const next = jest.fn();
-    await handler(req, res as unknown as Response, next as NextFunction);
-
-    const userArg = mockCreateRoom.mock.calls[0][0];
-    expect(userArg).toEqual({
-      id: 77,
-      username: 'charlie',
-      role: 'moderator',
-      language: 'en',
-      emailVerified: true,
-      twoFactorEnabled: false,
-    });
-    expect(userArg).not.toHaveProperty('userId');
-  });
-
-  it('passes error to next() on service failure', async () => {
-    const error = new Error('Room creation failed');
-    mockCreateRoom.mockRejectedValue(error);
-
-    const req = {
-      user: { userId: 1, username: 'alice', role: 'user' },
-      body: {
-        name: 'Failing Room',
-        config: { gameMode: 'ffa', maxPlayers: 4 },
-      },
-    } as unknown as Request;
-
-    const res = mockRes();
-    const next = jest.fn();
-    await handler(req, res as unknown as Response, next as NextFunction);
-
-    expect(next).toHaveBeenCalledWith(error);
-  });
-});
-
 describe('Middleware presence', () => {
   it('GET /lobby/rooms has authMiddleware', () => {
     const stack = (lobbyRouter as any).stack as RouteLayer[];
@@ -260,24 +129,16 @@ describe('Middleware presence', () => {
     expect(handlers).toContain(authMiddleware);
   });
 
-  it('POST /lobby/rooms has authMiddleware', () => {
+  it('has no POST /lobby/rooms — rooms are created over the socket (audit G6)', () => {
     const stack = (lobbyRouter as any).stack as RouteLayer[];
-    const layer = stack.find((l) => l.route?.path === '/lobby/rooms' && l.route.methods.post);
-    expect(layer).toBeDefined();
-
-    const handlers = layer!.route.stack.map((s) => s.handle);
-    expect(handlers).toContain(authMiddleware);
+    const postLayer = stack.find((l) => l.route?.path === '/lobby/rooms' && l.route.methods.post);
+    expect(postLayer).toBeUndefined();
+    expect(mockCreateRoom).not.toHaveBeenCalled();
   });
 
-  it('POST /lobby/rooms has validate middleware', () => {
+  it('GET /lobby/rooms has auth + emailVerified + handler', () => {
     const stack = (lobbyRouter as any).stack as RouteLayer[];
-
     const getLayer = stack.find((l) => l.route?.path === '/lobby/rooms' && l.route.methods.get);
-    const postLayer = stack.find((l) => l.route?.path === '/lobby/rooms' && l.route.methods.post);
-    expect(postLayer).toBeDefined();
-
-    // GET has 3 handlers (auth + emailVerified + handler), POST has 4 (auth + emailVerified + validate + handler)
     expect(getLayer!.route.stack.length).toBe(3);
-    expect(postLayer!.route.stack.length).toBe(4);
   });
 });

@@ -871,7 +871,7 @@ describe('Achievements Service', () => {
         mockExecute.mockResolvedValueOnce({}); // INSERT
         mockCheckCampaignStarUnlocks.mockResolvedValueOnce([]);
 
-        const result = await evaluateAfterCampaign(1, 15, 5, 2);
+        const result = await evaluateAfterCampaign(1, 15);
 
         expect(result.achievements).toHaveLength(1);
         expect(result.achievements[0].id).toBe(40);
@@ -891,7 +891,7 @@ describe('Achievements Service', () => {
         mockQuery.mockResolvedValueOnce([{ total_stars: 10 }]);
         mockCheckCampaignStarUnlocks.mockResolvedValueOnce([]);
 
-        const result = await evaluateAfterCampaign(1, 10, 5, 2);
+        const result = await evaluateAfterCampaign(1, 10);
 
         expect(result.achievements).toHaveLength(0);
       });
@@ -905,7 +905,7 @@ describe('Achievements Service', () => {
         mockQuery.mockResolvedValueOnce([]); // no user state
         mockCheckCampaignStarUnlocks.mockResolvedValueOnce([]);
 
-        const result = await evaluateAfterCampaign(1, 0, 5, 2);
+        const result = await evaluateAfterCampaign(1, 0);
 
         expect(result.achievements).toHaveLength(0);
       });
@@ -924,7 +924,7 @@ describe('Achievements Service', () => {
         mockExecute.mockResolvedValueOnce({}); // INSERT
         mockCheckCampaignStarUnlocks.mockResolvedValueOnce([]);
 
-        const result = await evaluateAfterCampaign(1, 20, 10, 3);
+        const result = await evaluateAfterCampaign(1, 20);
 
         expect(result.achievements).toHaveLength(1);
         expect(result.achievements[0].id).toBe(42);
@@ -940,7 +940,7 @@ describe('Achievements Service', () => {
         mockQuery.mockResolvedValueOnce([{ total: 3 }]); // only 3 completed
         mockCheckCampaignStarUnlocks.mockResolvedValueOnce([]);
 
-        const result = await evaluateAfterCampaign(1, 20, 10, 3);
+        const result = await evaluateAfterCampaign(1, 20);
 
         expect(result.achievements).toHaveLength(0);
       });
@@ -955,7 +955,7 @@ describe('Achievements Service', () => {
         mockQuery.mockResolvedValueOnce([{ total: 0 }]);
         mockCheckCampaignStarUnlocks.mockResolvedValueOnce([]);
 
-        const result = await evaluateAfterCampaign(1, 0, 10, 99);
+        const result = await evaluateAfterCampaign(1, 0);
 
         expect(result.achievements).toHaveLength(0);
       });
@@ -973,7 +973,7 @@ describe('Achievements Service', () => {
         mockExecute.mockResolvedValueOnce({});
         mockCheckCampaignStarUnlocks.mockResolvedValueOnce([]);
 
-        const result = await evaluateAfterCampaign(1, 10, 5, 2);
+        const result = await evaluateAfterCampaign(1, 10);
 
         expect(result.achievements).toHaveLength(1);
         expect(result.achievements[0].id).toBe(45);
@@ -985,7 +985,7 @@ describe('Achievements Service', () => {
         mockQuery.mockResolvedValueOnce([]); // no achievements
         mockCheckCampaignStarUnlocks.mockResolvedValueOnce([]);
 
-        await evaluateAfterCampaign(7, 25, 5, 2);
+        await evaluateAfterCampaign(7, 25);
 
         expect(mockCheckCampaignStarUnlocks).toHaveBeenCalledWith(7, 25);
       });
@@ -1001,7 +1001,7 @@ describe('Achievements Service', () => {
         mockExecute.mockResolvedValueOnce({});
         mockCheckCampaignStarUnlocks.mockResolvedValueOnce([]);
 
-        await evaluateAfterCampaign(1, 10, 5, 2);
+        await evaluateAfterCampaign(1, 10);
 
         expect(mockCheckCampaignStarUnlocks).toHaveBeenCalledWith(1, 10);
       });
@@ -1024,7 +1024,7 @@ describe('Achievements Service', () => {
         mockGetCosmeticById.mockResolvedValueOnce(cosmetic);
         mockCheckCampaignStarUnlocks.mockResolvedValueOnce([]);
 
-        const result = await evaluateAfterCampaign(1, 10, 5, 2);
+        const result = await evaluateAfterCampaign(1, 10);
 
         expect(result.achievements).toHaveLength(1);
         expect(result.rewards).toHaveLength(1);

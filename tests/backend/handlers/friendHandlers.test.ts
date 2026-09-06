@@ -312,15 +312,22 @@ describe('friendHandlers', () => {
       await notifyFriendsOnline(io, 1, 'in_lobby');
 
       expect(mockGetFriendIds).toHaveBeenCalledWith(1);
-      expect(io.to).toHaveBeenCalledWith('user:2');
-      expect(io.to).toHaveBeenCalledWith('user:3');
-      expect(io.to).toHaveBeenCalledWith('user:4');
-      // Each call emits friend:online
-      expect(io._toEmit).toHaveBeenCalledTimes(3);
+      // One broadcast to all three rooms at once, not one per friend. (audit E11)
+      expect(io.to).toHaveBeenCalledTimes(1);
+      expect(io.to).toHaveBeenCalledWith(['user:2', 'user:3', 'user:4']);
+      expect(io._toEmit).toHaveBeenCalledTimes(1);
       expect(io._toEmit).toHaveBeenCalledWith('friend:online', {
         userId: 1,
         activity: 'in_lobby',
       });
+    });
+
+    it('emits nothing when the user has no friends', async () => {
+      mockGetFriendIds.mockResolvedValue([]);
+
+      await notifyFriendsOnline(io, 1, 'in_lobby');
+
+      expect(io.to).not.toHaveBeenCalled();
     });
 
     it('handles error gracefully without throwing', async () => {
@@ -337,9 +344,9 @@ describe('friendHandlers', () => {
       await notifyFriendsOffline(io, 1);
 
       expect(mockGetFriendIds).toHaveBeenCalledWith(1);
-      expect(io.to).toHaveBeenCalledWith('user:2');
-      expect(io.to).toHaveBeenCalledWith('user:3');
-      expect(io._toEmit).toHaveBeenCalledTimes(2);
+      expect(io.to).toHaveBeenCalledTimes(1);
+      expect(io.to).toHaveBeenCalledWith(['user:2', 'user:3']); // audit E11
+      expect(io._toEmit).toHaveBeenCalledTimes(1);
       expect(io._toEmit).toHaveBeenCalledWith('friend:offline', { userId: 1 });
     });
 

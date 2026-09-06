@@ -16,8 +16,6 @@ import {
   PublicUser,
   CampaignGameState,
   UserRole,
-  SimulationBatchStatus,
-  SimulationGameResult,
   getErrorMessage,
   EMOTES,
   EMOTE_COOLDOWN_MS,
@@ -52,8 +50,10 @@ import {
   readySchema,
   adminKickSchema,
   adminCloseRoomSchema,
+  adminSpectateSchema,
   allowGuestPacket,
   guestPacketLabel,
+  sanitizeGuestUsername,
 } from './utils/socketValidation';
 import { query } from './db/connection';
 import { UserRow } from './db/types';
@@ -80,6 +80,13 @@ const spectatorChatLimiter = createSocketRateLimiter(3);
 // Caps how often a guest can make us write a rejection log line. (audit GUEST-LOG-FLOOD-1)
 const guestRejectLogLimiter = createSocketRateLimiter(2);
 const spectatorActionLimiter = createSocketRateLimiter(2);
+// Module-scoped like its siblings. It used to be created inside the connection handler, so every
+// socket owned a private Map that nothing ever pruned. (audit E10)
+const campaignStartLimiter = createSocketRateLimiter(1);
+// lobby:subscribe/unsubscribe, admin:spectate and admin:roomMessage had no limiter at all — each
+// is a cheap call, but socket.join/leave and a room-wide broadcast are not free at 1000/s. (audit B16)
+const lobbySubscribeLimiter = createSocketRateLimiter(5);
+const adminRoomLimiter = createSocketRateLimiter(3);
 
 /** Extract active room code from socket, optionally sending error callback */
 function requireRoom(
@@ -378,9 +385,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     // Lobby subscription — scopes room:list and lobby:chat to clients actually showing the lobby.
     // (audit LOBBY-BROADCAST-1)
     socket.on('lobby:subscribe', () => {
+      if (!lobbySubscribeLimiter.isAllowed(socket.id)) return; // audit B16
       socket.join(LOBBY_ROOM);
     });
     socket.on('lobby:unsubscribe', () => {
+      if (!lobbySubscribeLimiter.isAllowed(socket.id)) return; // audit B16
       socket.leave(LOBBY_ROOM);
     });
 
@@ -1008,13 +1017,8 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           data.position,
         );
 
-        if (result.success) {
-          io.to(`room:${roomCode}`).emit('spectator:actionApplied', {
-            type: data.type as 'place_wall' | 'trigger_meteor' | 'drop_powerup' | 'speed_zone',
-            position: data.position,
-          });
-        }
-
+        // No `spectator:actionApplied` broadcast: nothing ever listened for it, and the effect
+        // itself reaches every client through the next tick's state. (audit G7)
         callback(result);
       } catch (err: unknown) {
         callback({ success: false, error: clientError(err) });
@@ -1035,7 +1039,10 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
         const gameRoom = roomManager.getRoom(parsed.roomCode);
         if (gameRoom) {
-          gameRoom.handlePlayerDisconnect(parsed.userId);
+          // A kick is an explicit removal, like room:leave — kill immediately. This used to call
+          // handlePlayerDisconnect, which starts the 10 s reconnect grace meant for dropped
+          // connections, so a kicked player lingered alive in the match. (audit A12)
+          gameRoom.handlePlayerLeave(parsed.userId);
         }
 
         const room = await lobbyService.leaveRoom(parsed.roomCode, parsed.userId);
@@ -1080,12 +1087,15 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         // Notify all players in the room
         io.to(`room:${parsed.roomCode}`).emit('admin:kicked', { reason: 'Room closed by admin' });
 
-        // Remove all sockets from the room
+        // Remove all sockets from the room. The Lua leaves are independent per player, so run
+        // them concurrently instead of one Redis round-trip after another. (audit E11)
         const sockets = await io.in(`room:${parsed.roomCode}`).fetchSockets();
-        for (const s of sockets) {
-          await lobbyService.leaveRoom(parsed.roomCode, s.data.userId);
-          s.leave(`room:${parsed.roomCode}`);
-        }
+        await Promise.all(
+          sockets.map(async (s) => {
+            await lobbyService.leaveRoom(parsed.roomCode, s.data.userId);
+            s.leave(`room:${parsed.roomCode}`);
+          }),
+        );
 
         // Clear any pending rematch votes for this room
         const existingVotes = rematchVotes.get(parsed.roomCode);
@@ -1110,18 +1120,24 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Admin: spectate room
     socket.on('admin:spectate', async (data, callback) => {
+      if (!adminRoomLimiter.isAllowed(socket.id))
+        return callback({ success: false, error: 'Rate limited' }); // audit B16
       if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') {
         return callback({ success: false, error: 'Insufficient permissions' });
       }
 
-      const gameRoom = roomManager.getRoom(data.roomCode);
+      // The room code went straight into socket.join() with no type check. (audit B16)
+      const parsed = validateSocket(adminSpectateSchema, data, callback);
+      if (!parsed) return;
+
+      const gameRoom = roomManager.getRoom(parsed.roomCode);
       if (!gameRoom) {
         return callback({ success: false, error: 'Game not running in this room' });
       }
 
-      socket.join(`room:${data.roomCode}`);
+      socket.join(`room:${parsed.roomCode}`);
       logger.info(
-        { admin: socket.data.username, roomCode: data.roomCode },
+        { admin: socket.data.username, roomCode: parsed.roomCode },
         'Admin spectating room',
       );
       callback({ success: true });
@@ -1129,6 +1145,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Admin: send message to room
     socket.on('admin:roomMessage', (data) => {
+      if (!adminRoomLimiter.isAllowed(socket.id)) return; // audit B16
       if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') return;
       if (typeof data.roomCode !== 'string' || !data.roomCode) return;
 
@@ -1179,19 +1196,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           queuePosition: result.queuePosition,
         });
       } else {
-        const runner = mgr.getBatch(result.batchId)!;
-
-        // Forward events to the requesting admin socket
-        runner.on('progress', (status: SimulationBatchStatus) =>
-          socket.emit('sim:progress', status),
-        );
-        runner.on('gameResult', (gameResult: SimulationGameResult) =>
-          socket.emit('sim:gameResult', { batchId: result.batchId, result: gameResult }),
-        );
-        runner.on('completed', (status: SimulationBatchStatus) =>
-          socket.emit('sim:completed', { batchId: result.batchId, status }),
-        );
-
+        // Progress/result/completed events reach this admin through the `sim:admin` room, which
+        // SimulationManager wires for every batch. The three per-socket runner.on() listeners
+        // that used to live here closed over the socket and were never removed, pinning both
+        // the finished runner (with its full result array) and the disconnected socket for the
+        // lifetime of the process. (audit B6)
         logger.info(
           { admin: socket.data.username, batchId: result.batchId, totalGames: config.totalGames },
           'Admin started simulation batch',
@@ -1242,8 +1251,6 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     });
 
     // Campaign: start level (solo, online co-op, or local co-op)
-    const campaignStartLimiter = createSocketRateLimiter(1);
-
     socket.on('campaign:start', async (data, callback) => {
       if (!campaignStartLimiter.isAllowed(socket.id)) {
         return callback({ success: false, error: 'Too many requests, please wait' });
@@ -1260,9 +1267,24 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           socket.leave(campaignRoom);
         }
 
-        const campaignService = await import('./services/campaign');
-        const enemyTypeService = await import('./services/enemy-type');
-        const progressService = await import('./services/campaign-progress');
+        // Every service used by this handler is resolved once, up front. Two of them
+        // (achievements, cosmetics) used to be `await import()`ed inside the per-user completion
+        // loop, and buddy was imported and its settings fetched twice per start. (audit E10)
+        const [
+          campaignService,
+          enemyTypeService,
+          progressService,
+          achievementsService,
+          cosmeticsService,
+          buddyService,
+        ] = await Promise.all([
+          import('./services/campaign'),
+          import('./services/enemy-type'),
+          import('./services/campaign-progress'),
+          import('./services/achievements'),
+          import('./services/cosmetics'),
+          import('./services/buddy'),
+        ]);
 
         const level = await campaignService.getLevel(data.levelId);
         if (!level || !level.isPublished) {
@@ -1277,6 +1299,10 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         const userIds: number[] = [socket.data.userId];
         const usernames: string[] = [socket.data.username];
         let partnerSocket: typeof socket | null = null;
+        // Fetched once here and reused for the buddy's colour below. (audit E10)
+        const buddySettings = data.buddyMode
+          ? await buddyService.getBuddySettings(socket.data.userId)
+          : null;
 
         if (data.coopMode) {
           // Online co-op: party-based
@@ -1325,12 +1351,9 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           }
           userIds.push(p2Id);
           usernames.push(p2Username);
-        } else if (data.buddyMode) {
+        } else if (data.buddyMode && buddySettings) {
           // Buddy mode: P2 is an invulnerable support character
           const buddyId = -(2000 + (Date.now() % 10000));
-          const buddySettings = await import('./services/buddy').then((m) =>
-            m.getBuddySettings(socket.data.userId),
-          );
           userIds.push(buddyId);
           usernames.push(buddySettings.name);
         }
@@ -1416,41 +1439,55 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
                 }
               }
 
-              // Record completion for all real players
-              let stars = 0;
+              // Record completion for all real players. Stars are per user — recordCompletion
+              // compares this run against each player's own best — so each real player is told
+              // their own count on their `user:` room. A single `stars` variable overwritten per
+              // loop iteration used to send both co-op players (and the replay) the LAST
+              // player's count. (audit A13)
+              const starsByUser = new Map<number, number>();
               for (const uid of userIds) {
                 if (uid > 0) {
-                  stars = await progressService.recordCompletion(
+                  starsByUser.set(
                     uid,
-                    level.id,
-                    timeSeconds,
-                    deaths,
-                    level.parTime,
+                    await progressService.recordCompletion(
+                      uid,
+                      level.id,
+                      timeSeconds,
+                      deaths,
+                      level.parTime,
+                    ),
                   );
                 }
               }
-              emitToCampaign('campaign:levelComplete', {
-                levelId: level.id,
-                timeSeconds,
-                stars,
-                nextLevelId,
-              });
+              if (starsByUser.size === 0) {
+                emitToCampaign('campaign:levelComplete', {
+                  levelId: level.id,
+                  timeSeconds,
+                  stars: 0,
+                  nextLevelId,
+                });
+              } else {
+                for (const [uid, stars] of starsByUser) {
+                  io.to(`user:${uid}`).emit('campaign:levelComplete', {
+                    levelId: level.id,
+                    timeSeconds,
+                    stars,
+                    nextLevelId,
+                  });
+                }
+              }
+              // The replay record is P1's (userId column), so it carries the first real user's stars.
+              const stars = starsByUser.size > 0 ? [...starsByUser.values()][0] : 0;
 
               // Evaluate campaign achievements for all real players
               for (const uid of userIds) {
                 if (uid <= 0) continue;
                 try {
-                  const achievementsService = await import('./services/achievements');
-                  const cosmeticsService = await import('./services/cosmetics');
                   const userState = await progressService.getUserState(uid);
                   const totalStars = userState.totalStars;
-                  const unlocked = await achievementsService.evaluateAfterCampaign(
-                    uid,
-                    totalStars,
-                    level.id,
-                    level.worldId,
-                  );
-                  await cosmeticsService.checkCampaignStarUnlocks(uid, totalStars);
+                  // evaluateAfterCampaign already runs checkCampaignStarUnlocks; the direct call
+                  // that used to follow it here did the same work a second time. (audit E10)
+                  const unlocked = await achievementsService.evaluateAfterCampaign(uid, totalStars);
                   if (unlocked.achievements.length > 0) {
                     io.to(`user:${uid}`).emit('achievement:unlocked', unlocked);
                   }
@@ -1582,14 +1619,17 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         const humanCosmeticIds = userIds.filter((id) => id > 0);
         if (humanCosmeticIds.length > 0) {
           try {
-            const cosmeticsService = await import('./services/cosmetics');
             const cosmeticsMap = await cosmeticsService.getPlayerCosmeticsForGame(humanCosmeticIds);
             for (const [uid, cosData] of cosmeticsMap) {
               const player = game.getPlayer(uid);
               if (player) player.cosmetics = cosData;
             }
-          } catch {
-            /* cosmetics are non-critical */
+          } catch (err) {
+            // Non-critical: the level still starts with default looks — but say so. (audit B17)
+            logger.warn(
+              { err: getErrorMessage(err), userIds: humanCosmeticIds },
+              'Failed to load campaign cosmetics',
+            );
           }
         }
 
@@ -1603,11 +1643,8 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         }
 
         // Apply buddy color as cosmetic
-        if (data.buddyMode && userIds.length > 1) {
+        if (data.buddyMode && buddySettings && userIds.length > 1) {
           const buddyId = userIds[1];
-          const buddySettings = await import('./services/buddy').then((m) =>
-            m.getBuddySettings(socket.data.userId),
-          );
           const player = game.getPlayer(buddyId);
           if (player) {
             const colorNum = parseInt(buddySettings.color.replace('#', ''), 16);
@@ -1735,10 +1772,13 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       }
 
       const isGuest = socket.data.isGuest === true;
+      // Unauthenticated input: type-check, strip and cap it before it is stored on the player
+      // and re-broadcast in every state frame. '' lets the manager generate a Guest_… name.
+      // (audit B2)
       const result = openWorldManager.handleJoin(
         socket.id,
         socket.data.userId,
-        isGuest ? _data?.username || '' : socket.data.username,
+        isGuest ? sanitizeGuestUsername(_data?.username) : socket.data.username,
         isGuest,
       );
 
@@ -1819,6 +1859,9 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         spectatorChatLimiter.remove(socket.id);
         spectatorActionLimiter.remove(socket.id);
         guestRejectLogLimiter.remove(socket.id);
+        campaignStartLimiter.remove(socket.id); // audit E10
+        lobbySubscribeLimiter.remove(socket.id); // audit B16
+        adminRoomLimiter.remove(socket.id); // audit B16
         // Capture before clearing: the room-cleanup block further down reads this, and clearing it
         // first made its `||` dead, forcing a Redis lookup every disconnect — and if the
         // `player:<id>:room` key had expired during a long session, that lookup returned null and
@@ -1907,9 +1950,12 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     void restoreSession(socket);
   });
 
-  // Periodic cleanup of finished game rooms
+  // Periodic cleanup of finished game rooms and finished simulation runners. SimulationManager
+  // .cleanup() had no production caller, so every completed batch — full result array included —
+  // stayed in memory until restart. (audit B6)
   const cleanupInterval = setInterval(() => {
     roomManager.cleanup();
+    getSimulationManager().cleanup();
   }, ROOM_CLEANUP_INTERVAL_MS);
 
   // Keep presence alive for everyone currently connected. Presence keys expire after 120s so an

@@ -446,8 +446,6 @@ export async function evaluateAfterGame(
 export async function evaluateAfterCampaign(
   userId: number,
   totalStars: number,
-  _levelId: number,
-  _worldId: number,
 ): Promise<AchievementUnlockEvent> {
   // Fetch active campaign achievements NOT yet unlocked
   const achievements = await query<AchievementRow[]>(
@@ -536,6 +534,61 @@ export async function getAchievementProgress(userId: number): Promise<Achievemen
   );
   const bests: Partial<BestRow> = bestRows[0] || {};
 
+  // Per-mode and campaign totals are aggregated ONCE each, lazily, and the loop below reads them
+  // from memory. There used to be a query inside the loop for every locked mode_specific or
+  // campaign achievement — dozens of round-trips per GET /achievements/progress. The numbers are
+  // the same ones the per-achievement queries produced. (audit E2)
+  interface ModeTotalsRow extends RowDataPacket {
+    game_mode: string;
+    matches: number;
+    wins: number | string;
+    kills: number | string;
+  }
+  type ModeTotals = { matches: number; wins: number; kills: number };
+  let modeTotals: Map<string, ModeTotals> | null = null;
+  const getModeTotals = async (): Promise<Map<string, ModeTotals>> => {
+    if (modeTotals) return modeTotals;
+    const rows = await query<ModeTotalsRow[]>(
+      `SELECT m.game_mode,
+              COUNT(*) as matches,
+              SUM(CASE WHEN mp.placement = 1 THEN 1 ELSE 0 END) as wins,
+              COALESCE(SUM(mp.kills), 0) as kills
+       FROM match_players mp
+       JOIN matches m ON m.id = mp.match_id
+       WHERE mp.user_id = ?
+       GROUP BY m.game_mode`,
+      [userId],
+    );
+    // SUM() comes back as a DECIMAL string from mysql2; normalise once here.
+    modeTotals = new Map(
+      rows.map((r) => [
+        r.game_mode,
+        { matches: Number(r.matches), wins: Number(r.wins), kills: Number(r.kills) },
+      ]),
+    );
+    return modeTotals;
+  };
+
+  interface CampaignTotalsRow extends RowDataPacket {
+    total_stars: number | null;
+    levels_completed: number;
+  }
+  let campaignTotals: { totalStars: number; levelsCompleted: number } | null = null;
+  const getCampaignTotals = async () => {
+    if (campaignTotals) return campaignTotals;
+    const [row] = await query<CampaignTotalsRow[]>(
+      `SELECT
+         (SELECT total_stars FROM campaign_user_state WHERE user_id = ?) as total_stars,
+         (SELECT COUNT(*) FROM campaign_progress WHERE user_id = ? AND completed = TRUE) as levels_completed`,
+      [userId, userId],
+    );
+    campaignTotals = {
+      totalStars: Number(row?.total_stars ?? 0),
+      levelsCompleted: Number(row?.levels_completed ?? 0),
+    };
+    return campaignTotals;
+  };
+
   const results: AchievementProgress[] = [];
 
   for (const a of achievements) {
@@ -586,62 +639,18 @@ export async function getAchievementProgress(userId: number): Promise<Achievemen
         case 'mode_specific': {
           const mode = config.mode as string;
           const modeStat = config.stat as string;
-          if (modeStat === 'wins') {
-            interface CR extends RowDataPacket {
-              total: number;
-            }
-            const [row] = await query<CR[]>(
-              `SELECT COUNT(*) as total FROM matches m
-               JOIN match_players mp ON mp.match_id = m.id
-               WHERE mp.user_id = ? AND m.game_mode = ? AND mp.placement = 1`,
-              [userId, mode],
-            );
-            current = row?.total ?? 0;
-          } else if (modeStat === 'matches') {
-            interface CR extends RowDataPacket {
-              total: number;
-            }
-            const [row] = await query<CR[]>(
-              `SELECT COUNT(*) as total FROM matches m
-               JOIN match_players mp ON mp.match_id = m.id
-               WHERE mp.user_id = ? AND m.game_mode = ?`,
-              [userId, mode],
-            );
-            current = row?.total ?? 0;
-          } else if (modeStat === 'kills') {
-            interface SR extends RowDataPacket {
-              total: number;
-            }
-            const [row] = await query<SR[]>(
-              `SELECT COALESCE(SUM(mp.kills), 0) as total FROM matches m
-               JOIN match_players mp ON mp.match_id = m.id
-               WHERE mp.user_id = ? AND m.game_mode = ?`,
-              [userId, mode],
-            );
-            current = row?.total ?? 0;
+          if (modeStat === 'wins' || modeStat === 'matches' || modeStat === 'kills') {
+            const totals = (await getModeTotals()).get(mode);
+            current = totals ? totals[modeStat] : 0;
           }
           break;
         }
         case 'campaign': {
           const subType = config.subType as string;
           if (subType === 'total_stars') {
-            interface CR extends RowDataPacket {
-              total_stars: number;
-            }
-            const [row] = await query<CR[]>(
-              'SELECT total_stars FROM campaign_user_state WHERE user_id = ?',
-              [userId],
-            );
-            current = row?.total_stars ?? 0;
+            current = (await getCampaignTotals()).totalStars;
           } else if (subType === 'levels_completed') {
-            interface CR extends RowDataPacket {
-              total: number;
-            }
-            const [row] = await query<CR[]>(
-              'SELECT COUNT(*) as total FROM campaign_progress WHERE user_id = ? AND completed = TRUE',
-              [userId],
-            );
-            current = row?.total ?? 0;
+            current = (await getCampaignTotals()).levelsCompleted;
           }
           break;
         }

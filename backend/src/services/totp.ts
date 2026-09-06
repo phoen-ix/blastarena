@@ -47,11 +47,10 @@ export async function beginSetup(userId: number, username: string): Promise<Totp
   const secret = totp.secret.base32;
   const encrypted = encryptTotpSecret(secret, key);
 
+  // Ten bcrypt hashes in parallel on the libuv pool rather than one after another — sequentially
+  // this was ~2.5–5 s of wall-clock per setup. (audit E5)
   const backupCodes = generateBackupCodes(10);
-  const hashedCodes: string[] = [];
-  for (const code of backupCodes) {
-    hashedCodes.push(await hashPassword(code));
-  }
+  const hashedCodes = await Promise.all(backupCodes.map((code) => hashPassword(code)));
 
   await execute('UPDATE users SET totp_secret = ?, totp_backup_codes = ? WHERE id = ?', [
     encrypted,

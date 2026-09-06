@@ -5,7 +5,6 @@ import {
   MapChallenge,
   MapChallengeSummary,
   ChallengeScore,
-  ChallengeLeaderboardResponse,
   ActiveChallengeInfo,
 } from '@blast-arena/shared';
 import { AppError } from '../middleware/errorHandler';
@@ -39,7 +38,18 @@ interface ScoreRow extends RowDataPacket {
 }
 
 interface TilesRow extends RowDataPacket {
-  tiles: string;
+  /** JSON column: a string, or already an object depending on driver settings. */
+  tiles: string | unknown;
+}
+
+/** JSON columns may arrive parsed or as text; same helper as services/custom-maps.ts. (audit B7) */
+function safeJsonParse<T>(value: unknown, fallback: T): T {
+  if (typeof value !== 'string') return (value as T) ?? fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
 }
 
 function toSummary(row: ChallengeSummaryRow): MapChallengeSummary {
@@ -186,34 +196,6 @@ export async function deactivateChallenge(id: number): Promise<void> {
   await execute('UPDATE map_challenges SET is_active = FALSE WHERE id = ?', [id]);
 }
 
-export async function getChallengeLeaderboard(
-  challengeId: number,
-  page: number = 1,
-  limit: number = 20,
-): Promise<ChallengeLeaderboardResponse> {
-  const offset = (page - 1) * limit;
-  const [rows, countRows] = await Promise.all([
-    query<ScoreRow[]>(
-      `SELECT cs.user_id, u.username, cs.wins, cs.kills, cs.deaths, cs.games_played, cs.best_placement
-       FROM challenge_scores cs
-       JOIN users u ON cs.user_id = u.id
-       WHERE cs.challenge_id = ?
-       ORDER BY cs.wins DESC, cs.kills DESC, cs.deaths ASC, cs.id ASC
-       LIMIT ? OFFSET ?`,
-      [challengeId, limit, offset],
-    ),
-    query<CountRow[]>('SELECT COUNT(*) as total FROM challenge_scores WHERE challenge_id = ?', [
-      challengeId,
-    ]),
-  ]);
-  return {
-    scores: rows.map(toScore),
-    total: countRows[0].total,
-    page,
-    limit,
-  };
-}
-
 export async function recordChallengeResult(
   challengeId: number,
   userId: number,
@@ -247,7 +229,11 @@ export async function getActiveChallengeInfo(): Promise<ActiveChallengeInfo | nu
   const mapRows = await query<TilesRow[]>('SELECT tiles FROM custom_maps WHERE id = ?', [
     challenge.customMapId,
   ]);
-  const mapTiles = mapRows.length > 0 ? (JSON.parse(mapRows[0].tiles) as string[][]) : null;
+  // mysql2 may hand a JSON column back already parsed (an object), in which case JSON.parse
+  // throws — every other service goes through safeJsonParse for this reason. This one sat behind
+  // the unauthenticated GET /challenges/active. (audit B7)
+  const mapTiles =
+    mapRows.length > 0 ? safeJsonParse<string[][] | null>(mapRows[0].tiles, null) : null;
 
   // Get top 5 scores
   const topRows = await query<ScoreRow[]>(

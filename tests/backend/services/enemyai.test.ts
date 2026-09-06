@@ -460,7 +460,19 @@ describe('EnemyAI Service', () => {
         true,
         'enemy-ai-1',
       ]);
-      expect(mockLoadAI).toHaveBeenCalledWith('enemy-ai-1');
+      // Uploaded (uploaded_by = 1) → untrusted → isolated. (audit B10)
+      expect(mockLoadAI).toHaveBeenCalledWith('enemy-ai-1', false);
+    });
+
+    it('re-activates a seeded AI (no uploader) as trusted, like initialize() does', async () => {
+      // Without the flag a seeded enemy AI silently moved into the isolate on re-activation.
+      // (audit B10)
+      mockQuery.mockResolvedValue([makeAIRow({ is_active: false, uploaded_by: null })]);
+      mockExecute.mockResolvedValue({});
+
+      await updateEnemyAI('enemy-ai-1', { isActive: true }, 1);
+
+      expect(mockLoadAI).toHaveBeenCalledWith('enemy-ai-1', true);
     });
 
     it('should unload AI from registry when deactivating', async () => {
@@ -549,8 +561,8 @@ describe('EnemyAI Service', () => {
         'enemy-ai-1',
       ]);
 
-      // Reloaded because active
-      expect(mockReloadAI).toHaveBeenCalledWith('enemy-ai-1');
+      // Reloaded because active; uploaded_by = 1 → untrusted. (audit B10)
+      expect(mockReloadAI).toHaveBeenCalledWith('enemy-ai-1', false);
 
       // Audit logged
       expect(mockExecute).toHaveBeenCalledWith(

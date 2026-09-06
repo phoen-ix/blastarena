@@ -3,6 +3,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { EnemyAIEntry } from '@blast-arena/shared';
 import { query, execute } from '../db/connection';
+import { logAdminAction } from './admin-audit';
 import { EnemyAIRow } from '../db/types';
 import { compileEnemyAI } from './enemyai-compiler';
 import { getEnemyAIRegistry } from './enemyai-registry';
@@ -101,9 +102,12 @@ export async function uploadEnemyAI(
 
   getEnemyAIRegistry().loadAI(id);
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [uploadedBy, 'upload_enemy_ai', 'enemy_ai', 0, JSON.stringify({ aiId: id, name, filename })],
+  await logAdminAction(
+    uploadedBy,
+    'upload_enemy_ai',
+    'enemy_ai',
+    0,
+    JSON.stringify({ aiId: id, name, filename }),
   );
 
   logger.info({ aiId: id, name }, 'Custom EnemyAI uploaded');
@@ -142,15 +146,12 @@ export async function uploadEnemyAIFromSource(
 
   getEnemyAIRegistry().loadAI(id);
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [
-      uploadedBy,
-      'upload_enemy_ai',
-      'enemy_ai',
-      0,
-      JSON.stringify({ aiId: id, name, filename, source: 'import' }),
-    ],
+  await logAdminAction(
+    uploadedBy,
+    'upload_enemy_ai',
+    'enemy_ai',
+    0,
+    JSON.stringify({ aiId: id, name, filename, source: 'import' }),
   );
 
   const entry = await getEnemyAI(id);
@@ -189,7 +190,10 @@ export async function updateEnemyAI(
   if (updates.isActive !== undefined) {
     if (updates.isActive) {
       try {
-        getEnemyAIRegistry().loadAI(id);
+        // Same trust rule as EnemyAIRegistry.initialize(): a seeded AI (no uploader) runs
+        // in-process; an upload is isolated. Without the flag, re-activating a seeded AI silently
+        // moved it into the isolate (with its 20 ms invoke budget) until restart. (audit B10)
+        getEnemyAIRegistry().loadAI(id, rows[0].uploaded_by == null);
       } catch (err: unknown) {
         logger.warn(
           { aiId: id, error: err instanceof Error ? err.message : String(err) },
@@ -201,9 +205,12 @@ export async function updateEnemyAI(
     }
   }
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'update_enemy_ai', 'enemy_ai', 0, JSON.stringify({ aiId: id, updates })],
+  await logAdminAction(
+    adminId,
+    'update_enemy_ai',
+    'enemy_ai',
+    0,
+    JSON.stringify({ aiId: id, updates }),
   );
 }
 
@@ -233,15 +240,19 @@ export async function reuploadEnemyAI(
 
   if (rows[0].is_active) {
     try {
-      getEnemyAIRegistry().reloadAI(id);
+      // Same trust rule as initialize() — see updateEnemyAI. (audit B10)
+      getEnemyAIRegistry().reloadAI(id, rows[0].uploaded_by == null);
     } catch (_err: unknown) {
       logger.warn({ aiId: id }, 'Failed to reload enemy AI after re-upload');
     }
   }
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'reupload_enemy_ai', 'enemy_ai', 0, JSON.stringify({ aiId: id, filename })],
+  await logAdminAction(
+    adminId,
+    'reupload_enemy_ai',
+    'enemy_ai',
+    0,
+    JSON.stringify({ aiId: id, filename }),
   );
 
   return { success: true };
@@ -260,9 +271,12 @@ export async function deleteEnemyAI(id: string, adminId: number): Promise<void> 
 
   await execute('DELETE FROM enemy_ais WHERE id = ?', [id]);
 
-  await execute(
-    'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-    [adminId, 'delete_enemy_ai', 'enemy_ai', 0, JSON.stringify({ aiId: id, name: rows[0].name })],
+  await logAdminAction(
+    adminId,
+    'delete_enemy_ai',
+    'enemy_ai',
+    0,
+    JSON.stringify({ aiId: id, name: rows[0].name }),
   );
 
   logger.info({ aiId: id, name: rows[0].name }, 'Custom EnemyAI deleted');

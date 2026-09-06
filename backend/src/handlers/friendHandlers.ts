@@ -195,12 +195,10 @@ export async function notifyFriendsOnline(
 ): Promise<void> {
   try {
     const friendIds = await friendsService.getFriendIds(userId);
-    for (const friendId of friendIds) {
-      io.to(`user:${friendId}`).emit('friend:online', {
-        userId,
-        activity,
-      });
-    }
+    if (friendIds.length === 0) return;
+    // One emit to every friend's room at once — io.to() takes an array and de-duplicates
+    // sockets — instead of one broadcast per friend. (audit E11)
+    io.to(friendIds.map((id) => `user:${id}`)).emit('friend:online', { userId, activity });
   } catch (err) {
     logger.error({ err, userId }, 'Failed to notify friends online');
   }
@@ -210,9 +208,8 @@ export async function notifyFriendsOnline(
 export async function notifyFriendsOffline(io: TypedServer, userId: number): Promise<void> {
   try {
     const friendIds = await friendsService.getFriendIds(userId);
-    for (const friendId of friendIds) {
-      io.to(`user:${friendId}`).emit('friend:offline', { userId });
-    }
+    if (friendIds.length === 0) return;
+    io.to(friendIds.map((id) => `user:${id}`)).emit('friend:offline', { userId }); // audit E11
   } catch (err) {
     logger.error({ err, userId }, 'Failed to notify friends offline');
   }

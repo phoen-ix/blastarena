@@ -169,3 +169,14 @@ Migrations in `backend/src/db/migrations/` run automatically on server start:
 28. `028_tutorial_levels_seed.sql` — Tutorial campaign: 8 worlds, 21 levels
 29. `029_email_hashing.sql` — email_hash, email_hint columns for HMAC-SHA256 storage
 30. `030_finalize_email_hashing.sql` — Drop plaintext email columns, enforce NOT NULL on email_hash
+31. `031_map_ratings.sql` — map_ratings table (1-5 stars on published custom maps)
+32. `032_map_challenges.sql` — map_challenges + challenge_scores tables, custom_map_id index on matches
+33. `033_open_world.sql` — open-world server settings
+34. `034_verification_resend_count.sql` — verification_resend_count on users
+35. `035_campaign_world_index.sql` — world_id index on campaign_levels
+36. `036_totp.sql` — TOTP secret, backup codes and enabled flag on users
+37. `037_open_world_afk_timeout.sql` — open_world_afk_timeout setting
+38. `038_email_verify_expires.sql` — expiry on verification tokens
+39. `039_leaderboard_elo_index.sql` — elo_rating and finished_at indexes for the leaderboard queries
+40. `040_audit_indexes.sql` — indexes for admin_actions(action), friendships(friend_id, status), cosmetics(unlock_type, is_active), achievements(is_active), campaign_replays(created_at), custom_maps(updated_at), refresh_tokens(revoked, created_at); drops the redundant idx_progress_user_level
+41. `041_drop_login_attempts.sql` — Drop the never-used login_attempts table (login limiting is Redis-based)

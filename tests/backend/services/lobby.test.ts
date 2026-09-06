@@ -35,9 +35,11 @@ const mockRedis = {
     store.set(args[0] as string, args[1] as string);
     return Promise.resolve('OK');
   }),
-  del: jest.fn<AnyFn>((key: string) => {
-    store.delete(key);
-    return Promise.resolve(1);
+  // Variadic like the real command: deleteRoom sends every key in one DEL. (audit E11)
+  del: jest.fn<AnyFn>((...keys: string[]) => {
+    let removed = 0;
+    for (const key of keys) if (store.delete(key)) removed++;
+    return Promise.resolve(removed);
   }),
   // SCAN returns all matching keys in a single cursor pass (test simplification)
   scan: jest.fn<AnyFn>((_cursor: string, _matchKw: string, pattern: string) => {
@@ -75,7 +77,6 @@ import {
   leaveRoom,
   deleteRoom,
   setPlayerReady,
-  setPlayerTeam,
 } from '../../../backend/src/services/lobby';
 
 import { AppError } from '../../../backend/src/middleware/errorHandler';
@@ -106,9 +107,10 @@ describe('lobby service', () => {
       store.set(args[0] as string, args[1] as string);
       return Promise.resolve('OK');
     });
-    mockRedis.del.mockImplementation((key: string) => {
-      store.delete(key);
-      return Promise.resolve(1);
+    mockRedis.del.mockImplementation((...keys: string[]) => {
+      let removed = 0;
+      for (const key of keys) if (store.delete(key)) removed++;
+      return Promise.resolve(removed);
     });
     mockRedis.scan.mockImplementation((_cursor: string, _matchKw: string, pattern: string) => {
       const prefix = pattern.replace('*', '');
@@ -534,21 +536,29 @@ describe('lobby service', () => {
     });
   });
 
-  // ── setPlayerTeam ──────────────────────────────────────────────────
+  // ── deleteRoom ─────────────────────────────────────────────────────
 
-  describe('setPlayerTeam', () => {
-    it('sets team on player', async () => {
+  describe('deleteRoom', () => {
+    it('removes the room key and every player key in a single DEL', async () => {
+      // (audit E11) — one round-trip for all keys instead of one per player.
       const host = makeUser(1, 'alice');
-      const config = makeConfig();
-      await createRoom(host as any, 'Room', config as any);
+      await createRoom(host as any, 'Room', makeConfig() as any);
+      await joinRoom('ABCDEF', makeUser(2, 'bob') as any);
+      mockRedis.del.mockClear();
 
-      const room = await setPlayerTeam('ABCDEF', 1, 0);
+      await deleteRoom('ABCDEF');
 
-      expect(room.players[0].team).toBe(0);
+      expect(mockRedis.del).toHaveBeenCalledTimes(1);
+      expect(mockRedis.del).toHaveBeenCalledWith('room:ABCDEF', 'player:1:room', 'player:2:room');
+      expect(store.has('room:ABCDEF')).toBe(false);
+      expect(store.has('player:1:room')).toBe(false);
+      expect(store.has('player:2:room')).toBe(false);
+    });
 
-      const room2 = await setPlayerTeam('ABCDEF', 1, 1);
-
-      expect(room2.players[0].team).toBe(1);
+    it('still deletes the room key when the room is already gone', async () => {
+      mockRedis.del.mockClear();
+      await deleteRoom('NOPE00');
+      expect(mockRedis.del).toHaveBeenCalledWith('room:NOPE00');
     });
   });
 });

@@ -51,21 +51,39 @@ describe('Party Service', () => {
     jest.clearAllMocks();
     store.clear();
 
-    // Faithfully emulate the create/leave/kick Lua scripts against the in-memory store so the
-    // existing behavioural assertions keep exercising real semantics now that these operations
-    // are atomic (audit REDIS-RACE-1/3/4). Individual tests may still override eval per-call.
+    // Faithfully emulate the create/join/leave/kick Lua scripts against the in-memory store so
+    // the existing behavioural assertions keep exercising real semantics now that these
+    // operations are atomic (audit REDIS-RACE-1/3/4). The scripts answer 'ERR:CODE' strings, which
+    // the service maps to AppError (audit B4). Individual tests may still override eval per-call.
     mockRedis.eval.mockImplementation((...callArgs: unknown[]) => {
       const script = callArgs[0] as string;
       const numKeys = callArgs[1] as number;
       const keys = callArgs.slice(2, 2 + numKeys) as string[];
       const argv = callArgs.slice(2 + numKeys) as string[];
 
-      if (script.includes('Already in a party')) {
+      if (script.includes("redis.call('EXISTS', playerKey)")) {
         // CREATE_PARTY_LUA: keys=[partyKey, playerKey], argv=[partyJson, partyId, ttl]
-        if (store.has(keys[1])) return Promise.reject(new Error('Already in a party'));
+        if (store.has(keys[1])) return Promise.resolve('ERR:ALREADY_IN_PARTY');
         store.set(keys[0], argv[0]);
         store.set(keys[1], argv[1]);
         return Promise.resolve('OK');
+      }
+
+      if (script.includes('ERR:ALREADY_IN_OTHER_PARTY')) {
+        // JOIN_PARTY_LUA: keys=[partyKey, playerKey],
+        // argv=[maxSize, userId, username, ttl, partyId]
+        const current = store.get(keys[1]);
+        if (current && current !== argv[4]) return Promise.resolve('ERR:ALREADY_IN_OTHER_PARTY');
+        const data = store.get(keys[0]);
+        if (!data) return Promise.resolve('ERR:PARTY_NOT_FOUND');
+        const party = JSON.parse(data);
+        if (party.members.length >= Number(argv[0])) return Promise.resolve('ERR:PARTY_FULL');
+        if (party.members.some((m: { userId: number }) => String(m.userId) === argv[1]))
+          return Promise.resolve('ERR:ALREADY_IN_PARTY');
+        party.members.push({ userId: Number(argv[1]), username: argv[2] });
+        store.set(keys[0], JSON.stringify(party));
+        store.set(keys[1], party.id);
+        return Promise.resolve(JSON.stringify(party));
       }
 
       if (script.includes("return 'left'")) {
@@ -87,25 +105,24 @@ describe('Party Service', () => {
         return Promise.resolve('left');
       }
 
-      if (script.includes('can kick members')) {
+      if (script.includes('ERR:NOT_LEADER')) {
         // KICK_FROM_PARTY_LUA: keys=[partyKey, targetPlayerKey], argv=[leaderId, targetId, ttl]
         const data = store.get(keys[0]);
-        if (!data) return Promise.reject(new Error('Party not found'));
+        if (!data) return Promise.resolve('ERR:PARTY_NOT_FOUND');
         const party = JSON.parse(data);
         const leaderId = Number(argv[0]);
         const targetId = Number(argv[1]);
-        if (party.leaderId !== leaderId)
-          return Promise.reject(new Error('Only the party leader can kick members'));
-        if (targetId === leaderId) return Promise.reject(new Error('Cannot kick yourself'));
+        if (party.leaderId !== leaderId) return Promise.resolve('ERR:NOT_LEADER');
+        if (targetId === leaderId) return Promise.resolve('ERR:CANNOT_KICK_SELF');
         if (!party.members.some((m: { userId: number }) => m.userId === targetId))
-          return Promise.reject(new Error('User is not in the party'));
+          return Promise.resolve('ERR:NOT_IN_PARTY');
         party.members = party.members.filter((m: { userId: number }) => m.userId !== targetId);
         store.delete(keys[1]);
         store.set(keys[0], JSON.stringify(party));
         return Promise.resolve(JSON.stringify(party));
       }
 
-      // JOIN_PARTY_LUA and others are stubbed per-test via mockResolvedValue.
+      // Anything else is stubbed per-test via mockResolvedValue.
       return Promise.resolve(undefined);
     });
   });
@@ -125,7 +142,11 @@ describe('Party Service', () => {
     it('should throw when already in a party', async () => {
       store.set('player:party:1', 'existing-party');
 
-      await expect(partyService.createParty(1, 'alice')).rejects.toThrow('Already in a party');
+      await expect(partyService.createParty(1, 'alice')).rejects.toMatchObject({
+        message: 'Already in a party',
+        statusCode: 409,
+        code: 'ALREADY_IN_PARTY',
+      });
     });
   });
 
@@ -187,6 +208,30 @@ describe('Party Service', () => {
       await expect(partyService.joinParty('p1', 2, 'bob')).rejects.toThrow(
         'Already in another party',
       );
+    });
+
+    it('checks exclusivity inside the script, not with a separate GET (audit B5)', async () => {
+      store.set('player:party:2', 'other-party');
+      mockRedis.get.mockClear();
+
+      await expect(partyService.joinParty('p1', 2, 'bob')).rejects.toMatchObject({
+        code: 'ALREADY_IN_PARTY',
+      });
+      // No JS-side pre-check: the only Redis call is the eval.
+      expect(mockRedis.get).not.toHaveBeenCalled();
+      expect(mockRedis.eval).toHaveBeenCalledTimes(1);
+      // The party id travels into the script so it can tell "this party" from "another".
+      const evalArgs = mockRedis.eval.mock.calls[0];
+      expect(evalArgs[evalArgs.length - 1]).toBe('p1');
+    });
+
+    it('lets a player re-join the party they are already bound to by key', async () => {
+      const party = { id: 'p1', leaderId: 1, members: [{ userId: 1, username: 'alice' }] };
+      store.set('party:p1', JSON.stringify(party));
+      store.set('player:party:2', 'p1');
+
+      const result = await partyService.joinParty('p1', 2, 'bob');
+      expect(result.members.map((m) => m.userId)).toEqual([1, 2]);
     });
 
     it('should throw when Lua script fails', async () => {
@@ -318,31 +363,6 @@ describe('Party Service', () => {
       await expect(partyService.kickFromParty('p1', 1, 99)).rejects.toThrow(
         'User is not in the party',
       );
-    });
-  });
-
-  describe('disbandParty', () => {
-    it('should delete party and all player keys', async () => {
-      const party = {
-        id: 'p1',
-        leaderId: 1,
-        members: [
-          { userId: 1, username: 'alice' },
-          { userId: 2, username: 'bob' },
-        ],
-        createdAt: '2026-01-01',
-      };
-      store.set('party:p1', JSON.stringify(party));
-      store.set('player:party:1', 'p1');
-      store.set('player:party:2', 'p1');
-
-      const memberIds = await partyService.disbandParty('p1');
-      expect(memberIds).toEqual([1, 2]);
-    });
-
-    it('should return empty array when party not found', async () => {
-      const memberIds = await partyService.disbandParty('nonexistent');
-      expect(memberIds).toEqual([]);
     });
   });
 

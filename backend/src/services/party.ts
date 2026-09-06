@@ -7,7 +7,50 @@ const PARTY_TTL = 3600; // 1 hour
 const PARTY_KEY_PREFIX = 'party:';
 const PLAYER_PARTY_PREFIX = 'player:party:';
 
-// Lua script for atomic party join (prevents race conditions)
+/**
+ * Lua scripts reply with `'ERR:CODE'` strings, mapped to AppError here — the same pattern as
+ * JOIN_ERROR_MAP in services/lobby.ts.
+ *
+ * They used to reply with `{err = '…'}` tables, which ioredis surfaces as a thrown `ReplyError`.
+ * clientError() only lets AppError through, so "Party is full", "Already in party" and "Only the
+ * party leader can kick members" all reached the client as "An unexpected error occurred" — and
+ * were logged as server errors. (audit B4)
+ */
+const PARTY_ERROR_MAP: Record<string, { message: string; status: number; code: string }> = {
+  PARTY_NOT_FOUND: { message: 'Party not found', status: 404, code: 'PARTY_NOT_FOUND' },
+  PARTY_FULL: { message: 'Party is full', status: 409, code: 'PARTY_FULL' },
+  ALREADY_IN_PARTY: { message: 'Already in a party', status: 409, code: 'ALREADY_IN_PARTY' },
+  ALREADY_IN_OTHER_PARTY: {
+    message: 'Already in another party',
+    status: 409,
+    code: 'ALREADY_IN_PARTY',
+  },
+  NOT_LEADER: {
+    message: 'Only the party leader can kick members',
+    status: 403,
+    code: 'NOT_LEADER',
+  },
+  CANNOT_KICK_SELF: { message: 'Cannot kick yourself', status: 400, code: 'CANNOT_KICK_SELF' },
+  NOT_IN_PARTY: { message: 'User is not in the party', status: 404, code: 'NOT_IN_PARTY' },
+};
+
+/** Throw the AppError for an `ERR:CODE` reply; return the reply unchanged otherwise. */
+function throwIfPartyError(result: unknown, fallback: { message: string; code: string }): string {
+  if (typeof result !== 'string') {
+    throw new AppError(fallback.message, 409, fallback.code);
+  }
+  if (result.startsWith('ERR:')) {
+    const mapped = PARTY_ERROR_MAP[result.slice(4)];
+    if (mapped) throw new AppError(mapped.message, mapped.status, mapped.code);
+    throw new AppError(fallback.message, 409, fallback.code);
+  }
+  return result;
+}
+
+// Lua script for atomic party join (prevents race conditions).
+// KEYS[1] = party key, KEYS[2] = player:party:<userId> key
+// ARGV[1] = max size, ARGV[2] = user id (string), ARGV[3] = username, ARGV[4] = ttl, ARGV[5] = party id
+// Returns: party JSON on success, or 'ERR:*'
 const JOIN_PARTY_LUA = `
   local partyKey = KEYS[1]
   local playerKey = KEYS[2]
@@ -15,20 +58,29 @@ const JOIN_PARTY_LUA = `
   local userId = ARGV[2]
   local username = ARGV[3]
   local ttl = tonumber(ARGV[4])
+  local partyId = ARGV[5]
+
+  -- Exclusivity is checked here, atomically with the join. It used to be a separate GET in JS
+  -- before the eval, so two invites accepted at the same moment both passed and the player was
+  -- left as a ghost member of the first party. (audit B5)
+  local currentParty = redis.call('GET', playerKey)
+  if currentParty and currentParty ~= partyId then
+    return 'ERR:ALREADY_IN_OTHER_PARTY'
+  end
 
   local partyData = redis.call('GET', partyKey)
   if not partyData then
-    return {err = 'Party not found'}
+    return 'ERR:PARTY_NOT_FOUND'
   end
 
   local party = cjson.decode(partyData)
   if #party.members >= maxSize then
-    return {err = 'Party is full'}
+    return 'ERR:PARTY_FULL'
   end
 
   for _, m in ipairs(party.members) do
     if tostring(m.userId) == userId then
-      return {err = 'Already in party'}
+      return 'ERR:ALREADY_IN_PARTY'
     end
   end
 
@@ -48,7 +100,7 @@ const CREATE_PARTY_LUA = `
   local ttl = tonumber(ARGV[3])
 
   if redis.call('EXISTS', playerKey) == 1 then
-    return {err = 'Already in a party'}
+    return 'ERR:ALREADY_IN_PARTY'
   end
 
   redis.call('SET', partyKey, partyJson, 'EX', ttl)
@@ -67,8 +119,8 @@ export async function createParty(userId: number, username: string): Promise<Par
     createdAt: new Date().toISOString(),
   };
 
-  // Rejects with 'Already in a party' (Lua error reply) if the player already has a party.
-  await redis.eval(
+  // 'ERR:ALREADY_IN_PARTY' if the player already has a party. (audit B4)
+  const result = await redis.eval(
     CREATE_PARTY_LUA,
     2,
     `${PARTY_KEY_PREFIX}${partyId}`,
@@ -77,6 +129,7 @@ export async function createParty(userId: number, username: string): Promise<Par
     partyId,
     PARTY_TTL,
   );
+  throwIfPartyError(result, { message: 'Failed to create party', code: 'PARTY_CREATE_FAILED' });
 
   return party;
 }
@@ -100,12 +153,7 @@ export async function getPlayerParty(userId: number): Promise<string | null> {
 export async function joinParty(partyId: string, userId: number, username: string): Promise<Party> {
   const redis = getRedis();
 
-  // Check player not already in a different party
-  const existingParty = await redis.get(`${PLAYER_PARTY_PREFIX}${userId}`);
-  if (existingParty && existingParty !== partyId) {
-    throw new AppError('Already in another party', 409, 'ALREADY_IN_PARTY');
-  }
-
+  // The "already in another party" check lives inside the script (audit B5).
   const result = await redis.eval(
     JOIN_PARTY_LUA,
     2,
@@ -115,13 +163,14 @@ export async function joinParty(partyId: string, userId: number, username: strin
     userId.toString(),
     username,
     PARTY_TTL,
+    partyId,
   );
 
-  if (typeof result === 'string') {
-    return JSON.parse(result) as Party;
-  }
-
-  throw new AppError('Failed to join party', 409, 'PARTY_JOIN_FAILED');
+  const json = throwIfPartyError(result, {
+    message: 'Failed to join party',
+    code: 'PARTY_JOIN_FAILED',
+  });
+  return JSON.parse(json) as Party;
 }
 
 // Atomic leave: remove the member (or disband if leader leaves / party empties) in one call.
@@ -186,14 +235,14 @@ const KICK_FROM_PARTY_LUA = `
 
   local partyData = redis.call('GET', partyKey)
   if not partyData then
-    return {err = 'Party not found'}
+    return 'ERR:PARTY_NOT_FOUND'
   end
   local party = cjson.decode(partyData)
   if party.leaderId ~= leaderId then
-    return {err = 'Only the party leader can kick members'}
+    return 'ERR:NOT_LEADER'
   end
   if targetId == leaderId then
-    return {err = 'Cannot kick yourself'}
+    return 'ERR:CANNOT_KICK_SELF'
   end
 
   local found = false
@@ -206,7 +255,7 @@ const KICK_FROM_PARTY_LUA = `
     end
   end
   if not found then
-    return {err = 'User is not in the party'}
+    return 'ERR:NOT_IN_PARTY'
   end
 
   party.members = newMembers
@@ -231,26 +280,11 @@ export async function kickFromParty(
     PARTY_TTL,
   );
 
-  if (typeof result === 'string') {
-    return JSON.parse(result) as Party;
-  }
-  throw new AppError('Failed to kick member', 409, 'PARTY_KICK_FAILED');
-}
-
-export async function disbandParty(partyId: string): Promise<number[]> {
-  const redis = getRedis();
-  const party = await getParty(partyId);
-  if (!party) return [];
-
-  const memberIds = party.members.map((m) => m.userId);
-  const pipeline = redis.pipeline();
-  pipeline.del(`${PARTY_KEY_PREFIX}${partyId}`);
-  for (const member of party.members) {
-    pipeline.del(`${PLAYER_PARTY_PREFIX}${member.userId}`);
-  }
-  await pipeline.exec();
-
-  return memberIds;
+  const json = throwIfPartyError(result, {
+    message: 'Failed to kick member',
+    code: 'PARTY_KICK_FAILED',
+  });
+  return JSON.parse(json) as Party;
 }
 
 // Invite management via Redis with TTL

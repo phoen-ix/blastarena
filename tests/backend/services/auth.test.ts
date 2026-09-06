@@ -3,9 +3,16 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mockQuery = jest.fn<(...args: any[]) => Promise<any>>();
 const mockExecute = jest.fn<(...args: any[]) => Promise<any>>();
+// Transaction connection used by the refresh rotation (audit B12). Its execute() follows the
+// mysql2 promise shape, `[result, fields]`; the pool-level mockExecute above returns `result`.
+const mockConnExecute = jest.fn<(...args: any[]) => Promise<any>>();
+const mockWithTransaction = jest.fn<(...args: any[]) => Promise<any>>(async (fn) =>
+  fn({ execute: mockConnExecute, query: jest.fn() }),
+);
 jest.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
+  withTransaction: mockWithTransaction,
 }));
 
 const mockHashPassword = jest.fn<(password: string) => Promise<string>>();
@@ -237,7 +244,7 @@ describe('Auth Service', () => {
 
     it('should rotate token and return new auth on success', async () => {
       mockQuery.mockResolvedValue([mockRefreshRow]);
-      mockExecute.mockResolvedValue({ affectedRows: 1 });
+      mockConnExecute.mockResolvedValue([{ affectedRows: 1 }]);
 
       const result = await authService.refreshAccessToken('old-token');
 
@@ -251,8 +258,51 @@ describe('Auth Service', () => {
       });
       expect(result.auth.accessToken).toBeDefined();
       expect(result.refreshToken).toBeDefined();
-      // Should revoke old token and insert new one
-      expect(mockExecute).toHaveBeenCalledTimes(2);
+      // Revoke-old and insert-new run on the SAME transaction connection, so an INSERT failure
+      // cannot leave the user with no valid refresh token. (audit B12)
+      expect(mockWithTransaction).toHaveBeenCalledTimes(1);
+      expect(mockConnExecute).toHaveBeenCalledTimes(2);
+      expect(mockConnExecute).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining('SET revoked = TRUE WHERE id = ? AND revoked = FALSE'),
+        [5],
+      );
+      expect(mockConnExecute).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('INSERT INTO refresh_tokens'),
+        [10, 'hashed-token', expect.any(Date)],
+      );
+      // Nothing written outside the transaction.
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it('rolls back the rotation when the insert fails, and rethrows', async () => {
+      mockQuery.mockResolvedValue([mockRefreshRow]);
+      mockConnExecute
+        .mockResolvedValueOnce([{ affectedRows: 1 }])
+        .mockRejectedValueOnce(new Error('ER_LOCK_WAIT_TIMEOUT'));
+      // A real withTransaction rolls back and rethrows; the mock simply propagates.
+
+      await expect(authService.refreshAccessToken('old-token')).rejects.toThrow(
+        'ER_LOCK_WAIT_TIMEOUT',
+      );
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it('treats a lost compare-and-swap as reuse: revokes every token for the user', async () => {
+      mockQuery.mockResolvedValue([mockRefreshRow]);
+      mockConnExecute.mockResolvedValue([{ affectedRows: 0 }]);
+      mockExecute.mockResolvedValue({ affectedRows: 3 });
+
+      await expect(authService.refreshAccessToken('old-token')).rejects.toMatchObject({
+        statusCode: 401,
+        code: 'TOKEN_REUSE',
+      });
+      expect(mockConnExecute).toHaveBeenCalledTimes(1); // no INSERT after a failed CAS
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.stringContaining('SET revoked = TRUE WHERE user_id = ?'),
+        [10],
+      );
     });
 
     it('should throw 401 on invalid token (not found in DB)', async () => {
@@ -344,6 +394,64 @@ describe('Auth Service', () => {
         expect(err).toBeInstanceOf(AppError);
         expect((err as InstanceType<typeof AppError>).statusCode).toBe(400);
       }
+    });
+  });
+
+  describe('resendVerificationEmail', () => {
+    const unverified = {
+      id: 10,
+      email_hash: 'hashed-email',
+      email_verified: false,
+      language: 'de',
+      verification_resend_count: 1,
+    };
+
+    it('counts the resend only after the email has actually been sent', async () => {
+      // (audit B14) — the counter used to be bumped in the same UPDATE as the token, before the
+      // SMTP call, so a delivery failure burned one of the three attempts.
+      mockQuery.mockResolvedValue([unverified]);
+      mockExecute.mockResolvedValue({ affectedRows: 1 });
+
+      const result = await authService.resendVerificationEmail(10, 'Test@Example.com');
+
+      expect(result).toEqual({ remainingResends: 1 });
+      expect(mockSendVerificationEmail).toHaveBeenCalledWith(
+        'test@example.com',
+        'a'.repeat(64),
+        'de',
+      );
+
+      const sqls = mockExecute.mock.calls.map((c) => String(c[0]));
+      expect(sqls[0]).toContain('email_verify_token = ?');
+      expect(sqls[0]).not.toContain('verification_resend_count');
+      expect(sqls[1]).toContain('verification_resend_count = verification_resend_count + 1');
+      // Order: token written, mail sent, THEN counted.
+      const sendOrder = mockSendVerificationEmail.mock.invocationCallOrder[0];
+      expect(mockExecute.mock.invocationCallOrder[0]).toBeLessThan(sendOrder);
+      expect(mockExecute.mock.invocationCallOrder[1]).toBeGreaterThan(sendOrder);
+    });
+
+    it('does not burn an attempt when the email fails to send', async () => {
+      mockQuery.mockResolvedValue([unverified]);
+      mockExecute.mockResolvedValue({ affectedRows: 1 });
+      mockSendVerificationEmail.mockRejectedValue(new Error('SMTP down'));
+
+      await expect(authService.resendVerificationEmail(10, 'test@example.com')).rejects.toThrow(
+        'SMTP down',
+      );
+
+      const sqls = mockExecute.mock.calls.map((c) => String(c[0]));
+      expect(sqls.some((sql) => sql.includes('verification_resend_count + 1'))).toBe(false);
+    });
+
+    it('refuses once the limit is reached', async () => {
+      mockQuery.mockResolvedValue([{ ...unverified, verification_resend_count: 3 }]);
+
+      await expect(
+        authService.resendVerificationEmail(10, 'test@example.com'),
+      ).rejects.toMatchObject({ statusCode: 429, code: 'RESEND_LIMIT_REACHED' });
+      expect(mockSendVerificationEmail).not.toHaveBeenCalled();
+      expect(mockExecute).not.toHaveBeenCalled();
     });
   });
 

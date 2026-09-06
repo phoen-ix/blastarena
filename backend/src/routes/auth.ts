@@ -269,6 +269,13 @@ router.post(
         return res.status(400).json({ error: 'Cannot log in as yourself' });
       }
 
+      // Every other way into a game requires a verified email (socket middleware, REST
+      // emailVerifiedMiddleware); this was the one entry point that did not, so an unverified
+      // account could play as local co-op P2. Same response shape as emailVerified.ts. (audit B8)
+      if (!p2User.emailVerified) {
+        return res.status(403).json({ error: 'Email not verified', code: 'EMAIL_NOT_VERIFIED' });
+      }
+
       const token = authService.generateLocalCoopToken(p2User.id, p2User.username, duration);
       const config = getConfig();
 

@@ -91,16 +91,16 @@ On disconnect, the server:
 
 | Event | Payload | Description | Auth |
 |-------|---------|-------------|------|
-| `admin:kick` | `{ roomCode: string, userId: number, reason?: string }` + callback | Kick a player from a room. Target receives `admin:kicked` | admin, moderator |
+| `admin:kick` | `{ roomCode: string, userId: number, reason?: string }` + callback | Kick a player from a room. The target is killed immediately (no reconnect grace) and receives `admin:kicked` | admin, moderator |
 | `admin:closeRoom` | `{ roomCode: string }` + callback | Force-close a room. All players receive `admin:kicked`, room is deleted | admin only |
-| `admin:spectate` | `{ roomCode: string }` + callback | Join a room as a spectator. Admin socket joins `room:{roomCode}` to receive game state | admin, moderator |
-| `admin:roomMessage` | `{ roomCode: string, message: string }` | Send a system message to a room. Requires admin to have joined the room (spectating). Max 500 chars | admin, moderator |
+| `admin:spectate` | `{ roomCode: string }` + callback | Join a room as a spectator. `roomCode` must match `/^[A-Z0-9]{6}$/`. Admin socket joins `room:{roomCode}` to receive game state. 3/s (adminRoom) | admin, moderator |
+| `admin:roomMessage` | `{ roomCode: string, message: string }` | Send a system message to a room. Requires admin to have joined the room (spectating). Max 500 chars. 3/s (adminRoom) | admin, moderator |
 
 ### Simulation Events
 
 | Event | Payload | Description | Auth |
 |-------|---------|-------------|------|
-| `sim:start` | `SimulationConfig` + callback | Start a simulation batch. May be queued if another is running. Events forwarded to requesting socket | admin only |
+| `sim:start` | `SimulationConfig` + callback | Start a simulation batch. May be queued if another is running. Progress/result/completed events are broadcast to the `sim:admin` room (every connected admin), whether the batch started immediately or from the queue | admin only |
 | `sim:cancel` | `{ batchId: string }` + callback | Cancel a running simulation batch | admin only |
 | `sim:spectate` | `{ batchId: string }` + callback | Start spectating a simulation. Socket joins `sim:{batchId}`, receives current game state immediately | admin only |
 | `sim:unspectate` | `{ batchId: string }` | Stop spectating a simulation. Socket leaves `sim:{batchId}` | admin only |
@@ -128,12 +128,12 @@ On disconnect, the server:
 
 | Event | Payload | Description | Rate Limit |
 |-------|---------|-------------|------------|
-| `party:create` | callback | Create a new party. Creator becomes leader. Socket joins `party:{partyId}` | -- |
+| `party:create` | callback | Create a new party. Creator becomes leader. Socket joins `party:{partyId}` | 5/s (partyAction) |
 | `party:invite` | `{ userId: number }` + callback | Invite a friend to the party. Leader-only. Target must be a friend | 3/s (invite) |
-| `party:acceptInvite` | `{ inviteId: string }` + callback | Accept a party invite. Socket joins `party:{partyId}`. All members receive `party:state` | -- |
+| `party:acceptInvite` | `{ inviteId: string }` + callback | Accept a party invite. Socket joins `party:{partyId}`. All members receive `party:state`. Errors: `Party not found`, `Party is full`, `Already in a party`, `Already in another party` | 5/s (partyAction) |
 | `party:declineInvite` | `{ inviteId: string }` | Decline a party invite. No callback | -- |
-| `party:leave` | callback | Leave the party. If leader leaves, party is disbanded (`party:disbanded` sent to all) | -- |
-| `party:kick` | `{ userId: number }` + callback | Kick a member from the party. Leader-only. Kicked user receives `party:disbanded` | -- |
+| `party:leave` | callback | Leave the party. If leader leaves, party is disbanded (`party:disbanded` sent to all) | 5/s (partyAction) |
+| `party:kick` | `{ userId: number }` + callback | Kick a member from the party. Leader-only. Kicked user receives `party:disbanded`. Errors: `Only the party leader can kick members`, `Cannot kick yourself`, `User is not in the party` | 5/s (partyAction) |
 | `party:chat` | `{ message: string }` | Send a chat message to the party. Max 200 chars (`PARTY_CHAT_MAX_LENGTH`). Subject to admin chat mode | 5/s (partyChat) |
 
 **Create/accept callback**: `{ success: boolean; party?: Party; error?: string }`
@@ -143,7 +143,7 @@ On disconnect, the server:
 | Event | Payload | Description | Rate Limit |
 |-------|---------|-------------|------------|
 | `invite:room` | `{ userId: number }` + callback | Invite a friend to your current room. Must be friends. Target receives `invite:room` (server-to-client) | 3/s (invite) |
-| `invite:acceptRoom` | `{ inviteId: string }` + callback | Accept a room invite. Client handles the actual `room:join` separately | -- |
+| `invite:acceptRoom` | `{ inviteId: string }` + callback | Accept a room invite. Client handles the actual `room:join` separately | 5/s (partyAction) |
 | `invite:declineRoom` | `{ inviteId: string }` | Decline a room invite. No callback | -- |
 
 ### Chat Events
@@ -164,8 +164,8 @@ On disconnect, the server:
 
 | Event | Payload | Description | Rate Limit |
 |-------|---------|-------------|------------|
-| `openworld:join` | `{ username?: string }` + callback | Join the persistent world. Callback returns `{ success, playerId, username, isGuest, state, error }`. Guests are assigned a negative id from `OPENWORLD_GUEST_ID_START` and a generated name. Re-joining with a known userId re-binds the existing player to the new socket. On success the socket joins the `openworld` room and an `openworld:info` snapshot is broadcast | -- |
-| `openworld:leave` | _(none)_ | Leave the world. Flushes pending stats for registered users and broadcasts `openworld:playerLeft` + `openworld:info` | -- |
+| `openworld:join` | `{ username?: string }` + callback | Join the persistent world. Callback returns `{ success, playerId, username, isGuest, state, error }`. Guests are assigned a negative id from `OPENWORLD_GUEST_ID_START`; a guest's `username` is sanitised (trimmed, restricted to `[A-Za-z0-9_-]`, cut to `USERNAME_MAX_LENGTH`) and a name is generated when nothing is left. Re-joining with a known userId re-binds the existing player to the new socket. On success the socket joins the `openworld` room and an `openworld:info` snapshot is broadcast | -- |
+| `openworld:leave` | _(none)_ | Leave the world. Flushes pending stats for registered users and broadcasts `openworld:info` | -- |
 | `openworld:input` | `PlayerInput` | Movement/bomb input. Guest-accessible, so it is validated like `game:input` and ignored during the between-round freeze | 30/s (openWorldInput) |
 
 ## Server-to-Client Events
@@ -206,7 +206,7 @@ On disconnect, the server:
 | `campaign:enemyDied` | `{ enemyId: number, position: Position, isBoss: boolean }` | `campaign:{userId}` | An enemy was killed |
 | `campaign:exitOpened` | `{ position: Position }` | `campaign:{userId}` | The exit tile has opened (win condition met) |
 | `campaign:playerLockedIn` | `{ playerId: number, position: Position }` | `campaign:{userId}` | A player reached the exit and is frozen in place (sequential lock-in) |
-| `campaign:levelComplete` | `{ levelId: number, timeSeconds: number, stars: number, nextLevelId: number \| null }` | `campaign:{userId}` | Level completed with completion time, star rating, and next level ID |
+| `campaign:levelComplete` | `{ levelId: number, timeSeconds: number, stars: number, nextLevelId: number \| null }` | `user:{userId}` per real player (falls back to `campaign:{userId}` with `stars: 0` when no real player is present) | Level completed with completion time, the recipient's own star rating, and next level ID |
 | `campaign:gameOver` | `{ levelId: number, reason: string }` | `campaign:{userId}` | Campaign game over (all lives lost or time expired) |
 | `campaign:partnerLeft` | `{ reason: string }` | `campaign:{userId}` | Co-op partner left (reason: `'quit'` or `'disconnected'`). Game continues solo |
 
@@ -284,8 +284,6 @@ All open world events are scoped to the `openworld` room, which a socket enters 
 | Event | Payload | Scope | Description |
 |-------|---------|-------|-------------|
 | `openworld:state` | `GameState` | `openworld` | World state every tick (20 ticks/sec), including during the between-round freeze |
-| `openworld:playerJoined` | `{ id: number, username: string, isGuest: boolean }` | `openworld` | Someone entered the world |
-| `openworld:playerLeft` | `{ id: number, username: string }` | `openworld` | Someone left, disconnected or was AFK-kicked |
 | `openworld:info` | `{ playerCount, maxPlayers, roundTimeRemaining, roundNumber, leaderboard: OpenWorldScoreEntry[] }` | `openworld` | Round + scoreboard snapshot. `leaderboard` is the FULL standings sorted by score (clients rank by array index). Sent every `OPENWORLD_INFO_BROADCAST_TICKS` (5s) and immediately after a join, a leave and a round start |
 | `openworld:scoreUpdate` | `OpenWorldScoreEntry` (`{ playerId, username, kills, deaths, score, isGuest }`) | `openworld` | One player's score changed. Emitted for both killer (+2) and victim (-1, floored at 0) on every death so the HUD board moves without waiting for the next snapshot |
 | `openworld:roundEnd` | `{ roundNumber: number, leaderboard: OpenWorldScoreEntry[], nextRoundIn: number }` | `openworld` | Round timer expired. Final standings; the world freezes for `OPENWORLD_ROUND_FREEZE_TICKS` before regenerating |
@@ -317,10 +315,13 @@ All open world events are scoped to the `openworld` room, which a socket enters 
 | friendActionLimiter | `friend:list`, `friend:accept`, `friend:decline`, `friend:cancel`, `friend:remove`, `friend:block`, `friend:unblock` | 5/s | General friend action throttle |
 | partyChatLimiter | `party:chat` | 5/s | Party chat throttle |
 | inviteLimiter | `party:invite`, `invite:room` | 3/s | Invite spam prevention |
+| partyActionLimiter | `party:create`, `party:acceptInvite`, `party:leave`, `party:kick`, `invite:acceptRoom` | 5/s | Each costs a Redis Lua call or a `fetchSockets()` |
+| lobbySubscribeLimiter | `lobby:subscribe`, `lobby:unsubscribe` | 5/s | Room join/leave churn |
+| adminRoomLimiter | `admin:spectate`, `admin:roomMessage` | 3/s | Room joins and room-wide broadcasts |
 | lobbyChatLimiter | `lobby:chat` | 3/s | Lobby chat throttle |
 | dmChatLimiter | `dm:send` | 5/s | DM throttle |
 | spectatorChatLimiter | `game:spectatorChat` | 3/s | Spectator chat throttle (per-socket instance) |
-| campaignStartLimiter | `campaign:start` | 1/s | Prevent rapid campaign restarts |
+| campaignStartLimiter | `campaign:start` | 1/s | Prevent rapid campaign restarts (module-scoped; entry removed on disconnect) |
 | openWorldInputLimiter | `openworld:input` | 30/s | Same headroom as `game:input`; this path is guest-accessible |
 
 ### Per-IP Limits

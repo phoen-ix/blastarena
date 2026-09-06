@@ -17,7 +17,9 @@ import * as cosmeticsService from '../services/cosmetics';
 import { invalidateTransporter, sendTestEmail } from '../services/email';
 import { getSimulationManager, getIO } from '../game/registry';
 import { openWorldManager } from '../game/OpenWorldManager';
-import { execute } from '../db/connection';
+import { execute, query } from '../db/connection';
+import { logAdminAction } from '../services/admin-audit';
+import { IdRow } from '../db/types';
 import { logger } from '../utils/logger';
 import {
   SimulationConfig,
@@ -277,15 +279,12 @@ router.put(
   async (req, res, next) => {
     try {
       await settingsService.setSetting('registration_enabled', String(req.body.enabled));
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'registration_enabled', value: req.body.enabled }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'registration_enabled', value: req.body.enabled }),
       );
       const io = getIO();
       io.to('role:staff').emit('admin:settingsChanged', {
@@ -306,15 +305,12 @@ router.put(
   async (req, res, next) => {
     try {
       await settingsService.setSetting('recordings_enabled', String(req.body.enabled));
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'recordings_enabled', value: req.body.enabled }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'recordings_enabled', value: req.body.enabled }),
       );
       // Broadcast to all connected clients
       const io = getIO();
@@ -336,15 +332,12 @@ router.put(
   async (req, res, next) => {
     try {
       await settingsService.setSetting('spectator_actions_enabled', String(req.body.enabled));
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'spectator_actions_enabled', value: req.body.enabled }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'spectator_actions_enabled', value: req.body.enabled }),
       );
       const io = getIO();
       io.to('role:staff').emit('admin:settingsChanged', {
@@ -369,15 +362,12 @@ router.put(
   async (req, res, next) => {
     try {
       await settingsService.setSetting('party_chat_mode', req.body.mode);
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'party_chat_mode', value: req.body.mode }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'party_chat_mode', value: req.body.mode }),
       );
       const io = getIO();
       io.to('role:staff').emit('admin:settingsChanged', {
@@ -398,15 +388,12 @@ router.put(
   async (req, res, next) => {
     try {
       await settingsService.setSetting('lobby_chat_mode', req.body.mode);
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'lobby_chat_mode', value: req.body.mode }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'lobby_chat_mode', value: req.body.mode }),
       );
       const io = getIO();
       io.to('role:staff').emit('admin:settingsChanged', {
@@ -427,15 +414,12 @@ router.put(
   async (req, res, next) => {
     try {
       await settingsService.setSetting('dm_mode', req.body.mode);
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'dm_mode', value: req.body.mode }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'dm_mode', value: req.body.mode }),
       );
       const io = getIO();
       io.to('role:staff').emit('admin:settingsChanged', { key: 'dm_mode', value: req.body.mode });
@@ -453,15 +437,12 @@ router.put(
   async (req, res, next) => {
     try {
       await settingsService.setSetting('emote_mode', req.body.mode);
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'emote_mode', value: req.body.mode }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'emote_mode', value: req.body.mode }),
       );
       const io = getIO();
       io.to('role:staff').emit('admin:settingsChanged', {
@@ -482,15 +463,12 @@ router.put(
   async (req, res, next) => {
     try {
       await settingsService.setSetting('spectator_chat_mode', req.body.mode);
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'spectator_chat_mode', value: req.body.mode }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'spectator_chat_mode', value: req.body.mode }),
       );
       const io = getIO();
       io.to('role:staff').emit('admin:settingsChanged', {
@@ -573,15 +551,12 @@ router.put(
         }
       }
 
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'open_world', value: updates }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'open_world', value: updates }),
       );
 
       // Hot-reload open world manager
@@ -603,15 +578,12 @@ router.put('/admin/settings/xp_multiplier', adminOnlyMiddleware, async (req, res
       return res.status(400).json({ error: 'Multiplier must be between 0 and 10' });
     }
     await settingsService.setSetting('xp_multiplier', String(multiplier));
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [
-        req.user!.userId,
-        'update_setting',
-        'setting',
-        0,
-        JSON.stringify({ key: 'xp_multiplier', value: multiplier }),
-      ],
+    await logAdminAction(
+      req.user!.userId,
+      'update_setting',
+      'setting',
+      0,
+      JSON.stringify({ key: 'xp_multiplier', value: multiplier }),
     );
     const io = getIO();
     io.to('role:staff').emit('admin:settingsChanged', { key: 'xp_multiplier', value: multiplier });
@@ -632,15 +604,12 @@ router.put(
   async (req, res, next) => {
     try {
       await settingsService.setSetting('default_theme', req.body.theme);
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'default_theme', value: req.body.theme }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'default_theme', value: req.body.theme }),
       );
       const io = getIO();
       io.to('role:staff').emit('admin:settingsChanged', {
@@ -671,15 +640,12 @@ router.put(
       if (req.body.text !== undefined) {
         await settingsService.setSetting('imprint_text', req.body.text);
       }
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'imprint', value: req.body.enabled }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'imprint', value: req.body.enabled }),
       );
       res.json({ message: 'Imprint settings updated' });
     } catch (err) {
@@ -695,15 +661,12 @@ router.put(
   async (req, res, next) => {
     try {
       await settingsService.setSetting('display_github', String(req.body.enabled));
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'display_github', value: req.body.enabled }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'display_github', value: req.body.enabled }),
       );
       res.json({ message: 'Setting updated' });
     } catch (err) {
@@ -805,15 +768,12 @@ router.put(
     try {
       const defaults = req.body.defaults as GameDefaults;
       await settingsService.setGameDefaults(defaults);
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'game_defaults', value: defaults }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'game_defaults', value: defaults }),
       );
       const io = getIO();
       io.to('role:staff').emit('admin:settingsChanged', { key: 'game_defaults', value: defaults });
@@ -832,15 +792,12 @@ router.put(
     try {
       const defaults = req.body.defaults as SimulationDefaults;
       await settingsService.setSimulationDefaults(defaults);
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'simulation_defaults', value: defaults }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'simulation_defaults', value: defaults }),
       );
       const io = getIO();
       io.to('role:staff').emit('admin:settingsChanged', {
@@ -910,15 +867,12 @@ router.put(
       await settingsService.setEmailSettings(incoming);
       invalidateTransporter();
 
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'email_settings' }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'email_settings' }),
       );
 
       const io = getIO();
@@ -1165,9 +1119,12 @@ router.delete('/admin/matches/:id', adminOnlyMiddleware, async (req, res, next) 
     await replayService.deleteReplay(matchId);
     // Delete match record (cascades to match_players)
     await execute('DELETE FROM matches WHERE id = ?', [matchId]);
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [req.user!.userId, 'delete_match', 'match', matchId, JSON.stringify({ matchId })],
+    await logAdminAction(
+      req.user!.userId,
+      'delete_match',
+      'match',
+      matchId,
+      JSON.stringify({ matchId }),
     );
     res.json({ message: 'Match deleted' });
   } catch (err) {
@@ -1175,27 +1132,32 @@ router.delete('/admin/matches/:id', adminOnlyMiddleware, async (req, res, next) 
   }
 });
 
+/** Replay files deleted concurrently per chunk by DELETE /admin/matches. (audit E10) */
+const REPLAY_DELETE_CONCURRENCY = 20;
+
 router.delete('/admin/matches', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    // Get all match IDs to clean up replay files
-    const matches = await adminService.getMatchHistory(1, 100000);
+    // Only the ids are needed to clean up replay files. This used to call
+    // getMatchHistory(1, 100000) — the full history query with its winner join and per-row
+    // player count — just to list them, and then unlinked the replays strictly one after another.
+    // (audit E10)
+    const matchIds = (await query<IdRow[]>('SELECT id FROM matches')).map((r) => r.id);
     let replaysCleaned = 0;
-    for (const m of matches.matches) {
-      if (await replayService.deleteReplay(m.id)) replaysCleaned++;
+    for (let i = 0; i < matchIds.length; i += REPLAY_DELETE_CONCURRENCY) {
+      const chunk = matchIds.slice(i, i + REPLAY_DELETE_CONCURRENCY);
+      const deleted = await Promise.all(chunk.map((id) => replayService.deleteReplay(id)));
+      replaysCleaned += deleted.filter(Boolean).length;
     }
     // Delete all match records (cascades to match_players)
     await execute('DELETE FROM matches');
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [
-        req.user!.userId,
-        'delete_all_matches',
-        'match',
-        0,
-        JSON.stringify({ count: matches.total, replaysCleaned }),
-      ],
+    await logAdminAction(
+      req.user!.userId,
+      'delete_all_matches',
+      'match',
+      0,
+      JSON.stringify({ count: matchIds.length, replaysCleaned }),
     );
-    res.json({ message: 'All matches deleted', count: matches.total, replaysCleaned });
+    res.json({ message: 'All matches deleted', count: matchIds.length, replaysCleaned });
   } catch (err) {
     next(err);
   }
@@ -1413,22 +1375,37 @@ const simulationConfigSchema = z.object({
   botAiId: z.string().max(36).optional(),
 });
 
-router.get('/admin/simulations', adminOnlyMiddleware, fsReadLimiter, (req, res) => {
-  const mgr = getSimulationManager();
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
-  res.json(mgr.getHistory(page, limit));
+// getHistory / getBatchResults / deleteBatch are async now that the manager reads the simulations
+// directory with fs.promises instead of blocking the game-loop thread. (audit E3)
+router.get('/admin/simulations', adminOnlyMiddleware, fsReadLimiter, async (req, res, next) => {
+  try {
+    const mgr = getSimulationManager();
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    res.json(await mgr.getHistory(page, limit));
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.get('/admin/simulations/:batchId', adminOnlyMiddleware, fsReadLimiter, (req, res) => {
-  const mgr = getSimulationManager();
-  const data = mgr.getBatchResults(req.params.batchId);
-  if (!data) {
-    res.status(404).json({ error: 'Batch not found' });
-    return;
-  }
-  res.json(data);
-});
+router.get(
+  '/admin/simulations/:batchId',
+  adminOnlyMiddleware,
+  fsReadLimiter,
+  async (req, res, next) => {
+    try {
+      const mgr = getSimulationManager();
+      const data = await mgr.getBatchResults(req.params.batchId);
+      if (!data) {
+        res.status(404).json({ error: 'Batch not found' });
+        return;
+      }
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.get(
   '/admin/simulations/:batchId/replay/:gameIndex',
@@ -1469,17 +1446,21 @@ router.post(
   },
 );
 
-router.delete('/admin/simulations/:batchId', adminOnlyMiddleware, (req, res) => {
-  const mgr = getSimulationManager();
-  // Try cancelling if running
-  mgr.cancelBatch(req.params.batchId);
-  // Delete from disk and memory
-  const deleted = mgr.deleteBatch(req.params.batchId);
-  if (!deleted) {
-    res.status(404).json({ error: 'Batch not found' });
-    return;
+router.delete('/admin/simulations/:batchId', adminOnlyMiddleware, async (req, res, next) => {
+  try {
+    const mgr = getSimulationManager();
+    // Try cancelling if running
+    mgr.cancelBatch(req.params.batchId);
+    // Delete from disk and memory
+    const deleted = await mgr.deleteBatch(req.params.batchId);
+    if (!deleted) {
+      res.status(404).json({ error: 'Batch not found' });
+      return;
+    }
+    res.json({ message: 'Batch deleted' });
+  } catch (err) {
+    next(err);
   }
-  res.json({ message: 'Batch deleted' });
 });
 
 // --- Bot AI Management ---
@@ -1772,9 +1753,12 @@ router.post(
         req.body.startDate,
         req.body.endDate,
       );
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [req.user!.userId, 'season_create', 'season', season.id, `Created season: ${season.name}`],
+      await logAdminAction(
+        req.user!.userId,
+        'season_create',
+        'season',
+        season.id,
+        `Created season: ${season.name}`,
       );
       res.json(season);
     } catch (err) {
@@ -1783,29 +1767,34 @@ router.post(
   },
 );
 
-router.put('/admin/seasons/:id', adminOnlyMiddleware, async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id);
-    await seasonService.updateSeason(id, req.body);
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [req.user!.userId, 'season_update', 'season', id, 'Updated season'],
-    );
-    const season = await seasonService.getSeasonById(id);
-    res.json(season);
-  } catch (err) {
-    next(err);
-  }
-});
+// The four PUT routes below (seasons, achievements, cosmetics, challenges) accepted an unvalidated
+// body and, for seasons, handed a NaN id straight to the driver. Each now reuses its POST schema
+// with every field optional. (audit B9)
+router.put(
+  '/admin/seasons/:id',
+  adminOnlyMiddleware,
+  validate(seasonSchema.partial()),
+  async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id))
+        return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
+      await seasonService.updateSeason(id, req.body);
+      await logAdminAction(req.user!.userId, 'season_update', 'season', id, 'Updated season');
+      const season = await seasonService.getSeasonById(id);
+      res.json(season);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.delete('/admin/seasons/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     await seasonService.deleteSeason(id);
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [req.user!.userId, 'season_delete', 'season', id, 'Deleted season'],
-    );
+    await logAdminAction(req.user!.userId, 'season_delete', 'season', id, 'Deleted season');
     res.json({ message: 'Season deleted' });
   } catch (err) {
     next(err);
@@ -1815,11 +1804,9 @@ router.delete('/admin/seasons/:id', adminOnlyMiddleware, async (req, res, next) 
 router.post('/admin/seasons/:id/activate', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     await seasonService.activateSeason(id);
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [req.user!.userId, 'season_activate', 'season', id, 'Activated season'],
-    );
+    await logAdminAction(req.user!.userId, 'season_activate', 'season', id, 'Activated season');
     res.json({ message: 'Season activated' });
   } catch (err) {
     next(err);
@@ -1837,16 +1824,15 @@ router.post(
   async (req, res, next) => {
     try {
       const id = parseInt(req.params.id);
+      if (Number.isNaN(id))
+        return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
       await seasonService.endSeason(id, req.body.resetMode);
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'season_end',
-          'season',
-          id,
-          `Ended season (${req.body.resetMode} reset)`,
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'season_end',
+        'season',
+        id,
+        `Ended season (${req.body.resetMode} reset)`,
       );
       res.json({ message: 'Season ended' });
     } catch (err) {
@@ -1890,10 +1876,7 @@ router.put(
     try {
       const config = req.body as RankConfig;
       await settingsService.setRankConfig(config);
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [req.user!.userId, 'settings_update', 'setting', 0, 'Updated rank tiers'],
-      );
+      await logAdminAction(req.user!.userId, 'settings_update', 'setting', 0, 'Updated rank tiers');
       res.json(config);
     } catch (err) {
       next(err);
@@ -1931,15 +1914,12 @@ router.post(
   async (req, res, next) => {
     try {
       const achievement = await achievementsService.createAchievement(req.body);
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'achievement_create',
-          'achievement',
-          achievement.id,
-          `Created achievement: ${achievement.name}`,
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'achievement_create',
+        'achievement',
+        achievement.id,
+        `Created achievement: ${achievement.name}`,
       );
       res.json(achievement);
     } catch (err) {
@@ -1948,28 +1928,47 @@ router.post(
   },
 );
 
-router.put('/admin/achievements/:id', adminOnlyMiddleware, async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id);
-    await achievementsService.updateAchievement(id, req.body);
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [req.user!.userId, 'achievement_update', 'achievement', id, 'Updated achievement'],
-    );
-    const achievement = await achievementsService.getAchievementById(id);
-    res.json(achievement);
-  } catch (err) {
-    next(err);
-  }
+// isActive is an update-only field the service already handles; the POST schema has no reason to.
+const achievementUpdateSchema = achievementSchema.partial().extend({
+  isActive: z.boolean().optional(),
 });
+
+router.put(
+  '/admin/achievements/:id',
+  adminOnlyMiddleware,
+  validate(achievementUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id))
+        return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
+      await achievementsService.updateAchievement(id, req.body);
+      await logAdminAction(
+        req.user!.userId,
+        'achievement_update',
+        'achievement',
+        id,
+        'Updated achievement',
+      );
+      const achievement = await achievementsService.getAchievementById(id);
+      res.json(achievement);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.delete('/admin/achievements/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     await achievementsService.deleteAchievement(id);
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [req.user!.userId, 'achievement_delete', 'achievement', id, 'Deleted achievement'],
+    await logAdminAction(
+      req.user!.userId,
+      'achievement_delete',
+      'achievement',
+      id,
+      'Deleted achievement',
     );
     res.json({ message: 'Achievement deleted' });
   } catch (err) {
@@ -2005,15 +2004,12 @@ router.post(
   async (req, res, next) => {
     try {
       const cosmetic = await cosmeticsService.createCosmetic(req.body);
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'cosmetic_create',
-          'cosmetic',
-          cosmetic.id,
-          `Created cosmetic: ${cosmetic.name}`,
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'cosmetic_create',
+        'cosmetic',
+        cosmetic.id,
+        `Created cosmetic: ${cosmetic.name}`,
       );
       res.json(cosmetic);
     } catch (err) {
@@ -2022,29 +2018,35 @@ router.post(
   },
 );
 
-router.put('/admin/cosmetics/:id', adminOnlyMiddleware, async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id);
-    await cosmeticsService.updateCosmetic(id, req.body);
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [req.user!.userId, 'cosmetic_update', 'cosmetic', id, 'Updated cosmetic'],
-    );
-    const cosmetic = await cosmeticsService.getCosmeticById(id);
-    res.json(cosmetic);
-  } catch (err) {
-    next(err);
-  }
+const cosmeticUpdateSchema = cosmeticSchema.partial().extend({
+  isActive: z.boolean().optional(),
 });
+
+router.put(
+  '/admin/cosmetics/:id',
+  adminOnlyMiddleware,
+  validate(cosmeticUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id))
+        return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
+      await cosmeticsService.updateCosmetic(id, req.body);
+      await logAdminAction(req.user!.userId, 'cosmetic_update', 'cosmetic', id, 'Updated cosmetic');
+      const cosmetic = await cosmeticsService.getCosmeticById(id);
+      res.json(cosmetic);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.delete('/admin/cosmetics/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     await cosmeticsService.deleteCosmetic(id);
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [req.user!.userId, 'cosmetic_delete', 'cosmetic', id, 'Deleted cosmetic'],
-    );
+    await logAdminAction(req.user!.userId, 'cosmetic_delete', 'cosmetic', id, 'Deleted cosmetic');
     res.json({ message: 'Cosmetic deleted' });
   } catch (err) {
     next(err);
@@ -2236,15 +2238,12 @@ router.post('/admin/achievements/import', adminOnlyMiddleware, async (req, res, 
             sortOrder: entry.data.sortOrder,
           });
           idMap.set(entry.originalId, created.id);
-          await execute(
-            'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-            [
-              req.user!.userId,
-              'cosmetic_import',
-              'cosmetic',
-              created.id,
-              `Imported cosmetic: ${created.name}`,
-            ],
+          await logAdminAction(
+            req.user!.userId,
+            'cosmetic_import',
+            'cosmetic',
+            created.id,
+            `Imported cosmetic: ${created.name}`,
           );
         } else if (action === 'skip') {
           idMap.set(entry.originalId, null);
@@ -2255,6 +2254,10 @@ router.post('/admin/achievements/import', adminOnlyMiddleware, async (req, res, 
     }
 
     let created = 0;
+    // Fetched at most once for the whole import, lazily — it used to be re-fetched inside the
+    // loop for every achievement whose reward cosmetic was not in the bundle. (audit E10)
+    let existingCosmetics: Awaited<ReturnType<typeof cosmeticsService.getAllCosmetics>> | null =
+      null;
     for (const achEntry of achData) {
       let rewardType = achEntry.rewardType;
       let rewardId: number | null = null;
@@ -2271,8 +2274,8 @@ router.post('/admin/achievements/import', adminOnlyMiddleware, async (req, res, 
           }
         } else {
           // No cosmetic in bundle — try name match in DB
-          const allExisting = await cosmeticsService.getAllCosmetics();
-          const match = allExisting.find(
+          existingCosmetics ??= await cosmeticsService.getAllCosmetics();
+          const match = existingCosmetics.find(
             (c) => c.name.toLowerCase() === achEntry.reward!.name.toLowerCase(),
           );
           if (match) {
@@ -2294,15 +2297,12 @@ router.post('/admin/achievements/import', adminOnlyMiddleware, async (req, res, 
         rewardId,
         sortOrder: achEntry.sortOrder,
       });
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'achievement_import',
-          'achievement',
-          achievement.id,
-          `Imported achievement: ${achievement.name}`,
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'achievement_import',
+        'achievement',
+        achievement.id,
+        `Imported achievement: ${achievement.name}`,
       );
       created++;
     }
@@ -2362,15 +2362,12 @@ router.post('/admin/cosmetics/import', adminOnlyMiddleware, async (req, res, nex
       sortOrder: data.sortOrder || 0,
     });
 
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [
-        req.user!.userId,
-        'cosmetic_import',
-        'cosmetic',
-        cosmetic.id,
-        `Imported cosmetic: ${cosmetic.name}`,
-      ],
+    await logAdminAction(
+      req.user!.userId,
+      'cosmetic_import',
+      'cosmetic',
+      cosmetic.id,
+      `Imported cosmetic: ${cosmetic.name}`,
     );
 
     res.json(cosmetic);
@@ -2416,15 +2413,12 @@ router.post(
         req.body.endDate,
         req.user!.userId,
       );
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'challenge_create',
-          'challenge',
-          challenge.id,
-          `Created challenge: ${challenge.title}`,
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'challenge_create',
+        'challenge',
+        challenge.id,
+        `Created challenge: ${challenge.title}`,
       );
       res.json(challenge);
     } catch (err) {
@@ -2433,25 +2427,34 @@ router.post(
   },
 );
 
-router.put('/admin/challenges/:id', adminOnlyMiddleware, async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
-    await challengesService.updateChallenge(id, req.body);
-    res.json({ message: 'Challenge updated' });
-  } catch (err) {
-    next(err);
-  }
-});
+router.put(
+  '/admin/challenges/:id',
+  adminOnlyMiddleware,
+  validate(challengeSchema.partial()),
+  async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id))
+        return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
+      await challengesService.updateChallenge(id, req.body);
+      res.json({ message: 'Challenge updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.delete('/admin/challenges/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
     await challengesService.deleteChallenge(id);
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [req.user!.userId, 'challenge_delete', 'challenge', id, `Deleted challenge #${id}`],
+    await logAdminAction(
+      req.user!.userId,
+      'challenge_delete',
+      'challenge',
+      id,
+      `Deleted challenge #${id}`,
     );
     res.json({ message: 'Challenge deleted' });
   } catch (err) {
@@ -2464,9 +2467,12 @@ router.post('/admin/challenges/:id/activate', adminOnlyMiddleware, async (req, r
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
     await challengesService.activateChallenge(id);
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [req.user!.userId, 'challenge_activate', 'challenge', id, `Activated challenge #${id}`],
+    await logAdminAction(
+      req.user!.userId,
+      'challenge_activate',
+      'challenge',
+      id,
+      `Activated challenge #${id}`,
     );
     res.json({ message: 'Challenge activated' });
   } catch (err) {
@@ -2479,9 +2485,12 @@ router.post('/admin/challenges/:id/deactivate', adminOnlyMiddleware, async (req,
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
     await challengesService.deactivateChallenge(id);
-    await execute(
-      'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [req.user!.userId, 'challenge_deactivate', 'challenge', id, `Deactivated challenge #${id}`],
+    await logAdminAction(
+      req.user!.userId,
+      'challenge_deactivate',
+      'challenge',
+      id,
+      `Deactivated challenge #${id}`,
     );
     res.json({ message: 'Challenge deactivated' });
   } catch (err) {
@@ -2497,15 +2506,12 @@ router.put(
   async (req, res, next) => {
     try {
       await settingsService.setSetting('challenges_enabled', String(req.body.enabled));
-      await execute(
-        'INSERT INTO admin_actions (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-        [
-          req.user!.userId,
-          'update_setting',
-          'setting',
-          0,
-          JSON.stringify({ key: 'challenges_enabled', value: req.body.enabled }),
-        ],
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'challenges_enabled', value: req.body.enabled }),
       );
       res.json({ message: 'Setting updated' });
     } catch (err) {

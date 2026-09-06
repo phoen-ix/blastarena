@@ -7,6 +7,7 @@ import * as userService from '../services/user';
 import * as buddyService from '../services/buddy';
 import * as totpService from '../services/totp';
 import { rateLimiter } from '../middleware/rateLimiter';
+import { getConfig } from '../config';
 import {
   USERNAME_MIN_LENGTH,
   USERNAME_MAX_LENGTH,
@@ -251,14 +252,21 @@ router.get('/user/matches', authMiddleware, emailVerifiedMiddleware, async (req,
   }
 });
 
-router.get('/user/confirm-email/:token', async (req, res, next) => {
-  try {
-    await userService.confirmEmailChange(req.params.token);
-    res.json({ message: 'Email address updated successfully' });
-  } catch (err) {
-    next(err);
-  }
-});
+// This is the link in the confirmation email, so a browser lands here: redirect into the app
+// (mirroring /auth/verify-email) instead of answering raw JSON, and meter it the same way —
+// it was the one token-bearing GET with no rate limiter. (audit B15)
+router.get(
+  '/user/confirm-email/:token',
+  rateLimiter({ windowMs: 15 * 60 * 1000, maxRequests: 10 }),
+  async (req, res, next) => {
+    try {
+      await userService.confirmEmailChange(req.params.token);
+      res.redirect(`${getConfig().APP_URL}?emailChanged=true`);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // ── TOTP Two-Factor Authentication ──────────────────────────────────
 
@@ -288,10 +296,15 @@ router.post(
   },
 );
 
+// Same limiter as totp/setup on the two code-checking routes: a 6-digit code has a million
+// possibilities, and nginx's 30 r/s API zone alone allows a brute force in hours. (audit B16)
+const totpCodeLimiter = rateLimiter({ windowMs: 15 * 60 * 1000, maxRequests: 5 });
+
 router.post(
   '/user/totp/confirm',
   authMiddleware,
   emailVerifiedMiddleware,
+  totpCodeLimiter,
   validate(totpConfirmSchema),
   async (req, res, next) => {
     try {
@@ -307,6 +320,7 @@ router.post(
   '/user/totp/disable',
   authMiddleware,
   emailVerifiedMiddleware,
+  totpCodeLimiter,
   validate(totpDisableSchema),
   async (req, res, next) => {
     try {

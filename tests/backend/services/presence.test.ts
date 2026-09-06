@@ -119,14 +119,4 @@ describe('Presence Service', () => {
       expect(store.has('presence:1')).toBe(false);
     });
   });
-
-  describe('refreshPresence', () => {
-    it('should refresh TTL', async () => {
-      store.set('presence:1', JSON.stringify({ status: 'in_lobby' }));
-
-      await presenceService.refreshPresence(1);
-
-      expect(mockRedis.expire).toHaveBeenCalledWith('presence:1', 120);
-    });
-  });
 });

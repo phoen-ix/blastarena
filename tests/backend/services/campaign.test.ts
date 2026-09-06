@@ -376,13 +376,25 @@ describe('Campaign Service', () => {
       expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('is_published = TRUE'), [1]);
     });
 
+    it('selects only the summary columns, never the heavy JSON ones', async () => {
+      // (audit E6) — listLevels ignored LEVEL_SUMMARY_COLUMNS and pulled `*`.
+      mockQuery.mockResolvedValue([]);
+      await listLevels(1);
+      const sql = mockQuery.mock.calls[0][0] as string;
+      expect(sql).not.toContain('SELECT *');
+      expect(sql).toContain('enemy_placements');
+      expect(sql).not.toContain('tiles');
+      expect(sql).not.toContain('puzzle_config');
+    });
+
     it('should include unpublished levels when flag is true', async () => {
       mockQuery.mockResolvedValue([]);
 
       await listLevels(1, true);
 
       const sql = mockQuery.mock.calls[0][0] as string;
-      expect(sql).not.toContain('is_published');
+      // The column is in the select list (summary needs it) but no longer in the WHERE.
+      expect(sql).not.toContain('is_published = TRUE');
       expect(mockQuery).toHaveBeenCalledWith(expect.any(String), [1]);
     });
 
@@ -830,9 +842,10 @@ describe('Campaign Service', () => {
       expect(params[20]).toBe(0.3); // powerupDropRate default
       expect(params[21]).toBe(false); // reinforcedWalls default
       expect(params[22]).toBe(false); // hazardTiles default
-      expect(params[23]).toBeNull(); // puzzleConfig default
-      expect(params[24]).toBe(false); // isPublished default
-      expect(params[25]).toBe(1); // createdBy
+      expect(params[23]).toBe('[]'); // coveredTiles default (audit B3)
+      expect(params[24]).toBeNull(); // puzzleConfig default
+      expect(params[25]).toBe(false); // isPublished default
+      expect(params[26]).toBe(1); // createdBy
     });
 
     it('should JSON.stringify array/object fields', async () => {
@@ -859,6 +872,28 @@ describe('Campaign Service', () => {
       expect(params[13]).toBe(JSON.stringify(data.winConditionConfig));
       expect(params[18]).toBe(JSON.stringify(data.startingPowerups));
       expect(params[19]).toBe(JSON.stringify(data.availablePowerupTypes));
+    });
+
+    it('writes covered_tiles on create, in the column position matching its value', async () => {
+      // covered tiles were dropped on create and on import because the INSERT omitted the
+      // column although the schema and updateLevel both have it. (audit B3)
+      mockQuery.mockResolvedValue([{ total: 0 }]);
+      mockExecute.mockResolvedValue({ insertId: 7 });
+      const coveredTiles = [{ x: 3, y: 4, type: 'teleporter' }];
+
+      await createLevel(1, { coveredTiles } as Record<string, unknown>, 1);
+
+      const sql = mockExecute.mock.calls[0][0] as string;
+      const params = mockExecute.mock.calls[0][1] as unknown[];
+      const columns = sql
+        .slice(sql.indexOf('(') + 1, sql.indexOf(')'))
+        .split(',')
+        .map((c) => c.trim());
+      expect(columns).toContain('covered_tiles');
+      expect(params[columns.indexOf('covered_tiles')]).toBe(JSON.stringify(coveredTiles));
+      // One placeholder per column, so nothing is silently shifted.
+      expect((sql.match(/\?/g) ?? []).length).toBe(columns.length);
+      expect(params).toHaveLength(columns.length);
     });
 
     it('should handle null optional JSON fields in create', async () => {

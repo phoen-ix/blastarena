@@ -78,7 +78,9 @@ export async function getReplay(matchId: number): Promise<ReplayData | null> {
   if (!filePath) return null;
 
   try {
-    const compressed = fs.readFileSync(filePath);
+    // Async read: a multi-MB gzipped replay used to be read synchronously on the thread that
+    // runs every game loop. (audit E3)
+    const compressed = await fs.promises.readFile(filePath);
     const decompressed = await gunzip(compressed);
     return JSON.parse(decompressed.toString()) as ReplayData;
   } catch (err) {
@@ -119,7 +121,7 @@ export async function getReplayPlacements(
   if (!filePath) return null;
 
   try {
-    const compressed = fs.readFileSync(filePath);
+    const compressed = await fs.promises.readFile(filePath); // audit E3
     const decompressed = await gunzip(compressed);
     const data = JSON.parse(decompressed.toString()) as ReplayData;
     return data.gameOver?.placements || null;
@@ -152,11 +154,6 @@ interface ReplayIndex {
 }
 
 let replayIndex: ReplayIndex | null = null;
-
-/** Drop the cached listing so the next lookup re-reads the directory. */
-export function invalidateReplayIndex(): void {
-  replayIndex = null;
-}
 
 async function getReplayIndex(): Promise<ReplayIndex> {
   const now = Date.now();
@@ -278,33 +275,34 @@ export async function listCampaignReplays(
     [...params, limit, offset],
   );
 
-  // Look up file sizes
-  const replays: CampaignReplayListItem[] = [];
-  for (const row of rows) {
-    let fileSizeKB = 0;
-    try {
-      const stat = await fs.promises.stat(path.join(REPLAY_DIR, row.filename));
-      fileSizeKB = Math.round(stat.size / 1024);
-    } catch {
-      // File may have been deleted
-    }
-    replays.push({
-      sessionId: row.session_id,
-      levelId: row.level_id,
-      levelName: row.level_name,
-      worldName: row.world_name,
-      userId: row.user_id,
-      username: row.username,
-      coopMode: !!row.coop_mode,
-      buddyMode: !!row.buddy_mode,
-      duration: row.duration,
-      result: row.result,
-      stars: row.stars,
-      createdAt:
-        row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
-      fileSizeKB,
-    });
-  }
+  // Look up file sizes — all of the page's stats at once, not one after another. (audit E11)
+  const fileSizes = await Promise.all(
+    rows.map(async (row) => {
+      try {
+        const stat = await fs.promises.stat(path.join(REPLAY_DIR, row.filename));
+        return Math.round(stat.size / 1024);
+      } catch {
+        // File may have been deleted
+        return 0;
+      }
+    }),
+  );
+  const replays: CampaignReplayListItem[] = rows.map((row, i) => ({
+    sessionId: row.session_id,
+    levelId: row.level_id,
+    levelName: row.level_name,
+    worldName: row.world_name,
+    userId: row.user_id,
+    username: row.username,
+    coopMode: !!row.coop_mode,
+    buddyMode: !!row.buddy_mode,
+    duration: row.duration,
+    result: row.result,
+    stars: row.stars,
+    createdAt:
+      row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+    fileSizeKB: fileSizes[i],
+  }));
 
   return { replays, total };
 }
@@ -323,17 +321,29 @@ export async function getCampaignReplay(sessionId: string): Promise<ReplayData |
   }
 }
 
+/**
+ * Delete a campaign replay's file and DB row.
+ *
+ * Returns whether a file was actually removed. It used to answer `true` unconditionally and never
+ * evicted the session from the cached index, so a deleted replay was still listed as present for
+ * the rest of the index TTL. The DB row is always deleted. (audit B17)
+ */
 export async function deleteCampaignReplay(sessionId: string): Promise<boolean> {
-  const filePath = await findCampaignReplayFile(sessionId);
-  if (filePath) {
+  const index = await getReplayIndex();
+  const name = index.byCampaignSession.get(sessionId);
+  let fileDeleted = false;
+  if (name) {
     try {
-      await fs.promises.unlink(filePath);
+      await fs.promises.unlink(path.join(REPLAY_DIR, name));
+      fileDeleted = true;
     } catch (err) {
       logger.error({ err, sessionId }, 'Failed to delete campaign replay file');
     }
+    // Evict either way: on failure the file is unreadable or already gone.
+    index.byCampaignSession.delete(sessionId);
   }
   await execute(`DELETE FROM campaign_replays WHERE session_id = ?`, [sessionId]);
-  return true;
+  return fileDeleted;
 }
 
 async function findCampaignReplayFile(sessionId: string): Promise<string | null> {

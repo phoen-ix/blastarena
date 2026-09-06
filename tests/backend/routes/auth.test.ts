@@ -14,6 +14,8 @@ const mockRefreshAccessToken = jest.fn<AnyFn>();
 const mockVerifyEmail = jest.fn<AnyFn>();
 const mockForgotPassword = jest.fn<AnyFn>();
 const mockResetPassword = jest.fn<AnyFn>();
+const mockVerifyCredentials = jest.fn<AnyFn>();
+const mockGenerateLocalCoopToken = jest.fn<AnyFn>();
 
 jest.mock('../../../backend/src/services/auth', () => ({
   register: mockRegister,
@@ -23,6 +25,13 @@ jest.mock('../../../backend/src/services/auth', () => ({
   verifyEmail: mockVerifyEmail,
   forgotPassword: mockForgotPassword,
   resetPassword: mockResetPassword,
+  verifyCredentials: mockVerifyCredentials,
+  generateLocalCoopToken: mockGenerateLocalCoopToken,
+}));
+
+const mockGetPlayerCosmeticsForGame = jest.fn<AnyFn>();
+jest.mock('../../../backend/src/services/cosmetics', () => ({
+  getPlayerCosmeticsForGame: mockGetPlayerCosmeticsForGame,
 }));
 
 const mockIsRegistrationEnabled = jest.fn<AnyFn>();
@@ -569,5 +578,73 @@ describe('Middleware presence', () => {
     // verify-email has rateLimiter but NOT validate — only 2 entries
     const verifyStack = getRouteStack('get', '/auth/verify-email/:token');
     expect(verifyStack.length).toBe(2);
+  });
+});
+
+// ============================== POST /local-coop/login =====================
+
+describe('POST /local-coop/login', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let handler: any;
+
+  beforeEach(() => {
+    handler = getHandler('post', '/local-coop/login');
+    mockGetConfig.mockReturnValue({ APP_URL: 'http://localhost:8080' });
+    mockGenerateLocalCoopToken.mockReturnValue('p2-token');
+    mockGetPlayerCosmeticsForGame.mockResolvedValue(new Map([[2, { colorHex: 0xff0000 }]]));
+  });
+
+  const p2 = {
+    id: 2,
+    username: 'p2',
+    role: 'user',
+    language: 'en',
+    emailVerified: true,
+    twoFactorEnabled: false,
+  };
+
+  it('logs a verified account in as P2 and sets the isolated cookie', async () => {
+    mockVerifyCredentials.mockResolvedValue(p2);
+    const req = mockReq({
+      user: { userId: 1, username: 'p1', role: 'user' },
+      body: { username: 'p2', password: 'pw', duration: 0 },
+    });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+
+    expect(res._cookie).toMatchObject({ name: 'localCoopP2', value: 'p2-token' });
+    expect(res._json).toEqual({
+      user: { id: 2, username: 'p2' },
+      cosmetics: { colorHex: 0xff0000 },
+    });
+  });
+
+  // (audit B8) — every other entry into a game requires a verified email; this one did not.
+  it('refuses an unverified account with the same shape as emailVerifiedMiddleware', async () => {
+    mockVerifyCredentials.mockResolvedValue({ ...p2, emailVerified: false });
+    const req = mockReq({
+      user: { userId: 1, username: 'p1', role: 'user' },
+      body: { username: 'p2', password: 'pw', duration: 0 },
+    });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+
+    expect(res._status).toBe(403);
+    expect(res._json).toEqual({ error: 'Email not verified', code: 'EMAIL_NOT_VERIFIED' });
+    expect(res._cookie).toBeNull();
+    expect(mockGenerateLocalCoopToken).not.toHaveBeenCalled();
+  });
+
+  it('refuses logging in as yourself', async () => {
+    mockVerifyCredentials.mockResolvedValue({ ...p2, id: 1 });
+    const req = mockReq({
+      user: { userId: 1, username: 'p1', role: 'user' },
+      body: { username: 'p1', password: 'pw', duration: 0 },
+    });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+
+    expect(res._status).toBe(400);
+    expect(res._cookie).toBeNull();
   });
 });
