@@ -13,6 +13,7 @@ import {
   getErrorMessage,
 } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
+import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
 
 const CONDITION_TYPES: AchievementConditionType[] = [
@@ -245,7 +246,7 @@ export class AchievementsTab {
       btn.addEventListener('click', () => {
         const id = parseInt((btn as HTMLElement).dataset.id!);
         const name = (btn as HTMLElement).dataset.name!;
-        this.confirmDelete('achievement', id, name, async () => {
+        this.confirmDelete('achievement', name, async () => {
           await ApiClient.delete(`/admin/achievements/${id}`);
           this.notifications.success(t('admin:achievements.achievementDeleted'));
           await this.loadAchievements();
@@ -256,24 +257,22 @@ export class AchievementsTab {
 
   private showAchievementModal(existing?: Achievement): void {
     const isEdit = !!existing;
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute(
-      'aria-label',
-      isEdit
+    // createModal(): focus trap + Escape + backdrop click, like every other modal. (audit G12)
+    const { overlay, content, close } = createModal({
+      ariaLabel: isEdit
         ? t('admin:achievements.editAchievement')
         : t('admin:achievements.createAchievementTitle'),
-    );
+      className: 'modal modal-scroll',
+      style: 'max-width:520px;',
+      parent: document.getElementById('ui-overlay')!,
+    });
 
     const condCfg = existing?.conditionConfig || {};
     const currentCondType = existing?.conditionType || 'cumulative';
 
     setHtml(
-      overlay,
+      content,
       `
-      <div class="modal modal-scroll" style="max-width:520px;">
         <h2>${isEdit ? t('admin:achievements.editAchievement') : t('admin:achievements.createAchievementTitle')}</h2>
         <div class="form-stack">
           <div>
@@ -325,11 +324,8 @@ export class AchievementsTab {
           <button class="btn btn-secondary" id="am-cancel">${t('admin:achievements.cancel')}</button>
           <button class="btn btn-primary" id="am-submit">${isEdit ? t('admin:achievements.save') : t('admin:achievements.create')}</button>
         </div>
-      </div>
     `,
     );
-
-    document.getElementById('ui-overlay')!.appendChild(overlay);
 
     const condTypeSelect = overlay.querySelector('#am-condType') as HTMLSelectElement;
     const condFieldsEl = overlay.querySelector('#am-cond-fields') as HTMLElement;
@@ -354,10 +350,7 @@ export class AchievementsTab {
     updateCondFields();
     updateRewardVisibility();
 
-    overlay.querySelector('#am-cancel')!.addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
+    overlay.querySelector('#am-cancel')!.addEventListener('click', close);
 
     overlay.querySelector('#am-submit')!.addEventListener('click', async () => {
       const name = (overlay.querySelector('#am-name') as HTMLInputElement).value.trim();
@@ -400,7 +393,7 @@ export class AchievementsTab {
           await ApiClient.post('/admin/achievements', payload);
           this.notifications.success(t('admin:achievements.achievementCreated'));
         }
-        overlay.remove();
+        close();
         await this.loadAchievements();
       } catch (err: unknown) {
         errorEl.textContent = getErrorMessage(err);
@@ -637,7 +630,7 @@ export class AchievementsTab {
       btn.addEventListener('click', () => {
         const id = parseInt((btn as HTMLElement).dataset.id!);
         const name = (btn as HTMLElement).dataset.name!;
-        this.confirmDelete('cosmetic', id, name, async () => {
+        this.confirmDelete('cosmetic', name, async () => {
           await ApiClient.delete(`/admin/cosmetics/${id}`);
           this.notifications.success(t('admin:achievements.cosmeticDeleted'));
           await this.loadCosmetics();
@@ -648,22 +641,21 @@ export class AchievementsTab {
 
   private showCosmeticModal(existing?: Cosmetic): void {
     const isEdit = !!existing;
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute(
-      'aria-label',
-      isEdit ? t('admin:achievements.editCosmetic') : t('admin:achievements.createCosmeticTitle'),
-    );
+    const { overlay, content, close } = createModal({
+      ariaLabel: isEdit
+        ? t('admin:achievements.editCosmetic')
+        : t('admin:achievements.createCosmeticTitle'),
+      className: 'modal modal-scroll',
+      style: 'max-width:520px;',
+      parent: document.getElementById('ui-overlay')!,
+    });
 
     const currentType = existing?.type || 'color';
     const cfg = existing?.config || {};
 
     setHtml(
-      overlay,
+      content,
       `
-      <div class="modal modal-scroll" style="max-width:520px;">
         <h2>${isEdit ? t('admin:achievements.editCosmetic') : t('admin:achievements.createCosmeticTitle')}</h2>
         <div class="form-stack">
           <div>
@@ -707,11 +699,8 @@ export class AchievementsTab {
           <button class="btn btn-secondary" id="cm-cancel">${t('admin:achievements.cancel')}</button>
           <button class="btn btn-primary" id="cm-submit">${isEdit ? t('admin:achievements.save') : t('admin:achievements.create')}</button>
         </div>
-      </div>
     `,
     );
-
-    document.getElementById('ui-overlay')!.appendChild(overlay);
 
     const typeSelect = overlay.querySelector('#cm-type') as HTMLSelectElement;
     const configFieldsEl = overlay.querySelector('#cm-config-fields') as HTMLElement;
@@ -732,10 +721,7 @@ export class AchievementsTab {
     updateConfigFields();
     updateUnlockReqVisibility();
 
-    overlay.querySelector('#cm-cancel')!.addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
+    overlay.querySelector('#cm-cancel')!.addEventListener('click', close);
 
     overlay.querySelector('#cm-submit')!.addEventListener('click', async () => {
       const name = (overlay.querySelector('#cm-name') as HTMLInputElement).value.trim();
@@ -792,7 +778,7 @@ export class AchievementsTab {
           await ApiClient.post('/admin/cosmetics', payload);
           this.notifications.success(t('admin:achievements.cosmeticCreated'));
         }
-        overlay.remove();
+        close();
         await this.loadCosmetics();
       } catch (err: unknown) {
         errorEl.textContent = getErrorMessage(err);
@@ -947,16 +933,15 @@ export class AchievementsTab {
   }
 
   private showImportAchievementsModal(): void {
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', t('admin:achievements.importAchievements'));
+    const { overlay, content, close } = createModal({
+      ariaLabel: t('admin:achievements.importAchievements'),
+      style: 'max-width:520px;',
+      parent: document.getElementById('ui-overlay')!,
+    });
 
     setHtml(
-      overlay,
+      content,
       `
-      <div class="modal" style="max-width:520px;">
         <h2>${t('admin:achievements.importAchievements')}</h2>
         <p class="modal-desc">
           ${t('admin:achievements.importFileDesc')}
@@ -968,11 +953,8 @@ export class AchievementsTab {
           <button class="btn btn-secondary" id="ach-import-cancel">${t('admin:achievements.cancel')}</button>
           <button class="btn btn-primary" id="ach-import-submit" disabled>${t('admin:achievements.import')}</button>
         </div>
-      </div>
     `,
     );
-
-    document.getElementById('ui-overlay')!.appendChild(overlay);
 
     const fileInput = overlay.querySelector('#ach-import-file') as HTMLInputElement;
     const errorEl = overlay.querySelector('#ach-import-error') as HTMLElement;
@@ -1045,10 +1027,7 @@ export class AchievementsTab {
       }
     });
 
-    overlay.querySelector('#ach-import-cancel')!.addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
+    overlay.querySelector('#ach-import-cancel')!.addEventListener('click', close);
 
     submitBtn.addEventListener('click', async () => {
       if (!parsedData) return;
@@ -1066,11 +1045,11 @@ export class AchievementsTab {
         });
 
         if (result.conflicts && result.conflicts.length > 0) {
-          overlay.remove();
+          close();
           this.showCosmeticConflictModal(result.conflicts, parsedData);
         } else {
           // No conflicts, or no cosmetics — all imported directly
-          overlay.remove();
+          close();
           this.notifications.success(result.message || t('admin:achievements.importSuccess'));
           await this.loadAchievements();
         }
@@ -1086,11 +1065,12 @@ export class AchievementsTab {
     conflicts: AchievementImportConflict[],
     bundleData: AchievementBundleExportData,
   ): void {
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', t('admin:achievements.resolveConflicts'));
+    const { overlay, content, close } = createModal({
+      ariaLabel: t('admin:achievements.resolveConflicts'),
+      className: 'modal modal-scroll',
+      style: 'max-width:560px;',
+      parent: document.getElementById('ui-overlay')!,
+    });
 
     const rows = conflicts
       .map((c, i) => {
@@ -1123,9 +1103,8 @@ export class AchievementsTab {
       .join('');
 
     setHtml(
-      overlay,
+      content,
       `
-      <div class="modal modal-scroll" style="max-width:560px;">
         <h2>${t('admin:achievements.resolveConflicts')}</h2>
         <p class="modal-desc" style="margin-bottom:16px;">
           ${t('admin:achievements.conflictDesc')}
@@ -1135,16 +1114,10 @@ export class AchievementsTab {
           <button class="btn btn-secondary" id="conflict-cancel">${t('admin:achievements.cancel')}</button>
           <button class="btn btn-primary" id="conflict-submit">${t('admin:achievements.import')}</button>
         </div>
-      </div>
     `,
     );
 
-    document.getElementById('ui-overlay')!.appendChild(overlay);
-
-    overlay.querySelector('#conflict-cancel')!.addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
+    overlay.querySelector('#conflict-cancel')!.addEventListener('click', close);
 
     overlay.querySelector('#conflict-submit')!.addEventListener('click', async () => {
       const cosmeticIdMap: Record<string, 'create' | 'skip' | number> = {};
@@ -1170,7 +1143,7 @@ export class AchievementsTab {
             cosmeticIdMap,
           },
         );
-        overlay.remove();
+        close();
         this.notifications.success(result.message);
         await this.loadAchievements();
       } catch (err: unknown) {
@@ -1208,22 +1181,16 @@ export class AchievementsTab {
 
   // ─── Shared utilities ────────────────────────────────────────────────
 
-  private confirmDelete(
-    entity: string,
-    id: number,
-    name: string,
-    onConfirm: () => Promise<void>,
-  ): void {
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', t('admin:achievements.deleteEntity', { entity }));
+  private confirmDelete(entity: string, name: string, onConfirm: () => Promise<void>): void {
+    const { overlay, content, close } = createModal({
+      ariaLabel: t('admin:achievements.deleteEntity', { entity }),
+      style: 'max-width:420px;',
+      parent: document.getElementById('ui-overlay')!,
+    });
 
     setHtml(
-      overlay,
+      content,
       `
-      <div class="modal" style="max-width:420px;">
         <h2 class="text-danger">${t('admin:achievements.deleteEntity', { entity: escapeHtml(entity) })}</h2>
         <p class="modal-desc" style="font-size:14px;">${t('admin:achievements.deleteConfirmMessage', { name: escapeHtml(name) })}</p>
         <p class="modal-hint">${t('admin:achievements.deleteTypePrompt')}</p>
@@ -1232,11 +1199,8 @@ export class AchievementsTab {
           <button class="btn btn-secondary" id="del-cancel">${t('admin:achievements.cancel')}</button>
           <button class="btn-danger btn-confirm" id="del-confirm" style="opacity:0.5;" disabled>${t('admin:achievements.deleteBtn')}</button>
         </div>
-      </div>
     `,
     );
-
-    document.getElementById('ui-overlay')!.appendChild(overlay);
 
     const input = overlay.querySelector('#del-confirm-input') as HTMLInputElement;
     const confirmBtn = overlay.querySelector('#del-confirm') as HTMLButtonElement;
@@ -1247,13 +1211,10 @@ export class AchievementsTab {
       confirmBtn.style.opacity = matches ? '1' : '0.5';
     });
 
-    overlay.querySelector('#del-cancel')!.addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
+    overlay.querySelector('#del-cancel')!.addEventListener('click', close);
 
     confirmBtn.addEventListener('click', async () => {
-      overlay.remove();
+      close();
       try {
         await onConfirm();
       } catch (err: unknown) {

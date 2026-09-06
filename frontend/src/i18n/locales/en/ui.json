@@ -19,7 +19,8 @@
     "expand": "Expand sidebar",
     "collapse": "Collapse sidebar",
     "viewProfile": "View profile",
-    "openWorld": "Open World"
+    "openWorld": "Open World",
+    "level": "Lvl {{level}}"
   },
   "rooms": {
     "title": "Available Rooms",
@@ -111,7 +112,6 @@
       "cosmetics": "Cosmetics"
     },
     "privacy": {
-      "title": "Privacy",
       "settingsTitle": "Privacy Settings",
       "publicProfile": "Public Profile",
       "publicProfileDesc": "Allow other players to view your stats, rank, and achievements",
@@ -120,7 +120,6 @@
       "saved": "Saved!"
     },
     "account": {
-      "title": "Account Settings",
       "profile": "Profile",
       "username": "Username",
       "usernameHint": "Letters, numbers, underscores, hyphens. 3-20 characters.",
@@ -134,11 +133,9 @@
       "unverified": "unverified",
       "pendingChange": "Pending change to",
       "pendingHint": "check that inbox for the confirmation link.",
-      "cancel": "Cancel",
       "pendingCancelled": "Pending email change cancelled",
       "newEmailPlaceholder": "New email address",
       "emailEmpty": "Enter a new email address.",
-      "emailSame": "That's already your current email.",
       "sendConfirmation": "Send Confirmation",
       "changeEmail": "Change Email",
       "changePassword": "Change Password",
@@ -149,7 +146,6 @@
       "passwordTooShort": "New password must be at least 8 characters.",
       "passwordMismatch": "New passwords do not match.",
       "save": "Save",
-      "close": "Close",
       "twoFactor": {
         "title": "Two-Factor Authentication",
         "description": "Add an extra layer of security to your account using an authenticator app like Google Authenticator, Authy, or 1Password.",
@@ -285,7 +281,15 @@
     "failed": "Failed",
     "join": "Join",
     "msg": "Msg",
-    "friendRequestReceived": "{{username}} sent you a friend request"
+    "friendRequestReceived": "{{username}} sent you a friend request",
+    "block": "Block",
+    "blocked": "{{username}} has been blocked",
+    "blockFailed": "Failed to block user",
+    "blockModal": {
+      "ariaLabel": "Block user",
+      "title": "Block User",
+      "message": "Block {{username}}? They will be removed from your friends and can no longer send you requests or messages. You can unblock them from the Blocked tab."
+    }
   },
   "party": {
     "title": "Party",
@@ -418,26 +422,6 @@
     "small": "Small",
     "medium": "Medium",
     "large": "Large",
-    "sizes": {
-      "11x11": "Small (11×11)",
-      "15x13": "Medium (15×13)",
-      "19x15": "Large (19×15)",
-      "21x21": "Huge (21×21)"
-    },
-    "density": {
-      "none": "None (0%)",
-      "low": "Low (15%)",
-      "normal": "Normal (30%)",
-      "high": "High (50%)",
-      "veryHigh": "Very High (80%)"
-    },
-    "powerUpRates": {
-      "none": "None (0%)",
-      "low": "Low (30%)",
-      "medium": "Medium (50%)",
-      "high": "High (65%)",
-      "veryHigh": "Very High (80%)"
-    },
     "difficulty": {
       "easy": "Easy",
       "normal": "Normal",
@@ -553,7 +537,12 @@
     "remoteMode": {
       "all": "ALL",
       "fifo": "1st"
-    }
+    },
+    "buddyTag": "[BUDDY]",
+    "coopDead": "(dead)",
+    "coopReady": "(ready)",
+    "coopRespawnIn": "({{seconds}}s)",
+    "adminMessageFrom": "Message from {{from}}"
   },
   "room": {
     "back": "← Back",
@@ -597,13 +586,18 @@
       "tnt": "TNT",
       "dynamite": "Dynamite",
       "sparky": "Sparky"
-    }
+    },
+    "adminMessageFrom": "Message from {{from}}"
   },
   "game": {
     "leaveTitle": "LEAVE GAME",
     "leaveWarning": "You will die and lose all progress.",
     "leaveConfirm": "Leave Game",
-    "leaveCancel": "Cancel"
+    "leaveCancel": "Cancel",
+    "pausedTitle": "PAUSED",
+    "pauseContinue": "Continue",
+    "pauseRestartLevel": "Restart Level",
+    "pauseExitLevel": "Exit Level"
   },
   "gameOver": {
     "gameWord": "GAME",
@@ -635,7 +629,8 @@
   },
   "lobbyChat": {
     "empty": "No messages yet",
-    "ariaLabel": "Lobby chat message"
+    "ariaLabel": "Lobby chat message",
+    "title": "Lobby Chat"
   },
   "replay": {
     "back": "Back",
@@ -669,5 +664,31 @@
     "roundEnd": "Round Over",
     "roundStart": "New Round Starting",
     "nextRound": "Next round in {{seconds}}s"
+  },
+  "replayLog": {
+    "filters": {
+      "kills": "Kills",
+      "bombs": "Bombs",
+      "bot": "Bot AI",
+      "powerups": "Power-ups",
+      "movement": "Movement",
+      "explosions": "Explosions",
+      "players": "Leave/DC"
+    },
+    "selfDestructed": "{{victim}} self-destructed",
+    "killed": "{{killer}} killed {{victim}}",
+    "bombPlaced": "{{owner}} placed bomb at ({{x}},{{y}})",
+    "bombDetonated": "{{owner}} bomb detonated at ({{x}},{{y}})",
+    "botDecision": "{{bot}}: {{decision}}",
+    "moved": "{{player}} moved {{direction}} to ({{x}},{{y}})",
+    "pickedUp": "{{player}} picked up {{type}}",
+    "explosion": "{{owner}} explosion: {{cells}} cells, {{walls}} walls",
+    "left": "{{player}} left the game",
+    "disconnected": "{{player}} disconnected",
+    "disconnectKilled": "{{player}} killed (disconnect timeout)",
+    "gameOver": "Game over"
+  },
+  "connection": {
+    "reconnecting": "Reconnecting to server..."
   }
 }

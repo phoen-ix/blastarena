@@ -7,6 +7,7 @@ import {
   isTotpChallengeResponse,
 } from '@blast-arena/shared';
 import { i18n } from '../i18n';
+import { API_URL } from '../config';
 
 export type AuthChangeCallback = (user: PublicUser | null) => void;
 
@@ -128,7 +129,7 @@ export class AuthManager {
 
   async refresh(): Promise<boolean> {
     try {
-      const response = await fetch('/api/auth/refresh', {
+      const response = await fetch(`${API_URL}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
       });

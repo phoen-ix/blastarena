@@ -3,12 +3,12 @@
   "titleBrand": "<span style=\"color:var(--text);\">KAMP</span>ANJE",
   "backToLobby": "Tilbake til lobbyen",
   "mapPreview": {
-    "loading": "Laster forh\u00e5ndsvisning..."
+    "loading": "Laster forhåndsvisning..."
   },
-  "empty": "Ingen kampanjeverdener tilgjengelig enn\u00e5.",
+  "empty": "Ingen kampanjeverdener tilgjengelig ennå.",
   "loadFailed": "Kunne ikke laste kampanje: {{error}}",
-  "loadingLevel": "Laster niv\u00e5...",
-  "startFailed": "Kunne ikke starte niv\u00e5: {{error}}",
+  "loadingLevel": "Laster nivå...",
+  "startFailed": "Kunne ikke starte nivå: {{error}}",
   "stats": {
     "enemies": "fiender",
     "life": "liv",
@@ -23,11 +23,11 @@
   },
   "progress": {
     "completed": "{{completed}}/{{total}}",
-    "size": "{{percent}}% st\u00f8rrelse"
+    "size": "{{percent}}% størrelse"
   },
   "localCoopModal": {
-    "title": "Lokalt samarbeid \u2014 oppsett",
-    "ariaLabel": "Lokalt samarbeid \u2014 oppsett",
+    "title": "Lokalt samarbeid — oppsett",
+    "ariaLabel": "Lokalt samarbeid — oppsett",
     "player1Controls": "Spiller 1-kontroller",
     "player2": "Spiller 2",
     "identity": "Identitet:",
@@ -52,14 +52,26 @@
     "start": "Start",
     "defaultPlayerName": "Spiller 2",
     "duration": {
-      "session": "Kun denne \u00f8kten",
+      "session": "Kun denne økten",
       "1h": "1 time",
       "6h": "6 timer",
       "12h": "12 timer",
       "24h": "24 timer"
     },
     "loginFailed": "Innlogging mislyktes",
-    "connectionError": "Tilkoblingsfeil"
+    "connectionError": "Tilkoblingsfeil",
+    "controlPresets": {
+      "wasd": "WASD + Mellomrom/E/Q",
+      "arrows": "Piler + Enter/Skift/Skråstrek",
+      "numpad": "Numpad 8462 + Pluss/Minus/Gange",
+      "gamepad1": "Håndkontroll 1",
+      "gamepad2": "Håndkontroll 2"
+    },
+    "cameraModes": {
+      "shared": "Delt (autozoom)",
+      "splitH": "Delt horisontalt",
+      "splitV": "Delt vertikalt"
+    }
   },
   "buddyModal": {
     "title": "Kompismodus",
@@ -71,7 +83,7 @@
     "name": "Navn",
     "namePlaceholder": "Kompis",
     "color": "Farge",
-    "sizeLabel": "St\u00f8rrelse: {{percent}}%",
+    "sizeLabel": "Størrelse: {{percent}}%",
     "p1Label": "S1",
     "buddyLabel": "Kompis",
     "player1Controls": "Spiller 1-kontroller",

@@ -597,7 +597,10 @@
     "revokeAllConfirmPrompt": "Skriv CONFIRM for at fortsætte:",
     "revokeAllCancel": "Annuller",
     "revokeAllConfirm": "Tilbagekald alle",
-    "revokeAllSuccess": "Alle sessioner tilbagekaldt"
+    "revokeAllSuccess": "Alle sessioner tilbagekaldt",
+    "spectatorActionsDesc": "Lad eliminerede spillere bruge energi på vægge, meteorer, power-ups og fartzoner (rum kan stadig slå det fra pr. kamp)",
+    "spectatorActionsToggled": "Tilskuer-spilleder {{status}}",
+    "spectatorActionsGlobal": "Tilskuer-spilleder (globalt)"
   },
   "seasons": {
     "sectionTitle": "Sæsonadministration",

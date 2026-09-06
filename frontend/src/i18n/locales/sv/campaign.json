@@ -59,7 +59,19 @@
       "24h": "24 timmar"
     },
     "loginFailed": "Inloggning misslyckades",
-    "connectionError": "Anslutningsfel"
+    "connectionError": "Anslutningsfel",
+    "controlPresets": {
+      "wasd": "WASD + Mellanslag/E/Q",
+      "arrows": "Pilar + Enter/Skift/Snedstreck",
+      "numpad": "Numpad 8462 + Plus/Minus/Gånger",
+      "gamepad1": "Handkontroll 1",
+      "gamepad2": "Handkontroll 2"
+    },
+    "cameraModes": {
+      "shared": "Delad (autozoom)",
+      "splitH": "Delad horisontellt",
+      "splitV": "Delad vertikalt"
+    }
   },
   "buddyModal": {
     "title": "Kompisläge",

@@ -1,7 +1,8 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
 import { BotAIEntry, EnemyAIEntry, getErrorMessage } from '@blast-arena/shared';
-import { escapeHtml, setHtml } from '../../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
+import { createModal } from '../../utils/modal';
 import { API_URL } from '../../config';
 import { t } from '../../i18n';
 
@@ -118,7 +119,7 @@ export class AITab {
     const fileSize = ai.fileSize > 0 ? `${(ai.fileSize / 1024).toFixed(1)}KB` : '—';
 
     return `
-      <tr data-bot-ai-id="${escapeHtml(ai.id)}">
+      <tr data-bot-ai-id="${escapeAttr(ai.id)}">
         <td>${escapeHtml(ai.name)}${builtinBadge}</td>
         <td style="color:var(--text-dim);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(ai.description || '—')}</td>
         <td>${statusBadge}</td>
@@ -127,11 +128,11 @@ export class AITab {
         <td>${escapeHtml(ai.filename)} (${fileSize})</td>
         <td>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="btn-sm btn-secondary bot-ai-toggle" data-id="${escapeHtml(ai.id)}" data-active="${ai.isActive}">${ai.isActive ? t('admin:ai.deactivate') : t('admin:ai.activate')}</button>
-            <button class="btn-sm btn-secondary bot-ai-download" data-id="${escapeHtml(ai.id)}">${t('admin:ai.download')}</button>
-            ${!ai.isBuiltin ? `<button class="btn-sm btn-secondary bot-ai-reupload" data-id="${escapeHtml(ai.id)}">${t('admin:ai.reupload')}</button>` : ''}
-            ${!ai.isBuiltin ? `<button class="btn-sm btn-secondary bot-ai-edit" data-id="${escapeHtml(ai.id)}">${t('admin:ai.edit')}</button>` : ''}
-            ${!ai.isBuiltin ? `<button class="btn-sm btn-danger bot-ai-delete" data-id="${escapeHtml(ai.id)}" data-name="${escapeHtml(ai.name)}">${t('admin:ai.delete')}</button>` : ''}
+            <button class="btn-sm btn-secondary bot-ai-toggle" data-id="${escapeAttr(ai.id)}" data-active="${ai.isActive}">${ai.isActive ? t('admin:ai.deactivate') : t('admin:ai.activate')}</button>
+            <button class="btn-sm btn-secondary bot-ai-download" data-id="${escapeAttr(ai.id)}">${t('admin:ai.download')}</button>
+            ${!ai.isBuiltin ? `<button class="btn-sm btn-secondary bot-ai-reupload" data-id="${escapeAttr(ai.id)}">${t('admin:ai.reupload')}</button>` : ''}
+            ${!ai.isBuiltin ? `<button class="btn-sm btn-secondary bot-ai-edit" data-id="${escapeAttr(ai.id)}">${t('admin:ai.edit')}</button>` : ''}
+            ${!ai.isBuiltin ? `<button class="btn-sm btn-danger bot-ai-delete" data-id="${escapeAttr(ai.id)}" data-name="${escapeAttr(ai.name)}">${t('admin:ai.delete')}</button>` : ''}
           </div>
         </td>
       </tr>
@@ -214,7 +215,7 @@ export class AITab {
     const fileSize = ai.fileSize > 0 ? `${(ai.fileSize / 1024).toFixed(1)}KB` : '—';
 
     return `
-      <tr data-enemy-ai-id="${escapeHtml(ai.id)}">
+      <tr data-enemy-ai-id="${escapeAttr(ai.id)}">
         <td>${escapeHtml(ai.name)}</td>
         <td style="color:var(--text-dim);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(ai.description || '—')}</td>
         <td>${statusBadge}</td>
@@ -223,11 +224,11 @@ export class AITab {
         <td>${escapeHtml(ai.filename)} (${fileSize})</td>
         <td>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="btn-sm btn-secondary enemy-ai-toggle" data-id="${escapeHtml(ai.id)}" data-active="${ai.isActive}">${ai.isActive ? t('admin:ai.deactivate') : t('admin:ai.activate')}</button>
-            <button class="btn-sm btn-secondary enemy-ai-download" data-id="${escapeHtml(ai.id)}">${t('admin:ai.download')}</button>
-            <button class="btn-sm btn-secondary enemy-ai-reupload" data-id="${escapeHtml(ai.id)}">${t('admin:ai.reupload')}</button>
-            <button class="btn-sm btn-secondary enemy-ai-edit" data-id="${escapeHtml(ai.id)}">${t('admin:ai.edit')}</button>
-            <button class="btn-sm btn-danger enemy-ai-delete" data-id="${escapeHtml(ai.id)}" data-name="${escapeHtml(ai.name)}">${t('admin:ai.delete')}</button>
+            <button class="btn-sm btn-secondary enemy-ai-toggle" data-id="${escapeAttr(ai.id)}" data-active="${ai.isActive}">${ai.isActive ? t('admin:ai.deactivate') : t('admin:ai.activate')}</button>
+            <button class="btn-sm btn-secondary enemy-ai-download" data-id="${escapeAttr(ai.id)}">${t('admin:ai.download')}</button>
+            <button class="btn-sm btn-secondary enemy-ai-reupload" data-id="${escapeAttr(ai.id)}">${t('admin:ai.reupload')}</button>
+            <button class="btn-sm btn-secondary enemy-ai-edit" data-id="${escapeAttr(ai.id)}">${t('admin:ai.edit')}</button>
+            <button class="btn-sm btn-danger enemy-ai-delete" data-id="${escapeAttr(ai.id)}" data-name="${escapeAttr(ai.name)}">${t('admin:ai.delete')}</button>
           </div>
         </td>
       </tr>
@@ -307,18 +308,17 @@ export class AITab {
     const title = isEnemy ? t('admin:ai.uploadEnemyTitle') : t('admin:ai.uploadTitle');
     const endpoint = isEnemy ? '/admin/enemy-ai' : '/admin/ai';
 
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', title);
-    overlay.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;';
+    // createModal(): focus trap + Escape + backdrop click, like every other modal. (audit G12)
+    const { overlay, content, close } = createModal({
+      ariaLabel: title,
+      className: 'modal-content',
+      style:
+        'background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:500px;max-width:90vw;',
+    });
 
     setHtml(
-      overlay,
+      content,
       `
-      <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:500px;max-width:90vw;">
         <h3 style="margin:0 0 16px;color:var(--primary);">${title}</h3>
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div>
@@ -340,16 +340,10 @@ export class AITab {
             <button class="btn btn-primary" id="ai-upload-submit">${t('admin:ai.uploadAndCompile')}</button>
           </div>
         </div>
-      </div>
     `,
     );
 
-    document.body.appendChild(overlay);
-
-    overlay.querySelector('#ai-upload-cancel')?.addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
+    overlay.querySelector('#ai-upload-cancel')?.addEventListener('click', close);
 
     overlay.querySelector('#ai-upload-submit')?.addEventListener('click', async () => {
       const nameInput = overlay.querySelector('#ai-upload-name') as HTMLInputElement;
@@ -382,7 +376,7 @@ export class AITab {
         this.notifications.success(
           isEnemy ? t('admin:ai.uploadEnemySuccess') : t('admin:ai.uploadSuccess'),
         );
-        overlay.remove();
+        close();
         await this.loadList();
       } catch (err: unknown) {
         const msg = getErrorMessage(err);
@@ -405,18 +399,16 @@ export class AITab {
     const endpoint = isEnemy ? `/admin/enemy-ai/${id}/upload` : `/admin/ai/${id}/upload`;
     const title = isEnemy ? t('admin:ai.reuploadEnemyTitle') : t('admin:ai.reuploadTitle');
 
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', title);
-    overlay.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;';
+    const { overlay, content, close } = createModal({
+      ariaLabel: title,
+      className: 'modal-content',
+      style:
+        'background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:400px;max-width:90vw;',
+    });
 
     setHtml(
-      overlay,
+      content,
       `
-      <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:400px;max-width:90vw;">
         <h3 style="margin:0 0 16px;color:var(--primary);">${title}</h3>
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div>
@@ -429,16 +421,10 @@ export class AITab {
             <button class="btn btn-primary" id="ai-reupload-submit">${t('admin:ai.uploadAndCompile')}</button>
           </div>
         </div>
-      </div>
     `,
     );
 
-    document.body.appendChild(overlay);
-
-    overlay.querySelector('#ai-reupload-cancel')?.addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
+    overlay.querySelector('#ai-reupload-cancel')?.addEventListener('click', close);
 
     overlay.querySelector('#ai-reupload-submit')?.addEventListener('click', async () => {
       const fileInput = overlay.querySelector('#ai-reupload-file') as HTMLInputElement;
@@ -462,7 +448,7 @@ export class AITab {
         this.notifications.success(
           isEnemy ? t('admin:ai.reuploadEnemySuccess') : t('admin:ai.reuploadSuccess'),
         );
-        overlay.remove();
+        close();
         await this.loadList();
       } catch (err: unknown) {
         const msg = getErrorMessage(err);
@@ -485,23 +471,21 @@ export class AITab {
     const endpoint = isEnemy ? `/admin/enemy-ai/${ai.id}` : `/admin/ai/${ai.id}`;
     const title = isEnemy ? t('admin:ai.editEnemyTitle') : t('admin:ai.editTitle');
 
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', title);
-    overlay.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;';
+    const { overlay, content, close } = createModal({
+      ariaLabel: title,
+      className: 'modal-content',
+      style:
+        'background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:400px;max-width:90vw;',
+    });
 
     setHtml(
-      overlay,
+      content,
       `
-      <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:400px;max-width:90vw;">
         <h3 style="margin:0 0 16px;color:var(--primary);">${title}</h3>
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div>
             <label style="display:block;margin-bottom:4px;color:var(--text-dim);font-size:13px;">${t('admin:ai.nameLabel')}</label>
-            <input type="text" id="ai-edit-name" class="admin-input" value="${escapeHtml(ai.name)}" maxlength="100" style="width:100%;box-sizing:border-box;">
+            <input type="text" id="ai-edit-name" class="admin-input" value="${escapeAttr(ai.name)}" maxlength="100" style="width:100%;box-sizing:border-box;">
           </div>
           <div>
             <label style="display:block;margin-bottom:4px;color:var(--text-dim);font-size:13px;">${t('admin:ai.descriptionLabel')}</label>
@@ -512,16 +496,10 @@ export class AITab {
             <button class="btn btn-primary" id="ai-edit-submit">${t('admin:ai.save')}</button>
           </div>
         </div>
-      </div>
     `,
     );
 
-    document.body.appendChild(overlay);
-
-    overlay.querySelector('#ai-edit-cancel')?.addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
+    overlay.querySelector('#ai-edit-cancel')?.addEventListener('click', close);
 
     overlay.querySelector('#ai-edit-submit')?.addEventListener('click', async () => {
       const nameInput = overlay.querySelector('#ai-edit-name') as HTMLInputElement;
@@ -539,7 +517,7 @@ export class AITab {
         this.notifications.success(
           isEnemy ? t('admin:ai.enemyAiUpdated') : t('admin:ai.aiUpdated'),
         );
-        overlay.remove();
+        close();
         await this.loadList();
       } catch (err: unknown) {
         this.notifications.error(getErrorMessage(err));
@@ -555,31 +533,26 @@ export class AITab {
       ? t('admin:ai.deleteFallbackEnemy')
       : t('admin:ai.deleteFallbackBot');
 
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', title);
-    overlay.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;';
+    const { overlay, content, close } = createModal({
+      ariaLabel: title,
+      className: 'modal-content',
+      style:
+        'background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:400px;max-width:90vw;',
+    });
 
     setHtml(
-      overlay,
+      content,
       `
-      <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:400px;max-width:90vw;">
         <h3 style="margin:0 0 12px;color:var(--danger);">${title}</h3>
         <p style="color:var(--text-dim);margin:0 0 12px;">${t('admin:ai.deleteConfirmMessage', { name: escapeHtml(name), fallbackMessage: fallbackMsg })}</p>
         <p style="color:var(--text-dim);margin:0 0 16px;font-size:13px;">${t('admin:ai.deleteTypeToConfirm')}</p>
-        <input type="text" id="ai-delete-confirm" class="admin-input" placeholder="${escapeHtml(name)}" aria-label="${t('admin:ai.deleteConfirmAriaLabel')}" style="width:100%;box-sizing:border-box;margin-bottom:16px;">
+        <input type="text" id="ai-delete-confirm" class="admin-input" placeholder="${escapeAttr(name)}" aria-label="${t('admin:ai.deleteConfirmAriaLabel')}" style="width:100%;box-sizing:border-box;margin-bottom:16px;">
         <div style="display:flex;gap:12px;justify-content:flex-end;">
           <button class="btn btn-secondary" id="ai-delete-cancel">${t('admin:ai.cancel')}</button>
           <button class="btn btn-danger" id="ai-delete-submit" disabled>${t('admin:ai.delete')}</button>
         </div>
-      </div>
     `,
     );
-
-    document.body.appendChild(overlay);
 
     const confirmInput = overlay.querySelector('#ai-delete-confirm') as HTMLInputElement;
     const deleteBtn = overlay.querySelector('#ai-delete-submit') as HTMLButtonElement;
@@ -588,10 +561,7 @@ export class AITab {
       deleteBtn.disabled = confirmInput.value !== name;
     });
 
-    overlay.querySelector('#ai-delete-cancel')?.addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
+    overlay.querySelector('#ai-delete-cancel')?.addEventListener('click', close);
 
     deleteBtn.addEventListener('click', async () => {
       try {
@@ -599,7 +569,7 @@ export class AITab {
         this.notifications.success(
           isEnemy ? t('admin:ai.enemyAiDeleted') : t('admin:ai.aiDeleted'),
         );
-        overlay.remove();
+        close();
         await this.loadList();
       } catch (err: unknown) {
         this.notifications.error(getErrorMessage(err));

@@ -64,7 +64,7 @@ export class UsersTab {
       `
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">
         <div class="admin-search" style="flex:1;margin-bottom:0;">
-          <input type="text" placeholder="${escapeAttr(t('admin:users.searchPlaceholder'))}" id="admin-user-search" value="${escapeHtml(this.search)}">
+          <input type="text" placeholder="${escapeAttr(t('admin:users.searchPlaceholder'))}" id="admin-user-search" value="${escapeAttr(this.search)}">
         </div>
         ${isAdmin ? `<button class="btn btn-primary" id="admin-create-user" style="flex-shrink:0;white-space:nowrap;">${t('admin:users.createUser')}</button>` : ''}
         ${isAdmin ? `<button class="btn btn-secondary" id="admin-cleanup" style="flex-shrink:0;white-space:nowrap;">${t('admin:users.cleanup.button')}</button>` : ''}

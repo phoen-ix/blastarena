@@ -1,13 +1,12 @@
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
-import { escapeHtml, setHtml } from '../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../utils/html';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { t } from '../i18n';
 import {
   LeaderboardResponse,
   LeaderboardEntry,
   Season,
-  RankConfig,
   getErrorMessage,
 } from '@blast-arena/shared';
 
@@ -21,7 +20,10 @@ export class LeaderboardUI {
   private currentSeasonId: number | null = null;
   private onViewProfile?: (userId: number) => void;
   private seasons: Season[] = [];
-  private rankConfig: RankConfig | null = null;
+  // Delegated profile-link handler on the embedded container (the persistent `.main-body`),
+  // removed in destroy() — it used to accumulate one copy per visit. (audit C2)
+  private profileClickHandler: ((e: Event) => void) | null = null;
+  private embeddedContainer: HTMLElement | null = null;
 
   constructor(
     notifications: NotificationUI,
@@ -76,12 +78,15 @@ export class LeaderboardUI {
       this.loadLeaderboard();
     });
 
-    this.container.addEventListener('click', (e: Event) => {
+    this.unbindEmbeddedListeners();
+    this.profileClickHandler = (e: Event) => {
       const target = (e.target as HTMLElement).closest('[data-user-id]') as HTMLElement | null;
       if (target && this.onViewProfile) {
         this.onViewProfile(parseInt(target.dataset.userId!, 10));
       }
-    });
+    };
+    this.container.addEventListener('click', this.profileClickHandler);
+    this.embeddedContainer = this.container;
 
     this.currentPage = 1;
     this.pushGamepadContext();
@@ -89,7 +94,16 @@ export class LeaderboardUI {
   }
 
   destroy(): void {
+    this.unbindEmbeddedListeners();
     UIGamepadNavigator.getInstance().popContext('leaderboard-ui');
+  }
+
+  private unbindEmbeddedListeners(): void {
+    if (this.embeddedContainer && this.profileClickHandler) {
+      this.embeddedContainer.removeEventListener('click', this.profileClickHandler);
+    }
+    this.embeddedContainer = null;
+    this.profileClickHandler = null;
   }
 
   private pushGamepadContext(): void {
@@ -151,12 +165,12 @@ export class LeaderboardUI {
 
   private async loadInitialData(): Promise<void> {
     try {
-      const [seasonsResp, tiersData] = await Promise.all([
-        ApiClient.get<{ seasons: Season[]; total: number }>('/leaderboard/seasons'),
-        ApiClient.get<RankConfig>('/leaderboard/tiers'),
-      ]);
+      // Rank tiers used to be fetched here too and stored in a field nothing read; every row
+      // already carries its rankTier/rankColor from the server. (audit G4)
+      const seasonsResp = await ApiClient.get<{ seasons: Season[]; total: number }>(
+        '/leaderboard/seasons',
+      );
       this.seasons = seasonsResp.seasons ?? [];
-      this.rankConfig = tiersData;
       this.populateSeasonSelect();
     } catch (err: unknown) {
       this.notifications.error(getErrorMessage(err));
@@ -240,7 +254,7 @@ export class LeaderboardUI {
   }
 
   private renderRow(entry: LeaderboardEntry): string {
-    const rankBadge = `<span class="lb-rank-pill" style="background:${escapeHtml(entry.rankColor)}">${escapeHtml(entry.rankTier)}</span>`;
+    const rankBadge = `<span class="lb-rank-pill" style="background:${escapeAttr(entry.rankColor)}">${escapeHtml(entry.rankTier)}</span>`;
 
     return `
       <tr>

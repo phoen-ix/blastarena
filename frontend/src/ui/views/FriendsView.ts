@@ -1,7 +1,8 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
 import { Friend, FriendRequest, ActivityStatus } from '@blast-arena/shared';
-import { escapeHtml, enableKeyboardActions, setHtml } from '../../utils/html';
+import { escapeHtml, escapeAttr, enableKeyboardActions, setHtml } from '../../utils/html';
+import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
 
 export class FriendsView implements ILobbyView {
@@ -32,6 +33,13 @@ export class FriendsView implements ILobbyView {
   private friendOnlineHandler!: (data: { userId: number; activity: ActivityStatus }) => void;
   private friendOfflineHandler!: (data: { userId: number }) => void;
 
+  // Delegated DOM handlers on the persistent `.main-body`, removed in destroy(). They used to be
+  // re-added on every render() and never removed, so each visit multiplied every action. (audit C2)
+  private clickHandler: ((e: Event) => void) | null = null;
+  private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
+  private disposeKeyboardActions: (() => void) | null = null;
+  private boundContainer: HTMLElement | null = null;
+
   constructor(deps: ViewDeps, onMessageFriend: (userId: number, username: string) => void) {
     this.deps = deps;
     this.onMessageFriend = onMessageFriend;
@@ -48,12 +56,14 @@ export class FriendsView implements ILobbyView {
 
   /** Set up delegated event handlers once — survive innerHTML rebuilds */
   private setupDelegatedListeners(): void {
-    if (!this.container) return;
+    if (!this.container || this.boundContainer === this.container) return;
+    this.unbindDelegatedListeners();
+    this.boundContainer = this.container;
     const sc = this.deps.socketClient;
 
-    enableKeyboardActions(this.container);
+    this.disposeKeyboardActions = enableKeyboardActions(this.container);
 
-    this.container.addEventListener('click', (e) => {
+    this.clickHandler = (e: Event) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
       if (!btn) {
         // Tab switching
@@ -133,6 +143,12 @@ export class FriendsView implements ILobbyView {
           });
           break;
         }
+        case 'block': {
+          const userId = parseInt(btn.dataset.userId!);
+          const username = btn.dataset.username!;
+          this.confirmBlock(userId, username);
+          break;
+        }
         case 'join': {
           const roomCode = btn.dataset.room!;
           sc.emit('room:join', { code: roomCode }, (res) => {
@@ -165,17 +181,80 @@ export class FriendsView implements ILobbyView {
           break;
         }
       }
-    });
+    };
+    this.container.addEventListener('click', this.clickHandler);
 
-    this.container.addEventListener('keydown', (e) => {
+    this.keydownHandler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.id === 'friend-search-input' && e.key === 'Enter') {
         this.handleSearch((target as HTMLInputElement).value);
       }
+    };
+    this.container.addEventListener('keydown', this.keydownHandler);
+  }
+
+  private unbindDelegatedListeners(): void {
+    if (this.boundContainer) {
+      if (this.clickHandler) this.boundContainer.removeEventListener('click', this.clickHandler);
+      if (this.keydownHandler) {
+        this.boundContainer.removeEventListener('keydown', this.keydownHandler);
+      }
+    }
+    this.disposeKeyboardActions?.();
+    this.disposeKeyboardActions = null;
+    this.boundContainer = null;
+    this.clickHandler = null;
+    this.keydownHandler = null;
+  }
+
+  /**
+   * Block a user (friend or pending request). The server has handled `friend:block` since the
+   * Blocked tab shipped, but nothing in the UI ever emitted it — so the list could only ever be
+   * empty. The blocked user is removed from the friend/request lists on the server side and
+   * sees it as a removal. (audit G7a)
+   */
+  private confirmBlock(userId: number, username: string): void {
+    const { overlay, content, close } = createModal({
+      ariaLabel: t('ui:friends.blockModal.ariaLabel'),
+      style: 'max-width:420px;',
+      parent: document.getElementById('ui-overlay') ?? document.body,
+    });
+    setHtml(
+      content,
+      `
+      <h2 class="text-danger">${t('ui:friends.blockModal.title')}</h2>
+      <p class="modal-desc">${escapeHtml(t('ui:friends.blockModal.message', { username }))}</p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="friend-block-cancel">${t('ui:friends.cancel')}</button>
+        <button class="btn btn-danger" id="friend-block-confirm">${t('ui:friends.block')}</button>
+      </div>
+    `,
+    );
+    overlay.querySelector('#friend-block-cancel')!.addEventListener('click', close);
+    overlay.querySelector('#friend-block-confirm')!.addEventListener('click', () => {
+      close();
+      this.deps.socketClient.emit('friend:block', { userId }, (res) => {
+        if (res.success) {
+          this.deps.notifications.success(t('ui:friends.blocked', { username }));
+          this.friends = this.friends.filter((f) => f.userId !== userId);
+          this.incoming = this.incoming.filter((r) => r.fromUserId !== userId);
+          this.outgoing = this.outgoing.filter((r) => r.fromUserId !== userId);
+          if (!this.blocked.some((b) => b.userId === userId)) {
+            this.blocked.push({ userId, username });
+          }
+          this.renderContent();
+          // Authoritative refresh — the server prunes pending requests on block too.
+          this.loadFriends();
+          this.loadBlocked();
+        } else {
+          this.deps.notifications.error(res.error || t('ui:friends.blockFailed'));
+        }
+      });
     });
   }
 
   destroy(): void {
+    this.unbindDelegatedListeners();
     this.container = null;
     const sc = this.deps.socketClient;
     sc.off('friend:update', this.friendUpdateHandler);
@@ -342,10 +421,11 @@ export class FriendsView implements ILobbyView {
               <div class="friend-card-activity ${isOnline ? (f.activity === 'in_game' || f.activity === 'in_campaign' ? 'in-game' : 'active') : ''}">${activityLabel}</div>
             </div>
             <div class="friend-card-actions">
-              ${f.activity === 'in_lobby' && f.roomCode ? `<button class="btn btn-primary btn-sm" data-action="join" data-room="${escapeHtml(f.roomCode || '')}">${t('ui:friends.join')}</button>` : ''}
-              <button class="btn btn-ghost btn-sm" data-action="message" data-user-id="${f.userId}" data-username="${escapeHtml(f.username)}">${t('ui:friends.msg')}</button>
+              ${f.activity === 'in_lobby' && f.roomCode ? `<button class="btn btn-primary btn-sm" data-action="join" data-room="${escapeAttr(f.roomCode || '')}">${t('ui:friends.join')}</button>` : ''}
+              <button class="btn btn-ghost btn-sm" data-action="message" data-user-id="${f.userId}" data-username="${escapeAttr(f.username)}">${t('ui:friends.msg')}</button>
               <button class="btn btn-ghost btn-sm" data-action="invite" data-user-id="${f.userId}">${t('ui:friends.invite')}</button>
               <button class="btn btn-ghost btn-sm btn-danger-text" data-action="remove" data-friend-id="${f.userId}">${t('ui:friends.remove')}</button>
+              <button class="btn btn-ghost btn-sm btn-danger-text" data-action="block" data-user-id="${f.userId}" data-username="${escapeAttr(f.username)}">${t('ui:friends.block')}</button>
             </div>
           </div>
         `;
@@ -370,6 +450,7 @@ export class FriendsView implements ILobbyView {
             <div class="friend-card-actions">
               <button class="btn btn-primary btn-sm" data-action="accept" data-from-id="${r.fromUserId}">${t('ui:friends.accept')}</button>
               <button class="btn btn-ghost btn-sm btn-danger-text" data-action="decline" data-from-id="${r.fromUserId}">${t('ui:friends.decline')}</button>
+              <button class="btn btn-ghost btn-sm btn-danger-text" data-action="block" data-user-id="${r.fromUserId}" data-username="${escapeAttr(r.fromUsername)}">${t('ui:friends.block')}</button>
             </div>
           </div>
         `,
@@ -436,7 +517,7 @@ export class FriendsView implements ILobbyView {
             <div class="friend-card-name">${escapeHtml(u.username)}</div>
           </div>
           <div class="friend-card-actions">
-            <button class="btn btn-primary btn-sm" data-action="add" data-username="${escapeHtml(u.username)}">${t('ui:friends.addFriend')}</button>
+            <button class="btn btn-primary btn-sm" data-action="add" data-username="${escapeAttr(u.username)}">${t('ui:friends.addFriend')}</button>
           </div>
         </div>
       `,

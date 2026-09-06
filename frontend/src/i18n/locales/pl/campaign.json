@@ -1,18 +1,18 @@
 {
   "title": "Kampania",
   "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AIGN",
-  "backToLobby": "Powr\u00f3t do lobby",
+  "backToLobby": "Powrót do lobby",
   "mapPreview": {
-    "loading": "\u0141adowanie podgl\u0105du..."
+    "loading": "Ładowanie podglądu..."
   },
-  "empty": "Brak dost\u0119pnych \u015bwiat\u00f3w kampanii.",
-  "loadFailed": "Nie uda\u0142o si\u0119 za\u0142adowa\u0107 kampanii: {{error}}",
-  "loadingLevel": "\u0141adowanie poziomu...",
-  "startFailed": "Nie uda\u0142o si\u0119 uruchomi\u0107 poziomu: {{error}}",
+  "empty": "Brak dostępnych światów kampanii.",
+  "loadFailed": "Nie udało się załadować kampanii: {{error}}",
+  "loadingLevel": "Ładowanie poziomu...",
+  "startFailed": "Nie udało się uruchomić poziomu: {{error}}",
   "stats": {
     "enemies": "wrogowie",
-    "life": "\u017cycie",
-    "lives": "\u017cycia",
+    "life": "życie",
+    "lives": "życia",
     "time": "czas"
   },
   "buttons": {
@@ -30,24 +30,24 @@
     "ariaLabel": "Ustawienia lokalnego Co-Op",
     "player1Controls": "Sterowanie Gracza 1",
     "player2": "Gracz 2",
-    "identity": "To\u017csamo\u015b\u0107:",
-    "guest": "Go\u015b\u0107",
-    "logIn": "Zaloguj si\u0119",
+    "identity": "Tożsamość:",
+    "guest": "Gość",
+    "logIn": "Zaloguj się",
     "name": "Nazwa:",
     "color": "Kolor:",
-    "nameAriaLabel": "Nazwa u\u017cytkownika Gracza 2",
-    "passwordAriaLabel": "Has\u0142o Gracza 2",
-    "usernamePlaceholder": "Nazwa u\u017cytkownika",
-    "passwordPlaceholder": "Has\u0142o",
+    "nameAriaLabel": "Nazwa użytkownika Gracza 2",
+    "passwordAriaLabel": "Hasło Gracza 2",
+    "usernamePlaceholder": "Nazwa użytkownika",
+    "passwordPlaceholder": "Hasło",
     "loginDurationAriaLabel": "Czas trwania logowania",
     "loggingIn": "Logowanie...",
-    "logInBtn": "Zaloguj si\u0119",
-    "enterCredentials": "Wpisz nazw\u0119 u\u017cytkownika i has\u0142o",
+    "logInBtn": "Zaloguj się",
+    "enterCredentials": "Wpisz nazwę użytkownika i hasło",
     "loggedInAs": "Zalogowany jako <strong>{{username}}</strong>",
-    "logout": "Wyloguj si\u0119",
+    "logout": "Wyloguj się",
     "controls": "Sterowanie",
     "cameraMode": "Tryb kamery",
-    "controlConflict": "Obaj gracze nie mog\u0105 u\u017cywa\u0107 tego samego sterowania",
+    "controlConflict": "Obaj gracze nie mogą używać tego samego sterowania",
     "cancel": "Anuluj",
     "start": "Start",
     "defaultPlayerName": "Gracz 2",
@@ -58,13 +58,25 @@
       "12h": "12 godzin",
       "24h": "24 godziny"
     },
-    "loginFailed": "Logowanie nie powiod\u0142o si\u0119",
-    "connectionError": "B\u0142\u0105d po\u0142\u0105czenia"
+    "loginFailed": "Logowanie nie powiodło się",
+    "connectionError": "Błąd połączenia",
+    "controlPresets": {
+      "wasd": "WASD + Spacja/E/Q",
+      "arrows": "Strzałki + Enter/Shift/Ukośnik",
+      "numpad": "Klawiatura numeryczna 8462 + Plus/Minus/Razy",
+      "gamepad1": "Pad 1",
+      "gamepad2": "Pad 2"
+    },
+    "cameraModes": {
+      "shared": "Wspólna (auto-zoom)",
+      "splitH": "Podział poziomy",
+      "splitV": "Podział pionowy"
+    }
   },
   "buddyModal": {
     "title": "Tryb kompana",
     "ariaLabel": "Tryb kompana",
-    "loading": "\u0141adowanie ustawie\u0144 kompana...",
+    "loading": "Ładowanie ustawień kompana...",
     "buddy": "Kompan",
     "edit": "Edytuj",
     "done": "Gotowe",
@@ -76,7 +88,7 @@
     "buddyLabel": "Kompan",
     "player1Controls": "Sterowanie Gracza 1",
     "buddyControls": "Sterowanie kompana",
-    "controlConflict": "Gracz 1 i kompan nie mog\u0105 u\u017cywa\u0107 tego samego sterowania",
+    "controlConflict": "Gracz 1 i kompan nie mogą używać tego samego sterowania",
     "cancel": "Anuluj",
     "start": "Start"
   }

@@ -10,6 +10,7 @@ import {
   CustomMapSummary,
 } from '@blast-arena/shared';
 import { game } from '../../main';
+import { ensureLevelEditorScene } from '../../scenes/levelEditorLoader';
 import { renderMapPreview } from '../../utils/mapPreview';
 import { getCustomMapTiles } from '../../utils/mapPreviewCache';
 import { escapeHtml, setHtml } from '../../utils/html';
@@ -487,9 +488,10 @@ export class CreateRoomView implements ILobbyView {
     maxPlayersSelect.addEventListener('change', updateMapSelection);
 
     // New Map button
-    this.container.querySelector('#cr-new-map')!.addEventListener('click', () => {
+    this.container.querySelector('#cr-new-map')!.addEventListener('click', async () => {
       game.registry.set('editorMode', 'custom_map');
       game.registry.set('customMapId', null);
+      await ensureLevelEditorScene(game); // lazy editor chunk (audit F9)
       const lobbyScene = game.scene.getScene('LobbyScene');
       if (lobbyScene) lobbyScene.scene.start('LevelEditorScene');
     });

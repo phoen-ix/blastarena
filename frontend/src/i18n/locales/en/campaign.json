@@ -59,7 +59,19 @@
       "24h": "24 hours"
     },
     "loginFailed": "Login failed",
-    "connectionError": "Connection error"
+    "connectionError": "Connection error",
+    "controlPresets": {
+      "wasd": "WASD + Space/E/Q",
+      "arrows": "Arrows + Enter/Shift/Slash",
+      "numpad": "Numpad 8462 + Plus/Minus/Multiply",
+      "gamepad1": "Gamepad 1",
+      "gamepad2": "Gamepad 2"
+    },
+    "cameraModes": {
+      "shared": "Shared (Auto-Zoom)",
+      "splitH": "Split Horizontal",
+      "splitV": "Split Vertical"
+    }
   },
   "buddyModal": {
     "title": "Buddy Mode",

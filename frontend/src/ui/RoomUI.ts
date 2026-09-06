@@ -2,7 +2,7 @@ import { SocketClient } from '../network/SocketClient';
 import { AuthManager } from '../network/AuthManager';
 import { NotificationUI } from './NotificationUI';
 import { Room, RoomPlayer, POWERUP_DEFINITIONS } from '@blast-arena/shared';
-import { escapeHtml, setHtml } from '../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../utils/html';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { t } from '../i18n';
 
@@ -20,6 +20,11 @@ export class RoomUI {
   private onPlayerJoined?: (player: RoomPlayer) => void;
   private onPlayerLeft?: (userId: number) => void;
   private onPlayerReady?: (data: { userId: number; ready: boolean }) => void;
+  private onAdminRoomMessage?: (data: { message: string; from: string }) => void;
+  // Admin "message room" banner. Kept outside the rendered markup so a room:state re-render does
+  // not wipe it; re-attached after every render(). (audit G7b)
+  private adminBanner: HTMLElement | null = null;
+
   constructor(
     socketClient: SocketClient,
     authManager: AuthManager,
@@ -50,6 +55,8 @@ export class RoomUI {
     UIGamepadNavigator.getInstance().popContext('room');
     this.container.remove();
     this.removeListeners();
+    this.adminBanner?.remove();
+    this.adminBanner = null;
   }
 
   private pushGamepadContext(): void {
@@ -109,6 +116,11 @@ export class RoomUI {
     };
     this.socketClient.on('room:playerReady', this.onPlayerReady);
 
+    // The server has rebroadcast the admin panel's "message room" to `room:{code}` all along, but
+    // no client ever rendered it — the feature did nothing visible. (audit G7b)
+    this.onAdminRoomMessage = (data) => this.showAdminBanner(data);
+    this.socketClient.on('admin:roomMessage', this.onAdminRoomMessage);
+
     // Delegated event handlers — set up once, survive innerHTML rebuilds
     this.container.addEventListener('click', (e) => {
       const target = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
@@ -149,6 +161,50 @@ export class RoomUI {
     if (this.onPlayerJoined) this.socketClient.off('room:playerJoined', this.onPlayerJoined);
     if (this.onPlayerLeft) this.socketClient.off('room:playerLeft', this.onPlayerLeft);
     if (this.onPlayerReady) this.socketClient.off('room:playerReady', this.onPlayerReady);
+    if (this.onAdminRoomMessage) {
+      this.socketClient.off('admin:roomMessage', this.onAdminRoomMessage);
+    }
+  }
+
+  /** Dismissible banner for an admin/moderator message sent to this room. */
+  private showAdminBanner(data: { message: string; from: string }): void {
+    this.adminBanner?.remove();
+
+    const banner = document.createElement('div');
+    banner.className = 'room-admin-banner';
+    banner.setAttribute('role', 'status');
+
+    const body = document.createElement('div');
+    body.className = 'room-admin-banner-body';
+    const from = document.createElement('div');
+    from.className = 'room-admin-banner-from';
+    from.textContent = t('ui:room.adminMessageFrom', { from: data.from });
+    const text = document.createElement('div');
+    text.className = 'room-admin-banner-text';
+    text.textContent = data.message;
+    body.appendChild(from);
+    body.appendChild(text);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'banner-close';
+    closeBtn.setAttribute('aria-label', t('common:actions.close'));
+    closeBtn.textContent = '\u00d7';
+    closeBtn.addEventListener('click', () => {
+      banner.remove();
+      if (this.adminBanner === banner) this.adminBanner = null;
+    });
+
+    banner.appendChild(body);
+    banner.appendChild(closeBtn);
+    this.adminBanner = banner;
+    this.mountAdminBanner();
+  }
+
+  private mountAdminBanner(): void {
+    if (this.adminBanner && this.adminBanner.parentElement !== this.container) {
+      this.container.prepend(this.adminBanner);
+    }
   }
 
   private isHost(): boolean {
@@ -289,6 +345,7 @@ export class RoomUI {
       </div>
     `,
     );
+    this.mountAdminBanner();
   }
 
   private renderPlayer(player: RoomPlayer, index: number): string {
@@ -339,7 +396,7 @@ export class RoomUI {
         ${
           isTeamsMode && iAmHost
             ? `
-          <select class="team-select admin-select" data-user-id="${player.user.id}" aria-label="${t('ui:room.teamAssignment', { username: escapeHtml(player.user.username) })}">
+          <select class="team-select admin-select" data-user-id="${player.user.id}" aria-label="${escapeAttr(t('ui:room.teamAssignment', { username: player.user.username }))}">
             <option value="0" ${playerTeam === 0 ? 'selected' : ''} style="color:#ff4466;">${t('game:teams.red')}</option>
             <option value="1" ${playerTeam === 1 ? 'selected' : ''} style="color:#448aff;">${t('game:teams.blue')}</option>
           </select>

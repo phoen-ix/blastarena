@@ -59,7 +59,19 @@
       "24h": "24 horas"
     },
     "loginFailed": "Error al iniciar sesión",
-    "connectionError": "Error de conexión"
+    "connectionError": "Error de conexión",
+    "controlPresets": {
+      "wasd": "WASD + Espacio/E/Q",
+      "arrows": "Flechas + Intro/Mayús/Barra",
+      "numpad": "Teclado numérico 8462 + Más/Menos/Multiplicar",
+      "gamepad1": "Mando 1",
+      "gamepad2": "Mando 2"
+    },
+    "cameraModes": {
+      "shared": "Compartida (zoom automático)",
+      "splitH": "Dividida horizontal",
+      "splitV": "Dividida vertical"
+    }
   },
   "buddyModal": {
     "title": "Modo Compañero",

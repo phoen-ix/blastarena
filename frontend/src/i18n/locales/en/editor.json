@@ -15,10 +15,10 @@
     "mechanics": "Mechanics",
     "teleporterA": "Teleporter A",
     "teleporterB": "Teleporter B",
-    "conveyorUp": "Conveyor \u2191",
-    "conveyorDown": "Conveyor \u2193",
-    "conveyorLeft": "Conveyor \u2190",
-    "conveyorRight": "Conveyor \u2192",
+    "conveyorUp": "Conveyor ↑",
+    "conveyorDown": "Conveyor ↓",
+    "conveyorLeft": "Conveyor ←",
+    "conveyorRight": "Conveyor →",
     "puzzle": "Puzzle",
     "switch": "Switch",
     "gate": "Gate",
@@ -83,7 +83,8 @@
     "needSpawns": "Need at least 2 spawn points",
     "mapSaved": "Map saved!",
     "levelSaved": "Level saved!",
-    "saveFailed": "Save failed: {{error}}"
+    "saveFailed": "Save failed: {{error}}",
+    "noWorld": "Cannot save: this level is not attached to a campaign world. Create it from the Campaign admin tab."
   },
   "defaults": {
     "untitledLevel": "Untitled Level",

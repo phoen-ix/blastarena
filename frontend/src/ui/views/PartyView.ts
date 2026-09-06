@@ -3,7 +3,8 @@ import { ApiClient } from '../../network/ApiClient';
 import { Party, PartyChatMessage, ChatMode, Friend } from '@blast-arena/shared';
 import type { ServerToClientEvents } from '@blast-arena/shared';
 import { PartyBar } from '../PartyBar';
-import { escapeHtml, setHtml } from '../../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
+import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
 
 const AVATAR_COLORS = [
@@ -343,19 +344,17 @@ export class PartyView implements ILobbyView {
       return;
     }
 
-    // Create modal overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', t('ui:party.inviteModalTitle'));
+    // createModal(): focus trap + Escape + backdrop click, like every other modal. (audit G12)
+    const { overlay, content, close } = createModal({
+      ariaLabel: t('ui:party.inviteModalTitle'),
+      style: 'max-width:400px;',
+    });
     setHtml(
-      overlay,
+      content,
       `
-      <div class="modal" style="max-width:400px;">
         <div class="modal-header">
           <h3>${t('ui:party.inviteModalTitle')}</h3>
-          <button class="modal-close" aria-label="Close">&times;</button>
+          <button class="modal-close" aria-label="${escapeAttr(t('common:actions.close'))}">&times;</button>
         </div>
         <div class="modal-body" style="max-height:300px;overflow-y:auto;padding:0;">
           ${available
@@ -378,24 +377,10 @@ export class PartyView implements ILobbyView {
             })
             .join('')}
         </div>
-      </div>
     `,
     );
 
-    document.body.appendChild(overlay);
-
-    const close = () => {
-      overlay.remove();
-      document.removeEventListener('keydown', escHandler);
-    };
     overlay.querySelector('.modal-close')!.addEventListener('click', close);
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) close();
-    });
-    const escHandler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
-    document.addEventListener('keydown', escHandler);
 
     overlay.querySelectorAll('.party-invite-send').forEach((btn) => {
       btn.addEventListener('click', () => {

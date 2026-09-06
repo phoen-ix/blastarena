@@ -1,54 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import {
-  posToTile,
-  tileToPos,
-  getExplosionCells,
-  manhattanDistance,
-  isInBounds,
-  TILE_SIZE,
-} from '@blast-arena/shared';
+import { getExplosionCells, manhattanDistance } from '@blast-arena/shared';
 
 function makeGrid(width: number, height: number, fill: string = 'empty'): string[][] {
   return Array.from({ length: height }, () => Array(width).fill(fill));
 }
-
-describe('posToTile', () => {
-  it('converts pixel center to correct tile', () => {
-    // Center of tile (1,1) = (1*48 + 24, 1*48 + 24) = (72, 72)
-    const result = posToTile(72, 72);
-    expect(result).toEqual({ x: 1, y: 1 });
-  });
-
-  it('handles origin (0,0)', () => {
-    const result = posToTile(0, 0);
-    expect(result).toEqual({ x: 0, y: 0 });
-  });
-
-  it('handles sub-tile precision (floors)', () => {
-    // 47 pixels is still within tile 0 (0-47)
-    const result = posToTile(47, 47);
-    expect(result).toEqual({ x: 0, y: 0 });
-
-    // 48 pixels enters tile 1
-    const result2 = posToTile(48, 48);
-    expect(result2).toEqual({ x: 1, y: 1 });
-  });
-});
-
-describe('tileToPos', () => {
-  it('returns center of tile in pixels', () => {
-    const result = tileToPos(2, 3);
-    expect(result).toEqual({
-      x: 2 * TILE_SIZE + TILE_SIZE / 2,
-      y: 3 * TILE_SIZE + TILE_SIZE / 2,
-    });
-  });
-
-  it('tile (0,0) returns half-tile-size', () => {
-    const result = tileToPos(0, 0);
-    expect(result).toEqual({ x: TILE_SIZE / 2, y: TILE_SIZE / 2 });
-  });
-});
 
 describe('manhattanDistance', () => {
   it('same point = 0', () => {
@@ -66,27 +21,6 @@ describe('manhattanDistance', () => {
 
   it('arbitrary points', () => {
     expect(manhattanDistance({ x: 3, y: 7 }, { x: 10, y: 2 })).toBe(12);
-  });
-});
-
-describe('isInBounds', () => {
-  it('inside returns true', () => {
-    expect(isInBounds(5, 5, 10, 10)).toBe(true);
-  });
-
-  it('edge returns true (0, width-1)', () => {
-    expect(isInBounds(0, 0, 10, 10)).toBe(true);
-    expect(isInBounds(9, 9, 10, 10)).toBe(true);
-  });
-
-  it('outside returns false (negative)', () => {
-    expect(isInBounds(-1, 0, 10, 10)).toBe(false);
-    expect(isInBounds(0, -1, 10, 10)).toBe(false);
-  });
-
-  it('outside returns false (>= width/height)', () => {
-    expect(isInBounds(10, 0, 10, 10)).toBe(false);
-    expect(isInBounds(0, 10, 10, 10)).toBe(false);
   });
 });
 

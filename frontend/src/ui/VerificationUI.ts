@@ -29,6 +29,16 @@ export class VerificationUI {
     this.startPolling();
   }
 
+  /**
+   * Stop the 15 s refresh-token poll and remove the overlay. Without this the poll outlived every
+   * exit path except logout (scene shutdown, a successful check, an auto-login on a later visit)
+   * and kept rotating the refresh token for as long as the tab stayed open. (audit C7)
+   */
+  destroy(): void {
+    this.stopPolling();
+    this.overlay.remove();
+  }
+
   private render(): void {
     const user = this.authManager.getUser();
     setHtml(
@@ -179,6 +189,7 @@ export class VerificationUI {
 
   /** Poll every 15s to auto-detect verification */
   private startPolling(): void {
+    if (this.checkInterval) return;
     this.checkInterval = setInterval(async () => {
       try {
         const refreshed = await this.authManager.refresh();

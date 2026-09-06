@@ -197,6 +197,9 @@ export class LobbyScene extends Phaser.Scene {
     this.roomUI?.hide();
     this.roomUI = null;
 
+    // Every showLobby() builds a new LobbyUI; make sure the previous one has released its
+    // panels' socket handlers before it is dropped (hide() is idempotent). (audit C1)
+    this.lobbyUI?.hide();
     this.lobbyUI = new LobbyUI(
       this.socketClient,
       this.authManager,
@@ -276,8 +279,7 @@ export class LobbyScene extends Phaser.Scene {
       this.socketClient.off('campaign:coopStart', this.campaignCoopStartHandler);
       this.campaignCoopStartHandler = null;
     }
-    this.lobbyUI?.destroyPanels();
-    this.lobbyUI?.hide();
+    this.lobbyUI?.hide(); // destroys the PartyBar/LobbyChatPanel pair as well (audit C1)
     this.roomUI?.hide();
   }
 }

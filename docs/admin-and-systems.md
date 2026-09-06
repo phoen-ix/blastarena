@@ -68,7 +68,7 @@ Admin uploads `.ts` file -> esbuild transpiles to `.js` -> structure validation 
 `GameStateManager.processTick()` wraps `generateInput()` in try/catch; on crash, replaces bot's AI with built-in fallback.
 
 ### Per-Room Selection
-`botAiId` field in `MatchConfig`, `SimulationConfig`, `GameDefaults`, `SimulationDefaults`. When multiple AIs are active, a "Bot AI" dropdown appears in CreateRoomModal and SimulationsTab config modal.
+`botAiId` field in `MatchConfig`, `SimulationConfig`, `GameDefaults`, `SimulationDefaults`. When multiple AIs are active, a "Bot AI" dropdown appears in CreateRoomView and SimulationsTab config modal.
 
 ### Storage & Database
 - Files: `./data/ai/{uuid}/source.ts` + `compiled.js`; Docker volume `./data/ai:/app/ai`

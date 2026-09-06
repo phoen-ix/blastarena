@@ -4,7 +4,7 @@ import { AuthManager } from '../network/AuthManager';
 import { NotificationUI } from './NotificationUI';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { PartyBar } from './PartyBar';
-import { escapeHtml, setHtml } from '../utils/html';
+import { setHtml } from '../utils/html';
 import {
   getErrorMessage,
   CampaignGameState,
@@ -305,7 +305,9 @@ export class CampaignUI {
       font-weight: 700;
       color: var(--text);
     `;
-    worldName.textContent = escapeHtml(world.name);
+    // textContent is not markup: escaping here double-escaped (`Fire & Ice` → `Fire &amp; Ice`).
+    // (audit C11)
+    worldName.textContent = world.name;
 
     const themeBadge = document.createElement('span');
     themeBadge.style.cssText = `
@@ -318,7 +320,7 @@ export class CampaignUI {
       padding: 3px 8px;
       border-radius: 4px;
     `;
-    themeBadge.textContent = escapeHtml(world.theme);
+    themeBadge.textContent = world.theme;
 
     nameArea.appendChild(worldName);
     nameArea.appendChild(themeBadge);
@@ -342,7 +344,7 @@ export class CampaignUI {
       color: var(--text-dim);
       line-height: 1.4;
     `;
-    desc.textContent = escapeHtml(world.description);
+    desc.textContent = world.description;
 
     // Progress bar row
     const progressRow = document.createElement('div');
@@ -476,7 +478,7 @@ export class CampaignUI {
       font-weight: 600;
       color: ${level.locked ? 'var(--text-muted)' : isAvailable ? 'var(--text)' : 'var(--text-dim)'};
     `;
-    levelName.textContent = escapeHtml(level.name);
+    levelName.textContent = level.name;
 
     nameRow.appendChild(levelName);
 
@@ -529,7 +531,7 @@ export class CampaignUI {
       color: var(--text-muted);
       line-height: 1.3;
     `;
-    levelDesc.textContent = escapeHtml(level.description);
+    levelDesc.textContent = level.description;
 
     leftSide.appendChild(nameRow);
     leftSide.appendChild(levelDesc);
@@ -735,6 +737,9 @@ export class CampaignUI {
         ...this.container.querySelectorAll<HTMLElement>('.btn-primary'),
       ],
       onBack: () => {
+        // Embedded, `container` IS the lobby's `.main-body`: hide() would remove it and leave the
+        // lobby shell empty. The lobby context's own onBack handles navigation. (audit C3)
+        if (this.embedded) return;
         this.hide();
         this.onClose();
       },

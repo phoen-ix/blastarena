@@ -3,12 +3,12 @@
   "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AGNE",
   "backToLobby": "Retour au lobby",
   "mapPreview": {
-    "loading": "Chargement de l'aper\u00e7u..."
+    "loading": "Chargement de l'aperçu..."
   },
   "empty": "Aucun monde de campagne disponible pour le moment.",
-  "loadFailed": "\u00c9chec du chargement de la campagne : {{error}}",
+  "loadFailed": "Échec du chargement de la campagne : {{error}}",
   "loadingLevel": "Chargement du niveau...",
-  "startFailed": "\u00c9chec du lancement du niveau : {{error}}",
+  "startFailed": "Échec du lancement du niveau : {{error}}",
   "stats": {
     "enemies": "ennemis",
     "life": "vie",
@@ -30,8 +30,8 @@
     "ariaLabel": "Configuration coop locale",
     "player1Controls": "Commandes du joueur 1",
     "player2": "Joueur 2",
-    "identity": "Identit\u00e9 :",
-    "guest": "Invit\u00e9",
+    "identity": "Identité :",
+    "guest": "Invité",
     "logIn": "Connexion",
     "name": "Nom :",
     "color": "Couleur :",
@@ -39,15 +39,15 @@
     "passwordAriaLabel": "Mot de passe du joueur 2",
     "usernamePlaceholder": "Nom d'utilisateur",
     "passwordPlaceholder": "Mot de passe",
-    "loginDurationAriaLabel": "Dur\u00e9e de connexion",
+    "loginDurationAriaLabel": "Durée de connexion",
     "loggingIn": "Connexion en cours...",
     "logInBtn": "Connexion",
     "enterCredentials": "Entrez le nom d'utilisateur et le mot de passe",
-    "loggedInAs": "Connect\u00e9 en tant que <strong>{{username}}</strong>",
-    "logout": "D\u00e9connexion",
+    "loggedInAs": "Connecté en tant que <strong>{{username}}</strong>",
+    "logout": "Déconnexion",
     "controls": "Commandes",
-    "cameraMode": "Mode cam\u00e9ra",
-    "controlConflict": "Les deux joueurs ne peuvent pas utiliser les m\u00eames commandes",
+    "cameraMode": "Mode caméra",
+    "controlConflict": "Les deux joueurs ne peuvent pas utiliser les mêmes commandes",
     "cancel": "Annuler",
     "start": "Lancer",
     "defaultPlayerName": "Joueur 2",
@@ -58,16 +58,28 @@
       "12h": "12 heures",
       "24h": "24 heures"
     },
-    "loginFailed": "\u00c9chec de la connexion",
-    "connectionError": "Erreur de connexion"
+    "loginFailed": "Échec de la connexion",
+    "connectionError": "Erreur de connexion",
+    "controlPresets": {
+      "wasd": "ZQSD + Espace/E/A",
+      "arrows": "Flèches + Entrée/Maj/Barre oblique",
+      "numpad": "Pavé numérique 8462 + Plus/Moins/Multiplier",
+      "gamepad1": "Manette 1",
+      "gamepad2": "Manette 2"
+    },
+    "cameraModes": {
+      "shared": "Partagée (zoom auto)",
+      "splitH": "Écran divisé horizontal",
+      "splitV": "Écran divisé vertical"
+    }
   },
   "buddyModal": {
     "title": "Mode compagnon",
     "ariaLabel": "Mode compagnon",
-    "loading": "Chargement des param\u00e8tres du compagnon...",
+    "loading": "Chargement des paramètres du compagnon...",
     "buddy": "Compagnon",
     "edit": "Modifier",
-    "done": "Termin\u00e9",
+    "done": "Terminé",
     "name": "Nom",
     "namePlaceholder": "Compagnon",
     "color": "Couleur",
@@ -76,7 +88,7 @@
     "buddyLabel": "Compagnon",
     "player1Controls": "Commandes du joueur 1",
     "buddyControls": "Commandes du compagnon",
-    "controlConflict": "Le joueur 1 et le compagnon ne peuvent pas utiliser les m\u00eames commandes",
+    "controlConflict": "Le joueur 1 et le compagnon ne peuvent pas utiliser les mêmes commandes",
     "cancel": "Annuler",
     "start": "Lancer"
   }

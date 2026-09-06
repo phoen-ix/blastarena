@@ -15,10 +15,10 @@
     "mechanics": "Mechaniken",
     "teleporterA": "Teleporter A",
     "teleporterB": "Teleporter B",
-    "conveyorUp": "Fließband \u2191",
-    "conveyorDown": "Fließband \u2193",
-    "conveyorLeft": "Fließband \u2190",
-    "conveyorRight": "Fließband \u2192",
+    "conveyorUp": "Fließband ↑",
+    "conveyorDown": "Fließband ↓",
+    "conveyorLeft": "Fließband ←",
+    "conveyorRight": "Fließband →",
     "puzzle": "Rätsel",
     "switch": "Schalter",
     "gate": "Tor",
@@ -83,7 +83,8 @@
     "needSpawns": "Mindestens 2 Startpunkte erforderlich",
     "mapSaved": "Karte gespeichert!",
     "levelSaved": "Level gespeichert!",
-    "saveFailed": "Speichern fehlgeschlagen: {{error}}"
+    "saveFailed": "Speichern fehlgeschlagen: {{error}}",
+    "noWorld": "Speichern nicht möglich: Dieses Level gehört zu keiner Kampagnenwelt. Erstelle es über den Kampagnen-Admin-Tab."
   },
   "defaults": {
     "untitledLevel": "Unbenanntes Level",

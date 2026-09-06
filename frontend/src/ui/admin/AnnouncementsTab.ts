@@ -1,7 +1,7 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
 import { UserRole, getErrorMessage } from '@blast-arena/shared';
-import { escapeHtml, setHtml } from '../../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 /** Active banner row returned by GET /admin/announcements/banner (null when no banner). */
@@ -52,7 +52,7 @@ export class AnnouncementsTab {
         <h3>${t('admin:announcements.broadcastToastTitle')}</h3>
         <p style="color:var(--text-dim);font-size:13px;margin-bottom:12px;">${t('admin:announcements.broadcastToastDescription')}</p>
         <div style="display:flex;gap:12px;align-items:center;">
-          <input type="text" class="admin-input" id="toast-input" placeholder="${escapeHtml(t('admin:announcements.toastPlaceholder'))}" aria-label="${escapeHtml(t('admin:announcements.toastAriaLabel'))}" style="flex:1;min-width:0;">
+          <input type="text" class="admin-input" id="toast-input" placeholder="${escapeAttr(t('admin:announcements.toastPlaceholder'))}" aria-label="${escapeAttr(t('admin:announcements.toastAriaLabel'))}" style="flex:1;min-width:0;">
           <button class="btn btn-primary" id="toast-send">${t('admin:announcements.sendToastBtn')}</button>
         </div>
         <div id="toast-preview-area"></div>
@@ -78,7 +78,7 @@ export class AnnouncementsTab {
               : `<p style="color:var(--text-dim);font-size:13px;margin-bottom:12px;">${t('admin:announcements.noActiveBanner')}</p>`
           }
           <div style="display:flex;gap:12px;align-items:center;">
-            <input type="text" class="admin-input" id="banner-input" placeholder="${escapeHtml(t('admin:announcements.bannerPlaceholder'))}" aria-label="${escapeHtml(t('admin:announcements.bannerAriaLabel'))}" style="flex:1;min-width:0;">
+            <input type="text" class="admin-input" id="banner-input" placeholder="${escapeAttr(t('admin:announcements.bannerPlaceholder'))}" aria-label="${escapeAttr(t('admin:announcements.bannerAriaLabel'))}" style="flex:1;min-width:0;">
             <button class="btn btn-primary" id="banner-set">${t('admin:announcements.setBannerBtn')}</button>
           </div>
         </div>

@@ -28,6 +28,7 @@ import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { EnemyTextureGenerator } from '../../game/EnemyTextureGenerator';
 import { game } from '../../main';
+import { ensureLevelEditorScene } from '../../scenes/levelEditorLoader';
 
 type ViewMode = 'worlds' | 'enemies' | 'replays';
 
@@ -422,7 +423,7 @@ export class CampaignTab {
             if (contentEl) this.renderWorldsTable(contentEl);
           }
           // Launch editor for the new level
-          this.launchLevelEditor(res.id, worldId);
+          await this.launchLevelEditor(res.id, worldId);
         } catch (err: unknown) {
           this.notifications.error(getErrorMessage(err));
         }
@@ -434,7 +435,7 @@ export class CampaignTab {
       btn.addEventListener('click', () => {
         const id = Number((btn as HTMLElement).dataset.id);
         const worldId = Number((btn as HTMLElement).dataset.worldId);
-        this.launchLevelEditor(id, worldId || undefined);
+        void this.launchLevelEditor(id, worldId || undefined);
       });
     });
 
@@ -577,7 +578,7 @@ export class CampaignTab {
     }
   }
 
-  private launchLevelEditor(levelId: number, worldId?: number): void {
+  private async launchLevelEditor(levelId: number, worldId?: number): Promise<void> {
     game.registry.set('editorLevelId', levelId);
     if (worldId) {
       game.registry.set('editorWorldId', worldId);
@@ -587,6 +588,9 @@ export class CampaignTab {
       game.registry.set('editorWorldTheme', 'classic');
     }
     game.registry.set('returnToAdmin', 'campaign');
+
+    // The editor is a lazy chunk: fetch it while the admin UI is still on screen. (audit F9)
+    await ensureLevelEditorScene(game);
 
     // Clear admin UI DOM, then start the editor scene
     const uiOverlay = document.getElementById('ui-overlay');

@@ -1,6 +1,5 @@
 import { SocketClient } from '../network/SocketClient';
 import { ApiClient } from '../network/ApiClient';
-import { NotificationUI } from './NotificationUI';
 import { LobbyChatMessage, ChatMode, UserRole, LOBBY_CHAT_MAX_LENGTH } from '@blast-arena/shared';
 import type { ServerToClientEvents } from '@blast-arena/shared';
 import { escapeHtml, setHtml } from '../utils/html';
@@ -10,8 +9,6 @@ import { t } from '../i18n';
 export class LobbyChatPanel {
   private container: HTMLElement;
   private socketClient: SocketClient;
-  private notifications: NotificationUI;
-  private currentUserId: number;
   private currentUserRole: UserRole;
   private chatMode: ChatMode = 'everyone';
   private messages: LobbyChatMessage[] = [];
@@ -23,15 +20,8 @@ export class LobbyChatPanel {
   private lobbyChatHandler!: ServerToClientEvents['lobby:chat'];
   private settingsChangedHandler!: ServerToClientEvents['admin:settingsChanged'];
 
-  constructor(
-    socketClient: SocketClient,
-    notifications: NotificationUI,
-    userId: number,
-    userRole: UserRole,
-  ) {
+  constructor(socketClient: SocketClient, userRole: UserRole) {
     this.socketClient = socketClient;
-    this.notifications = notifications;
-    this.currentUserId = userId;
     this.currentUserRole = userRole;
     this.container = document.createElement('div');
     this.setupSocketListeners();
@@ -122,7 +112,7 @@ export class LobbyChatPanel {
     toggle.className = 'lobby-chat-toggle' + (this.expanded ? ' expanded' : '');
     setHtml(
       toggle,
-      `<span>Lobby Chat</span><span class="lobby-chat-arrow">${this.expanded ? '\u25BC' : '\u25B2'}</span>`,
+      `<span>${t('ui:lobbyChat.title')}</span><span class="lobby-chat-arrow">${this.expanded ? '\u25BC' : '\u25B2'}</span>`,
     );
     toggle.addEventListener('click', () => {
       this.expanded = !this.expanded;

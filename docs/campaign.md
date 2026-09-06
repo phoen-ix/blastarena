@@ -105,7 +105,7 @@ Two views:
 - **Worlds & Levels**: CRUD, reorder, publish/unpublish, edit launches editor
 - **Enemy Types**: CRUD with live Canvas2D sprite preview, all config fields
 
-**Admin -> Editor flow**: CampaignTab's "Edit" button sets `editorLevelId` in Phaser registry, clears admin UI DOM, and starts `LevelEditorScene` directly via scene manager.
+**Admin -> Editor flow**: CampaignTab's "Edit" button sets `editorLevelId` in Phaser registry, awaits `ensureLevelEditorScene(game)` (the editor is a lazy chunk), clears admin UI DOM, and starts `LevelEditorScene` via the scene manager.
 
 ## Progress Tracking
 

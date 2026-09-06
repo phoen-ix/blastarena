@@ -25,6 +25,7 @@ export class DashboardTab {
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
   private recordingsEnabled: boolean = true;
   private registrationEnabled: boolean = true;
+  private spectatorActionsEnabled: boolean = true;
   private gameDefaults: GameDefaults = {};
   private simulationDefaults: SimulationDefaults = {};
   private activeAIs: BotAIEntry[] = [];
@@ -99,6 +100,7 @@ export class DashboardTab {
         aiResp,
         imprintResp,
         githubResp,
+        spectatorResp,
       ] = await Promise.all([
         ApiClient.get<{ enabled: boolean }>('/admin/settings/recordings_enabled'),
         ApiClient.get<{ enabled: boolean }>('/admin/settings/registration_enabled'),
@@ -114,9 +116,11 @@ export class DashboardTab {
         ApiClient.get<{ ais: BotAIEntry[] }>('/admin/ai/active'),
         ApiClient.get<{ enabled: boolean; text: string }>('/admin/settings/imprint'),
         ApiClient.get<{ enabled: boolean }>('/admin/settings/display_github'),
+        ApiClient.get<{ enabled: boolean }>('/admin/settings/spectator_actions_enabled'),
       ]);
       this.recordingsEnabled = recResp.enabled;
       this.registrationEnabled = regResp.enabled;
+      this.spectatorActionsEnabled = spectatorResp.enabled;
       this.chatMode = chatResp.mode ?? 'everyone';
       this.lobbyChatMode = lobbyResp.mode ?? 'everyone';
       this.dmMode = dmResp.mode ?? 'everyone';
@@ -179,6 +183,13 @@ export class DashboardTab {
             <span class="setting-item-label">${t('admin:dashboard.userRegistration')}</span>
           </label>
           <span class="setting-item-desc">${t('admin:dashboard.userRegistrationDesc')}</span>
+        </div>
+        <div class="setting-item">
+          <label class="setting-item-checkbox">
+            <input type="checkbox" id="toggle-spectator-actions" ${this.spectatorActionsEnabled ? 'checked' : ''}>
+            <span class="setting-item-label">${t('admin:dashboard.spectatorActionsGlobal')}</span>
+          </label>
+          <span class="setting-item-desc">${t('admin:dashboard.spectatorActionsDesc')}</span>
         </div>
         <div class="setting-item">
           <span class="setting-item-label">${t('admin:dashboard.partyChat')}</span>
@@ -353,6 +364,24 @@ export class DashboardTab {
         this.registrationEnabled = enabled;
         this.notifications.success(
           t('admin:dashboard.registrationToggled', {
+            status: enabled ? t('admin:dashboard.enabled') : t('admin:dashboard.disabled'),
+          }),
+        );
+      } catch {
+        (e.target as HTMLInputElement).checked = !enabled;
+        this.notifications.error(t('admin:dashboard.failedUpdateSetting'));
+      }
+    });
+
+    // Global kill switch for the Spectator Game Master. The GET/PUT routes existed, but no UI
+    // ever called them — the setting could only be flipped by hand in the DB. (audit G6c)
+    card.querySelector('#toggle-spectator-actions')!.addEventListener('change', async (e) => {
+      const enabled = (e.target as HTMLInputElement).checked;
+      try {
+        await ApiClient.put('/admin/settings/spectator_actions_enabled', { enabled });
+        this.spectatorActionsEnabled = enabled;
+        this.notifications.success(
+          t('admin:dashboard.spectatorActionsToggled', {
             status: enabled ? t('admin:dashboard.enabled') : t('admin:dashboard.disabled'),
           }),
         );

@@ -11,7 +11,7 @@ export class HelpView implements ILobbyView {
   private panel: HelpUI;
 
   constructor(deps: ViewDeps) {
-    this.panel = new HelpUI(deps.authManager, deps.notifications, () => {});
+    this.panel = new HelpUI(deps.authManager, () => {});
   }
 
   async render(container: HTMLElement): Promise<void> {

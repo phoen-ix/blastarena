@@ -1,5 +1,4 @@
 import { ApiClient } from '../../network/ApiClient';
-import { NotificationUI } from '../NotificationUI';
 import { escapeHtml, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
@@ -24,13 +23,8 @@ interface AdminActionsResponse {
 
 export class LogsTab {
   private container: HTMLElement | null = null;
-  private notifications: NotificationUI;
   private page = 1;
   private actionFilter = '';
-
-  constructor(notifications: NotificationUI) {
-    this.notifications = notifications;
-  }
 
   async render(parent: HTMLElement): Promise<void> {
     this.container = document.createElement('div');

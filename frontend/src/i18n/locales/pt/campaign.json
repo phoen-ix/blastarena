@@ -3,9 +3,9 @@
   "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>ANHA",
   "backToLobby": "Voltar ao Lobby",
   "mapPreview": {
-    "loading": "Carregando pr\u00e9-visualiza\u00e7\u00e3o..."
+    "loading": "Carregando pré-visualização..."
   },
-  "empty": "Nenhum mundo de campanha dispon\u00edvel ainda.",
+  "empty": "Nenhum mundo de campanha disponível ainda.",
   "loadFailed": "Falha ao carregar campanha: {{error}}",
   "loadingLevel": "Carregando fase...",
   "startFailed": "Falha ao iniciar fase: {{error}}",
@@ -26,8 +26,8 @@
     "size": "{{percent}}% tamanho"
   },
   "localCoopModal": {
-    "title": "Configura\u00e7\u00e3o de Co-Op Local",
-    "ariaLabel": "Configura\u00e7\u00e3o de Co-Op Local",
+    "title": "Configuração de Co-Op Local",
+    "ariaLabel": "Configuração de Co-Op Local",
     "player1Controls": "Controles do Jogador 1",
     "player2": "Jogador 2",
     "identity": "Identidade:",
@@ -37,34 +37,46 @@
     "color": "Cor:",
     "nameAriaLabel": "Nome do Jogador 2",
     "passwordAriaLabel": "Senha do Jogador 2",
-    "usernamePlaceholder": "Nome de usu\u00e1rio",
+    "usernamePlaceholder": "Nome de usuário",
     "passwordPlaceholder": "Senha",
-    "loginDurationAriaLabel": "Dura\u00e7\u00e3o do login",
+    "loginDurationAriaLabel": "Duração do login",
     "loggingIn": "Entrando...",
     "logInBtn": "Entrar",
-    "enterCredentials": "Digite o nome de usu\u00e1rio e a senha",
+    "enterCredentials": "Digite o nome de usuário e a senha",
     "loggedInAs": "Conectado como <strong>{{username}}</strong>",
     "logout": "Sair",
     "controls": "Controles",
-    "cameraMode": "Modo de C\u00e2mera",
-    "controlConflict": "Ambos os jogadores n\u00e3o podem usar os mesmos controles",
+    "cameraMode": "Modo de Câmera",
+    "controlConflict": "Ambos os jogadores não podem usar os mesmos controles",
     "cancel": "Cancelar",
     "start": "Iniciar",
     "defaultPlayerName": "Jogador 2",
     "duration": {
-      "session": "Apenas esta sess\u00e3o",
+      "session": "Apenas esta sessão",
       "1h": "1 hora",
       "6h": "6 horas",
       "12h": "12 horas",
       "24h": "24 horas"
     },
     "loginFailed": "Falha no login",
-    "connectionError": "Erro de conex\u00e3o"
+    "connectionError": "Erro de conexão",
+    "controlPresets": {
+      "wasd": "WASD + Espaço/E/Q",
+      "arrows": "Setas + Enter/Shift/Barra",
+      "numpad": "Teclado numérico 8462 + Mais/Menos/Vezes",
+      "gamepad1": "Comando 1",
+      "gamepad2": "Comando 2"
+    },
+    "cameraModes": {
+      "shared": "Partilhada (zoom automático)",
+      "splitH": "Dividida horizontal",
+      "splitV": "Dividida vertical"
+    }
   },
   "buddyModal": {
     "title": "Modo Parceiro",
     "ariaLabel": "Modo Parceiro",
-    "loading": "Carregando configura\u00e7\u00f5es do parceiro...",
+    "loading": "Carregando configurações do parceiro...",
     "buddy": "Parceiro",
     "edit": "Editar",
     "done": "Pronto",
@@ -76,7 +88,7 @@
     "buddyLabel": "Parceiro",
     "player1Controls": "Controles do Jogador 1",
     "buddyControls": "Controles do Parceiro",
-    "controlConflict": "Jogador 1 e Parceiro n\u00e3o podem usar os mesmos controles",
+    "controlConflict": "Jogador 1 e Parceiro não podem usar os mesmos controles",
     "cancel": "Cancelar",
     "start": "Iniciar"
   }

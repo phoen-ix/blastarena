@@ -3,7 +3,7 @@
   "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AIGN",
   "backToLobby": "Lobiye Don",
   "mapPreview": {
-    "loading": "\u00d6nizleme y\u00fckleniyor..."
+    "loading": "Önizleme yükleniyor..."
   },
   "empty": "Henuz kampanya dunyasi mevcut degil.",
   "loadFailed": "Kampanya yuklenemedi: {{error}}",
@@ -59,7 +59,19 @@
       "24h": "24 saat"
     },
     "loginFailed": "Giris basarisiz",
-    "connectionError": "Baglanti hatasi"
+    "connectionError": "Baglanti hatasi",
+    "controlPresets": {
+      "wasd": "WASD + Boşluk/E/Q",
+      "arrows": "Ok tuşları + Enter/Shift/Eğik çizgi",
+      "numpad": "Sayısal tuş takımı 8462 + Artı/Eksi/Çarpı",
+      "gamepad1": "Oyun kolu 1",
+      "gamepad2": "Oyun kolu 2"
+    },
+    "cameraModes": {
+      "shared": "Ortak (otomatik yakınlaştırma)",
+      "splitH": "Yatay bölünmüş",
+      "splitV": "Dikey bölünmüş"
+    }
   },
   "buddyModal": {
     "title": "Yardimci Modu",

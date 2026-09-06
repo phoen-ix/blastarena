@@ -44,16 +44,21 @@ export function trapFocus(modal: HTMLElement): () => void {
 /**
  * Enable keyboard activation (Enter/Space) for [data-action] elements
  * within a container using event delegation.
+ *
+ * Returns a disposer. Views bind this to the persistent `.main-body`, which outlives them, so a
+ * view that does not remove the listener in destroy() leaves one copy per visit. (audit C2)
  */
-export function enableKeyboardActions(container: HTMLElement): void {
-  container.addEventListener('keydown', (e) => {
+export function enableKeyboardActions(container: HTMLElement): () => void {
+  const handler = (e: KeyboardEvent) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const target = e.target as HTMLElement;
     const actionEl = target.closest('[data-action]') as HTMLElement | null;
     if (!actionEl) return;
     e.preventDefault();
     actionEl.click();
-  });
+  };
+  container.addEventListener('keydown', handler);
+  return () => container.removeEventListener('keydown', handler);
 }
 
 export function escapeHtml(text: string): string {
@@ -121,9 +126,6 @@ const SANITIZE_CONFIG: Config = {
   // the current tab.
   ADD_ATTR: ['target'],
 };
-
-/** The sanitiser configuration, exported so tests can check it against the real markup. */
-export const SANITIZER_OPTIONS = SANITIZE_CONFIG;
 
 /**
  * Table internals have to be parsed inside a table.

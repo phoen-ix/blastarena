@@ -32,7 +32,6 @@ export class PartyBar {
   private partyDisbandedHandler!: ServerToClientEvents['party:disbanded'];
   private partyChatHandler!: ServerToClientEvents['party:chat'];
   private partyInviteHandler!: ServerToClientEvents['party:invite'];
-  private partyJoinRoomHandler!: ServerToClientEvents['party:joinRoom'];
   private roomInviteHandler!: ServerToClientEvents['invite:room'];
   private settingsChangedHandler!: ServerToClientEvents['admin:settingsChanged'];
 
@@ -86,7 +85,6 @@ export class PartyBar {
     this.socketClient.off('party:disbanded', this.partyDisbandedHandler);
     this.socketClient.off('party:chat', this.partyChatHandler);
     this.socketClient.off('party:invite', this.partyInviteHandler);
-    this.socketClient.off('party:joinRoom', this.partyJoinRoomHandler);
     this.socketClient.off('invite:room', this.roomInviteHandler);
     this.socketClient.off('admin:settingsChanged', this.settingsChangedHandler);
     this.chatContainer?.remove();
@@ -127,12 +125,10 @@ export class PartyBar {
     };
     this.socketClient.on('party:invite', this.partyInviteHandler);
 
-    this.partyJoinRoomHandler = (data: { roomCode: string }) => {
-      if (this.onJoinRoom) {
-        this.onJoinRoom(data.roomCode);
-      }
-    };
-    this.socketClient.on('party:joinRoom', this.partyJoinRoomHandler);
+    // `party:joinRoom` (leader entered a room → followers auto-join) is handled by LobbyScene,
+    // which owns the room transition. PartyBar used to subscribe as well, so every follower
+    // emitted room:join twice and the second answer was an ALREADY_IN_ROOM error toast.
+    // (audit PARTY-JOIN-TWICE-1)
 
     this.roomInviteHandler = (invite: PartyInvite) => {
       this.showInviteToast(invite);

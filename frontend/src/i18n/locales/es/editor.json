@@ -15,10 +15,10 @@
     "mechanics": "Mecánicas",
     "teleporterA": "Teletransportador A",
     "teleporterB": "Teletransportador B",
-    "conveyorUp": "Cinta \u2191",
-    "conveyorDown": "Cinta \u2193",
-    "conveyorLeft": "Cinta \u2190",
-    "conveyorRight": "Cinta \u2192",
+    "conveyorUp": "Cinta ↑",
+    "conveyorDown": "Cinta ↓",
+    "conveyorLeft": "Cinta ←",
+    "conveyorRight": "Cinta →",
     "puzzle": "Puzzle",
     "switch": "Interruptor",
     "gate": "Puerta",
@@ -83,7 +83,8 @@
     "needSpawns": "Se necesitan al menos 2 puntos de aparición",
     "mapSaved": "¡Mapa guardado!",
     "levelSaved": "¡Nivel guardado!",
-    "saveFailed": "Error al guardar: {{error}}"
+    "saveFailed": "Error al guardar: {{error}}",
+    "noWorld": "No se puede guardar: este nivel no pertenece a ningún mundo de campaña. Créalo desde la pestaña Campaña del panel de administración."
   },
   "defaults": {
     "untitledLevel": "Nivel sin Título",

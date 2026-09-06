@@ -15,10 +15,10 @@
     "mechanics": "Mechanismen",
     "teleporterA": "Teleporter A",
     "teleporterB": "Teleporter B",
-    "conveyorUp": "Lopende band \u2191",
-    "conveyorDown": "Lopende band \u2193",
-    "conveyorLeft": "Lopende band \u2190",
-    "conveyorRight": "Lopende band \u2192",
+    "conveyorUp": "Lopende band ↑",
+    "conveyorDown": "Lopende band ↓",
+    "conveyorLeft": "Lopende band ←",
+    "conveyorRight": "Lopende band →",
     "puzzle": "Puzzel",
     "switch": "Schakelaar",
     "gate": "Poort",
@@ -83,7 +83,8 @@
     "needSpawns": "Minimaal 2 spawnpunten nodig",
     "mapSaved": "Kaart opgeslagen!",
     "levelSaved": "Level opgeslagen!",
-    "saveFailed": "Opslaan mislukt: {{error}}"
+    "saveFailed": "Opslaan mislukt: {{error}}",
+    "noWorld": "Kan niet opslaan: dit level hoort bij geen enkele campagnewereld. Maak het aan via het tabblad Campagne in het beheer."
   },
   "defaults": {
     "untitledLevel": "Naamloos level",

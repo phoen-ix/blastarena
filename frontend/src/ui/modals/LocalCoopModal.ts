@@ -3,8 +3,8 @@ import {
   CameraMode,
   LocalCoopConfig,
   LocalCoopP2Identity,
-  CONTROL_PRESET_LABELS,
-  CAMERA_MODE_LABELS,
+  getControlPresetLabels,
+  getCameraModeLabels,
   loadLocalCoopConfig,
   saveLocalCoopConfig,
   loadP2Identity,
@@ -572,6 +572,7 @@ export function createControlsSection(
   const chips = document.createElement('div');
   chips.className = 'option-chips';
 
+  const presetLabels = getControlPresetLabels();
   for (const preset of ALL_PRESETS) {
     const chip = document.createElement('div');
     chip.className = 'option-chip';
@@ -588,7 +589,7 @@ export function createControlsSection(
     }
 
     const chipLabel = document.createElement('span');
-    chipLabel.textContent = CONTROL_PRESET_LABELS[preset];
+    chipLabel.textContent = presetLabels[preset];
     chip.appendChild(chipLabel);
 
     chip.addEventListener('click', () => onSelect(preset));
@@ -613,6 +614,7 @@ export function createCameraModeSection(
   const chips = document.createElement('div');
   chips.className = 'option-chips';
 
+  const cameraLabels = getCameraModeLabels();
   for (const mode of ALL_CAMERA_MODES) {
     const chip = document.createElement('div');
     chip.className = 'option-chip';
@@ -625,7 +627,7 @@ export function createCameraModeSection(
     }
 
     const chipLabel = document.createElement('span');
-    chipLabel.textContent = CAMERA_MODE_LABELS[mode];
+    chipLabel.textContent = cameraLabels[mode];
     chip.appendChild(chipLabel);
 
     chip.addEventListener('click', () => onSelect(mode));

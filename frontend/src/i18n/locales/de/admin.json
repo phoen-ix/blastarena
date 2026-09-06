@@ -597,7 +597,10 @@
     "revokeAllConfirmPrompt": "Geben Sie CONFIRM ein, um fortzufahren:",
     "revokeAllCancel": "Abbrechen",
     "revokeAllConfirm": "Alle widerrufen",
-    "revokeAllSuccess": "Alle Sitzungen widerrufen"
+    "revokeAllSuccess": "Alle Sitzungen widerrufen",
+    "spectatorActionsDesc": "Ausgeschiedene Spieler dürfen Energie für Wände, Meteoriten, Power-ups und Tempozonen ausgeben (Räume können es pro Match weiterhin deaktivieren)",
+    "spectatorActionsToggled": "Zuschauer-Spielleiter {{status}}",
+    "spectatorActionsGlobal": "Zuschauer-Spielleiter (global)"
   },
   "seasons": {
     "sectionTitle": "Season-Verwaltung",

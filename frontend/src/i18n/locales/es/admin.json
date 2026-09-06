@@ -597,7 +597,10 @@
     "revokeAllConfirmPrompt": "Escribe CONFIRM para continuar:",
     "revokeAllCancel": "Cancelar",
     "revokeAllConfirm": "Revocar todo",
-    "revokeAllSuccess": "Todas las sesiones revocadas"
+    "revokeAllSuccess": "Todas las sesiones revocadas",
+    "spectatorActionsDesc": "Permite que los jugadores eliminados gasten energía en muros, meteoritos, potenciadores y zonas de velocidad (las salas aún pueden desactivarlo por partida)",
+    "spectatorActionsToggled": "Game Master espectador {{status}}",
+    "spectatorActionsGlobal": "Game Master espectador (global)"
   },
   "seasons": {
     "sectionTitle": "Gestión de Temporadas",

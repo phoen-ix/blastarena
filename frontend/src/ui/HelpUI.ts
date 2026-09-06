@@ -1,6 +1,5 @@
 import { AuthManager } from '../network/AuthManager';
 import { ApiClient } from '../network/ApiClient';
-import { NotificationUI } from './NotificationUI';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import {
   POWERUP_DEFINITIONS,
@@ -82,7 +81,6 @@ function getStaffDocs() {
 export class HelpUI {
   private container: HTMLElement;
   private authManager: AuthManager;
-  private notifications: NotificationUI;
   private onClose: () => void;
   private activeTabId: string;
   private contentEl: HTMLElement | null = null;
@@ -90,16 +88,11 @@ export class HelpUI {
   private markdownCache: Map<string, string> = new Map();
   private displayGithub = false;
   private displayImprint = false;
+  private isEmbedded = false;
   private onLanguageChanged = () => this.render();
 
-  constructor(
-    authManager: AuthManager,
-    notifications: NotificationUI,
-    onClose: () => void,
-    initialTab?: string,
-  ) {
+  constructor(authManager: AuthManager, onClose: () => void, initialTab?: string) {
     this.authManager = authManager;
-    this.notifications = notifications;
     this.onClose = onClose;
     this.container = document.createElement('div');
     this.container.className = 'admin-container';
@@ -672,31 +665,31 @@ export class HelpUI {
         .join(''),
     );
 
-    const sections = this.contentEl.querySelectorAll<HTMLElement>('.help-guide-section');
-    const promises = staffDocs.map(async (doc, i) => {
-      try {
-        const isYaml = doc.filename.endsWith('.yaml');
-        const content = await this.fetchRawDoc(`/api/docs/admin/${doc.filename}`);
-        const el = sections[i]?.querySelector('.help-markdown');
-        if (el) {
-          if (isYaml) {
-            setHtml(el, `<pre><code>${this.escapeForPre(content)}</code></pre>`);
-          } else {
-            setHtml(el, await marked.parse(content));
-          }
-        }
-      } catch {
-        const el = sections[i]?.querySelector('.help-markdown');
-        if (el) {
+    // Each doc is fetched the first time its <details> is opened, not all six up front (~300 KB
+    // of markdown + the OpenAPI spec for a tab most visits never expand), and goes through
+    // fetchAndParseDoc so the per-instance markdownCache serves repeat opens. (audit F7)
+    const sections = this.contentEl.querySelectorAll<HTMLDetailsElement>('.help-guide-section');
+    sections.forEach((section, i) => {
+      const doc = staffDocs[i];
+      const el = section.querySelector('.help-markdown');
+      if (!doc || !el) return;
+      let loaded = false;
+      const load = async () => {
+        if (loaded || !section.open) return;
+        loaded = true;
+        try {
+          setHtml(el, await this.fetchAndParseDoc(`/api/docs/admin/${doc.filename}`));
+        } catch {
+          loaded = false; // let the next toggle retry
           setHtml(
             el,
             `<div class="help-status-error">${t('help:failedToLoadDoc', { title: doc.title })}</div>`,
           );
         }
-      }
+      };
+      section.addEventListener('toggle', load);
+      if (section.open) void load();
     });
-
-    await Promise.all(promises);
   }
 
   private async fetchAndParseDoc(url: string, skipCache = false): Promise<string> {
@@ -707,7 +700,10 @@ export class HelpUI {
     // Not sanitised here: every consumer inserts through setHtml, which sanitises with the app's
     // one configuration. Sanitising twice, with two different configs, was how `target="_blank"`
     // silently disappeared from the docs. (audit CSP-1)
-    const html = await marked.parse(raw);
+    // The OpenAPI spec is YAML, not markdown — shown verbatim in a <pre>.
+    const html = url.endsWith('.yaml')
+      ? `<pre><code>${this.escapeForPre(raw)}</code></pre>`
+      : await marked.parse(raw);
     this.markdownCache.set(url, html);
     return html;
   }
@@ -726,6 +722,7 @@ export class HelpUI {
   }
 
   async renderEmbedded(container: HTMLElement): Promise<void> {
+    this.isEmbedded = true;
     this.container = container;
     await this.loadFooterSettings();
 
@@ -824,13 +821,18 @@ export class HelpUI {
     UIGamepadNavigator.getInstance().pushContext({
       id: 'help-ui',
       elements: () => [
-        this.container.querySelector<HTMLElement>('#help-ui-close')!,
+        // No close button in embedded mode — a `!`-asserted single query put `null` in this list
+        // and the first D-pad press threw. (audit C3)
+        ...this.container.querySelectorAll<HTMLElement>('#help-ui-close'),
         ...this.container.querySelectorAll<HTMLElement>('.admin-tab'),
         ...this.container.querySelectorAll<HTMLElement>(
           '.help-guide-section summary, .help-markdown a, .btn',
         ),
       ],
       onBack: () => {
+        // Embedded, `container` IS the lobby's `.main-body`: hide() would remove it and leave the
+        // lobby shell empty. The lobby context's own onBack handles navigation. (audit C3)
+        if (this.isEmbedded) return;
         this.hide();
         this.onClose();
       },

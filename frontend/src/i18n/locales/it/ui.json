@@ -19,7 +19,8 @@
     "expand": "Espandi barra laterale",
     "collapse": "Comprimi barra laterale",
     "viewProfile": "Visualizza profilo",
-    "openWorld": "Mondo aperto"
+    "openWorld": "Mondo aperto",
+    "level": "Liv. {{level}}"
   },
   "rooms": {
     "title": "Stanze disponibili",
@@ -111,7 +112,6 @@
       "cosmetics": "Cosmetici"
     },
     "privacy": {
-      "title": "Privacy",
       "settingsTitle": "Impostazioni privacy",
       "publicProfile": "Profilo pubblico",
       "publicProfileDesc": "Permetti agli altri giocatori di visualizzare le tue statistiche, grado e obiettivi",
@@ -120,7 +120,6 @@
       "saved": "Salvato!"
     },
     "account": {
-      "title": "Impostazioni account",
       "profile": "Profilo",
       "username": "Nome utente",
       "usernameHint": "Lettere, numeri, trattini bassi, trattini. 3-20 caratteri.",
@@ -134,11 +133,9 @@
       "unverified": "non verificata",
       "pendingChange": "Cambio in attesa verso",
       "pendingHint": "controlla quella casella di posta per il link di conferma.",
-      "cancel": "Annulla",
       "pendingCancelled": "Cambio email in attesa annullato",
       "newEmailPlaceholder": "Nuovo indirizzo email",
       "emailEmpty": "Inserisci un nuovo indirizzo email.",
-      "emailSame": "Questo è già il tuo indirizzo email attuale.",
       "sendConfirmation": "Invia conferma",
       "changeEmail": "Cambia email",
       "changePassword": "Cambia password",
@@ -149,7 +146,6 @@
       "passwordTooShort": "La nuova password deve avere almeno 8 caratteri.",
       "passwordMismatch": "Le nuove password non corrispondono.",
       "save": "Salva",
-      "close": "Chiudi",
       "dangerZone": "Zona pericolosa",
       "deleteAccount": "Elimina account",
       "deleteWarning": "Questo eliminerà permanentemente il tuo account e tutti i dati associati. Questa azione è irreversibile.",
@@ -285,7 +281,15 @@
     "failed": "Fallito",
     "join": "Entra",
     "msg": "Msg",
-    "friendRequestReceived": "{{username}} ti ha inviato una richiesta di amicizia"
+    "friendRequestReceived": "{{username}} ti ha inviato una richiesta di amicizia",
+    "block": "Blocca",
+    "blocked": "{{username}} è stato bloccato",
+    "blockFailed": "Impossibile bloccare l'utente",
+    "blockModal": {
+      "ariaLabel": "Blocca utente",
+      "title": "Blocca utente",
+      "message": "Bloccare {{username}}? Verrà rimosso dai tuoi amici e non potrà più inviarti richieste o messaggi. Puoi sbloccarlo dalla scheda Bloccati."
+    }
   },
   "party": {
     "title": "Gruppo",
@@ -418,26 +422,6 @@
     "small": "Piccola",
     "medium": "Media",
     "large": "Grande",
-    "sizes": {
-      "11x11": "Piccola (11×11)",
-      "15x13": "Media (15×13)",
-      "19x15": "Grande (19×15)",
-      "21x21": "Enorme (21×21)"
-    },
-    "density": {
-      "none": "Nessuna (0%)",
-      "low": "Bassa (15%)",
-      "normal": "Normale (30%)",
-      "high": "Alta (50%)",
-      "veryHigh": "Molto alta (80%)"
-    },
-    "powerUpRates": {
-      "none": "Nessuna (0%)",
-      "low": "Bassa (30%)",
-      "medium": "Media (50%)",
-      "high": "Alta (65%)",
-      "veryHigh": "Molto alta (80%)"
-    },
     "difficulty": {
       "easy": "Facile",
       "normal": "Normale",
@@ -553,7 +537,12 @@
     "remoteMode": {
       "all": "TUTTE",
       "fifo": "1ª"
-    }
+    },
+    "buddyTag": "[BUDDY]",
+    "coopDead": "(morto)",
+    "coopReady": "(pronto)",
+    "coopRespawnIn": "({{seconds}}s)",
+    "adminMessageFrom": "Messaggio da {{from}}"
   },
   "room": {
     "back": "← Indietro",
@@ -597,13 +586,18 @@
       "tnt": "TNT",
       "dynamite": "Dynamite",
       "sparky": "Sparky"
-    }
+    },
+    "adminMessageFrom": "Messaggio da {{from}}"
   },
   "game": {
     "leaveTitle": "ABBANDONA PARTITA",
     "leaveWarning": "Morirai e perderai tutti i progressi.",
     "leaveConfirm": "Abbandona partita",
-    "leaveCancel": "Annulla"
+    "leaveCancel": "Annulla",
+    "pausedTitle": "PAUSA",
+    "pauseContinue": "Continua",
+    "pauseRestartLevel": "Riavvia livello",
+    "pauseExitLevel": "Esci dal livello"
   },
   "gameOver": {
     "gameWord": "FINE",
@@ -635,7 +629,8 @@
   },
   "lobbyChat": {
     "empty": "Nessun messaggio ancora",
-    "ariaLabel": "Messaggio chat lobby"
+    "ariaLabel": "Messaggio chat lobby",
+    "title": "Chat della lobby"
   },
   "replay": {
     "back": "Indietro",
@@ -669,5 +664,31 @@
     "roundEnd": "Round finito",
     "roundStart": "Nuovo round in arrivo",
     "nextRound": "Prossimo round tra {{seconds}}s"
+  },
+  "replayLog": {
+    "filters": {
+      "kills": "Uccisioni",
+      "bombs": "Bombe",
+      "bot": "IA dei bot",
+      "powerups": "Potenziamenti",
+      "movement": "Movimento",
+      "explosions": "Esplosioni",
+      "players": "Uscite/Disc."
+    },
+    "selfDestructed": "{{victim}} si è autodistrutto",
+    "killed": "{{killer}} ha eliminato {{victim}}",
+    "bombPlaced": "{{owner}} ha piazzato una bomba in ({{x}},{{y}})",
+    "bombDetonated": "La bomba di {{owner}} è esplosa in ({{x}},{{y}})",
+    "botDecision": "{{bot}}: {{decision}}",
+    "moved": "{{player}} si è mosso {{direction}} verso ({{x}},{{y}})",
+    "pickedUp": "{{player}} ha raccolto {{type}}",
+    "explosion": "Esplosione di {{owner}}: {{cells}} celle, {{walls}} muri",
+    "left": "{{player}} ha lasciato la partita",
+    "disconnected": "{{player}} si è disconnesso",
+    "disconnectKilled": "{{player}} eliminato (timeout disconnessione)",
+    "gameOver": "Fine della partita"
+  },
+  "connection": {
+    "reconnecting": "Riconnessione al server..."
   }
 }

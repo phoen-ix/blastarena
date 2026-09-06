@@ -46,14 +46,6 @@ export class OpenWorldView implements ILobbyView {
   private deps: ViewDeps;
   private container: HTMLElement | null = null;
   private infoHandler: ((data: OpenWorldInfo) => void) | null = null;
-  private roundEndHandler:
-    | ((data: {
-        roundNumber: number;
-        leaderboard: OpenWorldScoreEntry[];
-        nextRoundIn: number;
-      }) => void)
-    | null = null;
-  private roundStartHandler: ((data: { roundNumber: number }) => void) | null = null;
   private timerInterval: ReturnType<typeof setInterval> | null = null;
   private roundTimeRemaining = 0;
 
@@ -291,16 +283,8 @@ export class OpenWorldView implements ILobbyView {
       this.renderLeaderboard(data.leaderboard);
     };
     this.deps.socketClient.on('openworld:info', this.infoHandler);
-
-    this.roundEndHandler = () => {
-      // Round end handled by GameScene/HUD when in-game
-    };
-    this.deps.socketClient.on('openworld:roundEnd', this.roundEndHandler);
-
-    this.roundStartHandler = () => {
-      // Round start handled by GameScene/HUD when in-game
-    };
-    this.deps.socketClient.on('openworld:roundStart', this.roundStartHandler);
+    // `openworld:roundEnd` / `openworld:roundStart` are handled by GameScene/HUD while in-game;
+    // this view used to subscribe to both with empty handlers. (audit G3)
   }
 
   private startTimerCountdown(): void {
@@ -358,14 +342,6 @@ export class OpenWorldView implements ILobbyView {
     if (this.infoHandler) {
       this.deps.socketClient.off('openworld:info', this.infoHandler);
       this.infoHandler = null;
-    }
-    if (this.roundEndHandler) {
-      this.deps.socketClient.off('openworld:roundEnd', this.roundEndHandler);
-      this.roundEndHandler = null;
-    }
-    if (this.roundStartHandler) {
-      this.deps.socketClient.off('openworld:roundStart', this.roundStartHandler);
-      this.roundStartHandler = null;
     }
     this.container = null;
   }

@@ -15,10 +15,10 @@
     "mechanics": "Mekaniker",
     "teleporterA": "Teleportör A",
     "teleporterB": "Teleportör B",
-    "conveyorUp": "Transportband \u2191",
-    "conveyorDown": "Transportband \u2193",
-    "conveyorLeft": "Transportband \u2190",
-    "conveyorRight": "Transportband \u2192",
+    "conveyorUp": "Transportband ↑",
+    "conveyorDown": "Transportband ↓",
+    "conveyorLeft": "Transportband ←",
+    "conveyorRight": "Transportband →",
     "puzzle": "Pussel",
     "switch": "Brytare",
     "gate": "Grind",
@@ -83,7 +83,8 @@
     "needSpawns": "Behöver minst 2 startplatser",
     "mapSaved": "Kartan sparad!",
     "levelSaved": "Banan sparad!",
-    "saveFailed": "Sparning misslyckades: {{error}}"
+    "saveFailed": "Sparning misslyckades: {{error}}",
+    "noWorld": "Kan inte spara: nivån hör inte till någon kampanjvärld. Skapa den från fliken Kampanj i adminpanelen."
   },
   "defaults": {
     "untitledLevel": "Namnlös bana",

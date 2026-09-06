@@ -597,7 +597,10 @@
     "revokeAllConfirmPrompt": "Skriv CONFIRM for å fortsette:",
     "revokeAllCancel": "Avbryt",
     "revokeAllConfirm": "Opphev alle",
-    "revokeAllSuccess": "Alle økter opphevet"
+    "revokeAllSuccess": "Alle økter opphevet",
+    "spectatorActionsDesc": "La utslåtte spillere bruke energi på vegger, meteorer, power-ups og fartssoner (rom kan fortsatt slå det av per kamp)",
+    "spectatorActionsToggled": "Tilskuer-spilleder {{status}}",
+    "spectatorActionsGlobal": "Tilskuer-spilleder (globalt)"
   },
   "seasons": {
     "sectionTitle": "Sesongadministrasjon",

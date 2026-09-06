@@ -1,24 +1,24 @@
 {
   "title": {
     "mapEditor": "Kartredigerer",
-    "levelEditor": "Niv\u00e5redigerer"
+    "levelEditor": "Nivåredigerer"
   },
   "tools": {
     "tiles": "Ruter",
     "empty": "Tom",
     "wall": "Vegg",
-    "destructible": "\u00d8deleggbar",
+    "destructible": "Ødeleggbar",
     "spawn": "Startpunkt",
     "exit": "Utgang",
-    "goal": "M\u00e5l",
-    "eraser": "Viskel\u00e6r",
+    "goal": "Mål",
+    "eraser": "Viskelær",
     "mechanics": "Mekanikk",
     "teleporterA": "Teleporter A",
     "teleporterB": "Teleporter B",
-    "conveyorUp": "Transportb\u00e5nd \u2191",
-    "conveyorDown": "Transportb\u00e5nd \u2193",
-    "conveyorLeft": "Transportb\u00e5nd \u2190",
-    "conveyorRight": "Transportb\u00e5nd \u2192",
+    "conveyorUp": "Transportbånd ↑",
+    "conveyorDown": "Transportbånd ↓",
+    "conveyorLeft": "Transportbånd ←",
+    "conveyorRight": "Transportbånd →",
     "puzzle": "Puslespill",
     "switch": "Bryter",
     "gate": "Port",
@@ -48,21 +48,21 @@
   },
   "settings": {
     "mapSettings": "Kartinnstillinger",
-    "levelSettings": "Niv\u00e5innstillinger",
+    "levelSettings": "Nivåinnstillinger",
     "width": "Bredde",
-    "height": "H\u00f8yde",
-    "dimensionHint": "Oddetall, 7\u201351",
+    "height": "Høyde",
+    "dimensionHint": "Oddetall, 7–51",
     "name": "Navn",
     "description": "Beskrivelse",
     "lives": "Liv",
     "timeLimit": "Tidsbegrensning (sekunder, 0=ingen)",
     "parTime": "Partid (sekunder, 0=ingen)",
-    "parTimeHint": "2 stjerner hvis fullf\u00f8rt under partid",
+    "parTimeHint": "2 stjerner hvis fullført under partid",
     "winCondition": "Seiersbetingelse",
     "winConditions": {
       "killAll": "Drep alle fiender",
       "findExit": "Finn utgangen",
-      "reachGoal": "N\u00e5 m\u00e5let",
+      "reachGoal": "Nå målet",
       "surviveTime": "Overlev tiden"
     },
     "published": "Publisert"
@@ -74,7 +74,7 @@
   },
   "modals": {
     "unsavedChanges": "Ulagrede endringer",
-    "unsavedDescription": "Du har ulagrede endringer. Vil du lagre f\u00f8r du g\u00e5r?",
+    "unsavedDescription": "Du har ulagrede endringer. Vil du lagre før du går?",
     "cancel": "Avbryt",
     "discard": "Forkast",
     "saveAndExit": "Lagre og avslutt"
@@ -82,11 +82,12 @@
   "toasts": {
     "needSpawns": "Trenger minst 2 startpunkter",
     "mapSaved": "Kart lagret!",
-    "levelSaved": "Niv\u00e5 lagret!",
-    "saveFailed": "Lagring mislyktes: {{error}}"
+    "levelSaved": "Nivå lagret!",
+    "saveFailed": "Lagring mislyktes: {{error}}",
+    "noWorld": "Kan ikke lagre: dette nivået hører ikke til noen kampanjeverden. Opprett det fra Kampanje-fanen i adminpanelet."
   },
   "defaults": {
-    "untitledLevel": "Niv\u00e5 uten tittel",
+    "untitledLevel": "Nivå uten tittel",
     "untitledMap": "Kart uten tittel"
   }
 }

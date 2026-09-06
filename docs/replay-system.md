@@ -4,7 +4,7 @@ Games and simulations are recorded as gzipped JSON files when recording is enabl
 
 ## Recording Toggles
 
-- **Global toggle**: `recordings_enabled` in `server_settings` table — controls whether "Record Game" checkbox appears in CreateRoomModal
+- **Global toggle**: `recordings_enabled` in `server_settings` table — controls whether "Record Game" checkbox appears in CreateRoomView
 - **Per-room**: `recordGame` field in MatchConfig (default true when recordings enabled)
 - **Per-simulation**: `recordReplays` field in SimulationConfig (default true)
 - `GameRoom.replayRecorder` and `SimulationGame.replayRecorder` are nullable — only created when recording is active; all usage sites guarded with optional chaining

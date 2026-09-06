@@ -2,7 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import { SOCKET_URL, API_URL } from '../config';
 import { ClientToServerEvents, ServerToClientEvents } from '@blast-arena/shared';
 import { AuthManager } from './AuthManager';
-import { i18n } from '../i18n';
+import { i18n, t } from '../i18n';
 import { setHtml } from '../utils/html';
 
 /** Extract parameter types from an event handler function type */
@@ -27,11 +27,16 @@ export class SocketClient {
   }
 
   connect(): void {
-    if (this.socket?.connected) return;
+    // `active` covers "connecting" as well as "connected". Guarding on `connected` alone let a
+    // second call during the in-flight handshake (e.g. Play-as-Guest within the first ~100 ms of
+    // the background arena) create a second socket and orphan the first, listeners and all.
+    // (audit C8)
+    if (this.socket?.active) return;
 
     const token = this.authManager.getAccessToken();
     if (!token) return;
 
+    this.discardStaleSocket();
     this.socket = io(SOCKET_URL, {
       auth: { token, locale: i18n.language },
       reconnection: true,
@@ -78,8 +83,9 @@ export class SocketClient {
 
   /** Connect as guest (no auth token — for open world) */
   connectAsGuest(): void {
-    if (this.socket?.connected) return;
+    if (this.socket?.active) return; // connecting or connected (audit C8)
 
+    this.discardStaleSocket();
     this.socket = io(SOCKET_URL, {
       auth: { guest: true, locale: i18n.language },
       reconnection: true,
@@ -103,6 +109,19 @@ export class SocketClient {
       console.error('Socket connection error (guest):', error.message);
       this.showOverlay();
     });
+  }
+
+  /**
+   * Drop a socket that is neither connecting nor connected (e.g. after a server-side disconnect,
+   * which clears `active` without going through disconnect()). Its listeners belong to scenes
+   * that registered on the old instance; they are removed so the dead socket can be collected
+   * instead of lingering with a manager that still holds it. (audit C8)
+   */
+  private discardStaleSocket(): void {
+    if (!this.socket) return;
+    this.socket.removeAllListeners();
+    this.socket.disconnect();
+    this.socket = null;
   }
 
   disconnect(): void {
@@ -217,7 +236,7 @@ export class SocketClient {
       `
       <div class="connection-message">
         <div class="connection-spinner"></div>
-        <div>Reconnecting to server...</div>
+        <div>${t('ui:connection.reconnecting')}</div>
       </div>
     `,
     );

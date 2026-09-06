@@ -3,11 +3,11 @@
   "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AIGN",
   "backToLobby": "Tilbage til lobby",
   "mapPreview": {
-    "loading": "Indl\u00e6ser forh\u00e5ndsvisning..."
+    "loading": "Indlæser forhåndsvisning..."
   },
-  "empty": "Ingen kampagne-verdener tilg\u00e6ngelige endnu.",
-  "loadFailed": "Kunne ikke indl\u00e6se kampagne: {{error}}",
-  "loadingLevel": "Indl\u00e6ser bane...",
+  "empty": "Ingen kampagne-verdener tilgængelige endnu.",
+  "loadFailed": "Kunne ikke indlæse kampagne: {{error}}",
+  "loadingLevel": "Indlæser bane...",
   "startFailed": "Kunne ikke starte bane: {{error}}",
   "stats": {
     "enemies": "fjender",
@@ -23,15 +23,15 @@
   },
   "progress": {
     "completed": "{{completed}}/{{total}}",
-    "size": "{{percent}}% st\u00f8rrelse"
+    "size": "{{percent}}% størrelse"
   },
   "localCoopModal": {
-    "title": "Lokal co-op ops\u00e6tning",
-    "ariaLabel": "Lokal co-op ops\u00e6tning",
+    "title": "Lokal co-op opsætning",
+    "ariaLabel": "Lokal co-op opsætning",
     "player1Controls": "Spiller 1 kontroller",
     "player2": "Spiller 2",
     "identity": "Identitet:",
-    "guest": "G\u00e6st",
+    "guest": "Gæst",
     "logIn": "Log ind",
     "name": "Navn:",
     "color": "Farve:",
@@ -59,19 +59,31 @@
       "24h": "24 timer"
     },
     "loginFailed": "Login mislykkedes",
-    "connectionError": "Forbindelsesfejl"
+    "connectionError": "Forbindelsesfejl",
+    "controlPresets": {
+      "wasd": "WASD + Mellemrum/E/Q",
+      "arrows": "Pile + Enter/Skift/Skråstreg",
+      "numpad": "Numpad 8462 + Plus/Minus/Gange",
+      "gamepad1": "Controller 1",
+      "gamepad2": "Controller 2"
+    },
+    "cameraModes": {
+      "shared": "Delt (autozoom)",
+      "splitH": "Delt vandret",
+      "splitV": "Delt lodret"
+    }
   },
   "buddyModal": {
     "title": "Makkertilstand",
     "ariaLabel": "Makkertilstand",
-    "loading": "Indl\u00e6ser makkerindstillinger...",
+    "loading": "Indlæser makkerindstillinger...",
     "buddy": "Makker",
     "edit": "Rediger",
-    "done": "F\u00e6rdig",
+    "done": "Færdig",
     "name": "Navn",
     "namePlaceholder": "Makker",
     "color": "Farve",
-    "sizeLabel": "St\u00f8rrelse: {{percent}}%",
+    "sizeLabel": "Størrelse: {{percent}}%",
     "p1Label": "S1",
     "buddyLabel": "Makker",
     "player1Controls": "Spiller 1 kontroller",

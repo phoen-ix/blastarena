@@ -27,9 +27,6 @@ interface Tab {
 
 export class AdminUI {
   private container: HTMLElement;
-  private notifications: NotificationUI;
-  private socketClient: SocketClient;
-  private authManager: AuthManager;
   private onClose: () => void;
   private tabs: Tab[];
   private activeTabId: string;
@@ -43,9 +40,8 @@ export class AdminUI {
     onClose: () => void,
     initialTab?: string,
   ) {
-    this.socketClient = socketClient;
-    this.authManager = authManager;
-    this.notifications = notifications;
+    // socketClient / authManager / notifications are only needed to build the tabs below; they
+    // were also stored on the instance and never read again. (audit G4)
     this.onClose = onClose;
     this.container = document.createElement('div');
     this.container.className = 'admin-container';
@@ -82,7 +78,7 @@ export class AdminUI {
         id: 'logs',
         label: t('admin:tabs.logs'),
         adminOnly: true,
-        instance: new LogsTab(notifications),
+        instance: new LogsTab(),
       },
       {
         id: 'simulations',

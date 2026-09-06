@@ -33,6 +33,7 @@ export class MenuScene extends Phaser.Scene {
   private socketClient!: SocketClient;
   private notifications!: NotificationUI;
   private authUI!: AuthUI;
+  private verificationUI: VerificationUI | null = null;
   private landingContainer: HTMLElement | null = null;
   private connectingText: Phaser.GameObjects.Text | null = null;
   private titleTexts: Phaser.GameObjects.Text[] = [];
@@ -58,6 +59,7 @@ export class MenuScene extends Phaser.Scene {
     this.landingDocked = false;
     this.playInputHandler = null;
     this.bgConnectHandler = null;
+    this.verificationUI = null;
     this.titleTexts = [];
     this.events.once('shutdown', this.shutdown, this);
 
@@ -125,10 +127,27 @@ export class MenuScene extends Phaser.Scene {
       window.history.replaceState({}, '', window.location.pathname);
       this.notifications.success(t('auth:verification.verified'));
     }
+    // Same for the email-change confirmation link, which now redirects here too (audit B15)
+    if (params.get('emailChanged') === 'true') {
+      window.history.replaceState({}, '', window.location.pathname);
+      this.notifications.success(t('auth:verification.emailChanged'));
+    }
 
     // Stale-flag hygiene: the in-game auth overlay flag must not survive into a fresh menu
     // (e.g. if the guest was AFK-kicked with the form open and we land back here).
     this.registry.remove('authOverlayOpen');
+
+    // The forgot-password email links to `/reset-password?token=…` (also accepted: `?resetToken=`).
+    // Nothing handled that route, so the link just showed the normal menu and the reset endpoint
+    // was never called. Open the new-password form instead of auto-logging in: the reset revokes
+    // every session anyway, and a logged-in user following the link still wants the form. (audit B1)
+    const resetToken = this.readResetToken(params);
+    if (resetToken !== null) {
+      this.connectingText?.destroy();
+      this.connectingText = null;
+      this.showAuth('reset', resetToken);
+      return;
+    }
 
     // Try auto-login first
     this.authManager.tryAutoLogin().then((success) => {
@@ -138,6 +157,17 @@ export class MenuScene extends Phaser.Scene {
         this.showLanding();
       }
     });
+  }
+
+  /**
+   * Token from a `/reset-password` link, or null when this is not one. The URL is cleared so a
+   * reload (or a bookmark) does not re-open the form with a token that has already been used.
+   */
+  private readResetToken(params: URLSearchParams): string | null {
+    if (window.location.pathname !== '/reset-password') return null;
+    const token = params.get('token') ?? params.get('resetToken') ?? '';
+    window.history.replaceState({}, '', '/');
+    return token;
   }
 
   /** Show landing page with guest play, login, and register options */
@@ -377,11 +407,14 @@ export class MenuScene extends Phaser.Scene {
     this.authManager.clearGuest();
   }
 
-  private showAuth(initialMode: 'login' | 'register' = 'login'): void {
+  private showAuth(
+    initialMode: 'login' | 'register' | 'reset' = 'login',
+    resetToken?: string,
+  ): void {
     this.authUI = new AuthUI(this.authManager, this.notifications, () => {
       this.onAuthenticated();
     });
-    this.authUI.show(initialMode);
+    this.authUI.show(initialMode, resetToken);
   }
 
   private onAuthenticated(): void {
@@ -395,12 +428,16 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private showVerification(): void {
-    const ui = new VerificationUI(this.authManager, this.notifications, () => {
+    // Keep the instance so shutdown() can stop its refresh-token poll. (audit C7)
+    this.verificationUI?.destroy();
+    this.verificationUI = new VerificationUI(this.authManager, this.notifications, () => {
       // User verified — proceed to lobby
+      this.verificationUI?.destroy();
+      this.verificationUI = null;
       this.socketClient.connect();
       this.scene.start('LobbyScene');
     });
-    ui.show();
+    this.verificationUI.show();
   }
 
   /**
@@ -411,6 +448,8 @@ export class MenuScene extends Phaser.Scene {
   private shutdown(): void {
     this.hideLanding();
     this.authUI?.hide();
+    this.verificationUI?.destroy();
+    this.verificationUI = null;
     if (this.bgConnectHandler) {
       this.socketClient.getSocket()?.off('connect', this.bgConnectHandler);
       this.bgConnectHandler = null;

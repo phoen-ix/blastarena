@@ -8,7 +8,7 @@ import { escapeHtml, setHtml } from '../utils/html';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { ILobbyView, ViewDeps } from './views/types';
 import { RoomsView } from './views/RoomsView';
-import { t } from '../i18n';
+import { t, i18n } from '../i18n';
 
 const SIDEBAR_COLLAPSED_KEY = 'blast-arena-sidebar-collapsed';
 
@@ -21,8 +21,9 @@ export class LobbyUI {
   private roomListHandler: ((rooms: RoomListItem[]) => void) | null = null;
   private lobbyChatToggleHandler: (() => void) | null = null;
   private languageChangedHandler: (() => void) | null = null;
-  private partyBar: PartyBar;
-  private lobbyChatPanel: LobbyChatPanel;
+  private partyBar!: PartyBar;
+  private lobbyChatPanel!: LobbyChatPanel;
+  private panelsDestroyed = false;
   private sidebarCollapsed = false;
   private activeView: ILobbyView | null = null;
   private activeViewId = 'rooms';
@@ -43,17 +44,27 @@ export class LobbyUI {
     this.container = document.createElement('div');
     this.container.className = 'app-layout';
     this.sidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
-    const user = authManager.getUser();
+    this.createPanels();
+  }
+
+  /**
+   * PartyBar and LobbyChatPanel register their socket handlers in their constructors, so they
+   * exist for exactly as long as this LobbyUI is shown: created here, destroyed in hide().
+   */
+  private createPanels(): void {
+    const user = this.authManager.getUser();
     const userId = user?.id ?? 0;
     const userRole = user?.role ?? 'user';
-    this.lobbyChatPanel = new LobbyChatPanel(socketClient, notifications, userId, userRole);
-    this.partyBar = new PartyBar(socketClient, notifications, userId, userRole);
+    this.lobbyChatPanel = new LobbyChatPanel(this.socketClient, userRole);
+    this.partyBar = new PartyBar(this.socketClient, this.notifications, userId, userRole);
     this.partyBar.setJoinRoomCallback((roomCode) => this.joinRoom(roomCode));
+    this.panelsDestroyed = false;
   }
 
   show(initialView?: string, viewOptions?: Record<string, unknown>): void {
     this.initialView = initialView || null;
     this.initialViewOptions = viewOptions || null;
+    if (this.panelsDestroyed) this.createPanels();
 
     const uiOverlay = document.getElementById('ui-overlay');
     if (uiOverlay && !uiOverlay.contains(this.container)) {
@@ -120,11 +131,18 @@ export class LobbyUI {
       this.languageChangedHandler = null;
     }
     UIGamepadNavigator.getInstance().popContext('lobby');
-    this.lobbyChatPanel.unmount();
     this.container.remove();
+    // The panels' socket handlers (7 on PartyBar, 2 on LobbyChatPanel) must go with the UI.
+    // LobbyScene builds a fresh LobbyUI on every return from a room, and only scene shutdown
+    // used to destroy the panels — so N room round-trips left N sets of live handlers: N invite
+    // toasts per invite, N chat renders per message. (audit C1)
+    this.destroyPanels();
   }
 
+  /** Idempotent: hide() may run more than once on the same instance (view callback + scene). */
   destroyPanels(): void {
+    if (this.panelsDestroyed) return;
+    this.panelsDestroyed = true;
     this.partyBar.destroy();
     this.lobbyChatPanel.destroy();
   }
@@ -201,7 +219,11 @@ export class LobbyUI {
         return new SettingsView(deps);
       }
       case 'help': {
-        const { HelpView } = await import('./views/HelpView');
+        // The help namespace (~11 KB per language) is only needed here. (audit I18N-LOAD-1)
+        const [{ HelpView }] = await Promise.all([
+          import('./views/HelpView'),
+          i18n.loadNamespaces('help'),
+        ]);
         return new HelpView(deps);
       }
       case 'leaderboard': {
@@ -275,6 +297,8 @@ export class LobbyUI {
           const game = (await import('../main')).game;
           game.registry.set('editorMode', 'custom_map');
           game.registry.set('customMapId', null);
+          const { ensureLevelEditorScene } = await import('../scenes/levelEditorLoader');
+          await ensureLevelEditorScene(game); // lazy editor chunk (audit F9)
           const lobbyScene = game.scene.getScene('LobbyScene');
           if (lobbyScene) lobbyScene.scene.start('LevelEditorScene');
         });
@@ -535,7 +559,7 @@ export class LobbyUI {
         .then((rank) => {
           const sidebarLevel = this.container.querySelector('#sidebar-level') as HTMLElement;
           if (sidebarLevel && rank.level) {
-            sidebarLevel.textContent = `Lvl ${rank.level}`;
+            sidebarLevel.textContent = t('ui:sidebar.level', { level: rank.level });
           }
           const sidebarRank = this.container.querySelector('#sidebar-rank') as HTMLElement;
           if (sidebarRank && rank.rankTier) {

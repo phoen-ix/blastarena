@@ -597,7 +597,10 @@
     "revokeAllConfirmPrompt": "Tapez CONFIRM pour continuer :",
     "revokeAllCancel": "Annuler",
     "revokeAllConfirm": "Tout révoquer",
-    "revokeAllSuccess": "Toutes les sessions révoquées"
+    "revokeAllSuccess": "Toutes les sessions révoquées",
+    "spectatorActionsDesc": "Les joueurs éliminés peuvent dépenser de l'énergie en murs, météores, bonus et zones de vitesse (chaque salle peut encore le désactiver par partie)",
+    "spectatorActionsToggled": "Maître du jeu spectateur {{status}}",
+    "spectatorActionsGlobal": "Maître du jeu spectateur (global)"
   },
   "seasons": {
     "sectionTitle": "Gestion des saisons",

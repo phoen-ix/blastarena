@@ -597,7 +597,10 @@
     "revokeAllConfirmPrompt": "Wpisz CONFIRM, aby kontynuować:",
     "revokeAllCancel": "Anuluj",
     "revokeAllConfirm": "Unieważnij wszystkie",
-    "revokeAllSuccess": "Wszystkie sesje unieważnione"
+    "revokeAllSuccess": "Wszystkie sesje unieważnione",
+    "spectatorActionsDesc": "Pozwala wyeliminowanym graczom wydawać energię na ściany, meteory, ulepszenia i strefy prędkości (pokoje nadal mogą to wyłączyć na mecz)",
+    "spectatorActionsToggled": "Mistrz gry dla widzów: {{status}}",
+    "spectatorActionsGlobal": "Mistrz gry dla widzów (globalnie)"
   },
   "seasons": {
     "sectionTitle": "Zarządzanie sezonami",

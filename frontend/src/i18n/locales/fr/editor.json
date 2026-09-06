@@ -1,7 +1,7 @@
 {
   "title": {
-    "mapEditor": "\u00c9diteur de carte",
-    "levelEditor": "\u00c9diteur de niveau"
+    "mapEditor": "Éditeur de carte",
+    "levelEditor": "Éditeur de niveau"
   },
   "tools": {
     "tiles": "Tuiles",
@@ -12,21 +12,21 @@
     "exit": "Sortie",
     "goal": "Objectif",
     "eraser": "Gomme",
-    "mechanics": "M\u00e9caniques",
-    "teleporterA": "T\u00e9l\u00e9porteur A",
-    "teleporterB": "T\u00e9l\u00e9porteur B",
-    "conveyorUp": "Convoyeur \u2191",
-    "conveyorDown": "Convoyeur \u2193",
-    "conveyorLeft": "Convoyeur \u2190",
-    "conveyorRight": "Convoyeur \u2192",
+    "mechanics": "Mécaniques",
+    "teleporterA": "Téléporteur A",
+    "teleporterB": "Téléporteur B",
+    "conveyorUp": "Convoyeur ↑",
+    "conveyorDown": "Convoyeur ↓",
+    "conveyorLeft": "Convoyeur ←",
+    "conveyorRight": "Convoyeur →",
     "puzzle": "Puzzle",
     "switch": "Interrupteur",
     "gate": "Porte",
     "crumblingFloor": "Sol friable",
-    "themeHazards": "Dangers du th\u00e8me",
-    "noHazardsTheme": "Pas de tuiles dangereuses pour ce th\u00e8me",
+    "themeHazards": "Dangers du thème",
+    "noHazardsTheme": "Pas de tuiles dangereuses pour ce thème",
     "noHazardsAvailable": "Aucune tuile dangereuse disponible",
-    "showAllThemes": "Afficher tous les th\u00e8mes",
+    "showAllThemes": "Afficher tous les thèmes",
     "enemies": "Ennemis",
     "powerUps": "Bonus",
     "variants": {
@@ -40,15 +40,15 @@
       "speed_up": "vitesse +",
       "shield": "bouclier",
       "kick": "coup de pied",
-      "pierce_bomb": "bombe per\u00e7ante",
-      "remote_bomb": "bombe t\u00e9l\u00e9command\u00e9e",
+      "pierce_bomb": "bombe perçante",
+      "remote_bomb": "bombe télécommandée",
       "line_bomb": "bombe en ligne",
       "bomb_throw": "lancer bombe"
     }
   },
   "settings": {
-    "mapSettings": "Param\u00e8tres de la carte",
-    "levelSettings": "Param\u00e8tres du niveau",
+    "mapSettings": "Paramètres de la carte",
+    "levelSettings": "Paramètres du niveau",
     "width": "Largeur",
     "height": "Hauteur",
     "dimensionHint": "Nombres impairs, 7-51",
@@ -56,8 +56,8 @@
     "description": "Description",
     "lives": "Vies",
     "timeLimit": "Limite de temps (secondes, 0=aucune)",
-    "parTime": "Temps de r\u00e9f\u00e9rence (secondes, 0=aucun)",
-    "parTimeHint": "2 \u00e9toiles si termin\u00e9 sous le temps de r\u00e9f\u00e9rence",
+    "parTime": "Temps de référence (secondes, 0=aucun)",
+    "parTimeHint": "2 étoiles si terminé sous le temps de référence",
     "winCondition": "Condition de victoire",
     "winConditions": {
       "killAll": "Tuer tous les ennemis",
@@ -65,7 +65,7 @@
       "reachGoal": "Atteindre l'objectif",
       "surviveTime": "Survivre le temps imparti"
     },
-    "published": "Publi\u00e9"
+    "published": "Publié"
   },
   "actions": {
     "save": "Enregistrer",
@@ -73,17 +73,18 @@
     "back": "Retour"
   },
   "modals": {
-    "unsavedChanges": "Modifications non enregistr\u00e9es",
-    "unsavedDescription": "Vous avez des modifications non enregistr\u00e9es. Voulez-vous les enregistrer avant de quitter ?",
+    "unsavedChanges": "Modifications non enregistrées",
+    "unsavedDescription": "Vous avez des modifications non enregistrées. Voulez-vous les enregistrer avant de quitter ?",
     "cancel": "Annuler",
     "discard": "Abandonner",
     "saveAndExit": "Enregistrer et quitter"
   },
   "toasts": {
     "needSpawns": "Il faut au moins 2 points d'apparition",
-    "mapSaved": "Carte enregistr\u00e9e !",
-    "levelSaved": "Niveau enregistr\u00e9 !",
-    "saveFailed": "\u00c9chec de l'enregistrement : {{error}}"
+    "mapSaved": "Carte enregistrée !",
+    "levelSaved": "Niveau enregistré !",
+    "saveFailed": "Échec de l'enregistrement : {{error}}",
+    "noWorld": "Impossible d'enregistrer : ce niveau n'est rattaché à aucun monde de campagne. Créez-le depuis l'onglet Campagne de l'administration."
   },
   "defaults": {
     "untitledLevel": "Niveau sans titre",

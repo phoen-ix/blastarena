@@ -1,46 +1,46 @@
 {
   "title": {
     "mapEditor": "Edytor map",
-    "levelEditor": "Edytor poziom\u00f3w"
+    "levelEditor": "Edytor poziomów"
   },
   "tools": {
     "tiles": "Kafelki",
     "empty": "Pusty",
-    "wall": "\u015aciana",
+    "wall": "Ściana",
     "destructible": "Zniszczalny",
     "spawn": "Punkt startu",
-    "exit": "Wyj\u015bcie",
+    "exit": "Wyjście",
     "goal": "Cel",
     "eraser": "Gumka",
     "mechanics": "Mechaniki",
     "teleporterA": "Teleporter A",
     "teleporterB": "Teleporter B",
-    "conveyorUp": "Ta\u015bmoci\u0105g \u2191",
-    "conveyorDown": "Ta\u015bmoci\u0105g \u2193",
-    "conveyorLeft": "Ta\u015bmoci\u0105g \u2190",
-    "conveyorRight": "Ta\u015bmoci\u0105g \u2192",
-    "puzzle": "\u0141amig\u0142\u00f3wka",
-    "switch": "Prze\u0142\u0105cznik",
+    "conveyorUp": "Taśmociąg ↑",
+    "conveyorDown": "Taśmociąg ↓",
+    "conveyorLeft": "Taśmociąg ←",
+    "conveyorRight": "Taśmociąg →",
+    "puzzle": "Łamigłówka",
+    "switch": "Przełącznik",
     "gate": "Brama",
     "crumblingFloor": "Kruszywo",
-    "themeHazards": "Zagro\u017cenia motywu",
-    "noHazardsTheme": "Brak kafelk\u00f3w zagro\u017ce\u0144 dla tego motywu",
-    "noHazardsAvailable": "Brak dost\u0119pnych kafelk\u00f3w zagro\u017ce\u0144",
-    "showAllThemes": "Poka\u017c wszystkie motywy",
+    "themeHazards": "Zagrożenia motywu",
+    "noHazardsTheme": "Brak kafelków zagrożeń dla tego motywu",
+    "noHazardsAvailable": "Brak dostępnych kafelków zagrożeń",
+    "showAllThemes": "Pokaż wszystkie motywy",
     "enemies": "Wrogowie",
     "powerUps": "Bonusy",
     "variants": {
-      "toggle": "Prze\u0142\u0105cznik",
+      "toggle": "Przełącznik",
       "pressure": "Naciskowy",
       "oneshot": "Jednorazowy"
     },
     "powerUpNames": {
       "bomb_up": "bomba+",
-      "fire_up": "ogie\u0144+",
-      "speed_up": "szybko\u015b\u0107+",
+      "fire_up": "ogień+",
+      "speed_up": "szybkość+",
       "shield": "tarcza",
-      "kick": "kopni\u0119cie",
-      "pierce_bomb": "bomba przebijaj\u0105ca",
+      "kick": "kopnięcie",
+      "pierce_bomb": "bomba przebijająca",
       "remote_bomb": "bomba zdalna",
       "line_bomb": "bomba liniowa",
       "bomb_throw": "rzut bombą"
@@ -49,21 +49,21 @@
   "settings": {
     "mapSettings": "Ustawienia mapy",
     "levelSettings": "Ustawienia poziomu",
-    "width": "Szeroko\u015b\u0107",
-    "height": "Wysoko\u015b\u0107",
+    "width": "Szerokość",
+    "height": "Wysokość",
     "dimensionHint": "Liczby nieparzyste, 7-51",
     "name": "Nazwa",
     "description": "Opis",
-    "lives": "\u017bycia",
+    "lives": "Życia",
     "timeLimit": "Limit czasu (sekundy, 0=brak)",
     "parTime": "Czas wzorcowy (sekundy, 0=brak)",
-    "parTimeHint": "2 gwiazdki za uko\u0144czenie poni\u017cej czasu wzorcowego",
-    "winCondition": "Warunek zwyci\u0119stwa",
+    "parTimeHint": "2 gwiazdki za ukończenie poniżej czasu wzorcowego",
+    "winCondition": "Warunek zwycięstwa",
     "winConditions": {
-      "killAll": "Pokonaj wszystkich wrog\u00f3w",
-      "findExit": "Znajd\u017a wyj\u015bcie",
-      "reachGoal": "Osi\u0105gnij cel",
-      "surviveTime": "Przetrwaj okre\u015blony czas"
+      "killAll": "Pokonaj wszystkich wrogów",
+      "findExit": "Znajdź wyjście",
+      "reachGoal": "Osiągnij cel",
+      "surviveTime": "Przetrwaj określony czas"
     },
     "published": "Opublikowana"
   },
@@ -74,19 +74,20 @@
   },
   "modals": {
     "unsavedChanges": "Niezapisane zmiany",
-    "unsavedDescription": "Masz niezapisane zmiany. Czy chcesz zapisa\u0107 przed wyj\u015bciem?",
+    "unsavedDescription": "Masz niezapisane zmiany. Czy chcesz zapisać przed wyjściem?",
     "cancel": "Anuluj",
-    "discard": "Odrzu\u0107",
-    "saveAndExit": "Zapisz i wyjd\u017a"
+    "discard": "Odrzuć",
+    "saveAndExit": "Zapisz i wyjdź"
   },
   "toasts": {
-    "needSpawns": "Potrzeba co najmniej 2 punkt\u00f3w startu",
+    "needSpawns": "Potrzeba co najmniej 2 punktów startu",
     "mapSaved": "Mapa zapisana!",
     "levelSaved": "Poziom zapisany!",
-    "saveFailed": "Zapis nie powi\u00f3d\u0142 si\u0119: {{error}}"
+    "saveFailed": "Zapis nie powiódł się: {{error}}",
+    "noWorld": "Nie można zapisać: ten poziom nie należy do żadnego świata kampanii. Utwórz go w zakładce Kampania w panelu administracyjnym."
   },
   "defaults": {
-    "untitledLevel": "Poziom bez tytu\u0142u",
-    "untitledMap": "Mapa bez tytu\u0142u"
+    "untitledLevel": "Poziom bez tytułu",
+    "untitledMap": "Mapa bez tytułu"
   }
 }

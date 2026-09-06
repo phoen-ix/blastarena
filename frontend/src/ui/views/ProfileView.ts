@@ -1,6 +1,6 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
-import { escapeHtml, setHtml } from '../../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { drawPlayerSprite, getPlayerColorHex } from '../../utils/playerCanvas';
 import { t } from '../../i18n';
 import type { PublicProfile, AchievementProgress } from '@blast-arena/shared';
@@ -232,7 +232,7 @@ export class ProfileView implements ILobbyView {
             .slice(0, 20)
             .map(
               (a) => `
-            <div class="profile-page-achievement" title="${escapeHtml(a.achievement.description)}">
+            <div class="profile-page-achievement" title="${escapeAttr(a.achievement.description)}">
               <span class="profile-page-achievement-icon">${a.achievement.icon || '\u2B50'}</span>
               <span class="profile-page-achievement-name">${escapeHtml(a.achievement.name)}</span>
             </div>
@@ -271,7 +271,7 @@ export class ProfileView implements ILobbyView {
   private renderActions(p: PublicProfile): string {
     return `
       <div class="profile-page-section">
-        <button class="btn btn-primary profile-page-add-friend" data-user-id="${p.id}" data-username="${escapeHtml(p.username)}">
+        <button class="btn btn-primary profile-page-add-friend" data-user-id="${p.id}" data-username="${escapeAttr(p.username)}">
           ${t('ui:profile.addFriend')}
         </button>
       </div>
@@ -316,7 +316,7 @@ export class ProfileView implements ILobbyView {
               .map((p) => {
                 const pctVal = Math.min(100, Math.round((p.current / p.threshold) * 100));
                 return `
-                <div class="profile-page-progress-item" title="${escapeHtml(p.description)}">
+                <div class="profile-page-progress-item" title="${escapeAttr(p.description)}">
                   <div class="profile-page-progress-header">
                     <span>${p.icon || '\u2B50'}</span>
                     <span class="profile-page-progress-name">${escapeHtml(p.name)}</span>

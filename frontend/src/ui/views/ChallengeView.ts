@@ -12,14 +12,12 @@ export class ChallengeView implements ILobbyView {
   }
 
   private deps: ViewDeps;
-  private container: HTMLElement | null = null;
 
   constructor(deps: ViewDeps) {
     this.deps = deps;
   }
 
   async render(container: HTMLElement): Promise<void> {
-    this.container = container;
     setHtml(
       container,
       `<div class="panel-content" style="padding:1rem;"><p style="color:var(--text-muted);">${t('ui:challenge.loading')}</p></div>`,
@@ -154,6 +152,6 @@ export class ChallengeView implements ILobbyView {
   }
 
   destroy(): void {
-    this.container = null;
+    // Nothing held between renders: no listeners on the shared container, no timers. (audit G4)
   }
 }

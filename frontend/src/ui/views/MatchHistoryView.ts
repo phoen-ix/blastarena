@@ -37,14 +37,12 @@ export class MatchHistoryView implements ILobbyView {
     return t('ui:matchHistory.title');
   }
 
-  private deps: ViewDeps;
   private container: HTMLElement | null = null;
   private page = 1;
-  private total = 0;
 
-  constructor(deps: ViewDeps) {
-    this.deps = deps;
-  }
+  // `deps` is part of the ILobbyView construction contract (LobbyUI.createView) but nothing in
+  // this view reads it — it was stored, along with a `total` field, and never used. (audit G4)
+  constructor(_deps: ViewDeps) {}
 
   async render(container: HTMLElement): Promise<void> {
     this.container = container;
@@ -68,7 +66,6 @@ export class MatchHistoryView implements ILobbyView {
       const data = await ApiClient.get<MatchHistoryResponse>(
         `/user/matches?page=${this.page}&limit=20`,
       );
-      this.total = data.total;
       this.renderMatches(data);
     } catch {
       setHtml(

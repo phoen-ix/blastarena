@@ -19,7 +19,8 @@
     "expand": "Zijbalk uitklappen",
     "collapse": "Zijbalk inklappen",
     "viewProfile": "Profiel bekijken",
-    "openWorld": "Open wereld"
+    "openWorld": "Open wereld",
+    "level": "Lvl {{level}}"
   },
   "rooms": {
     "title": "Beschikbare kamers",
@@ -111,7 +112,6 @@
       "cosmetics": "Cosmetica"
     },
     "privacy": {
-      "title": "Privacy",
       "settingsTitle": "Privacy-instellingen",
       "publicProfile": "Openbaar profiel",
       "publicProfileDesc": "Sta andere spelers toe je stats, rang en prestaties te bekijken",
@@ -120,7 +120,6 @@
       "saved": "Opgeslagen!"
     },
     "account": {
-      "title": "Accountinstellingen",
       "profile": "Profiel",
       "username": "Gebruikersnaam",
       "usernameHint": "Letters, cijfers, underscores, koppeltekens. 3-20 tekens.",
@@ -134,11 +133,9 @@
       "unverified": "niet geverifieerd",
       "pendingChange": "Lopende wijziging naar",
       "pendingHint": "controleer die inbox voor de bevestigingslink.",
-      "cancel": "Annuleren",
       "pendingCancelled": "Lopende e-mailwijziging geannuleerd",
       "newEmailPlaceholder": "Nieuw e-mailadres",
       "emailEmpty": "Voer een nieuw e-mailadres in.",
-      "emailSame": "Dat is al je huidige e-mailadres.",
       "sendConfirmation": "Bevestiging versturen",
       "changeEmail": "E-mail wijzigen",
       "changePassword": "Wachtwoord wijzigen",
@@ -149,7 +146,6 @@
       "passwordTooShort": "Nieuw wachtwoord moet minimaal 8 tekens bevatten.",
       "passwordMismatch": "Nieuwe wachtwoorden komen niet overeen.",
       "save": "Opslaan",
-      "close": "Sluiten",
       "dangerZone": "Gevarenzone",
       "deleteAccount": "Account verwijderen",
       "deleteWarning": "Dit verwijdert je account en alle bijbehorende gegevens permanent. Deze actie kan niet ongedaan worden gemaakt.",
@@ -285,7 +281,15 @@
     "failed": "Mislukt",
     "join": "Deelnemen",
     "msg": "Ber.",
-    "friendRequestReceived": "{{username}} heeft je een vriendschapsverzoek gestuurd"
+    "friendRequestReceived": "{{username}} heeft je een vriendschapsverzoek gestuurd",
+    "block": "Blokkeren",
+    "blocked": "{{username}} is geblokkeerd",
+    "blockFailed": "Gebruiker blokkeren mislukt",
+    "blockModal": {
+      "ariaLabel": "Gebruiker blokkeren",
+      "title": "Gebruiker blokkeren",
+      "message": "{{username}} blokkeren? Deze persoon wordt uit je vrienden verwijderd en kan je geen verzoeken of berichten meer sturen. Je kunt de blokkering opheffen via het tabblad Geblokkeerd."
+    }
   },
   "party": {
     "title": "Groep",
@@ -418,26 +422,6 @@
     "small": "Klein",
     "medium": "Middel",
     "large": "Groot",
-    "sizes": {
-      "11x11": "Klein (11×11)",
-      "15x13": "Middel (15×13)",
-      "19x15": "Groot (19×15)",
-      "21x21": "Enorm (21×21)"
-    },
-    "density": {
-      "none": "Geen (0%)",
-      "low": "Laag (15%)",
-      "normal": "Normaal (30%)",
-      "high": "Hoog (50%)",
-      "veryHigh": "Zeer hoog (80%)"
-    },
-    "powerUpRates": {
-      "none": "Geen (0%)",
-      "low": "Laag (30%)",
-      "medium": "Middel (50%)",
-      "high": "Hoog (65%)",
-      "veryHigh": "Zeer hoog (80%)"
-    },
     "difficulty": {
       "easy": "Makkelijk",
       "normal": "Normaal",
@@ -553,7 +537,12 @@
     "remoteMode": {
       "all": "ALLES",
       "fifo": "1ste"
-    }
+    },
+    "buddyTag": "[BUDDY]",
+    "coopDead": "(dood)",
+    "coopReady": "(klaar)",
+    "coopRespawnIn": "({{seconds}}s)",
+    "adminMessageFrom": "Bericht van {{from}}"
   },
   "room": {
     "back": "← Terug",
@@ -597,13 +586,18 @@
       "tnt": "TNT",
       "dynamite": "Dynamiet",
       "sparky": "Sparky"
-    }
+    },
+    "adminMessageFrom": "Bericht van {{from}}"
   },
   "game": {
     "leaveTitle": "SPEL VERLATEN",
     "leaveWarning": "Je gaat dood en verliest alle voortgang.",
     "leaveConfirm": "Spel verlaten",
-    "leaveCancel": "Annuleren"
+    "leaveCancel": "Annuleren",
+    "pausedTitle": "GEPAUZEERD",
+    "pauseContinue": "Doorgaan",
+    "pauseRestartLevel": "Level opnieuw starten",
+    "pauseExitLevel": "Level verlaten"
   },
   "gameOver": {
     "gameWord": "GAME",
@@ -635,7 +629,8 @@
   },
   "lobbyChat": {
     "empty": "Nog geen berichten",
-    "ariaLabel": "Lobbychatbericht"
+    "ariaLabel": "Lobbychatbericht",
+    "title": "Lobbychat"
   },
   "replay": {
     "back": "Terug",
@@ -669,5 +664,31 @@
     "roundEnd": "Ronde voorbij",
     "roundStart": "Nieuwe ronde start",
     "nextRound": "Volgende ronde over {{seconds}}s"
+  },
+  "replayLog": {
+    "filters": {
+      "kills": "Kills",
+      "bombs": "Bommen",
+      "bot": "Bot-AI",
+      "powerups": "Power-ups",
+      "movement": "Beweging",
+      "explosions": "Explosies",
+      "players": "Vertrek/Verb."
+    },
+    "selfDestructed": "{{victim}} heeft zichzelf opgeblazen",
+    "killed": "{{killer}} heeft {{victim}} uitgeschakeld",
+    "bombPlaced": "{{owner}} plaatste een bom op ({{x}},{{y}})",
+    "bombDetonated": "Bom van {{owner}} ontplofte op ({{x}},{{y}})",
+    "botDecision": "{{bot}}: {{decision}}",
+    "moved": "{{player}} bewoog {{direction}} naar ({{x}},{{y}})",
+    "pickedUp": "{{player}} pakte {{type}} op",
+    "explosion": "Explosie van {{owner}}: {{cells}} vakken, {{walls}} muren",
+    "left": "{{player}} heeft het spel verlaten",
+    "disconnected": "{{player}} is losgekoppeld",
+    "disconnectKilled": "{{player}} uitgeschakeld (verbindingstime-out)",
+    "gameOver": "Spel afgelopen"
+  },
+  "connection": {
+    "reconnecting": "Opnieuw verbinden met server..."
   }
 }

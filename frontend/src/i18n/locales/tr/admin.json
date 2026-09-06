@@ -597,7 +597,10 @@
     "revokeAllConfirmPrompt": "Devam etmek için CONFIRM yazın:",
     "revokeAllCancel": "İptal",
     "revokeAllConfirm": "Tümünü İptal Et",
-    "revokeAllSuccess": "Tüm oturumlar iptal edildi"
+    "revokeAllSuccess": "Tüm oturumlar iptal edildi",
+    "spectatorActionsDesc": "Elenen oyuncuların duvar, meteor, güçlendirme ve hız bölgelerine enerji harcamasına izin verir (odalar bunu maç bazında yine de kapatabilir)",
+    "spectatorActionsToggled": "İzleyici Oyun Yöneticisi {{status}}",
+    "spectatorActionsGlobal": "İzleyici Oyun Yöneticisi (genel)"
   },
   "seasons": {
     "sectionTitle": "Sezon Yonetimi",

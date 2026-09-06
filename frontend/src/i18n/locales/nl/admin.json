@@ -597,7 +597,10 @@
     "revokeAllConfirmPrompt": "Typ CONFIRM om door te gaan:",
     "revokeAllCancel": "Annuleren",
     "revokeAllConfirm": "Alles intrekken",
-    "revokeAllSuccess": "Alle sessies ingetrokken"
+    "revokeAllSuccess": "Alle sessies ingetrokken",
+    "spectatorActionsDesc": "Laat uitgeschakelde spelers energie besteden aan muren, meteoren, power-ups en snelheidszones (kamers kunnen het per wedstrijd nog uitschakelen)",
+    "spectatorActionsToggled": "Toeschouwer-spelleider {{status}}",
+    "spectatorActionsGlobal": "Toeschouwer-spelleider (globaal)"
   },
   "seasons": {
     "sectionTitle": "Seizoensbeheer",

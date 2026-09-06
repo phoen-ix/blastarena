@@ -1,15 +1,7 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
-import {
-  RoomListItem,
-  Room,
-  GameDefaults,
-  BotAIEntry,
-  CustomMapSummary,
-  getErrorMessage,
-} from '@blast-arena/shared';
+import { RoomListItem, Room, getErrorMessage } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
-import { showCreateRoomModal } from '../modals/CreateRoomModal';
 import { t } from '../../i18n';
 
 /** Active banner row returned by GET /admin/announcements/banner (null when no banner). */
@@ -170,72 +162,5 @@ export class RoomsView implements ILobbyView {
     } catch {
       // No banner — ignore
     }
-  }
-
-  private async showCreateRoomModal(): Promise<void> {
-    let recordingsEnabled = false;
-    let gameDefaults: GameDefaults = {};
-    let activeAIs: BotAIEntry[] = [];
-    let customMaps: CustomMapSummary[] = [];
-    try {
-      const [recResp, defResp, aiResp, myMapsResp, pubMapsResp] = await Promise.all([
-        ApiClient.get<{ enabled: boolean }>('/admin/settings/recordings_enabled'),
-        ApiClient.get<{ defaults: GameDefaults }>('/admin/settings/game_defaults'),
-        ApiClient.get<{ ais: BotAIEntry[] }>('/admin/ai/active'),
-        ApiClient.get<{ maps: CustomMapSummary[] }>('/maps/mine').catch(() => ({ maps: [] })),
-        ApiClient.get<{ maps: CustomMapSummary[] }>('/maps/published').catch(() => ({ maps: [] })),
-      ]);
-      recordingsEnabled = recResp.enabled;
-      gameDefaults = defResp.defaults ?? {};
-      activeAIs = aiResp.ais ?? [];
-      // Merge and deduplicate
-      const myIds = new Set((myMapsResp.maps ?? []).map((m) => m.id));
-      customMaps = [
-        ...(myMapsResp.maps ?? []),
-        ...(pubMapsResp.maps ?? []).filter((m) => !myIds.has(m.id)),
-      ];
-    } catch {
-      // defaults
-    }
-    showCreateRoomModal({
-      socketClient: this.deps.socketClient,
-      notifications: this.deps.notifications,
-      onRoomCreated: (room) => this.onJoinRoom(room),
-      generateRoomName: () => this.generateRoomName(),
-      recordingsEnabled,
-      gameDefaults,
-      activeAIs,
-      customMaps,
-    });
-  }
-
-  private generateRoomName(): string {
-    const adjectives = [
-      'Explosive',
-      'Chaotic',
-      'Blazing',
-      'Fiery',
-      'Reckless',
-      'Volatile',
-      'Scorched',
-      'Molten',
-      'Infernal',
-      'Savage',
-    ];
-    const nouns = [
-      'Arena',
-      'Warzone',
-      'Blitz',
-      'Showdown',
-      'Brawl',
-      'Mayhem',
-      'Rumble',
-      'Frenzy',
-      'Clash',
-      'Carnage',
-    ];
-    const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
-    const noun = nouns[Math.floor(Math.random() * nouns.length)];
-    return `${adj} ${noun}`;
   }
 }

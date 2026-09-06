@@ -1488,6 +1488,107 @@
       color: var(--text);
     }
 
+    /* Admin "message room" banner — waiting room (RoomUI). (audit G7b) */
+    .room-admin-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 12px 24px 0;
+      padding: 12px 18px;
+      background: var(--bg-surface);
+      border: 1px solid var(--primary);
+      border-radius: var(--radius);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      font-size: 14px;
+      color: var(--text);
+      animation: modalIn 0.2s ease;
+    }
+
+    .room-admin-banner-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .room-admin-banner-from {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+
+    .room-admin-banner-text {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-height: 1.4;
+    }
+
+    .room-admin-banner .banner-close,
+    .hud-admin-banner .banner-close,
+    .hud-admin-banner .hud-admin-banner-close {
+      flex-shrink: 0;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 18px;
+      line-height: 1;
+      background: none;
+      border: none;
+      padding: 0 4px;
+      transition: color var(--transition);
+    }
+
+    .room-admin-banner .banner-close:hover,
+    .hud-admin-banner .banner-close:hover,
+    .hud-admin-banner .hud-admin-banner-close:hover {
+      color: var(--text);
+    }
+
+    /* Admin "message room" banner — in game, mounted inside the HUD overlay (HUDScene). Sits
+       below the HUD's top bar; the game canvas has no other fixed chrome at that height. */
+    .hud-admin-banner {
+      position: fixed;
+      top: 72px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      max-width: min(640px, calc(100vw - 32px));
+      padding: 12px 18px;
+      background: var(--bg-surface);
+      border: 1px solid var(--primary);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      font-size: 14px;
+      color: var(--text);
+      pointer-events: auto;
+      z-index: 120;
+      animation: modalIn 0.2s ease;
+    }
+
+    .hud-admin-banner-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .hud-admin-banner-from {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+
+    .hud-admin-banner-text {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-height: 1.4;
+    }
+
     /* ============ HUD ============ */
     .hud-container {
       position: absolute;
@@ -2412,50 +2513,6 @@
       color: #fff;
     }
 
-    .level-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 12px;
-      border-radius: 6px;
-      transition: background 0.15s;
-    }
-    .level-row:hover {
-      background: var(--bg-hover);
-    }
-    .level-row.locked {
-      opacity: 0.4;
-      pointer-events: none;
-    }
-    .level-stars {
-      color: #ffdd44;
-      font-size: 16px;
-      min-width: 60px;
-    }
-    .level-name {
-      font-weight: 600;
-      flex: 1;
-    }
-    .level-meta {
-      font-size: 12px;
-      color: var(--text-dim);
-      margin-left: 12px;
-    }
-    .level-start-btn {
-      padding: 4px 16px;
-      background: var(--primary);
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      font-family: 'Chakra Petch', sans-serif;
-      font-weight: 700;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .level-start-btn:hover {
-      filter: brightness(1.15);
-    }
-
     .friends-empty {
       text-align: center;
       padding: 30px 16px;
@@ -3335,28 +3392,6 @@
     .sidebar.collapsed .sidebar-nav-item {
       justify-content: center;
       padding: 10px 0;
-    }
-
-    .sidebar-nav-item .nav-badge {
-      margin-left: auto;
-      background: var(--danger);
-      color: #fff;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 1px 6px;
-      border-radius: 10px;
-      min-width: 18px;
-      text-align: center;
-    }
-
-    .sidebar.collapsed .nav-badge {
-      position: absolute;
-      top: 2px;
-      right: 2px;
-      margin-left: 0;
-      padding: 0 4px;
-      font-size: 9px;
-      min-width: 14px;
     }
 
     .sidebar.collapsed .sidebar-nav-item {

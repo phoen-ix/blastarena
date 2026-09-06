@@ -19,7 +19,8 @@
     "expand": "Kenar cubugunu genislet",
     "collapse": "Kenar cubugunu daralt",
     "viewProfile": "Profili goruntule",
-    "openWorld": "Açık Dünya"
+    "openWorld": "Açık Dünya",
+    "level": "Sv. {{level}}"
   },
   "rooms": {
     "title": "Mevcut Odalar",
@@ -111,7 +112,6 @@
       "cosmetics": "Kozmetikler"
     },
     "privacy": {
-      "title": "Gizlilik",
       "settingsTitle": "Gizlilik Ayarlari",
       "publicProfile": "Herkese Acik Profil",
       "publicProfileDesc": "Diger oyuncularin istatistiklerinizi, derecenizi ve basarimlarinizi goruntulemesine izin verin",
@@ -120,7 +120,6 @@
       "saved": "Kaydedildi!"
     },
     "account": {
-      "title": "Hesap Ayarlari",
       "profile": "Profil",
       "username": "Kullanici Adi",
       "usernameHint": "Harfler, rakamlar, alt cizgiler, tireler. 3-20 karakter.",
@@ -134,11 +133,9 @@
       "unverified": "dogrulanmadi",
       "pendingChange": "Degisiklik bekliyor",
       "pendingHint": "onay baglantisi icin o gelen kutusunu kontrol edin.",
-      "cancel": "Iptal",
       "pendingCancelled": "Bekleyen e-posta degisikligi iptal edildi",
       "newEmailPlaceholder": "Yeni e-posta adresi",
       "emailEmpty": "Yeni bir e-posta adresi girin.",
-      "emailSame": "Bu zaten mevcut e-posta adresiniz.",
       "sendConfirmation": "Onay Gonder",
       "changeEmail": "E-postayi Degistir",
       "changePassword": "Sifreyi Degistir",
@@ -149,7 +146,6 @@
       "passwordTooShort": "Yeni sifre en az 8 karakter olmalidir.",
       "passwordMismatch": "Yeni sifreler uyusmuyor.",
       "save": "Kaydet",
-      "close": "Kapat",
       "dangerZone": "Tehlikeli Bolge",
       "deleteAccount": "Hesabi Sil",
       "deleteWarning": "Bu islem hesabinizi ve tum iliskili verileri kalici olarak silecektir. Bu islem geri alinamaz.",
@@ -285,7 +281,15 @@
     "failed": "Basarisiz",
     "join": "Katil",
     "msg": "Msj",
-    "friendRequestReceived": "{{username}} size arkadaslik istegi gonderdi"
+    "friendRequestReceived": "{{username}} size arkadaslik istegi gonderdi",
+    "block": "Engelle",
+    "blocked": "{{username}} engellendi",
+    "blockFailed": "Kullanıcı engellenemedi",
+    "blockModal": {
+      "ariaLabel": "Kullanıcıyı engelle",
+      "title": "Kullanıcıyı engelle",
+      "message": "{{username}} engellensin mi? Arkadaşlarınızdan kaldırılacak ve size artık istek veya mesaj gönderemeyecek. Engellenenler sekmesinden engeli kaldırabilirsiniz."
+    }
   },
   "party": {
     "title": "Parti",
@@ -418,26 +422,6 @@
     "small": "Kucuk",
     "medium": "Orta",
     "large": "Buyuk",
-    "sizes": {
-      "11x11": "Kucuk (11x11)",
-      "15x13": "Orta (15x13)",
-      "19x15": "Buyuk (19x15)",
-      "21x21": "Cok Buyuk (21x21)"
-    },
-    "density": {
-      "none": "Yok (%0)",
-      "low": "Dusuk (%15)",
-      "normal": "Normal (%30)",
-      "high": "Yuksek (%50)",
-      "veryHigh": "Cok Yuksek (%80)"
-    },
-    "powerUpRates": {
-      "none": "Yok (%0)",
-      "low": "Dusuk (%30)",
-      "medium": "Orta (%50)",
-      "high": "Yuksek (%65)",
-      "veryHigh": "Cok Yuksek (%80)"
-    },
     "difficulty": {
       "easy": "Kolay",
       "normal": "Normal",
@@ -553,7 +537,12 @@
     "remoteMode": {
       "all": "TUMU",
       "fifo": "1."
-    }
+    },
+    "buddyTag": "[BUDDY]",
+    "coopDead": "(öldü)",
+    "coopReady": "(hazır)",
+    "coopRespawnIn": "({{seconds}}sn)",
+    "adminMessageFrom": "{{from}} tarafından mesaj"
   },
   "room": {
     "back": "← Geri",
@@ -597,13 +586,18 @@
       "tnt": "TNT",
       "dynamite": "Dinamit",
       "sparky": "Kivilcim"
-    }
+    },
+    "adminMessageFrom": "{{from}} tarafından mesaj"
   },
   "game": {
     "leaveTitle": "OYUNDAN AYRIL",
     "leaveWarning": "Öleceksiniz ve tüm ilerlemenizi kaybedeceksiniz.",
     "leaveConfirm": "Oyundan Ayrıl",
-    "leaveCancel": "İptal"
+    "leaveCancel": "İptal",
+    "pausedTitle": "DURAKLATILDI",
+    "pauseContinue": "Devam et",
+    "pauseRestartLevel": "Bölümü yeniden başlat",
+    "pauseExitLevel": "Bölümden çık"
   },
   "gameOver": {
     "gameWord": "OYUN",
@@ -635,7 +629,8 @@
   },
   "lobbyChat": {
     "empty": "Henuz mesaj yok",
-    "ariaLabel": "Lobi sohbet mesaji"
+    "ariaLabel": "Lobi sohbet mesaji",
+    "title": "Lobi sohbeti"
   },
   "replay": {
     "back": "Geri",
@@ -669,5 +664,31 @@
     "roundEnd": "Tur Bitti",
     "roundStart": "Yeni Tur Basliyor",
     "nextRound": "Sonraki tur {{seconds}}s icinde"
+  },
+  "replayLog": {
+    "filters": {
+      "kills": "Öldürmeler",
+      "bombs": "Bombalar",
+      "bot": "Bot yapay zekâsı",
+      "powerups": "Güçlendirmeler",
+      "movement": "Hareket",
+      "explosions": "Patlamalar",
+      "players": "Ayrılma/Bağlantı"
+    },
+    "selfDestructed": "{{victim}} kendini yok etti",
+    "killed": "{{killer}}, {{victim}} oyuncusunu öldürdü",
+    "bombPlaced": "{{owner}} ({{x}},{{y}}) konumuna bomba koydu",
+    "bombDetonated": "{{owner}} bombası ({{x}},{{y}}) konumunda patladı",
+    "botDecision": "{{bot}}: {{decision}}",
+    "moved": "{{player}} {{direction}} yönünde ({{x}},{{y}}) konumuna gitti",
+    "pickedUp": "{{player}} {{type}} aldı",
+    "explosion": "{{owner}} patlaması: {{cells}} hücre, {{walls}} duvar",
+    "left": "{{player}} oyundan ayrıldı",
+    "disconnected": "{{player}} bağlantısı kesildi",
+    "disconnectKilled": "{{player}} öldürüldü (bağlantı zaman aşımı)",
+    "gameOver": "Oyun bitti"
+  },
+  "connection": {
+    "reconnecting": "Sunucuya yeniden bağlanılıyor..."
   }
 }

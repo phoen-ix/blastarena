@@ -15,7 +15,7 @@ import {
   LogVerbosity,
   BotAIEntry,
 } from '@blast-arena/shared';
-import { escapeHtml, setHtml } from '../../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { game } from '../../main';
 import { t } from '../../i18n';
@@ -205,19 +205,19 @@ export class SimulationsTab {
         <td class="sim-td-actions">
           ${
             b.status === 'queued'
-              ? `<button class="btn-warn btn-sm" data-action="dequeue" data-batch="${escapeHtml(b.batchId)}">${t('admin:simulations.actions.remove')}</button>`
+              ? `<button class="btn-warn btn-sm" data-action="dequeue" data-batch="${escapeAttr(b.batchId)}">${t('admin:simulations.actions.remove')}</button>`
               : `
-            <button class="btn btn-secondary btn-sm" data-action="view" data-batch="${escapeHtml(b.batchId)}">${t('admin:simulations.actions.view')}</button>
+            <button class="btn btn-secondary btn-sm" data-action="view" data-batch="${escapeAttr(b.batchId)}">${t('admin:simulations.actions.view')}</button>
             ${
               b.status !== 'running'
-                ? `<button class="btn-warn btn-sm" data-action="delete" data-batch="${escapeHtml(b.batchId)}">${t('admin:simulations.actions.delete')}</button>`
+                ? `<button class="btn-warn btn-sm" data-action="delete" data-batch="${escapeAttr(b.batchId)}">${t('admin:simulations.actions.delete')}</button>`
                 : ''
             }
             ${
               b.status === 'running'
                 ? `
-              ${b.config.speed === 'realtime' ? `<button class="btn btn-secondary btn-sm" data-action="spectate" data-batch="${escapeHtml(b.batchId)}">${t('admin:simulations.actions.spectate')}</button>` : ''}
-              <button class="btn-warn btn-sm" data-action="cancel" data-batch="${escapeHtml(b.batchId)}">${t('admin:simulations.actions.cancel')}</button>
+              ${b.config.speed === 'realtime' ? `<button class="btn btn-secondary btn-sm" data-action="spectate" data-batch="${escapeAttr(b.batchId)}">${t('admin:simulations.actions.spectate')}</button>` : ''}
+              <button class="btn-warn btn-sm" data-action="cancel" data-batch="${escapeAttr(b.batchId)}">${t('admin:simulations.actions.cancel')}</button>
             `
                 : ''
             }

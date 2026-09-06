@@ -19,7 +19,8 @@
     "expand": "Utvid sidepanel",
     "collapse": "Skjul sidepanel",
     "viewProfile": "Vis profil",
-    "openWorld": "Åpen verden"
+    "openWorld": "Åpen verden",
+    "level": "Nivå {{level}}"
   },
   "rooms": {
     "title": "Tilgjengelige rom",
@@ -111,7 +112,6 @@
       "cosmetics": "Kosmetikk"
     },
     "privacy": {
-      "title": "Personvern",
       "settingsTitle": "Personverninnstillinger",
       "publicProfile": "Offentlig profil",
       "publicProfileDesc": "Tillat andre spillere å se din statistikk, rang og prestasjoner",
@@ -120,7 +120,6 @@
       "saved": "Lagret!"
     },
     "account": {
-      "title": "Kontoinnstillinger",
       "profile": "Profil",
       "username": "Brukernavn",
       "usernameHint": "Bokstaver, tall, understreker, bindestreker. 3–20 tegn.",
@@ -134,11 +133,9 @@
       "unverified": "ikke verifisert",
       "pendingChange": "Ventende endring til",
       "pendingHint": "sjekk den innboksen for bekreftelseslenken.",
-      "cancel": "Avbryt",
       "pendingCancelled": "Ventende e-postendring avbrutt",
       "newEmailPlaceholder": "Ny e-postadresse",
       "emailEmpty": "Skriv inn en ny e-postadresse.",
-      "emailSame": "Det er allerede din nåværende e-post.",
       "sendConfirmation": "Send bekreftelse",
       "changeEmail": "Endre e-post",
       "changePassword": "Endre passord",
@@ -149,7 +146,6 @@
       "passwordTooShort": "Nytt passord må være minst 8 tegn.",
       "passwordMismatch": "De nye passordene stemmer ikke overens.",
       "save": "Lagre",
-      "close": "Lukk",
       "dangerZone": "Faresone",
       "deleteAccount": "Slett konto",
       "deleteWarning": "Dette vil permanent slette kontoen din og alle tilknyttede data. Denne handlingen kan ikke angres.",
@@ -285,7 +281,15 @@
     "failed": "Mislyktes",
     "join": "Bli med",
     "msg": "Mld",
-    "friendRequestReceived": "{{username}} sendte deg en venneforespørsel"
+    "friendRequestReceived": "{{username}} sendte deg en venneforespørsel",
+    "block": "Blokker",
+    "blocked": "{{username}} er blokkert",
+    "blockFailed": "Kunne ikke blokkere brukeren",
+    "blockModal": {
+      "ariaLabel": "Blokker bruker",
+      "title": "Blokker bruker",
+      "message": "Blokkere {{username}}? Personen fjernes fra vennelisten din og kan ikke lenger sende deg forespørsler eller meldinger. Du kan oppheve blokkeringen fra fanen Blokkerte."
+    }
   },
   "party": {
     "title": "Gruppe",
@@ -418,26 +422,6 @@
     "small": "Liten",
     "medium": "Medium",
     "large": "Stor",
-    "sizes": {
-      "11x11": "Liten (11×11)",
-      "15x13": "Medium (15×13)",
-      "19x15": "Stor (19×15)",
-      "21x21": "Enorm (21×21)"
-    },
-    "density": {
-      "none": "Ingen (0%)",
-      "low": "Lav (15%)",
-      "normal": "Normal (30%)",
-      "high": "Høy (50%)",
-      "veryHigh": "Veldig høy (80%)"
-    },
-    "powerUpRates": {
-      "none": "Ingen (0%)",
-      "low": "Lav (30%)",
-      "medium": "Medium (50%)",
-      "high": "Høy (65%)",
-      "veryHigh": "Veldig høy (80%)"
-    },
     "difficulty": {
       "easy": "Lett",
       "normal": "Normal",
@@ -553,7 +537,12 @@
     "remoteMode": {
       "all": "ALLE",
       "fifo": "1."
-    }
+    },
+    "buddyTag": "[BUDDY]",
+    "coopDead": "(død)",
+    "coopReady": "(klar)",
+    "coopRespawnIn": "({{seconds}}s)",
+    "adminMessageFrom": "Melding fra {{from}}"
   },
   "room": {
     "back": "← Tilbake",
@@ -597,13 +586,18 @@
       "tnt": "TNT",
       "dynamite": "Dynamitt",
       "sparky": "Gnansen"
-    }
+    },
+    "adminMessageFrom": "Melding fra {{from}}"
   },
   "game": {
     "leaveTitle": "FORLAT SPILL",
     "leaveWarning": "Du vil dø og miste all fremgang.",
     "leaveConfirm": "Forlat spillet",
-    "leaveCancel": "Avbryt"
+    "leaveCancel": "Avbryt",
+    "pausedTitle": "PAUSE",
+    "pauseContinue": "Fortsett",
+    "pauseRestartLevel": "Start nivået på nytt",
+    "pauseExitLevel": "Forlat nivået"
   },
   "gameOver": {
     "gameWord": "SPILLET",
@@ -635,7 +629,8 @@
   },
   "lobbyChat": {
     "empty": "Ingen meldinger ennå",
-    "ariaLabel": "Lobbychatmelding"
+    "ariaLabel": "Lobbychatmelding",
+    "title": "Lobbychat"
   },
   "replay": {
     "back": "Tilbake",
@@ -669,5 +664,31 @@
     "roundEnd": "Runden er over",
     "roundStart": "Ny runde starter",
     "nextRound": "Neste runde om {{seconds}}s"
+  },
+  "replayLog": {
+    "filters": {
+      "kills": "Drap",
+      "bombs": "Bomber",
+      "bot": "Bot-AI",
+      "powerups": "Power-ups",
+      "movement": "Bevegelse",
+      "explosions": "Eksplosjoner",
+      "players": "Forlot/Frakoblet"
+    },
+    "selfDestructed": "{{victim}} sprengte seg selv",
+    "killed": "{{killer}} eliminerte {{victim}}",
+    "bombPlaced": "{{owner}} la bombe på ({{x}},{{y}})",
+    "bombDetonated": "Bomben til {{owner}} eksploderte på ({{x}},{{y}})",
+    "botDecision": "{{bot}}: {{decision}}",
+    "moved": "{{player}} flyttet {{direction}} til ({{x}},{{y}})",
+    "pickedUp": "{{player}} plukket opp {{type}}",
+    "explosion": "Eksplosjon fra {{owner}}: {{cells}} ruter, {{walls}} vegger",
+    "left": "{{player}} forlot spillet",
+    "disconnected": "{{player}} koblet fra",
+    "disconnectKilled": "{{player}} eliminert (tidsavbrudd for frakobling)",
+    "gameOver": "Spillet er over"
+  },
+  "connection": {
+    "reconnecting": "Kobler til serveren på nytt..."
   }
 }

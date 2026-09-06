@@ -2,8 +2,10 @@ import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
 import { CustomMapSummary, Position, TileType } from '@blast-arena/shared';
 import { escapeHtml, setHtml } from '../../utils/html';
+import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
 import { game } from '../../main';
+import { ensureLevelEditorScene } from '../../scenes/levelEditorLoader';
 
 export class MapsView implements ILobbyView {
   readonly viewId = 'maps';
@@ -14,6 +16,11 @@ export class MapsView implements ILobbyView {
   private deps: ViewDeps;
   private container: HTMLElement | null = null;
   private maps: CustomMapSummary[] = [];
+  // Delegated click handler, bound once per render() on the persistent `.main-body` and removed
+  // in destroy(). Binding it inside renderContent() stacked one copy per re-render — after two
+  // publishes a single Delete click ran three times. (audit C2)
+  private clickHandler: ((e: Event) => void) | null = null;
+  private boundContainer: HTMLElement | null = null;
 
   constructor(deps: ViewDeps) {
     this.deps = deps;
@@ -25,12 +32,22 @@ export class MapsView implements ILobbyView {
 
   async render(container: HTMLElement): Promise<void> {
     this.container = container;
+    this.bindEvents();
     await this.loadMaps();
     this.renderContent();
   }
 
   destroy(): void {
+    this.unbindEvents();
     this.container = null;
+  }
+
+  private unbindEvents(): void {
+    if (this.boundContainer && this.clickHandler) {
+      this.boundContainer.removeEventListener('click', this.clickHandler);
+    }
+    this.boundContainer = null;
+    this.clickHandler = null;
   }
 
   private async loadMaps(): Promise<void> {
@@ -58,7 +75,7 @@ export class MapsView implements ILobbyView {
       `,
       );
       this.container.querySelector('#empty-create-map')?.addEventListener('click', () => {
-        this.launchEditor(null);
+        void this.launchEditor(null);
       });
       return;
     }
@@ -100,20 +117,20 @@ export class MapsView implements ILobbyView {
       </table>
     `,
     );
-
-    this.bindEvents();
   }
 
   private bindEvents(): void {
-    if (!this.container) return;
+    if (!this.container || this.boundContainer === this.container) return;
+    this.unbindEvents();
+    this.boundContainer = this.container;
 
     // Event delegation
-    this.container.addEventListener('click', async (e) => {
+    this.clickHandler = async (e: Event) => {
       const target = e.target as HTMLElement;
 
       if (target.classList.contains('map-edit')) {
         const id = parseInt(target.dataset.id!, 10);
-        this.launchEditor(id);
+        void this.launchEditor(id);
         return;
       }
 
@@ -126,15 +143,18 @@ export class MapsView implements ILobbyView {
 
       if (target.dataset.action === 'delete') {
         const id = parseInt(target.dataset.id!, 10);
-        await this.deleteMap(id);
+        this.deleteMap(id);
         return;
       }
-    });
+    };
+    this.container.addEventListener('click', this.clickHandler);
   }
 
-  private launchEditor(mapId: number | null): void {
+  private async launchEditor(mapId: number | null): Promise<void> {
     game.registry.set('editorMode', 'custom_map');
     game.registry.set('customMapId', mapId);
+    // The editor scene is a lazy chunk, added to the game on first use. (audit F9)
+    await ensureLevelEditorScene(game);
     const lobbyScene = game.scene.getScene('LobbyScene');
     if (lobbyScene) lobbyScene.scene.start('LevelEditorScene');
   }
@@ -175,19 +195,39 @@ export class MapsView implements ILobbyView {
     }
   }
 
-  private async deleteMap(id: number): Promise<void> {
+  private deleteMap(id: number): void {
     const map = this.maps.find((m) => m.id === id);
     if (!map) return;
 
-    if (!confirm(t('ui:maps.confirmDeleteNamed', { name: map.name }))) return;
-
-    try {
-      await ApiClient.delete(`/maps/${id}`);
-      this.deps.notifications.success(t('ui:maps.mapDeleted'));
-      await this.loadMaps();
-      this.renderContent();
-    } catch (err) {
-      this.deps.notifications.error(t('ui:maps.failedDelete', { error: (err as Error).message }));
-    }
+    // In-app confirmation instead of the native confirm(): focus-trapped, Escape closes, and it
+    // renders in the app's theme like every other modal. (audit G12)
+    const { overlay, content, close } = createModal({
+      ariaLabel: t('ui:maps.delete'),
+      style: 'max-width:420px;',
+      parent: document.getElementById('ui-overlay') ?? document.body,
+    });
+    setHtml(
+      content,
+      `
+      <h2 class="text-danger">${t('ui:maps.delete')}</h2>
+      <p class="modal-desc">${escapeHtml(t('ui:maps.confirmDeleteNamed', { name: map.name }))}</p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="map-delete-cancel">${t('common:actions.cancel')}</button>
+        <button class="btn btn-danger" id="map-delete-confirm">${t('common:actions.delete')}</button>
+      </div>
+    `,
+    );
+    overlay.querySelector('#map-delete-cancel')!.addEventListener('click', close);
+    overlay.querySelector('#map-delete-confirm')!.addEventListener('click', async () => {
+      close();
+      try {
+        await ApiClient.delete(`/maps/${id}`);
+        this.deps.notifications.success(t('ui:maps.mapDeleted'));
+        await this.loadMaps();
+        this.renderContent();
+      } catch (err) {
+        this.deps.notifications.error(t('ui:maps.failedDelete', { error: (err as Error).message }));
+      }
+    });
   }
 }

@@ -15,10 +15,10 @@
     "mechanics": "Mekanikler",
     "teleporterA": "Isinlayici A",
     "teleporterB": "Isinlayici B",
-    "conveyorUp": "Konveyor \u2191",
-    "conveyorDown": "Konveyor \u2193",
-    "conveyorLeft": "Konveyor \u2190",
-    "conveyorRight": "Konveyor \u2192",
+    "conveyorUp": "Konveyor ↑",
+    "conveyorDown": "Konveyor ↓",
+    "conveyorLeft": "Konveyor ←",
+    "conveyorRight": "Konveyor →",
     "puzzle": "Bulmaca",
     "switch": "Anahtar",
     "gate": "Kapi",
@@ -83,7 +83,8 @@
     "needSpawns": "En az 2 dogma noktasi gerekli",
     "mapSaved": "Harita kaydedildi!",
     "levelSaved": "Bolum kaydedildi!",
-    "saveFailed": "Kaydetme basarisiz: {{error}}"
+    "saveFailed": "Kaydetme basarisiz: {{error}}",
+    "noWorld": "Kaydedilemiyor: bu bölüm bir kampanya dünyasına bağlı değil. Yönetim panelindeki Kampanya sekmesinden oluşturun."
   },
   "defaults": {
     "untitledLevel": "Isimsiz Bolum",

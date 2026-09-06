@@ -597,7 +597,10 @@
     "revokeAllConfirmPrompt": "Skriv CONFIRM för att fortsätta:",
     "revokeAllCancel": "Avbryt",
     "revokeAllConfirm": "Återkalla alla",
-    "revokeAllSuccess": "Alla sessioner återkallade"
+    "revokeAllSuccess": "Alla sessioner återkallade",
+    "spectatorActionsDesc": "Låt utslagna spelare spendera energi på väggar, meteorer, power-ups och hastighetszoner (rum kan fortfarande stänga av det per match)",
+    "spectatorActionsToggled": "Åskådar-spelledare {{status}}",
+    "spectatorActionsGlobal": "Åskådar-spelledare (globalt)"
   },
   "seasons": {
     "sectionTitle": "Säsongshantering",

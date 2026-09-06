@@ -1,7 +1,7 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
 import { DirectMessage, DMConversation, ChatMode, DM_MAX_LENGTH } from '@blast-arena/shared';
-import { escapeHtml, setHtml } from '../../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 export class MessagesView implements ILobbyView {
@@ -25,6 +25,12 @@ export class MessagesView implements ILobbyView {
   private dmReceiveHandler: (message: DirectMessage) => void;
   private dmReadHandler: (data: { fromUserId: number; readAt: string }) => void;
   private settingsChangedHandler: (data: { key: string; value?: unknown }) => void;
+
+  // Delegated DOM handlers on the persistent `.main-body`, removed in destroy(). Without that,
+  // every visit to this view added another copy: Enter in the input sent the DM N times. (audit C2)
+  private clickHandler: ((e: Event) => void) | null = null;
+  private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
+  private boundContainer: HTMLElement | null = null;
 
   constructor(deps: ViewDeps, options?: Record<string, unknown>) {
     this.deps = deps;
@@ -69,10 +75,12 @@ export class MessagesView implements ILobbyView {
 
   /** Set up delegated event handlers once — survive innerHTML rebuilds */
   private setupDelegatedListeners(): void {
-    if (!this.container) return;
+    if (!this.container || this.boundContainer === this.container) return;
+    this.unbindDelegatedListeners();
+    this.boundContainer = this.container;
 
     // Conversation list clicks
-    this.container.addEventListener('click', (e) => {
+    this.clickHandler = (e: Event) => {
       const convItem = (e.target as HTMLElement).closest(
         '.messages-conv-item',
       ) as HTMLElement | null;
@@ -88,15 +96,29 @@ export class MessagesView implements ILobbyView {
       if (sendBtn) {
         this.sendMessage();
       }
-    });
+    };
+    this.container.addEventListener('click', this.clickHandler);
 
     // Enter key in message input
-    this.container.addEventListener('keydown', (e) => {
+    this.keydownHandler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.matches('[data-msg-input]') && e.key === 'Enter') {
         this.sendMessage();
       }
-    });
+    };
+    this.container.addEventListener('keydown', this.keydownHandler);
+  }
+
+  private unbindDelegatedListeners(): void {
+    if (this.boundContainer) {
+      if (this.clickHandler) this.boundContainer.removeEventListener('click', this.clickHandler);
+      if (this.keydownHandler) {
+        this.boundContainer.removeEventListener('keydown', this.keydownHandler);
+      }
+    }
+    this.boundContainer = null;
+    this.clickHandler = null;
+    this.keydownHandler = null;
   }
 
   private sendMessage(): void {
@@ -128,6 +150,7 @@ export class MessagesView implements ILobbyView {
   }
 
   destroy(): void {
+    this.unbindDelegatedListeners();
     this.container = null;
     const sc = this.deps.socketClient;
     sc.off('dm:receive', this.dmReceiveHandler);
@@ -325,7 +348,7 @@ export class MessagesView implements ILobbyView {
             conv.lastMessage.length > 40 ? conv.lastMessage.slice(0, 40) + '...' : conv.lastMessage;
 
           return `
-          <div class="messages-conv-item ${isActive ? 'active' : ''}" data-conv-user-id="${conv.userId}" data-conv-username="${escapeHtml(conv.username)}">
+          <div class="messages-conv-item ${isActive ? 'active' : ''}" data-conv-user-id="${conv.userId}" data-conv-username="${escapeAttr(conv.username)}">
             <div class="messages-conv-item-avatar" style="background:${color};">
               ${escapeHtml(conv.username.charAt(0).toUpperCase())}
             </div>

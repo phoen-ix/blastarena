@@ -534,7 +534,7 @@
     "gameCreationDefaults": "Game Creation Defaults",
     "simulationDefaults": "Simulation Defaults",
     "overridesCount": "({{count}} overrides)",
-    "defaultOption": "\u2014 Default \u2014",
+    "defaultOption": "— Default —",
     "defaultIndicator": "(default)",
     "gameMode": "Game Mode",
     "maxPlayers": "Max Players",
@@ -597,7 +597,10 @@
     "revokeAllConfirmPrompt": "Type CONFIRM to proceed:",
     "revokeAllCancel": "Cancel",
     "revokeAllConfirm": "Revoke All",
-    "revokeAllSuccess": "All sessions revoked"
+    "revokeAllSuccess": "All sessions revoked",
+    "spectatorActionsDesc": "Let eliminated players spend energy on walls, meteors, power-ups and speed zones (rooms can still disable it per match)",
+    "spectatorActionsToggled": "Spectator Game Master {{status}}",
+    "spectatorActionsGlobal": "Spectator Game Master (global)"
   },
   "seasons": {
     "sectionTitle": "Season Management",
@@ -626,8 +629,8 @@
     },
     "endDialog": {
       "prompt": "How should player ratings be reset?",
-      "softReset": "Soft Reset \u2014 ratings decay toward baseline",
-      "hardReset": "Hard Reset \u2014 all ratings reset to default",
+      "softReset": "Soft Reset — ratings decay toward baseline",
+      "hardReset": "Hard Reset — all ratings reset to default",
       "cancel": "Cancel"
     },
     "rankTiers": {
@@ -660,7 +663,6 @@
     "viewWorlds": "Worlds & Levels",
     "viewEnemies": "Enemy Types",
     "viewReplays": "Replays",
-
     "worlds": {
       "createWorld": "Create World",
       "tableHeaders": {
@@ -688,7 +690,6 @@
       "worldUnpublished": "World unpublished",
       "worldPublished": "World published"
     },
-
     "levels": {
       "tableHeaders": {
         "order": "#",
@@ -718,14 +719,12 @@
       "deleteLevelConfirm": "Delete level \"{{name}}\"?",
       "levelDeleted": "Level deleted"
     },
-
     "winConditions": {
       "kill_all": "Kill All Enemies",
       "find_exit": "Find Exit",
       "reach_goal": "Reach Goal",
       "survive_time": "Survive Time"
     },
-
     "worldModal": {
       "editTitle": "Edit World",
       "createTitle": "Create World",
@@ -743,7 +742,6 @@
       "worldUpdated": "World updated",
       "worldCreated": "World created"
     },
-
     "enemies": {
       "createEnemy": "Create Enemy Type",
       "importEnemy": "Import Enemy Type",
@@ -766,7 +764,6 @@
       "deleteBtn": "Delete",
       "enemyImported": "Enemy type imported"
     },
-
     "enemyModal": {
       "editTitle": "Edit Enemy Type",
       "createTitle": "Create Enemy Type",
@@ -813,9 +810,7 @@
       "enemyUpdated": "Enemy type updated",
       "enemyCreated": "Enemy type created"
     },
-
     "exportDownloaded": "Export downloaded",
-
     "importLevelModal": {
       "ariaLabel": "Import Level",
       "title": "Import Level",
@@ -830,7 +825,6 @@
       "importFailed": "Import failed — check file format",
       "importSuccess": "Level imported successfully"
     },
-
     "conflictModal": {
       "ariaLabel": "Resolve Enemy Type Conflicts",
       "title": "Resolve Enemy Type Conflicts",
@@ -843,7 +837,6 @@
       "import": "Import",
       "importSuccess": "Level imported successfully"
     },
-
     "deleteModal": {
       "entityLabels": {
         "world": "World",
@@ -863,7 +856,6 @@
       "deleteBtn": "Delete",
       "deleteSuccess": "{{entity}} deleted"
     },
-
     "replays": {
       "totalCount": "{{count}} campaign replay",
       "totalCount_other": "{{count}} campaign replays",

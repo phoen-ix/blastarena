@@ -13,6 +13,10 @@ export class RoomsTab {
   private role: UserRole;
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
   private abortController: AbortController | null = null;
+  // Live updates: the server broadcasts `room:list` to the lobby room on every room mutation, so
+  // subscribe to that instead of polling /admin/rooms every 5 s. The interval stays as a 60 s
+  // safety net for a missed broadcast. (audit F7)
+  private roomListHandler: ((rooms: RoomListItem[]) => void) | null = null;
 
   constructor(notifications: NotificationUI, socketClient: SocketClient, role: UserRole) {
     this.notifications = notifications;
@@ -24,8 +28,16 @@ export class RoomsTab {
     this.abortController = new AbortController();
     this.container = document.createElement('div');
     parent.appendChild(this.container);
+
+    this.roomListHandler = (rooms) => this.renderRooms(rooms);
+    this.socketClient.on('room:list', this.roomListHandler);
+    // Idempotent server-side join. The tab lives inside the lobby shell, which subscribed on
+    // mount and unsubscribes on hide; `socket.leave` is not ref-counted, so this tab must NOT
+    // emit `lobby:unsubscribe` in destroy() or the rooms view would stop updating afterwards.
+    this.socketClient.emit('lobby:subscribe');
+
     await this.loadRooms();
-    this.refreshInterval = setInterval(() => this.loadRooms(), 5000);
+    this.refreshInterval = setInterval(() => this.loadRooms(), 60000);
   }
 
   destroy(): void {
@@ -35,21 +47,36 @@ export class RoomsTab {
       clearInterval(this.refreshInterval);
       this.refreshInterval = null;
     }
+    if (this.roomListHandler) {
+      this.socketClient.off('room:list', this.roomListHandler);
+      this.roomListHandler = null;
+    }
     this.container?.remove();
     this.container = null;
   }
 
   private async loadRooms(): Promise<void> {
     if (!this.container) return;
-    const isAdmin = this.role === 'admin';
 
     try {
       const rooms = await ApiClient.get<RoomListItem[]>('/admin/rooms');
+      this.renderRooms(rooms);
+    } catch {
       if (!this.container) return;
-
       setHtml(
         this.container,
-        `
+        `<div style="color:var(--danger);">${t('admin:rooms.loadFailed')}</div>`,
+      );
+    }
+  }
+
+  private renderRooms(rooms: RoomListItem[]): void {
+    if (!this.container) return;
+    const isAdmin = this.role === 'admin';
+
+    setHtml(
+      this.container,
+      `
         <table class="admin-table">
           <thead>
             <tr>
@@ -85,15 +112,10 @@ export class RoomsTab {
           </tbody>
         </table>
       `,
-      );
+    );
 
-      this.container.addEventListener('click', this.handleClick);
-    } catch {
-      setHtml(
-        this.container,
-        `<div style="color:var(--danger);">${t('admin:rooms.loadFailed')}</div>`,
-      );
-    }
+    // Same function reference every time, so addEventListener de-duplicates it.
+    this.container.addEventListener('click', this.handleClick);
   }
 
   private handleClick = async (e: Event) => {

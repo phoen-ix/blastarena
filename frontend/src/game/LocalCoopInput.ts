@@ -1,4 +1,5 @@
 import { GamepadManager, GamepadInput } from './GamepadManager';
+import { t } from '../i18n';
 
 export interface LocalPlayerInput {
   direction: 'up' | 'down' | 'left' | 'right' | null;
@@ -23,19 +24,25 @@ export interface LocalCoopConfig {
   p2Identity?: LocalCoopP2Identity;
 }
 
-export const CONTROL_PRESET_LABELS: Record<ControlPreset, string> = {
-  wasd: 'WASD + Space/E/Q',
-  arrows: 'Arrows + Enter/Shift/Slash',
-  numpad: 'Numpad 8462 + Plus/Minus/Multiply',
-  gamepad1: 'Gamepad 1',
-  gamepad2: 'Gamepad 2',
-};
+// Functions, not constants: t() returns the bare key until i18n has initialised, and this module
+// is imported at boot. (audit G12)
+export function getControlPresetLabels(): Record<ControlPreset, string> {
+  return {
+    wasd: t('campaign:localCoopModal.controlPresets.wasd'),
+    arrows: t('campaign:localCoopModal.controlPresets.arrows'),
+    numpad: t('campaign:localCoopModal.controlPresets.numpad'),
+    gamepad1: t('campaign:localCoopModal.controlPresets.gamepad1'),
+    gamepad2: t('campaign:localCoopModal.controlPresets.gamepad2'),
+  };
+}
 
-export const CAMERA_MODE_LABELS: Record<CameraMode, string> = {
-  shared: 'Shared (Auto-Zoom)',
-  'split-h': 'Split Horizontal',
-  'split-v': 'Split Vertical',
-};
+export function getCameraModeLabels(): Record<CameraMode, string> {
+  return {
+    shared: t('campaign:localCoopModal.cameraModes.shared'),
+    'split-h': t('campaign:localCoopModal.cameraModes.splitH'),
+    'split-v': t('campaign:localCoopModal.cameraModes.splitV'),
+  };
+}
 
 export const DEFAULT_LOCAL_COOP_CONFIG: LocalCoopConfig = {
   p1Controls: 'wasd',
@@ -151,7 +158,9 @@ export class LocalCoopInput {
   private keyDownHandler: (e: KeyboardEvent) => void;
   private keyUpHandler: (e: KeyboardEvent) => void;
 
-  constructor(scene: Phaser.Scene, gamepadManager: GamepadManager, config: LocalCoopConfig) {
+  // `_scene` is unused: input is read from window key events and the GamepadManager, not the
+  // scene. Kept in the signature for the GameScene call site. (audit G4)
+  constructor(gamepadManager: GamepadManager, config: LocalCoopConfig) {
     this.gamepadManager = gamepadManager;
     this.config = config;
 

@@ -1,7 +1,7 @@
 import { AuthManager } from '../network/AuthManager';
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
-import { escapeHtml, trapFocus, setHtml } from '../utils/html';
+import { escapeHtml, escapeAttr, trapFocus, setHtml } from '../utils/html';
 import {
   getErrorMessage,
   Cosmetic,
@@ -65,6 +65,20 @@ export class SettingsUI {
   private onLanguageChanged: () => void;
   private rendering = false;
   private delegationBound = false;
+  private isEmbedded = false;
+  // The preferences tab's `change` listener lives on contentEl, which survives tab switches; it is
+  // bound once per contentEl instead of once per render so it does not stack. (audit C2)
+  private prefsChangeHandler: ((e: Event) => void) | null = null;
+  private prefsChangeBoundTo: HTMLElement | null = null;
+  // Per-instance caches so re-renders after a save do not refetch what the response already
+  // returned: /user/profile is shared by the account and privacy tabs, and equipping a cosmetic
+  // used to reload all three cosmetics endpoints. (audit F7)
+  private profileCache: UserProfileResponse | null = null;
+  private cosmeticsCache: {
+    all: Cosmetic[];
+    mine: Cosmetic[];
+    equipped: EquippedCosmetics;
+  } | null = null;
   private get tabs(): Tab[] {
     return [
       { id: 'account', label: t('settings.tabs.account') },
@@ -103,7 +117,24 @@ export class SettingsUI {
   hide(): void {
     window.removeEventListener('language-changed', this.onLanguageChanged);
     UIGamepadNavigator.getInstance().popContext('settings-ui');
+    this.unbindPrefsChange();
     this.container.remove();
+  }
+
+  private unbindPrefsChange(): void {
+    if (this.prefsChangeBoundTo && this.prefsChangeHandler) {
+      this.prefsChangeBoundTo.removeEventListener('change', this.prefsChangeHandler);
+    }
+    this.prefsChangeBoundTo = null;
+    this.prefsChangeHandler = null;
+  }
+
+  /** One /user/profile fetch shared by the account and privacy tabs; cleared on every save. */
+  private async getProfile(): Promise<UserProfileResponse> {
+    if (!this.profileCache) {
+      this.profileCache = await ApiClient.get<UserProfileResponse>('/user/profile');
+    }
+    return this.profileCache;
   }
 
   private async render(): Promise<void> {
@@ -196,7 +227,7 @@ export class SettingsUI {
 
     let profile: UserProfileResponse;
     try {
-      profile = await ApiClient.get<UserProfileResponse>('/user/profile');
+      profile = await this.getProfile();
     } catch (err: unknown) {
       setHtml(
         this.contentEl,
@@ -216,7 +247,7 @@ export class SettingsUI {
           <h3 class="settings-section-title">${t('settings.account.profile')}</h3>
           <div class="form-group">
             <label>${t('settings.account.username')}</label>
-            <input type="text" class="input" id="acct-username" value="${escapeHtml(profile.username)}" maxlength="20">
+            <input type="text" class="input" id="acct-username" value="${escapeAttr(profile.username)}" maxlength="20">
             <div class="settings-hint">${t('settings.account.usernameHint')}</div>
           </div>
           <div id="acct-profile-status" class="settings-status"></div>
@@ -322,6 +353,7 @@ export class SettingsUI {
       try {
         const updated = await ApiClient.put<UserProfileResponse>('/user/profile', updates);
         profile = updated;
+        this.profileCache = updated;
         this.authManager.updateUser({ username: updated.username });
         setHtml(
           statusEl,
@@ -348,6 +380,7 @@ export class SettingsUI {
         const result = await ApiClient.post<{ message: string }>('/user/email', {
           email: newEmail,
         });
+        this.profileCache = null; // pendingEmailHint / emailHint changed server-side
         setHtml(statusEl, `<span class="text-success">${escapeHtml(result.message)}</span>`);
         (this.contentEl!.querySelector('#acct-new-email') as HTMLInputElement).value = '';
       } catch (err: unknown) {
@@ -409,6 +442,7 @@ export class SettingsUI {
       cancelEmailBtn.addEventListener('click', async () => {
         try {
           await ApiClient.delete('/user/email');
+          this.profileCache = null;
           this.notifications.success(t('settings.account.pendingCancelled'));
           if (this.contentEl) {
             setHtml(this.contentEl, '');
@@ -530,6 +564,7 @@ export class SettingsUI {
       try {
         await ApiClient.post('/user/totp/confirm', { code });
         closeModal();
+        this.profileCache = null; // twoFactorEnabled changed
         this.notifications.success(t('settings.account.twoFactor.enableSuccess'));
         if (this.contentEl) {
           setHtml(this.contentEl, '');
@@ -609,6 +644,7 @@ export class SettingsUI {
       try {
         await ApiClient.post('/user/totp/disable', { password, code });
         closeModal();
+        this.profileCache = null; // twoFactorEnabled changed
         this.notifications.success(t('settings.account.twoFactor.disableSuccess'));
         if (this.contentEl) {
           setHtml(this.contentEl, '');
@@ -887,22 +923,28 @@ export class SettingsUI {
       });
     }
 
-    // Visual settings checkboxes
-    this.contentEl.addEventListener('change', (e: Event) => {
-      const target = e.target as HTMLInputElement;
-      if (!target || target.type !== 'checkbox') return;
-      const key = target.name as keyof VisualSettings;
-      if (!(key in getSettings())) return;
-      const current = getSettings();
-      current[key] = target.checked;
-      if (target.hasAttribute('role') && target.getAttribute('role') === 'switch') {
-        target.setAttribute('aria-checked', String(target.checked));
-      }
-      saveSettings(current);
-      if (key === 'lobbyChat') {
-        window.dispatchEvent(new CustomEvent('lobbychat-toggle'));
-      }
-    });
+    // Visual settings checkboxes — delegated on contentEl, which outlives tab switches, so bind
+    // once per contentEl (see prefsChangeHandler). (audit C2)
+    if (this.prefsChangeBoundTo !== this.contentEl) {
+      this.unbindPrefsChange();
+      this.prefsChangeHandler = (e: Event) => {
+        const target = e.target as HTMLInputElement;
+        if (!target || target.type !== 'checkbox') return;
+        const key = target.name as keyof VisualSettings;
+        if (!(key in getSettings())) return;
+        const current = getSettings();
+        current[key] = target.checked;
+        if (target.hasAttribute('role') && target.getAttribute('role') === 'switch') {
+          target.setAttribute('aria-checked', String(target.checked));
+        }
+        saveSettings(current);
+        if (key === 'lobbyChat') {
+          window.dispatchEvent(new CustomEvent('lobbychat-toggle'));
+        }
+      };
+      this.contentEl.addEventListener('change', this.prefsChangeHandler);
+      this.prefsChangeBoundTo = this.contentEl;
+    }
 
     // Audio controls
     const muteCheckbox = this.contentEl.querySelector('#audio-mute') as HTMLInputElement;
@@ -1007,7 +1049,7 @@ export class SettingsUI {
 
     let profile: UserProfileResponse;
     try {
-      profile = await ApiClient.get<UserProfileResponse>('/user/profile');
+      profile = await this.getProfile();
     } catch (err: unknown) {
       setHtml(
         this.contentEl,
@@ -1046,6 +1088,7 @@ export class SettingsUI {
       const statusEl = this.contentEl!.querySelector('#privacy-status')!;
       try {
         await ApiClient.put('/user/privacy', { [field]: value });
+        this.profileCache = null;
         setHtml(statusEl, `<span class="text-success">${t('settings.privacy.saved')}</span>`);
         setTimeout(() => {
           setHtml(statusEl, '');
@@ -1066,31 +1109,29 @@ export class SettingsUI {
   private async renderCosmeticsTab(): Promise<void> {
     if (!this.contentEl) return;
 
-    let allCosmetics: Cosmetic[] = [];
-    let myCosmetics: Cosmetic[] = [];
-    let equipped: EquippedCosmetics = {
-      colorId: null,
-      eyesId: null,
-      trailId: null,
-      bombSkinId: null,
-    };
-
-    try {
-      const [allResp, mineResp, equippedResp] = await Promise.all([
-        ApiClient.get<{ cosmetics: Cosmetic[] }>('/cosmetics'),
-        ApiClient.get<{ cosmetics: Cosmetic[] }>('/cosmetics/mine'),
-        ApiClient.get<EquippedCosmetics>('/cosmetics/equipped'),
-      ]);
-      allCosmetics = allResp.cosmetics;
-      myCosmetics = mineResp.cosmetics;
-      equipped = equippedResp;
-    } catch (err: unknown) {
-      setHtml(
-        this.contentEl,
-        `<div class="error-banner">${t('settings.cosmetics.loadFailed', { error: escapeHtml(getErrorMessage(err)) })}</div>`,
-      );
-      return;
+    if (!this.cosmeticsCache) {
+      try {
+        const [allResp, mineResp, equippedResp] = await Promise.all([
+          ApiClient.get<{ cosmetics: Cosmetic[] }>('/cosmetics'),
+          ApiClient.get<{ cosmetics: Cosmetic[] }>('/cosmetics/mine'),
+          ApiClient.get<EquippedCosmetics>('/cosmetics/equipped'),
+        ]);
+        this.cosmeticsCache = {
+          all: allResp.cosmetics,
+          mine: mineResp.cosmetics,
+          equipped: equippedResp,
+        };
+      } catch (err: unknown) {
+        setHtml(
+          this.contentEl,
+          `<div class="error-banner">${t('settings.cosmetics.loadFailed', { error: escapeHtml(getErrorMessage(err)) })}</div>`,
+        );
+        return;
+      }
     }
+    const allCosmetics = this.cosmeticsCache.all;
+    const myCosmetics = this.cosmeticsCache.mine;
+    const equipped = this.cosmeticsCache.equipped;
 
     const ownedIds = new Set(myCosmetics.map((c) => c.id));
     const slots: { key: keyof EquippedCosmetics; type: CosmeticType; label: string }[] = [
@@ -1171,8 +1212,8 @@ export class SettingsUI {
             slot,
             cosmeticId,
           });
-          equipped = newEquipped;
-          // Re-render to update visual state
+          // The PUT answers with the new equipped set — re-render from memory. (audit F7)
+          if (this.cosmeticsCache) this.cosmeticsCache.equipped = newEquipped;
           await this.renderCosmeticsTab();
           this.notifications.success(t('settings.cosmetics.updated'));
         } catch (err: unknown) {
@@ -1265,6 +1306,7 @@ export class SettingsUI {
   }
 
   async renderEmbedded(container: HTMLElement): Promise<void> {
+    this.isEmbedded = true;
     this.container = container;
 
     setHtml(
@@ -1298,6 +1340,7 @@ export class SettingsUI {
   }
 
   destroy(): void {
+    this.unbindPrefsChange();
     UIGamepadNavigator.getInstance().popContext('settings-ui');
   }
 
@@ -1312,6 +1355,9 @@ export class SettingsUI {
         ...(this.contentEl?.querySelectorAll<HTMLElement>('input, button, .btn') || []),
       ],
       onBack: () => {
+        // Embedded, `container` IS the lobby's `.main-body`: hide() would remove it and leave the
+        // lobby shell empty. The lobby context's own onBack handles navigation. (audit C3)
+        if (this.isEmbedded) return;
         this.hide();
         this.onClose();
       },

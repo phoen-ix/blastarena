@@ -2,15 +2,18 @@ import { AuthManager } from '../network/AuthManager';
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
-import { getErrorMessage } from '@blast-arena/shared';
+import { getErrorMessage, validatePasswordI18n } from '@blast-arena/shared';
 import { i18n, t } from '../i18n';
 import { setHtml } from '../utils/html';
+import { createModal } from '../utils/modal';
 
 export class AuthUI {
   private overlay: HTMLElement;
   private authManager: AuthManager;
   private notifications: NotificationUI;
-  private mode: 'login' | 'register' | 'forgot' | 'totp' = 'login';
+  private mode: 'login' | 'register' | 'forgot' | 'totp' | 'reset' = 'login';
+  // Token from the forgot-password email link; only meaningful while mode === 'reset'. (audit B1)
+  private resetToken: string | null = null;
   private onAuthenticated: () => void;
   private onClose: (() => void) | null;
   private escHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -56,7 +59,8 @@ export class AuthUI {
     }
   }
 
-  show(mode?: 'login' | 'register'): void {
+  show(mode?: 'login' | 'register' | 'reset', resetToken?: string): void {
+    if (mode === 'reset') this.resetToken = resetToken ?? null;
     if (mode && mode !== this.mode) {
       // render() falls back to login when registration is disabled.
       this.mode = mode;
@@ -131,6 +135,9 @@ export class AuthUI {
         break;
       case 'totp':
         this.renderTotpVerification();
+        break;
+      case 'reset':
+        this.renderResetPassword();
         break;
     }
     this.injectCloseButton();
@@ -213,29 +220,22 @@ export class AuthUI {
     } catch {
       text = t('auth:imprint.loadFailed');
     }
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', t('auth:imprint.title'));
+    // createModal(): focus trap + Escape + backdrop click, like every other modal. (audit G12)
+    const { overlay, content, close } = createModal({
+      ariaLabel: t('auth:imprint.title'),
+      style: 'max-width:600px;',
+    });
     setHtml(
-      overlay,
+      content,
       `
-      <div class="modal" style="max-width:600px;">
         <div class="modal-header">
           <h3>${t('auth:imprint.title')}</h3>
           <button class="modal-close" aria-label="${t('common:actions.close')}">&times;</button>
         </div>
         <div class="modal-body" style="white-space:pre-wrap;font-size:14px;line-height:1.6;max-height:60vh;overflow-y:auto;">${this.escapeHtml(text)}</div>
-      </div>
     `,
     );
-    document.body.appendChild(overlay);
-    const close = () => overlay.remove();
     overlay.querySelector('.modal-close')!.addEventListener('click', close);
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) close();
-    });
   }
 
   private escapeHtml(str: string): string {
@@ -550,6 +550,114 @@ export class AuthUI {
     } finally {
       btn.disabled = false;
       btn.textContent = t('auth:forgotPassword.submit');
+    }
+  }
+
+  /**
+   * New-password form reached from the link in the forgot-password email
+   * (`/reset-password?token=…`, read by MenuScene). Nothing in the SPA handled that route, so the
+   * link landed on the normal menu and `POST /auth/reset-password` was never called. (audit B1)
+   */
+  private renderResetPassword(): void {
+    setHtml(
+      this.overlay,
+      `
+      <div class="auth-form">
+        ${this.renderLanguagePicker()}
+        <h2>${t('auth:resetPassword.title')} <span>${t('auth:resetPassword.titleAccent')}</span></h2>
+        <p class="auth-totp-hint">${t('auth:resetPassword.description')}</p>
+        <div class="form-group">
+          <label for="reset-password">${t('auth:resetPassword.newPassword')}</label>
+          <input type="password" id="reset-password" placeholder="${t('auth:resetPassword.newPasswordPlaceholder')}" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label for="reset-confirm">${t('auth:resetPassword.confirmPassword')}</label>
+          <input type="password" id="reset-confirm" placeholder="${t('auth:resetPassword.confirmPasswordPlaceholder')}" autocomplete="new-password">
+        </div>
+        <div class="form-error" id="reset-error"></div>
+        <button class="btn btn-primary" id="reset-btn">${t('auth:resetPassword.submit')}</button>
+        <div class="auth-switch" id="reset-request-again"></div>
+        <div class="auth-switch">
+          <a id="switch-login-back">${t('auth:resetPassword.backToLogin')}</a>
+        </div>
+      </div>
+    `,
+    );
+
+    this.overlay
+      .querySelector('#reset-btn')!
+      .addEventListener('click', () => this.handleResetPassword());
+    this.overlay.querySelector('#reset-confirm')!.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter') this.handleResetPassword();
+    });
+    this.overlay.querySelector('#switch-login-back')!.addEventListener('click', () => {
+      this.mode = 'login';
+      this.render();
+    });
+    this.bindLanguagePicker();
+
+    this.pushGamepadContext();
+  }
+
+  /**
+   * Offer the way out of a dead reset link. Rendered on demand rather than kept hidden in the
+   * markup: the gamepad navigator lists every `.auth-switch a`, and a hidden one has a zero rect.
+   */
+  private showRequestNewLink(): void {
+    const slot = this.overlay.querySelector('#reset-request-again');
+    if (!slot || slot.querySelector('#switch-forgot')) return;
+    setHtml(slot, `<a id="switch-forgot">${t('auth:resetPassword.requestNewLink')}</a>`);
+    slot.querySelector('#switch-forgot')!.addEventListener('click', () => {
+      this.mode = 'forgot';
+      this.render();
+    });
+  }
+
+  private async handleResetPassword(): Promise<void> {
+    const password = (document.getElementById('reset-password') as HTMLInputElement).value;
+    const confirm = (document.getElementById('reset-confirm') as HTMLInputElement).value;
+    const errorEl = document.getElementById('reset-error')!;
+    const btn = document.getElementById('reset-btn') as HTMLButtonElement;
+
+    if (!this.resetToken) {
+      // Reached without a token (e.g. a bookmarked form): only a fresh email link can help.
+      errorEl.textContent = t('auth:resetPassword.missingToken');
+      this.showRequestNewLink();
+      return;
+    }
+    if (!password || !confirm) {
+      errorEl.textContent = t('auth:resetPassword.fillAllFields');
+      return;
+    }
+    // Same rules the server enforces (PASSWORD_MIN/MAX_LENGTH), surfaced before the round trip.
+    const invalid = validatePasswordI18n(password);
+    if (invalid) {
+      errorEl.textContent = t(invalid.key, invalid.params);
+      return;
+    }
+    if (password !== confirm) {
+      errorEl.textContent = t('auth:resetPassword.mismatch');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = t('auth:resetPassword.submitting');
+    errorEl.textContent = '';
+
+    try {
+      // skipAuthRetry: there is no session to refresh here, and a 401 must not log anyone out.
+      await ApiClient.post('/auth/reset-password', { token: this.resetToken, password }, true);
+      this.resetToken = null;
+      this.notifications.success(t('auth:resetPassword.success'));
+      this.mode = 'login';
+      this.render();
+    } catch (err: unknown) {
+      // 400 INVALID_TOKEN (expired or already used) is the common failure — offer a new link.
+      errorEl.textContent = this.translateError(err);
+      this.showRequestNewLink();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = t('auth:resetPassword.submit');
     }
   }
 

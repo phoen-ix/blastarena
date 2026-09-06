@@ -15,10 +15,10 @@
     "mechanics": "Meccaniche",
     "teleporterA": "Teletrasporto A",
     "teleporterB": "Teletrasporto B",
-    "conveyorUp": "Nastro \u2191",
-    "conveyorDown": "Nastro \u2193",
-    "conveyorLeft": "Nastro \u2190",
-    "conveyorRight": "Nastro \u2192",
+    "conveyorUp": "Nastro ↑",
+    "conveyorDown": "Nastro ↓",
+    "conveyorLeft": "Nastro ←",
+    "conveyorRight": "Nastro →",
     "puzzle": "Rompicapo",
     "switch": "Interruttore",
     "gate": "Cancello",
@@ -83,7 +83,8 @@
     "needSpawns": "Servono almeno 2 punti di nascita",
     "mapSaved": "Mappa salvata!",
     "levelSaved": "Livello salvato!",
-    "saveFailed": "Salvataggio fallito: {{error}}"
+    "saveFailed": "Salvataggio fallito: {{error}}",
+    "noWorld": "Impossibile salvare: questo livello non appartiene a nessun mondo della campagna. Crealo dalla scheda Campagna dell'amministrazione."
   },
   "defaults": {
     "untitledLevel": "Livello senza titolo",

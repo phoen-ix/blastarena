@@ -59,7 +59,19 @@
       "24h": "24 uur"
     },
     "loginFailed": "Inloggen mislukt",
-    "connectionError": "Verbindingsfout"
+    "connectionError": "Verbindingsfout",
+    "controlPresets": {
+      "wasd": "WASD + Spatie/E/Q",
+      "arrows": "Pijltjes + Enter/Shift/Schuine streep",
+      "numpad": "Numpad 8462 + Plus/Min/Maal",
+      "gamepad1": "Gamepad 1",
+      "gamepad2": "Gamepad 2"
+    },
+    "cameraModes": {
+      "shared": "Gedeeld (auto-zoom)",
+      "splitH": "Horizontaal gesplitst",
+      "splitV": "Verticaal gesplitst"
+    }
   },
   "buddyModal": {
     "title": "Buddymodus",

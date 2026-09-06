@@ -13,7 +13,10 @@ export async function initI18n(): Promise<void> {
     .init({
       fallbackLng: 'en',
       supportedLngs: ['en', 'de', 'fr', 'es', 'it', 'pt', 'pl', 'nl', 'tr', 'sv', 'nb', 'da'],
-      ns: ['common', 'game', 'ui', 'auth', 'hud', 'admin', 'campaign', 'help', 'editor', 'errors'],
+      // Loaded at boot. `help` and `editor` are fetched on demand by the views that use them
+      // (i18n.loadNamespaces) — see LobbyUI.createView and scenes/levelEditorLoader. The former
+      // `hud` namespace was an empty `{}` in every locale and is gone. (audit I18N-LOAD-1)
+      ns: ['common', 'game', 'ui', 'auth', 'admin', 'campaign', 'errors'],
       defaultNS: 'ui',
       backend: {
         loadPath: '/locales/{{lng}}/{{ns}}.json',
