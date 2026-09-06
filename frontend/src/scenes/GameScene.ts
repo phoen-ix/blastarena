@@ -11,6 +11,7 @@ import {
   CampaignWorldTheme,
   OpenWorldScoreEntry,
   EnemyTypeEntry,
+  Position,
   TILE_SIZE,
   TICK_MS,
 } from '@blast-arena/shared';
@@ -48,6 +49,7 @@ import { ApiClient } from '../network/ApiClient';
 import { EmoteId, EMOTES, CampaignLevelSummary } from '@blast-arena/shared';
 import type { ServerToClientEvents } from '@blast-arena/shared';
 import { audioManager } from '../game/AudioManager';
+import { getSettings } from '../game/Settings';
 
 export class GameScene extends Phaser.Scene {
   /** ScaleManager resize handler; removed in shutdown(). (audit SCENE-RESIZE-LEAK-1) */
@@ -56,17 +58,19 @@ export class GameScene extends Phaser.Scene {
   private authManager!: AuthManager;
   private localPlayerId!: number;
 
-  // Composed renderers
-  private tileMap!: TileMapRenderer;
-  private playerRenderer!: PlayerSpriteRenderer;
-  private bombRenderer!: BombSpriteRenderer;
-  private explosionRenderer!: ExplosionRenderer;
-  private powerUpRenderer!: PowerUpRenderer;
-  private zoneRenderer!: ShrinkingZoneRenderer;
-  private hillZoneRenderer!: HillZoneRenderer;
-  private effectSystem!: EffectSystem;
-  private countdownOverlay!: CountdownOverlay;
-  private mapEventRenderer!: MapEventRenderer;
+  // Composed renderers. Nullable so cleanupRenderers() can drop them: Phaser keeps the scene
+  // instance alive between games, and a destroyed renderer still held here kept its dead Phaser
+  // objects (and the last map's sprites) reachable until the next create(). (audit C9)
+  private tileMap: TileMapRenderer | null = null;
+  private playerRenderer: PlayerSpriteRenderer | null = null;
+  private bombRenderer: BombSpriteRenderer | null = null;
+  private explosionRenderer: ExplosionRenderer | null = null;
+  private powerUpRenderer: PowerUpRenderer | null = null;
+  private zoneRenderer: ShrinkingZoneRenderer | null = null;
+  private hillZoneRenderer: HillZoneRenderer | null = null;
+  private effectSystem: EffectSystem | null = null;
+  private countdownOverlay: CountdownOverlay | null = null;
+  private mapEventRenderer: MapEventRenderer | null = null;
 
   // Input
   private addedKeys: Phaser.Input.Keyboard.Key[] = [];
@@ -75,7 +79,7 @@ export class GameScene extends Phaser.Scene {
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private detonateKey!: Phaser.Input.Keyboard.Key;
   private throwKey!: Phaser.Input.Keyboard.Key;
-  private gamepadManager!: GamepadManager;
+  private gamepadManager: GamepadManager | null = null;
   private pendingGamepadAction: 'bomb' | 'detonate' | 'throw' | null = null;
   private lastInputSeq: number = 0;
   private lastInputTime: number = 0;
@@ -86,6 +90,14 @@ export class GameScene extends Phaser.Scene {
   private hasShownCountdown: boolean = false;
   /** Stored map tiles from initial state — updated in-place with tile diffs */
   private storedTiles: import('@blast-arena/shared').TileType[][] | null = null;
+  /**
+   * Static per-entity data the tick protocol sends only once: a player's cosmetics on their first
+   * tick (and in every full state), an explosion's cells on its first tick. Every incoming state
+   * is hydrated from these caches before anything renders it, so renderers, the HUD and the replay
+   * recorder all keep seeing complete objects. (audit TICK-PAYLOAD-1)
+   */
+  private cosmeticsById = new Map<number, PlayerCosmeticData>();
+  private explosionCellsById = new Map<string, Position[]>();
 
   // Replay mode
   private replayPlayer: ReplayPlayer | null = null;
@@ -123,6 +135,10 @@ export class GameScene extends Phaser.Scene {
   private campaignGameOverHandler: ServerToClientEvents['campaign:gameOver'] | null = null;
   private campaignLockedInHandler: ServerToClientEvents['campaign:playerLockedIn'] | null = null;
   private campaignPartnerLeftHandler: ServerToClientEvents['campaign:partnerLeft'] | null = null;
+  // Campaign feedback events the server always emitted but nothing rendered. (audit G7)
+  private campaignEnemyDiedHandler: ServerToClientEvents['campaign:enemyDied'] | null = null;
+  private campaignExitOpenedHandler: ServerToClientEvents['campaign:exitOpened'] | null = null;
+  private campaignPlayerDiedHandler: ServerToClientEvents['campaign:playerDied'] | null = null;
 
   // Match/open-world listeners, likewise kept as refs so teardown removes only ours.
   // (audit SOCKET-OFF-REF-1)
@@ -291,6 +307,14 @@ export class GameScene extends Phaser.Scene {
     this.isDragging = false;
     this.lastGameState = null;
     this.hasShownCountdown = false;
+    // Per-session input/tile state — Phaser reuses the scene instance, so without this the
+    // previous match's tile grid and input sequence leaked into the next one. (audit C9)
+    this.storedTiles = null;
+    this.lastInputSeq = 0;
+    this.lastInputTime = 0;
+    this._emotePositions.clear();
+    this.cosmeticsById = new Map();
+    this.explosionCellsById.clear();
 
     this.pendingGamepadAction = null;
 
@@ -356,7 +380,7 @@ export class GameScene extends Phaser.Scene {
 
     // Create composed renderers
     this.effectSystem = new EffectSystem(this, this.socketClient, this.localPlayerId);
-    this.playerRenderer = new PlayerSpriteRenderer(this, this.localPlayerId);
+    this.playerRenderer = new PlayerSpriteRenderer(this);
     this.bombRenderer = new BombSpriteRenderer(this);
     this.explosionRenderer = new ExplosionRenderer(this);
     if (initialState?.map?.wrapping) {
@@ -387,7 +411,7 @@ export class GameScene extends Phaser.Scene {
 
     // Listen for bomb throws to animate arc before state arrives
     this.bombThrownHandler = (data) => {
-      this.bombRenderer.registerThrow(data.bombId, data.from, data.to);
+      this.bombRenderer?.registerThrow(data.bombId, data.from, data.to);
     };
     this.socketClient.on('game:bombThrown', this.bombThrownHandler);
 
@@ -434,14 +458,14 @@ export class GameScene extends Phaser.Scene {
     window.addEventListener('keydown', this.emoteKeyHandler);
 
     if (initialState) {
-      // Build player cosmetics map for BombSpriteRenderer
-      const cosmeticsMap = new Map<number, PlayerCosmeticData>();
+      // Player cosmetics for BombSpriteRenderer — the live cache, so a player who joins mid-game
+      // (open world) gets their bomb skin once their first tick carries their cosmetics.
       for (const player of initialState.players) {
         if (player.cosmetics) {
-          cosmeticsMap.set(player.id, player.cosmetics);
+          this.cosmeticsById.set(player.id, player.cosmetics);
         }
       }
-      this.bombRenderer.setPlayerCosmetics(cosmeticsMap);
+      this.bombRenderer.setPlayerCosmetics(this.cosmeticsById);
 
       // Store a deep copy of initial tiles for delta updates
       this.storedTiles = initialState.map.tiles.map((row) => [...row]);
@@ -463,6 +487,7 @@ export class GameScene extends Phaser.Scene {
         campaignTheme,
         initialState.map.wrapping ?? false,
       );
+      this.mapEventRenderer.setMapSize(initialState.map.width, initialState.map.height);
       this.updateState(initialState);
     }
 
@@ -595,7 +620,7 @@ export class GameScene extends Phaser.Scene {
           (this.registry.get('localCoopConfig') as LocalCoopConfig | undefined) ||
           DEFAULT_LOCAL_COOP_CONFIG;
         this.coopCameraMode = coopConfig.cameraMode;
-        this.localCoopInput = new LocalCoopInput(this, this.gamepadManager, coopConfig);
+        this.localCoopInput = new LocalCoopInput(this.gamepadManager, coopConfig);
         // Determine P2's ID from the initial state (second player in the player list)
         const initialState = this.registry.get('initialGameState') as GameState | undefined;
         if (initialState && initialState.players.length >= 2) {
@@ -658,6 +683,27 @@ export class GameScene extends Phaser.Scene {
         this.scene.start('GameOverScene');
       };
       this.socketClient.on('campaign:gameOver', this.campaignGameOverHandler);
+
+      // Enemy defeated: burst + SFX at the tile, heavier for a boss (audit G7)
+      this.campaignEnemyDiedHandler = (data) => {
+        this.effectSystem?.onEnemyDied(data.position, data.isBoss);
+      };
+      this.socketClient.on('campaign:enemyDied', this.campaignEnemyDiedHandler);
+
+      // Exit opened: pulse the exit tile and chime (audit G7)
+      this.campaignExitOpenedHandler = (data) => {
+        audioManager.powerUpCollect();
+        this.pulseTile(data.position.x, data.position.y);
+      };
+      this.socketClient.on('campaign:exitOpened', this.campaignExitOpenedHandler);
+
+      // Life lost: the campaign never emits game:playerDied, so the death SFX/shake and the HUD
+      // lives flash both hang off this event instead (audit G7)
+      this.campaignPlayerDiedHandler = (data) => {
+        this.effectSystem?.triggerPlayerDied({ playerId: data.playerId, killerId: null });
+        this.events.emit('campaignPlayerDied', data);
+      };
+      this.socketClient.on('campaign:playerDied', this.campaignPlayerDiedHandler);
 
       // Co-op specific listeners
       if (this.campaignCoopMode) {
@@ -723,6 +769,7 @@ export class GameScene extends Phaser.Scene {
             (row: import('@blast-arena/shared').TileType[]) => [...row],
           );
           this.tileMap?.updateTiles(data.state.map.tiles);
+          this.mapEventRenderer?.setMapSize(data.state.map.width, data.state.map.height);
           this.applyCameraBounds(data.state.map.width, data.state.map.height);
         }
         this.updateState(data.state);
@@ -833,68 +880,123 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('spectateTargetId', null);
   }
 
+  /** Fill in the once-only fields of a tick state from the caches (see cosmeticsById). */
+  private hydrateState(state: GameState): void {
+    for (const p of state.players) {
+      if (p.cosmetics) {
+        this.cosmeticsById.set(p.id, p.cosmetics);
+      } else {
+        const cached = this.cosmeticsById.get(p.id);
+        if (cached) p.cosmetics = cached;
+      }
+    }
+    const explosions = state.explosions;
+    for (const e of explosions) {
+      if (e.cells.length > 0) {
+        this.explosionCellsById.set(e.id, e.cells);
+      } else {
+        const cached = this.explosionCellsById.get(e.id);
+        if (cached) e.cells = cached;
+      }
+    }
+    // Forget explosions that are gone so the cache stays bounded in a long open-world session.
+    if (this.explosionCellsById.size > explosions.length + 16) {
+      const live = new Set<string>();
+      for (const e of explosions) live.add(e.id);
+      for (const id of this.explosionCellsById.keys()) {
+        if (!live.has(id)) this.explosionCellsById.delete(id);
+      }
+    }
+  }
+
   private updateState(state: GameState): void {
+    this.hydrateState(state);
     this.lastGameState = state;
 
     // Countdown overlay trigger — show during countdown, not after
     if (state.status === 'countdown' && !this.hasShownCountdown) {
       this.hasShownCountdown = true;
-      this.countdownOverlay.show();
+      this.countdownOverlay?.show();
     }
 
     // Update tile map — apply diffs to stored tiles, or use full tiles for replays/initial state
-    if (this.tileMap && this.storedTiles) {
+    const tileMap = this.tileMap;
+    if (tileMap && this.storedTiles) {
       if (state.tileDiffs && state.tileDiffs.length > 0) {
-        // Apply tile diffs to our stored copy
+        // Apply tile diffs to our stored copy, and to the renderer cell by cell — the full-grid
+        // rescan (updateTiles) is for the paths that actually carry a full grid. (audit F5)
         for (const diff of state.tileDiffs) {
           this.storedTiles[diff.y][diff.x] = diff.type;
         }
-        const destroyed = this.tileMap.updateTiles(this.storedTiles);
+        const destroyed = tileMap.applyTileDiffs(state.tileDiffs);
         if (destroyed.length > 0) {
-          this.effectSystem.onTilesDestroyed(destroyed);
+          this.effectSystem?.onTilesDestroyed(destroyed);
         }
       } else if (state.map.tiles && state.map.tiles.length > 0) {
         // Full tile update (initial state, replays, simulations)
-        const destroyed = this.tileMap.updateTiles(state.map.tiles);
+        const destroyed = tileMap.updateTiles(state.map.tiles);
         if (destroyed.length > 0) {
-          this.effectSystem.onTilesDestroyed(destroyed);
+          this.effectSystem?.onTilesDestroyed(destroyed);
         }
         // Update stored tiles from full state
         this.storedTiles = state.map.tiles.map((row) => [...row]);
       }
-    } else if (this.tileMap && state.map.tiles && state.map.tiles.length > 0) {
+    } else if (tileMap && state.map.tiles && state.map.tiles.length > 0) {
       // No stored tiles yet (e.g. simulation spectate joining mid-game)
       this.storedTiles = state.map.tiles.map((row) => [...row]);
-      const destroyed = this.tileMap.updateTiles(state.map.tiles);
+      const destroyed = tileMap.updateTiles(state.map.tiles);
       if (destroyed.length > 0) {
-        this.effectSystem.onTilesDestroyed(destroyed);
+        this.effectSystem?.onTilesDestroyed(destroyed);
       }
     }
 
-    this.playerRenderer.update(state.players);
-    this.bombRenderer.update(state.bombs);
-    this.explosionRenderer.update(state.explosions);
-    this.powerUpRenderer.update(state.powerUps);
+    this.playerRenderer?.update(state.players);
+    this.bombRenderer?.update(state.bombs);
+    this.explosionRenderer?.update(state.explosions);
+    this.powerUpRenderer?.update(state.powerUps);
 
     if (state.zone) {
-      this.zoneRenderer.update(state.zone, state.map.width, state.map.height);
+      this.zoneRenderer?.update(state.zone, state.map.width, state.map.height);
     }
 
     if (state.hillZone) {
-      this.hillZoneRenderer.update(state.hillZone, state.kothScores, state.pendingHillZone);
+      this.hillZoneRenderer?.update(state.hillZone, state.kothScores, state.pendingHillZone);
     }
 
     // Update map events (meteors, etc.)
-    this.mapEventRenderer.update(state.mapEvents, state.tick);
+    this.mapEventRenderer?.update(state.mapEvents, state.tick);
 
     // Update effect system alive state
     const me = state.players.find((p) => p.id === this.localPlayerId);
     if (me) {
-      this.effectSystem.setLocalPlayerAlive(me.alive);
+      this.effectSystem?.setLocalPlayerAlive(me.alive);
     }
 
     // Update HUD
     this.events.emit('stateUpdate', state);
+  }
+
+  /** Brief highlight ring on a tile (used when the campaign exit opens). */
+  private pulseTile(tileX: number, tileY: number): void {
+    if (!getSettings().animations) return;
+    const px = tileX * TILE_SIZE + TILE_SIZE / 2;
+    const py = tileY * TILE_SIZE + TILE_SIZE / 2;
+    const ring = this.add.graphics();
+    ring.setDepth(7);
+    ring.lineStyle(3, 0x44ff88, 0.9);
+    ring.strokeRect(-TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
+    ring.fillStyle(0x44ff88, 0.25);
+    ring.fillRect(-TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
+    ring.setPosition(px, py);
+    this.tweens.add({
+      targets: ring,
+      scale: { from: 0.6, to: 1.6 },
+      alpha: { from: 1, to: 0 },
+      duration: 500,
+      repeat: 2,
+      ease: 'Quad.easeOut',
+      onComplete: () => ring.destroy(),
+    });
   }
 
   update(_time: number, delta: number): void {
@@ -938,24 +1040,34 @@ export class GameScene extends Phaser.Scene {
     this.pollGamepadMenu();
 
     this.processInput();
+    // Sprites move toward their tick targets once per rendered frame, before the camera follows
+    // them, so both are smooth at the display's rate rather than the 20 Hz state rate. (audit F2)
+    this.playerRenderer?.frame(delta);
     this.updateCamera();
     // After updateCamera, so the ghosts are culled against this frame's worldView. No-ops for
     // non-wrapping maps and when the visible tile range hasn't changed. (audit TILE-GHOST-1)
     this.tileMap?.updateGhosts();
     this.updatePartnerArrows();
 
-    // Update emote bubble positions to follow players
-    if (this.emoteRenderer && this.lastGameState) {
-      this._emotePositions.clear();
+    // Update emote bubble positions to follow players — only while a bubble is actually showing,
+    // and reusing the stored point objects rather than allocating per player per frame.
+    // (audit F5)
+    if (this.emoteRenderer?.hasActive() && this.lastGameState) {
+      const positions = this._emotePositions;
       for (const p of this.lastGameState.players) {
-        if (p.alive) {
-          this._emotePositions.set(p.id, {
-            x: p.position.x * TILE_SIZE + TILE_SIZE / 2,
-            y: p.position.y * TILE_SIZE + TILE_SIZE / 2,
-          });
+        if (!p.alive) {
+          positions.delete(p.id);
+          continue;
         }
+        let pt = positions.get(p.id);
+        if (!pt) {
+          pt = { x: 0, y: 0 };
+          positions.set(p.id, pt);
+        }
+        pt.x = p.position.x * TILE_SIZE + TILE_SIZE / 2;
+        pt.y = p.position.y * TILE_SIZE + TILE_SIZE / 2;
       }
-      this.emoteRenderer.update(this._emotePositions);
+      this.emoteRenderer.update(positions);
     }
 
     // Drive replay playback from Phaser's frame loop
@@ -1091,8 +1203,8 @@ export class GameScene extends Phaser.Scene {
   private updatePartnerArrows(): void {
     if (this.coopCameraMode === 'shared' || !this.p2Camera) return;
 
-    const p1Sprite = this.playerRenderer.getSprite(this.localPlayerId);
-    const p2Sprite = this.playerRenderer.getSprite(this.localP2Id);
+    const p1Sprite = this.playerRenderer?.getSprite(this.localPlayerId);
+    const p2Sprite = this.playerRenderer?.getSprite(this.localP2Id);
 
     this.drawPartnerArrow(this.p1PartnerArrow, this.cameras.main, p1Sprite, p2Sprite);
     this.drawPartnerArrow(this.p2PartnerArrow, this.p2Camera, p2Sprite, p1Sprite);
@@ -1177,14 +1289,14 @@ export class GameScene extends Phaser.Scene {
   private handleReplayTickEvents(events: ReplayTickEvents): void {
     if (events.bombThrown) {
       for (const thrown of events.bombThrown) {
-        this.bombRenderer.registerThrow(thrown.bombId, thrown.from, thrown.to);
+        this.bombRenderer?.registerThrow(thrown.bombId, thrown.from, thrown.to);
       }
     }
     for (const explosion of events.explosions) {
-      this.effectSystem.triggerExplosion(explosion);
+      this.effectSystem?.triggerExplosion(explosion);
     }
     for (const death of events.playerDied) {
-      this.effectSystem.triggerPlayerDied(death);
+      this.effectSystem?.triggerPlayerDied(death);
     }
   }
 
@@ -1233,8 +1345,8 @@ export class GameScene extends Phaser.Scene {
 
     // Local co-op camera
     if (this.localCoopMode && this.localP2Id) {
-      const p1Sprite = this.playerRenderer.getSprite(this.localPlayerId);
-      const p2Sprite = this.playerRenderer.getSprite(this.localP2Id);
+      const p1Sprite = this.playerRenderer?.getSprite(this.localPlayerId);
+      const p2Sprite = this.playerRenderer?.getSprite(this.localP2Id);
 
       if (this.coopCameraMode === 'shared') {
         // Shared auto-zoom: camera follows midpoint, zooms out as players separate
@@ -1286,7 +1398,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    const sprite = this.playerRenderer.getSprite(this.localPlayerId);
+    const sprite = this.playerRenderer?.getSprite(this.localPlayerId);
     if (!sprite) return;
 
     const targetX = sprite.x - cam.width / 2;
@@ -1356,14 +1468,16 @@ export class GameScene extends Phaser.Scene {
       if (this.keysDown.has('ArrowRight') || this.keysDown.has('KeyD')) this.freeCamX += panSpeed;
 
       // Gamepad spectator input
-      const gpSpec = this.gamepadManager.pollSpectator();
-      if (gpSpec.panX !== 0 || gpSpec.panY !== 0) {
-        this.freeCamX += gpSpec.panX * panSpeed;
-        this.freeCamY += gpSpec.panY * panSpeed;
-        this.spectateTargetId = null;
-      }
-      if (gpSpec.nextPlayer || gpSpec.prevPlayer) {
-        this.cycleSpectateTarget(gpSpec.nextPlayer ? 1 : -1);
+      const gpSpec = this.gamepadManager?.pollSpectator();
+      if (gpSpec) {
+        if (gpSpec.panX !== 0 || gpSpec.panY !== 0) {
+          this.freeCamX += gpSpec.panX * panSpeed;
+          this.freeCamY += gpSpec.panY * panSpeed;
+          this.spectateTargetId = null;
+        }
+        if (gpSpec.nextPlayer || gpSpec.prevPlayer) {
+          this.cycleSpectateTarget(gpSpec.nextPlayer ? 1 : -1);
+        }
       }
 
       if (this.lastGameState) {
@@ -1413,12 +1527,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Poll gamepad before throttle to capture just-pressed actions
-    const gpInput = this.gamepadManager.poll();
-    if (gpInput.action) {
+    const gpInput = this.gamepadManager?.poll();
+    if (gpInput?.action) {
       this.pendingGamepadAction = gpInput.action;
     }
 
-    if (!this.cursors && !this.gamepadManager.isConnected()) return;
+    if (!this.cursors && !this.gamepadManager?.isConnected()) return;
 
     const now = Date.now();
     if (now - this.lastInputTime < TICK_MS) return;
@@ -1439,7 +1553,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Gamepad input (fills nulls — keyboard takes priority)
-    if (!direction && gpInput.direction) direction = gpInput.direction;
+    if (!direction && gpInput?.direction) direction = gpInput.direction;
     if (!action && this.pendingGamepadAction) {
       action = this.pendingGamepadAction;
       this.pendingGamepadAction = null;
@@ -1590,24 +1704,37 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** Destroy every composed renderer and drop the references. (audit C9) */
   private cleanupRenderers(): void {
     this.tileMap?.destroy();
+    this.tileMap = null;
     this.playerRenderer?.destroy();
+    this.playerRenderer = null;
     this.bombRenderer?.destroy();
+    this.bombRenderer = null;
     this.explosionRenderer?.destroy();
+    this.explosionRenderer = null;
     this.powerUpRenderer?.destroy();
+    this.powerUpRenderer = null;
     this.zoneRenderer?.destroy();
+    this.zoneRenderer = null;
     this.hillZoneRenderer?.destroy();
+    this.hillZoneRenderer = null;
     this.effectSystem?.destroy();
+    this.effectSystem = null;
     this.countdownOverlay?.destroy();
+    this.countdownOverlay = null;
     this.mapEventRenderer?.destroy();
+    this.mapEventRenderer = null;
     this.gamepadManager?.destroy();
+    this.gamepadManager = null;
     this.enemyRenderer?.destroy();
     this.enemyRenderer = null;
     this.emoteRenderer?.destroy();
     this.emoteRenderer = null;
     this.emoteWheel?.hide();
     this.emoteWheel = null;
+    this.storedTiles = null;
   }
 
   private pauseCampaign(): void {
@@ -1699,10 +1826,10 @@ export class GameScene extends Phaser.Scene {
       overlay,
       `
       <div class="pause-menu">
-        <h2 class="pause-title">PAUSED</h2>
-        <button class="btn btn-primary pause-btn" id="pause-continue">Continue</button>
-        <button class="btn btn-secondary pause-btn" id="pause-restart">Restart Level</button>
-        <button class="btn btn-ghost pause-btn" id="pause-exit">Exit Level</button>
+        <h2 class="pause-title">${t('ui:game.pausedTitle')}</h2>
+        <button class="btn btn-primary pause-btn" id="pause-continue">${t('ui:game.pauseContinue')}</button>
+        <button class="btn btn-secondary pause-btn" id="pause-restart">${t('ui:game.pauseRestartLevel')}</button>
+        <button class="btn btn-ghost pause-btn" id="pause-exit">${t('ui:game.pauseExitLevel')}</button>
       </div>
     `,
     );
@@ -1900,6 +2027,18 @@ export class GameScene extends Phaser.Scene {
     if (this.campaignPartnerLeftHandler) {
       this.socketClient.off('campaign:partnerLeft', this.campaignPartnerLeftHandler);
       this.campaignPartnerLeftHandler = null;
+    }
+    if (this.campaignEnemyDiedHandler) {
+      this.socketClient.off('campaign:enemyDied', this.campaignEnemyDiedHandler);
+      this.campaignEnemyDiedHandler = null;
+    }
+    if (this.campaignExitOpenedHandler) {
+      this.socketClient.off('campaign:exitOpened', this.campaignExitOpenedHandler);
+      this.campaignExitOpenedHandler = null;
+    }
+    if (this.campaignPlayerDiedHandler) {
+      this.socketClient.off('campaign:playerDied', this.campaignPlayerDiedHandler);
+      this.campaignPlayerDiedHandler = null;
     }
   }
 

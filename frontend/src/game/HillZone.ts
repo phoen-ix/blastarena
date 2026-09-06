@@ -2,12 +2,10 @@ import { HillZone } from '@blast-arena/shared';
 import { TILE_SIZE } from '@blast-arena/shared';
 
 export class HillZoneRenderer {
-  private scene: Phaser.Scene;
   private graphics: Phaser.GameObjects.Graphics;
   private pulseTimer: number = 0;
 
   constructor(scene: Phaser.Scene) {
-    this.scene = scene;
     this.graphics = scene.add.graphics();
     this.graphics.setDepth(5); // Above tiles, below players/bombs
   }

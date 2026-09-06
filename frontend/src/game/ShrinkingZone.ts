@@ -2,11 +2,9 @@ import { ZoneState } from '@blast-arena/shared';
 import { TILE_SIZE } from '@blast-arena/shared';
 
 export class ShrinkingZoneRenderer {
-  private scene: Phaser.Scene;
   private graphics: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene) {
-    this.scene = scene;
     this.graphics = scene.add.graphics();
     this.graphics.setDepth(15);
   }

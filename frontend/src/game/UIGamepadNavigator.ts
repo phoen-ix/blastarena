@@ -90,7 +90,7 @@ export class UIGamepadNavigator {
 
       const pad = this.getPad();
       if (!pad) {
-        this.prevButtons = [];
+        this.prevButtons.length = 0;
         this.prevDirection = null;
         return;
       }
@@ -141,8 +141,11 @@ export class UIGamepadNavigator {
         }
       }
 
-      // Store button states
-      this.prevButtons = pad.buttons.map((b) => b.pressed);
+      // Store button states in place — no per-frame `buttons.map()` allocation. (audit F10)
+      const buttons = pad.buttons;
+      const prev = this.prevButtons;
+      prev.length = buttons.length;
+      for (let i = 0; i < buttons.length; i++) prev[i] = buttons[i].pressed;
     };
 
     this.pollRAF = requestAnimationFrame(poll);

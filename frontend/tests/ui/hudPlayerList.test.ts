@@ -4,7 +4,12 @@ import { HudPlayerList } from '../../src/ui/hudPlayerList';
 
 // i18n is not initialised in tests; t() would return the raw key, which is fine but noisy.
 vi.mock('../../src/i18n', () => ({
-  t: (key: string) => (key === 'ui:hud.teamRed' ? 'RED' : key === 'ui:hud.teamBlue' ? 'BLUE' : key),
+  t: (key: string) => {
+    if (key === 'ui:hud.teamRed') return 'RED';
+    if (key === 'ui:hud.teamBlue') return 'BLUE';
+    if (key === 'ui:hud.buddyTag') return '[BUDDY]';
+    return key;
+  },
 }));
 
 /** A PlayerState with only the fields the list reads; the rest never leave the server. */

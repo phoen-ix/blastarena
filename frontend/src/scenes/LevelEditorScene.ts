@@ -149,6 +149,13 @@ export class LevelEditorScene extends Phaser.Scene {
   private isDirty = false;
   private savedState: string = '';
   private beforeUnloadHandler: ((e: BeforeUnloadEvent) => void) | null = null;
+  /**
+   * Bumped on every create() and shutdown(). The async loadData() continuation compares it to
+   * the value it captured, so a scene that was stopped (or restarted) while the fetch was in
+   * flight does not build UI, arm beforeunload or push a gamepad context on a dead instance.
+   * (audit C6)
+   */
+  private sessionId = 0;
 
   // DOM overlay
   private editorContainer: HTMLElement | null = null;
@@ -202,7 +209,10 @@ export class LevelEditorScene extends Phaser.Scene {
     this.isDirty = false;
 
     // Load enemy types
+    const session = ++this.sessionId;
     this.loadData().then(() => {
+      // Scene stopped or restarted while loading — nothing below may touch it. (audit C6)
+      if (session !== this.sessionId || !this.scene.isActive()) return;
       this.buildGrid();
       this.buildGridOverlay();
       this.drawSpawnOverlay();
@@ -701,7 +711,17 @@ export class LevelEditorScene extends Phaser.Scene {
 
     const posKey = `${tx},${ty}`;
     const currentTile = this.tiles[ty][tx];
+    this.applyTool(tx, ty, posKey, currentTile);
 
+    // The spawn overlay (a full-grid scan plus a Text object per spawn) is only worth rebuilding
+    // when a spawn tile was placed or removed — not on every pointermove while painting.
+    // (audit F10)
+    if (currentTile === 'spawn' || this.tiles[ty][tx] === 'spawn') {
+      this.drawSpawnOverlay();
+    }
+  }
+
+  private applyTool(tx: number, ty: number, posKey: string, currentTile: TileType): void {
     switch (this.currentTool) {
       case 'empty': {
         // Placing empty on a wall with a covered tile: restore the covered tile
@@ -870,7 +890,8 @@ export class LevelEditorScene extends Phaser.Scene {
     }
   }
 
-  private updateTileSprite(x: number, y: number, skipOverlay?: boolean): void {
+  /** Swap one tile sprite's texture; callers redraw the spawn overlay themselves if needed. */
+  private updateTileSprite(x: number, y: number): void {
     const tileType = this.tiles[y][x];
     const texture = getTileTexture(tileType, x, y, this.worldTheme);
     const sprite = this.tileSprites[y]?.[x];
@@ -882,7 +903,6 @@ export class LevelEditorScene extends Phaser.Scene {
         if (this.anims.exists(animKey)) sprite.play(animKey);
       }
     }
-    if (!skipOverlay) this.drawSpawnOverlay();
   }
 
   private removeEntitiesAt(x: number, y: number): void {
@@ -1025,33 +1045,32 @@ export class LevelEditorScene extends Phaser.Scene {
     );
     document.getElementById('ui-overlay')!.appendChild(overlay);
 
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
-
+    // One close path for every way out. The backdrop click used to remove the overlay but leave
+    // the window keydown handler bound, so each dismissed dialog left one more Escape listener
+    // behind. (audit C6)
     const onKeydown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        overlay.remove();
-        window.removeEventListener('keydown', onKeydown);
-      }
+      if (e.key === 'Escape') close();
+    };
+    const close = () => {
+      overlay.remove();
+      window.removeEventListener('keydown', onKeydown);
     };
     window.addEventListener('keydown', onKeydown);
 
-    overlay.querySelector('#unsaved-cancel')!.addEventListener('click', () => {
-      overlay.remove();
-      window.removeEventListener('keydown', onKeydown);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
     });
 
+    overlay.querySelector('#unsaved-cancel')!.addEventListener('click', close);
+
     overlay.querySelector('#unsaved-discard')!.addEventListener('click', () => {
-      overlay.remove();
-      window.removeEventListener('keydown', onKeydown);
+      close();
       this.isDirty = false;
       this.doNavigateBack();
     });
 
     overlay.querySelector('#unsaved-save')!.addEventListener('click', async () => {
-      overlay.remove();
-      window.removeEventListener('keydown', onKeydown);
+      close();
       await this.saveLevel();
       if (!this.isDirty) {
         this.doNavigateBack();
@@ -1103,7 +1122,7 @@ export class LevelEditorScene extends Phaser.Scene {
     } else {
       for (let y = 0; y < this.mapHeight; y++) {
         for (let x = 0; x < this.mapWidth; x++) {
-          this.updateTileSprite(x, y, true);
+          this.updateTileSprite(x, y);
         }
       }
       this.drawSpawnOverlay();
@@ -1927,6 +1946,21 @@ export class LevelEditorScene extends Phaser.Scene {
     try {
       if (this.levelId) {
         await apiClient.put(`/admin/campaign/levels/${this.levelId}`, levelData);
+      } else {
+        // No level yet: create it in the world the editor was opened for. This used to fall
+        // through to the "saved" toast and clear the dirty flag without saving anything.
+        // (audit C6)
+        const worldId = this.registry.get('editorWorldId') as number | undefined;
+        if (!worldId) {
+          this.showToast(t('editor:toasts.noWorld'), 'error');
+          return;
+        }
+        const resp = await apiClient.post<{ id: number }>('/admin/campaign/levels', {
+          ...levelData,
+          worldId,
+        });
+        this.levelId = resp.id;
+        this.registry.set('editorLevelId', this.levelId);
       }
       this.savedState = this.serializeState();
       this.isDirty = false;
@@ -2015,6 +2049,8 @@ export class LevelEditorScene extends Phaser.Scene {
   }
 
   shutdown(): void {
+    // Invalidate any loadData() continuation still in flight (audit C6)
+    this.sessionId++;
     if (this.onResize) {
       this.scale.off('resize', this.onResize);
       this.onResize = undefined;

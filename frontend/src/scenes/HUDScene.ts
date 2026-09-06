@@ -3,14 +3,17 @@ import {
   GameState,
   PlayerState,
   CampaignGameState,
+  CampaignEnemyState,
   TileType,
   KillCause,
   OpenWorldScoreEntry,
+  ServerToClientEvents,
 } from '@blast-arena/shared';
 import { escapeHtml, setHtml } from '../utils/html';
 import { HudPlayerList } from '../ui/hudPlayerList';
 import { SpectatorChat } from '../game/SpectatorChat';
 import { SpectatorActionBar } from '../game/SpectatorActionBar';
+import { MinimapTerrain } from '../game/minimapTerrain';
 import { t } from '../i18n';
 import { getSettings } from '../game/Settings';
 import { PLAYER_COLORS } from './BootScene';
@@ -20,11 +23,20 @@ import type { AuthManager } from '../network/AuthManager';
 import type { SocketClient } from '../network/SocketClient';
 import type { GameScene } from './GameScene';
 
+/** How long an admin broadcast stays on screen before hiding itself. */
+const ADMIN_BANNER_MS = 10_000;
+
 export class HUDScene extends Phaser.Scene {
   private hudContainer!: HTMLElement;
   private statsEl!: HTMLElement;
   private playerListEl!: HTMLElement;
   private killFeedEl!: HTMLElement;
+  // Cached once per create(); updateHUD used to getElementById these on every tick. (audit F4)
+  private timerEl: HTMLElement | null = null;
+  private specBannerEl: HTMLElement | null = null;
+  private lastTimerText = '';
+  private lastTimerColor = '';
+  private lastSpecBannerShown: boolean | null = null;
   private localPlayerDead: boolean = false;
   private localPlayerId!: number;
   private boundClickHandler: ((e: MouseEvent) => void) | null = null;
@@ -35,6 +47,12 @@ export class HUDScene extends Phaser.Scene {
   private killFeedEntries: { text: string; time: number; el?: HTMLElement }[] = [];
   private stateUpdateHandler: ((state: GameState) => void) | null = null;
   private campaignStateHandler: ((state: CampaignGameState) => void) | null = null;
+  private campaignPlayerDiedHandler: (() => void) | null = null;
+  // Admin "message room" broadcast: the server has always rebroadcast it, nothing rendered it.
+  // Handler ref kept and removed in shutdown(). (audit G7)
+  private adminMessageHandler: ServerToClientEvents['admin:roomMessage'] | null = null;
+  private adminBannerEl: HTMLElement | null = null;
+  private adminBannerTimer: ReturnType<typeof setTimeout> | null = null;
   private previousStats: {
     maxBombs: number;
     fireRange: number;
@@ -62,8 +80,15 @@ export class HUDScene extends Phaser.Scene {
   // Campaign HUD
   private campaignMode: boolean = false;
   private campaignHudEl: HTMLElement | null = null;
+  private campaignLivesEl: HTMLElement | null = null;
+  private campaignEnemiesEl: HTMLElement | null = null;
+  private campaignCoopStatusEl: HTMLElement | null = null;
   private lastCampaignLives: number = -1;
   private lastCampaignEnemyCount: number = -1;
+  /** Rendered co-op status row, so the DOMPurify-backed setHtml only runs on change. (audit F4) */
+  private lastCoopStatusSig = '';
+  private bossFillEl: HTMLElement | null = null;
+  private lastBossFillWidth = '';
   private spectatorChat: SpectatorChat | null = null;
   private spectatorChatMounted: boolean = false;
   public spectatorActionBar: SpectatorActionBar | null = null;
@@ -106,7 +131,11 @@ export class HUDScene extends Phaser.Scene {
   private minimapCtx: CanvasRenderingContext2D | null = null;
   private minimapEnabled: boolean = true;
   private minimapTileSize: number = 0;
-  private minimapTiles: TileType[][] | null = null;
+  /** Offscreen terrain layer, drawn once and patched per tile diff. (audit F1) */
+  private minimapTerrain: MinimapTerrain | null = null;
+  private minimapTerrainCanvas: HTMLCanvasElement | null = null;
+  /** Full grid from the initial state, held until the terrain layer is first built. */
+  private minimapSeedTiles: TileType[][] | null = null;
   private lastMinimapTick: number = -1;
 
   constructor() {
@@ -144,13 +173,26 @@ export class HUDScene extends Phaser.Scene {
     }
 
     this.killFeedEntries = [];
+    // Previous match's roster must not name victims in this one (audit C9)
+    this.lastKnownPlayers = [];
     this.previousStats = null;
     this.statEls = null;
     this.playerList.reset();
+    this.lastTimerText = '';
+    this.lastTimerColor = '';
+    this.lastSpecBannerShown = null;
     this.lastCampaignLives = -1;
     this.lastCampaignEnemyCount = -1;
+    this.lastCoopStatusSig = '';
+    this.bossFillEl = null;
+    this.lastBossFillWidth = '';
+    document.getElementById('campaign-boss-hp')?.remove();
     this.campaignHudEl?.remove();
     this.campaignHudEl = null;
+    this.campaignLivesEl = null;
+    this.campaignEnemiesEl = null;
+    this.campaignCoopStatusEl = null;
+    this.hideAdminBanner();
     this.spectatorActionBar?.destroy();
     this.spectatorActionBar = null;
     this.spectatorActionBarMounted = false;
@@ -179,6 +221,8 @@ export class HUDScene extends Phaser.Scene {
       </div>
     `,
     );
+    this.timerEl = this.hudContainer.querySelector<HTMLElement>('#hud-timer');
+    this.specBannerEl = this.hudContainer.querySelector<HTMLElement>('#hud-spectator');
 
     // Player list
     this.playerListEl = document.createElement('div');
@@ -207,7 +251,9 @@ export class HUDScene extends Phaser.Scene {
     this.minimapContainer = null;
     this.minimapCanvas = null;
     this.minimapCtx = null;
-    this.minimapTiles = null;
+    this.minimapTerrain = null;
+    this.minimapTerrainCanvas = null;
+    this.minimapSeedTiles = null;
     this.lastMinimapTick = -1;
     if (this.minimapEnabled) {
       this.minimapContainer = document.createElement('div');
@@ -257,6 +303,12 @@ export class HUDScene extends Phaser.Scene {
         this.onPlayerDied(data);
       };
       this.socketClient.on('game:playerDied', this.playerDiedHandler);
+
+      // Admin broadcast to the room (audit G7)
+      this.adminMessageHandler = (data) => {
+        this.showAdminBanner(data.message, data.from);
+      };
+      this.socketClient.on('admin:roomMessage', this.adminMessageHandler);
     }
 
     // Listen for state updates from GameScene
@@ -269,7 +321,7 @@ export class HUDScene extends Phaser.Scene {
     // Seed minimap tiles from initial state — GameScene emits stateUpdate during
     // its create() before HUDScene registers its listener, so we miss the full tiles
     if (this.minimapEnabled && initialState?.map?.tiles?.length) {
-      this.minimapTiles = initialState.map.tiles.map((row) => [...row]);
+      this.minimapSeedTiles = initialState.map.tiles;
     }
 
     // Campaign mode: add lives/enemy counter, hide player list and kill feed
@@ -293,6 +345,10 @@ export class HUDScene extends Phaser.Scene {
       );
       const overlay = document.getElementById('ui-overlay');
       overlay?.appendChild(this.campaignHudEl);
+      this.campaignLivesEl = this.campaignHudEl.querySelector<HTMLElement>('#campaign-lives');
+      this.campaignEnemiesEl = this.campaignHudEl.querySelector<HTMLElement>('#campaign-enemies');
+      this.campaignCoopStatusEl =
+        this.campaignHudEl.querySelector<HTMLElement>('#campaign-coop-status');
 
       // Listen for campaign state updates via Phaser event from GameScene
       // (not directly on socket — avoids shared-listener cleanup issues across scenes)
@@ -300,7 +356,69 @@ export class HUDScene extends Phaser.Scene {
         this.updateCampaignHUD(state);
       };
       gameScene.events.on('campaignStateUpdate', this.campaignStateHandler);
+
+      // A life lost: pulse the hearts so the change registers (audit G7)
+      this.campaignPlayerDiedHandler = () => this.flashCampaignLives();
+      gameScene.events.on('campaignPlayerDied', this.campaignPlayerDiedHandler);
     }
+  }
+
+  /** Brief pulse of the lives display when the party loses a life. */
+  private flashCampaignLives(): void {
+    const el = this.campaignLivesEl;
+    if (!el || typeof el.animate !== 'function') return;
+    el.animate(
+      [
+        { transform: 'scale(1)', filter: 'brightness(1)' },
+        { transform: 'scale(1.4)', filter: 'brightness(2.2)', offset: 0.3 },
+        { transform: 'scale(1)', filter: 'brightness(1)' },
+      ],
+      { duration: 550, easing: 'ease-out' },
+    );
+  }
+
+  /**
+   * Dismissible banner for an admin's "message room" broadcast. One at a time — a newer message
+   * replaces the current banner — and it hides itself after ADMIN_BANNER_MS. (audit G7)
+   */
+  private showAdminBanner(message: string, from: string): void {
+    this.hideAdminBanner();
+    const banner = document.createElement('div');
+    banner.className = 'hud-admin-banner';
+    banner.setAttribute('role', 'status');
+    banner.style.cssText =
+      'position:fixed;top:72px;left:50%;transform:translateX(-50%);max-width:min(640px,90vw);' +
+      'display:flex;align-items:flex-start;gap:12px;padding:10px 14px;' +
+      'background:rgba(20,16,40,0.92);border:1px solid var(--primary);border-radius:8px;' +
+      'color:var(--text);font-family:"DM Sans",sans-serif;font-size:14px;z-index:120;' +
+      'box-shadow:0 4px 20px rgba(0,0,0,0.5);';
+    setHtml(
+      banner,
+      `
+      <div style="flex:1;min-width:0;">
+        <div style="font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--primary);margin-bottom:2px;">${escapeHtml(t('ui:hud.adminMessageFrom', { from }))}</div>
+        <div style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(message)}</div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm hud-admin-banner-close" aria-label="${escapeHtml(t('common:actions.close'))}" style="flex-shrink:0;padding:2px 8px;line-height:1;">✕</button>
+    `,
+    );
+    banner
+      .querySelector('.hud-admin-banner-close')
+      ?.addEventListener('click', () => this.hideAdminBanner());
+    // Keep Space/Enter on the focused close button out of the game input
+    banner.addEventListener('keydown', (e) => e.stopPropagation());
+    document.getElementById('ui-overlay')?.appendChild(banner);
+    this.adminBannerEl = banner;
+    this.adminBannerTimer = setTimeout(() => this.hideAdminBanner(), ADMIN_BANNER_MS);
+  }
+
+  private hideAdminBanner(): void {
+    if (this.adminBannerTimer) {
+      clearTimeout(this.adminBannerTimer);
+      this.adminBannerTimer = null;
+    }
+    this.adminBannerEl?.remove();
+    this.adminBannerEl = null;
   }
 
   private static CAUSE_ICONS: Record<string, string> = {
@@ -319,15 +437,11 @@ export class HUDScene extends Phaser.Scene {
     killerId: number | null;
     cause?: KillCause;
   }): void {
-    // Look up names from latest game state
-    const state = this.registry.get('initialGameState') as GameState | undefined;
-    if (!state) return;
-
-    // We use the last known state stored in the event context
-    const victim = this.lastKnownPlayers?.find((p) => p.id === data.playerId);
-    const killer = data.killerId
-      ? this.lastKnownPlayers?.find((p) => p.id === data.killerId)
-      : null;
+    // Names come from the last state this HUD rendered. (This used to bail when the unrelated
+    // `initialGameState` registry key was absent — e.g. after a replay exit cleared it.
+    // audit C9)
+    const victim = this.lastKnownPlayers.find((p) => p.id === data.playerId);
+    const killer = data.killerId ? this.lastKnownPlayers.find((p) => p.id === data.killerId) : null;
 
     const causeIcon = HUDScene.CAUSE_ICONS[data.cause ?? 'bomb'] ?? '💣';
 
@@ -387,33 +501,34 @@ export class HUDScene extends Phaser.Scene {
   private lastKnownPlayers: PlayerState[] = [];
 
   private renderKillFeed(): void {
+    // Runs every tick; the feed is empty for most of a match. (audit F4)
+    if (!this.killFeedEl || this.killFeedEntries.length === 0) return;
     const now = Date.now();
-    if (!this.killFeedEl) return;
 
-    // Remove expired entries and their DOM elements
-    const filtered: typeof this.killFeedEntries = [];
-    for (const entry of this.killFeedEntries) {
-      if (now - entry.time >= 5000) {
+    // Expire in place, newest entries are at the end so removal is cheap
+    const entries = this.killFeedEntries;
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const entry = entries[i];
+      const age = now - entry.time;
+      if (age >= 5000) {
         entry.el?.remove();
+        entries.splice(i, 1);
+        continue;
+      }
+      // Update opacity on surviving entries
+      const opacity = Math.max(0.3, 1 - age / 5000);
+      if (entry.el) {
+        entry.el.style.opacity = String(opacity);
       } else {
-        // Update opacity on surviving entries
-        const age = now - entry.time;
-        const opacity = Math.max(0.3, 1 - age / 5000);
-        if (entry.el) {
-          entry.el.style.opacity = String(opacity);
-        } else {
-          // Create DOM element for new entries
-          const el = document.createElement('div');
-          el.className = 'killfeed-entry';
-          el.style.opacity = String(opacity);
-          setHtml(el, entry.text);
-          this.killFeedEl.appendChild(el);
-          entry.el = el;
-        }
-        filtered.push(entry);
+        // Create DOM element for new entries
+        const el = document.createElement('div');
+        el.className = 'killfeed-entry';
+        el.style.opacity = String(opacity);
+        setHtml(el, entry.text);
+        this.killFeedEl.appendChild(el);
+        entry.el = el;
       }
     }
-    this.killFeedEntries = filtered;
   }
 
   private updateHUD(state: GameState): void {
@@ -463,34 +578,46 @@ export class HUDScene extends Phaser.Scene {
       this.spectatorActionBar.updateFromState(state.spectatorEnergy, this.localPlayerId);
     }
 
-    // Spectator banner (not useful in campaign — single player, respawns)
-    const specBanner = document.getElementById('hud-spectator');
-    if (specBanner) {
-      specBanner.style.display = this.localPlayerDead && !this.campaignMode ? 'block' : 'none';
+    // Spectator banner (not useful in campaign — single player, respawns). Cached element,
+    // written only when the visibility flips. (audit F4)
+    const showSpecBanner = this.localPlayerDead && !this.campaignMode;
+    if (this.specBannerEl && showSpecBanner !== this.lastSpecBannerShown) {
+      this.lastSpecBannerShown = showSpecBanner;
+      this.specBannerEl.style.display = showSpecBanner ? 'block' : 'none';
     }
 
-    // Timer — count-up for campaign with no time limit, countdown otherwise
-    const timerEl = document.getElementById('hud-timer');
-    if (timerEl) {
-      timerEl.style.display = '';
+    // Timer — count-up for campaign with no time limit, countdown otherwise. The text changes
+    // once a second, not once a tick, so text/colour writes are gated on change. (audit F4)
+    if (this.timerEl) {
+      let text: string;
+      let color: string;
       if (this.campaignMode && state.roundTime >= 99999) {
         const elapsed = Math.max(0, Math.floor(state.timeElapsed));
         const mins = Math.floor(elapsed / 60);
         const secs = elapsed % 60;
-        timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-        timerEl.style.color = '#fff';
+        text = `${mins}:${secs.toString().padStart(2, '0')}`;
+        color = '#fff';
       } else {
         const remaining = Math.max(0, Math.ceil(state.roundTime - state.timeElapsed));
         const mins = Math.floor(remaining / 60);
         const secs = remaining % 60;
-        timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-        timerEl.style.color = remaining <= 30 ? '#ff3355' : '#fff';
+        text = `${mins}:${secs.toString().padStart(2, '0')}`;
+        color = remaining <= 30 ? '#ff3355' : '#fff';
+      }
+      if (text !== this.lastTimerText) {
+        if (this.lastTimerText === '') this.timerEl.style.display = '';
+        this.lastTimerText = text;
+        this.timerEl.textContent = text;
+      }
+      if (color !== this.lastTimerColor) {
+        this.lastTimerColor = color;
+        this.timerEl.style.color = color;
       }
     }
 
     // Player stats bar (element reuse — only update text/class when values change)
     if (me && me.alive) {
-      const statsEl = document.getElementById('hud-stats');
+      const statsEl = this.statsEl;
       if (statsEl) {
         // Lazily create stat elements once
         if (!this.statEls) {
@@ -564,7 +691,7 @@ export class HUDScene extends Phaser.Scene {
     }
 
     // Player list (open world renders the leaderboard instead)
-    const playersEl = this.openWorldMode ? null : document.getElementById('hud-players');
+    const playersEl = this.openWorldMode ? null : this.playerListEl;
     if (playersEl) {
       this.playerList.render(playersEl, state.players, {
         kothScores: state.kothScores,
@@ -585,19 +712,26 @@ export class HUDScene extends Phaser.Scene {
 
     const map = state.map;
     const maxSize = 140;
+    const fullTiles = map.tiles && map.tiles.length > 0 ? map.tiles : null;
 
-    // Maintain local tile copy (tick states omit full tiles for bandwidth).
+    // Terrain layer: built from the first full grid seen (or the seed from the initial state),
+    // rebuilt when the map size changes (open-world round restart), otherwise patched.
     //
     // This MUST happen before the redraw throttle below. tileDiffs are per-tick and cleared
     // server-side after each broadcast, so a diff skipped here is lost for good — with the
     // throttle in front, three out of every four ticks' diffs were dropped and destroyed walls
     // stayed drawn on the minimap for the rest of the match. (audit MINIMAP-DIFF-1)
-    if (map.tiles && map.tiles.length > 0) {
-      this.minimapTiles = map.tiles.map((row) => [...row]);
-    } else if (this.minimapTiles && state.tileDiffs) {
-      for (const diff of state.tileDiffs) {
-        this.minimapTiles[diff.y][diff.x] = diff.type;
-      }
+    if (!this.minimapTerrain || !this.minimapTerrain.matches(map.width, map.height)) {
+      const tiles = fullTiles ?? this.minimapSeedTiles;
+      if (!tiles || tiles.length < map.height) return;
+      this.buildMinimapCanvases(map.width, map.height, tiles, maxSize);
+      this.minimapSeedTiles = null;
+    } else if (fullTiles) {
+      // Replays and simulation spectate carry the whole grid every frame: cheap compare, patch
+      // only what changed. (audit F1)
+      this.minimapTerrain.sync(fullTiles);
+    } else if (state.tileDiffs) {
+      this.minimapTerrain.applyDiffs(state.tileDiffs);
     }
 
     // Redraw at ~5 FPS for performance.
@@ -610,30 +744,13 @@ export class HUDScene extends Phaser.Scene {
     if (state.tick - this.lastMinimapTick < 4) return;
     this.lastMinimapTick = state.tick;
 
-    if (!this.minimapTiles) return;
-
-    // Lazily create canvas on first state with map data
-    if (!this.minimapCanvas) {
-      const ts = Math.max(1, Math.floor(maxSize / Math.max(map.width, map.height)));
-      this.minimapTileSize = ts;
-      this.minimapCanvas = document.createElement('canvas');
-      this.minimapCanvas.width = map.width * ts;
-      this.minimapCanvas.height = map.height * ts;
-      this.minimapCanvas.style.imageRendering = 'pixelated';
-      this.minimapCtx = this.minimapCanvas.getContext('2d')!;
-      this.minimapContainer.appendChild(this.minimapCanvas);
-    }
-
-    const ctx = this.minimapCtx!;
+    const ctx = this.minimapCtx;
+    const terrainCanvas = this.minimapTerrainCanvas;
+    if (!ctx || !terrainCanvas) return;
     const ts = this.minimapTileSize;
 
-    // Draw tiles
-    for (let y = 0; y < map.height; y++) {
-      for (let x = 0; x < map.width; x++) {
-        ctx.fillStyle = this.getMinimapTileColor(this.minimapTiles[y][x]);
-        ctx.fillRect(x * ts, y * ts, ts, ts);
-      }
-    }
+    // Terrain: one blit of the pre-painted layer instead of a fillRect per tile. (audit F1)
+    ctx.drawImage(terrainCanvas, 0, 0);
 
     // Draw bombs (pulsing yellow/red)
     const bombBright = state.tick % 8 < 4;
@@ -698,89 +815,106 @@ export class HUDScene extends Phaser.Scene {
     }
   }
 
-  private getMinimapTileColor(type: TileType): string {
-    switch (type) {
-      case 'wall':
-        return '#333355';
-      case 'destructible':
-        return '#886633';
-      case 'destructible_cracked':
-        return '#776622';
-      case 'lava':
-        return '#cc3300';
-      case 'pit':
-        return '#0a0a12';
-      case 'ice':
-        return '#8ac8e8';
-      default:
-        return '#1a1a2e';
+  /** (Re)create the visible minimap canvas and its offscreen terrain layer for a map size. */
+  private buildMinimapCanvases(
+    width: number,
+    height: number,
+    tiles: TileType[][],
+    maxSize: number,
+  ): void {
+    if (!this.minimapContainer) return;
+    const ts = Math.max(1, Math.floor(maxSize / Math.max(width, height)));
+    this.minimapTileSize = ts;
+
+    if (!this.minimapCanvas) {
+      this.minimapCanvas = document.createElement('canvas');
+      this.minimapCanvas.style.imageRendering = 'pixelated';
+      this.minimapContainer.appendChild(this.minimapCanvas);
     }
+    // Assigning the size also clears the canvas, which is what a new map wants
+    this.minimapCanvas.width = width * ts;
+    this.minimapCanvas.height = height * ts;
+    this.minimapCtx = this.minimapCanvas.getContext('2d');
+
+    this.minimapTerrainCanvas = document.createElement('canvas');
+    this.minimapTerrainCanvas.width = width * ts;
+    this.minimapTerrainCanvas.height = height * ts;
+    const terrainCtx = this.minimapTerrainCanvas.getContext('2d');
+    this.minimapTerrain = terrainCtx
+      ? new MinimapTerrain(terrainCtx, tiles, width, height, ts)
+      : null;
+    // Force an immediate redraw with the new terrain
+    this.lastMinimapTick = -1;
   }
 
   private updateCampaignHUD(state: CampaignGameState): void {
     // Lives display (hearts)
     if (state.lives !== this.lastCampaignLives) {
       this.lastCampaignLives = state.lives;
-      const livesEl = document.getElementById('campaign-lives');
-      if (livesEl) {
+      if (this.campaignLivesEl) {
         let hearts = '';
         for (let i = 0; i < state.maxLives; i++) {
           hearts += i < state.lives ? '❤️' : '🖤';
         }
-        livesEl.textContent = hearts;
+        this.campaignLivesEl.textContent = hearts;
       }
     }
 
-    // Enemy count
-    const aliveEnemies = state.enemies.filter((e) => e.alive).length;
+    // Enemy count (plain loop — this runs every tick; audit F4)
+    let aliveEnemies = 0;
+    let boss: CampaignEnemyState | undefined;
+    for (const e of state.enemies) {
+      if (!e.alive) continue;
+      aliveEnemies++;
+      if (e.isBoss && !boss) boss = e;
+    }
     if (aliveEnemies !== this.lastCampaignEnemyCount) {
       this.lastCampaignEnemyCount = aliveEnemies;
-      const enemiesEl = document.getElementById('campaign-enemies');
-      if (enemiesEl) {
-        enemiesEl.textContent =
+      if (this.campaignEnemiesEl) {
+        this.campaignEnemiesEl.textContent =
           aliveEnemies > 0 ? t('ui:hud.enemies', { count: aliveEnemies }) : '';
       }
     }
 
-    // Co-op player status indicators
-    if (state.coopMode) {
-      const statusEl = document.getElementById('campaign-coop-status');
-      if (statusEl) {
-        const players = state.gameState.players;
-        const locked = state.lockedInPlayers ?? [];
-        setHtml(
-          statusEl,
-          players
-            .map((p) => {
-              let statusIcon = '';
-              let statusColor = 'var(--success)';
-              if (!p.alive) {
-                statusIcon = ' (dead)';
-                statusColor = 'var(--danger)';
-                // Check respawn timer
-                if (state.respawnTimers && state.respawnTimers[p.id] !== undefined) {
-                  const ticksLeft = state.respawnTimers[p.id];
-                  const secsLeft = Math.ceil(ticksLeft / 20);
-                  statusIcon = ` (${secsLeft}s)`;
-                  statusColor = 'var(--warning)';
-                }
-              } else if (locked.includes(p.id)) {
-                statusIcon = ' (ready)';
-                statusColor = 'var(--accent)';
-              }
-              return `<span style="color:${statusColor}">${escapeHtml(p.username)}${statusIcon}</span>`;
-            })
-            .join(''),
+    // Co-op player status indicators. The row used to be rebuilt through setHtml (DOMPurify)
+    // on every tick; now only when its content actually changes. (audit F4)
+    if (state.coopMode && this.campaignCoopStatusEl) {
+      const players = state.gameState.players;
+      const locked = state.lockedInPlayers ?? [];
+      let sig = '';
+      const parts: string[] = [];
+      for (const p of players) {
+        let statusIcon = '';
+        let statusColor = 'var(--success)';
+        if (!p.alive) {
+          statusIcon = ` ${t('ui:hud.coopDead')}`;
+          statusColor = 'var(--danger)';
+          // Check respawn timer
+          if (state.respawnTimers && state.respawnTimers[p.id] !== undefined) {
+            const ticksLeft = state.respawnTimers[p.id];
+            const secsLeft = Math.ceil(ticksLeft / 20);
+            statusIcon = ` ${t('ui:hud.coopRespawnIn', { seconds: secsLeft })}`;
+            statusColor = 'var(--warning)';
+          }
+        } else if (locked.includes(p.id)) {
+          statusIcon = ` ${t('ui:hud.coopReady')}`;
+          statusColor = 'var(--accent)';
+        }
+        sig += `${p.id}|${p.username}|${statusColor}|${statusIcon};`;
+        parts.push(
+          `<span style="color:${statusColor}">${escapeHtml(p.username)}${escapeHtml(statusIcon)}</span>`,
         );
+      }
+      if (sig !== this.lastCoopStatusSig) {
+        this.lastCoopStatusSig = sig;
+        setHtml(this.campaignCoopStatusEl, parts.join(''));
       }
     }
 
-    // Boss HP bar
-    const boss = state.enemies.find((e) => e.isBoss && e.alive);
-    let bossBar = document.getElementById('campaign-boss-hp');
+    // Boss HP bar — fill element cached, width written only when it changes (audit F4)
     if (boss) {
-      if (!bossBar) {
-        bossBar = document.createElement('div');
+      if (!this.bossFillEl || !this.bossFillEl.isConnected) {
+        const bossBar = document.createElement('div');
         bossBar.id = 'campaign-boss-hp';
         bossBar.style.cssText =
           'position:fixed;top:40px;left:50%;transform:translateX(-50%);width:300px;height:20px;background:rgba(0,0,0,0.6);border-radius:4px;overflow:hidden;z-index:100;';
@@ -789,13 +923,18 @@ export class HUDScene extends Phaser.Scene {
         fill.id = 'campaign-boss-hp-fill';
         fill.style.cssText = 'height:100%;background:var(--danger);transition:width 0.2s;';
         bossBar.appendChild(fill);
+        this.bossFillEl = fill;
+        this.lastBossFillWidth = '';
       }
-      const fill = document.getElementById('campaign-boss-hp-fill');
-      if (fill) {
-        fill.style.width = `${(boss.hp / boss.maxHp) * 100}%`;
+      const width = `${(boss.hp / boss.maxHp) * 100}%`;
+      if (width !== this.lastBossFillWidth) {
+        this.lastBossFillWidth = width;
+        this.bossFillEl.style.width = width;
       }
-    } else if (bossBar) {
-      bossBar.remove();
+    } else if (this.bossFillEl) {
+      this.bossFillEl.parentElement?.remove();
+      this.bossFillEl = null;
+      this.lastBossFillWidth = '';
     }
   }
 
@@ -1024,7 +1163,7 @@ export class HUDScene extends Phaser.Scene {
     const user = authManager.getUser();
     if (!user) return;
 
-    this.spectatorChat = new SpectatorChat(socketClient, user.id, user.role);
+    this.spectatorChat = new SpectatorChat(socketClient, user.role);
     const uiOverlay = document.getElementById('ui-overlay');
     if (uiOverlay) {
       this.spectatorChat.mount(uiOverlay);
@@ -1151,6 +1290,16 @@ export class HUDScene extends Phaser.Scene {
       gameScene?.events.off('campaignStateUpdate', this.campaignStateHandler);
       this.campaignStateHandler = null;
     }
+    if (this.campaignPlayerDiedHandler) {
+      const gameScene = this.scene.get('GameScene');
+      gameScene?.events.off('campaignPlayerDied', this.campaignPlayerDiedHandler);
+      this.campaignPlayerDiedHandler = null;
+    }
+    if (this.adminMessageHandler && this.socketClient) {
+      this.socketClient.off('admin:roomMessage', this.adminMessageHandler);
+      this.adminMessageHandler = null;
+    }
+    this.hideAdminBanner();
     if (this.spectatorChat) {
       this.spectatorChat.destroy();
       this.spectatorChat = null;
@@ -1170,11 +1319,19 @@ export class HUDScene extends Phaser.Scene {
     this.teardownOpenWorldHud();
     this.minimapContainer?.remove();
     this.minimapContainer = null;
-    this.minimapTiles = null;
+    this.minimapTerrain = null;
+    this.minimapTerrainCanvas = null;
+    this.minimapSeedTiles = null;
     this.minimapCanvas = null;
     this.minimapCtx = null;
+    this.timerEl = null;
+    this.specBannerEl = null;
     this.campaignHudEl?.remove();
     this.campaignHudEl = null;
+    this.campaignLivesEl = null;
+    this.campaignEnemiesEl = null;
+    this.campaignCoopStatusEl = null;
     document.getElementById('campaign-boss-hp')?.remove();
+    this.bossFillEl = null;
   }
 }

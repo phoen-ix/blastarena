@@ -3,6 +3,16 @@ import { SocketClient } from '../network/SocketClient';
 import { TILE_SIZE, Position } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 import { audioManager } from './AudioManager';
+import { POWERUP_COLORS } from '../scenes/BootScene';
+import { t } from '../i18n';
+
+/**
+ * Upper bound on debris bursts per tile-destruction batch. A wall-collapse event or a long pierce
+ * chain can clear dozens of tiles in one tick; past this many, extra bursts add nothing visible.
+ */
+const MAX_DEBRIS_BURSTS = 24;
+/** Alive-particle cap for the shared debris emitter (~20 tiles' worth). */
+const MAX_DEBRIS_PARTICLES = 160;
 
 export class EffectSystem {
   private scene: Phaser.Scene;
@@ -13,6 +23,12 @@ export class EffectSystem {
   private pendingShakeDuration: number = 0;
   private shakeScheduled: boolean = false;
   wrappingMapSize: { width: number; height: number } | null = null;
+  /**
+   * One pooled emitter for every tile-destruction burst. Previously each destroyed tile got its
+   * own emitter plus a 500ms timer to destroy it again — a wall collapse or pierce chain created
+   * dozens at once. (audit F6)
+   */
+  private debrisEmitter: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
 
   private explosionHandler:
     | ((data: { cells: { x: number; y: number }[]; ownerId: number }) => void)
@@ -44,6 +60,8 @@ export class EffectSystem {
       if (data.playerId === this.localPlayerId) {
         audioManager.powerUpCollect();
       }
+      // The pickup burst + floating label existed but nothing called it. (audit G2)
+      this.onPowerUpCollected(data.position.x, data.position.y, data.type);
     };
 
     this.socketClient.on('game:explosion', this.explosionHandler);
@@ -55,16 +73,11 @@ export class EffectSystem {
     this.localPlayerAlive = alive;
   }
 
-  /** Called when tiles are destroyed - triggers debris particles */
-  onTilesDestroyed(positions: Position[]): void {
-    const settings = getSettings();
-    if (!settings.particles) return;
-
-    for (const pos of positions) {
-      const x = pos.x * TILE_SIZE + TILE_SIZE / 2;
-      const y = pos.y * TILE_SIZE + TILE_SIZE / 2;
-
-      const emitter = this.scene.add.particles(x, y, 'particle_debris', {
+  /** The shared debris emitter, created on first use (the emitter sits at the origin, so the
+   * world position passed to emitParticleAt is the particle's local position). */
+  private getDebrisEmitter(): Phaser.GameObjects.Particles.ParticleEmitter {
+    if (!this.debrisEmitter || !this.debrisEmitter.active) {
+      this.debrisEmitter = this.scene.add.particles(0, 0, 'particle_debris', {
         speed: { min: 40, max: 120 },
         lifespan: 400,
         scale: { start: 1, end: 0.3 },
@@ -72,40 +85,75 @@ export class EffectSystem {
         gravityY: 200,
         angle: { min: 0, max: 360 },
         emitting: false,
+        maxAliveParticles: MAX_DEBRIS_PARTICLES,
       });
-      emitter.setDepth(9);
-      emitter.explode(Phaser.Math.Between(6, 8));
-      this.scene.time.delayedCall(500, () => {
-        if (emitter && emitter.active) emitter.destroy();
-      });
+      this.debrisEmitter.setDepth(9);
+    }
+    return this.debrisEmitter;
+  }
+
+  /** Called when tiles are destroyed - triggers debris particles (audit F6) */
+  onTilesDestroyed(positions: Position[]): void {
+    const settings = getSettings();
+    if (!settings.particles || positions.length === 0) return;
+
+    const emitter = this.getDebrisEmitter();
+    const bursts = Math.min(positions.length, MAX_DEBRIS_BURSTS);
+    for (let i = 0; i < bursts; i++) {
+      const pos = positions[i];
+      emitter.emitParticleAt(
+        pos.x * TILE_SIZE + TILE_SIZE / 2,
+        pos.y * TILE_SIZE + TILE_SIZE / 2,
+        Phaser.Math.Between(6, 8),
+      );
     }
   }
 
+  /** Short-lived burst at a world position; the emitter frees itself after the particles die. */
+  private burst(
+    px: number,
+    py: number,
+    texture: string,
+    config: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig,
+    count: number,
+    ttlMs: number,
+  ): void {
+    const emitter = this.scene.add.particles(px, py, texture, { ...config, emitting: false });
+    emitter.setDepth(9);
+    emitter.explode(count);
+    this.scene.time.delayedCall(ttlMs, () => {
+      if (emitter && emitter.active) emitter.destroy();
+    });
+  }
+
   /** Called when a power-up is collected - shows text popup and particles */
-  onPowerUpCollected(x: number, y: number, type: string, color: number): void {
+  onPowerUpCollected(x: number, y: number, type: string): void {
     const settings = getSettings();
     const px = x * TILE_SIZE + TILE_SIZE / 2;
     const py = y * TILE_SIZE + TILE_SIZE / 2;
+    const color = POWERUP_COLORS[type] ?? 0xffffff;
 
     if (settings.particles) {
-      const emitter = this.scene.add.particles(px, py, 'particle_star', {
-        speed: { min: 40, max: 100 },
-        lifespan: 400,
-        scale: { start: 1, end: 0 },
-        alpha: { start: 0.9, end: 0 },
-        tint: color,
-        angle: { min: 0, max: 360 },
-        emitting: false,
-      });
-      emitter.setDepth(9);
-      emitter.explode(10);
-      this.scene.time.delayedCall(500, () => {
-        if (emitter && emitter.active) emitter.destroy();
-      });
+      this.burst(
+        px,
+        py,
+        'particle_star',
+        {
+          speed: { min: 40, max: 100 },
+          lifespan: 400,
+          scale: { start: 1, end: 0 },
+          alpha: { start: 0.9, end: 0 },
+          tint: color,
+          angle: { min: 0, max: 360 },
+        },
+        10,
+        500,
+      );
     }
 
     if (settings.animations) {
-      const name = type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const fallback = type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const name = t(`game:powerups.${type}.name`, { defaultValue: fallback });
       const colorHex = '#' + color.toString(16).padStart(6, '0');
       const text = this.scene.add
         .text(px, py - 10, name, {
@@ -199,6 +247,58 @@ export class EffectSystem {
     }
   }
 
+  /**
+   * Campaign enemy defeated: a burst at the tile, and a heavier one plus a camera shake for a
+   * boss. The server has always emitted `campaign:enemyDied`; nothing listened. (audit G7)
+   */
+  onEnemyDied(position: Position, isBoss: boolean): void {
+    const settings = getSettings();
+    const px = position.x * TILE_SIZE + TILE_SIZE / 2;
+    const py = position.y * TILE_SIZE + TILE_SIZE / 2;
+
+    audioManager.shieldBreak();
+    if (isBoss) audioManager.explosion(0);
+
+    if (settings.particles) {
+      this.burst(
+        px,
+        py,
+        'particle_star',
+        {
+          speed: { min: 60, max: isBoss ? 220 : 140 },
+          lifespan: isBoss ? 700 : 450,
+          scale: { start: isBoss ? 1.6 : 1.1, end: 0 },
+          alpha: { start: 1, end: 0 },
+          tint: isBoss ? [0xffdd44, 0xff4444, 0xffffff] : 0xff6666,
+          angle: { min: 0, max: 360 },
+        },
+        isBoss ? 36 : 14,
+        isBoss ? 800 : 550,
+      );
+      if (isBoss) {
+        this.burst(
+          px,
+          py,
+          'particle_smoke',
+          {
+            speed: { min: 20, max: 60 },
+            lifespan: 900,
+            scale: { start: 1.5, end: 0.4 },
+            alpha: { start: 0.6, end: 0 },
+            gravityY: -30,
+            angle: { min: 0, max: 360 },
+          },
+          12,
+          1000,
+        );
+      }
+    }
+
+    if (isBoss && settings.screenShake) {
+      this.scene.cameras.main.shake(400, 0.02);
+    }
+  }
+
   /** Direct trigger for replay mode (no socket events) */
   triggerExplosion(data: { cells: { x: number; y: number }[]; ownerId: number }): void {
     this.onExplosion(data.cells);
@@ -219,5 +319,7 @@ export class EffectSystem {
     if (this.powerupCollectedHandler) {
       this.socketClient.off('game:powerupCollected', this.powerupCollectedHandler);
     }
+    if (this.debrisEmitter?.active) this.debrisEmitter.destroy();
+    this.debrisEmitter = null;
   }
 }

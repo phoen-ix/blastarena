@@ -47,7 +47,6 @@ export class GameOverScene extends Phaser.Scene {
   private xpColX = 0;
   private achievementToasts: Phaser.GameObjects.Text[] = [];
   private hasVoted = false;
-  private voteButton: Phaser.GameObjects.Text | null = null;
   private voteTallyText: Phaser.GameObjects.Text | null = null;
 
   constructor() {
@@ -68,7 +67,6 @@ export class GameOverScene extends Phaser.Scene {
     this.xpColX = 0;
     this.achievementToasts = [];
     this.hasVoted = false;
-    this.voteButton = null;
     this.voteTallyText = null;
 
     // Clear any leftover DOM overlays (countdown, HUD)
@@ -264,7 +262,6 @@ export class GameOverScene extends Phaser.Scene {
         })
         .setOrigin(0.5);
     }
-    this.voteButton = actionBtn;
 
     // Back to lobby button
     const backBtn = this.add
@@ -374,7 +371,7 @@ export class GameOverScene extends Phaser.Scene {
   ): void {
     const colors = themeManager.getCanvasColors();
     const success = data.success;
-    let hasNextLevel = false;
+    let nextBtn: Phaser.GameObjects.Text | null = null;
     const titleColor = success ? colors.successHex : colors.dangerHex;
     const titleText = success ? t('ui:gameOver.levelComplete') : t('ui:gameOver.levelFailed');
 
@@ -417,8 +414,8 @@ export class GameOverScene extends Phaser.Scene {
 
       // Next Level button
       if (data.nextLevelId) {
-        hasNextLevel = true;
-        const nextBtn = this.add
+        const nextLevelId = data.nextLevelId;
+        const btn = this.add
           .text(width / 2, height - 40, t('ui:gameOver.nextLevel'), {
             fontSize: '20px',
             color: colors.successHex,
@@ -427,15 +424,12 @@ export class GameOverScene extends Phaser.Scene {
           })
           .setOrigin(0.5)
           .setInteractive({ useHandCursor: true });
-        nextBtn.on('pointerover', () => nextBtn.setColor(colors.successHoverHex));
-        nextBtn.on('pointerout', () => nextBtn.setColor(colors.successHex));
-        nextBtn.on('pointerdown', () => {
-          // Guarded by the surrounding `if (data.nextLevelId)` check
-          this.startCampaignLevel(data.nextLevelId!, socketClient);
+        btn.on('pointerover', () => btn.setColor(colors.successHoverHex));
+        btn.on('pointerout', () => btn.setColor(colors.successHex));
+        btn.on('pointerdown', () => {
+          this.startCampaignLevel(nextLevelId, socketClient);
         });
-        this.buttons.push(nextBtn);
-        this.baseColors.push(colors.successHex);
-        this.highlightColors.push(colors.successHoverHex);
+        nextBtn = btn;
       }
     } else {
       // Reason
@@ -453,8 +447,8 @@ export class GameOverScene extends Phaser.Scene {
     // Play Again (on success) / Retry (on failure)
     // When 3 buttons (next level exists): spread evenly; otherwise 2 buttons
     const retryLabel = success ? t('ui:gameOver.playAgain') : t('ui:gameOver.retry');
-    const retryX = hasNextLevel ? width / 2 - 160 : width / 2 - 100;
-    const backX = hasNextLevel ? width / 2 + 160 : width / 2 + 100;
+    const retryX = nextBtn ? width / 2 - 160 : width / 2 - 100;
+    const backX = nextBtn ? width / 2 + 160 : width / 2 + 100;
     const retryBtn = this.add
       .text(retryX, height - 40, retryLabel, {
         fontSize: '20px',
@@ -496,9 +490,20 @@ export class GameOverScene extends Phaser.Scene {
       this.scene.start('LobbyScene');
     });
 
-    this.buttons = [retryBtn, backBtn];
-    this.baseColors = [colors.textHex, colors.primaryHex];
-    this.highlightColors = ['#cccccc', colors.primaryHoverHex];
+    // Gamepad button list, built once, in on-screen order. "Next Level" used to be pushed here
+    // and then dropped by an unconditional `[retryBtn, backBtn]` reassignment, so gamepad users
+    // could never select it. (audit C4)
+    this.buttons = [retryBtn];
+    this.baseColors = [colors.textHex];
+    this.highlightColors = ['#cccccc'];
+    if (nextBtn) {
+      this.buttons.push(nextBtn);
+      this.baseColors.push(colors.successHex);
+      this.highlightColors.push(colors.successHoverHex);
+    }
+    this.buttons.push(backBtn);
+    this.baseColors.push(colors.primaryHex);
+    this.highlightColors.push(colors.primaryHoverHex);
     this.underline = this.add.graphics();
   }
 

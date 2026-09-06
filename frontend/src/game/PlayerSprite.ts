@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { PlayerState, TILE_SIZE } from '@blast-arena/shared';
+import { PlayerState, TILE_SIZE, TICK_MS } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 import { PLAYER_COLORS, BootScene } from '../scenes/BootScene';
 import { wrapGhostOffsets } from '../utils/wrapGhosts';
@@ -10,11 +10,25 @@ const TEAM_COLOR_INDICES: Record<number, number[]> = {
   1: [1, 7, 4], // blue (#44aaff), cyan (#44ffff), purple (#cc44ff)
 };
 
+/**
+ * Fraction of the remaining distance a sprite covers per server tick (50ms). frame() rescales
+ * this to the actual frame delta, so the visual speed is the same at 30, 60 or 144 Hz.
+ */
+const LERP_PER_TICK = 0.45;
+
+const SHIELD_RADIUS = (TILE_SIZE - 4) / 2 + 4;
+
 export class PlayerSpriteRenderer {
   private scene: Phaser.Scene;
-  private localPlayerId: number;
 
   private sprites: Map<number, Phaser.GameObjects.Sprite> = new Map();
+  /**
+   * Where each sprite is heading, from the last state update. The lerp itself runs in frame(),
+   * once per rendered frame — it used to run in update(), i.e. only when a state arrived (20 Hz),
+   * so at 60 fps two frames out of three drew the sprite exactly where the previous one had.
+   * (audit F2)
+   */
+  private targetPositions: Map<number, { x: number; y: number }> = new Map();
   private labels: Map<number, Phaser.GameObjects.Text> = new Map();
   private teamIndicators: Map<number, Phaser.GameObjects.Graphics> = new Map();
   private shieldGraphics: Map<number, Phaser.GameObjects.Graphics> = new Map();
@@ -63,9 +77,8 @@ export class PlayerSpriteRenderer {
   private buddyGlowColor: number = 0x44aaff;
   private buddyGlowGraphics: Map<number, Phaser.GameObjects.Graphics> = new Map();
 
-  constructor(scene: Phaser.Scene, localPlayerId: number) {
+  constructor(scene: Phaser.Scene) {
     this.scene = scene;
-    this.localPlayerId = localPlayerId;
   }
 
   setBuddyPlayer(playerId: number, sizePercent: number, glowColor: number): void {
@@ -210,6 +223,7 @@ export class PlayerSpriteRenderer {
           // Clean up tracking maps
           this.prevShieldState.delete(player.id);
           this.prevPositions.delete(player.id);
+          this.targetPositions.delete(player.id);
           this.playerColorIndex.delete(player.id);
           this.playerTeams.delete(player.id);
           this.activeMoveAnim.delete(player.id);
@@ -293,24 +307,13 @@ export class PlayerSpriteRenderer {
         this.prevShieldState.set(player.id, player.hasShield);
       }
 
-      // Interpolate position (wrapping-aware for toroidal maps)
-      // Sprite stays in canonical range [0, worldW). Ghost sprites handle edge visibility.
-      if (this.wrappingWorldSize) {
-        const { w, h } = this.wrappingWorldSize;
-        let dx = targetX - sprite.x;
-        let dy = targetY - sprite.y;
-        if (dx > w / 2) dx -= w;
-        else if (dx < -w / 2) dx += w;
-        if (dy > h / 2) dy -= h;
-        else if (dy < -h / 2) dy += h;
-        sprite.x += dx * 0.45;
-        sprite.y += dy * 0.45;
-        // Wrap to canonical range
-        sprite.x = ((sprite.x % w) + w) % w;
-        sprite.y = ((sprite.y % h) + h) % h;
+      // Record where the sprite should head; frame() moves it there. (audit F2)
+      const target = this.targetPositions.get(player.id);
+      if (target) {
+        target.x = targetX;
+        target.y = targetY;
       } else {
-        sprite.x = Phaser.Math.Linear(sprite.x, targetX, 0.45);
-        sprite.y = Phaser.Math.Linear(sprite.y, targetY, 0.45);
+        this.targetPositions.set(player.id, { x: targetX, y: targetY });
       }
 
       // Update texture based on direction
@@ -322,30 +325,34 @@ export class PlayerSpriteRenderer {
         sprite.setTexture(dirTexture);
       }
 
-      // Enforce buddy display size every frame (setTexture and tweens can reset it)
+      // Enforce buddy display size on every update (setTexture and tweens can reset it)
       if (player.id === this.buddyPlayerId) {
         const buddySize = (TILE_SIZE - 4) * (this.buddySizePercent / 100);
         sprite.setDisplaySize(buddySize, buddySize);
       }
 
-      // Trail particles for cosmetic trails
-      if (player.cosmetics?.trailConfig && getSettings().particles) {
-        let emitter = this.trailEmitters.get(player.id);
-        if (!emitter && this.scene.textures.exists(player.cosmetics.trailConfig.particleKey)) {
-          emitter = this.scene.add.particles(0, 0, player.cosmetics.trailConfig.particleKey, {
-            speed: { min: 5, max: 15 },
-            scale: { start: 0.5, end: 0 },
-            lifespan: 400,
-            alpha: { start: 0.6, end: 0 },
-            frequency: player.cosmetics.trailConfig.frequency,
-            tint: player.cosmetics.trailConfig.tint,
-            emitting: true,
-          });
+      // Trail particles for cosmetic trails (positioned per frame in frame())
+      if (player.cosmetics?.trailConfig && settings.particles) {
+        if (
+          !this.trailEmitters.has(player.id) &&
+          this.scene.textures.exists(player.cosmetics.trailConfig.particleKey)
+        ) {
+          const emitter = this.scene.add.particles(
+            sprite.x,
+            sprite.y,
+            player.cosmetics.trailConfig.particleKey,
+            {
+              speed: { min: 5, max: 15 },
+              scale: { start: 0.5, end: 0 },
+              lifespan: 400,
+              alpha: { start: 0.6, end: 0 },
+              frequency: player.cosmetics.trailConfig.frequency,
+              tint: player.cosmetics.trailConfig.tint,
+              emitting: true,
+            },
+          );
           emitter.setDepth(5);
           this.trailEmitters.set(player.id, emitter);
-        }
-        if (emitter) {
-          emitter.setPosition(sprite.x, sprite.y);
         }
       }
 
@@ -391,29 +398,24 @@ export class PlayerSpriteRenderer {
         }
       }
 
-      this.prevPositions.set(player.id, { x: targetX, y: targetY });
+      if (prevPos) {
+        prevPos.x = targetX;
+        prevPos.y = targetY;
+      } else {
+        this.prevPositions.set(player.id, { x: targetX, y: targetY });
+      }
 
-      // ---- Shield visual ----
+      // ---- Shield visual (drawn per frame in frame(); only its lifetime is decided here) ----
       const hadShield = this.prevShieldState.get(player.id) ?? false;
       this.prevShieldState.set(player.id, player.hasShield);
 
       if (player.hasShield) {
-        let shieldGfx = this.shieldGraphics.get(player.id);
-        if (!shieldGfx) {
-          shieldGfx = this.scene.add.graphics();
+        if (!this.shieldGraphics.has(player.id)) {
+          const shieldGfx = this.scene.add.graphics();
           shieldGfx.setDepth(12);
+          shieldGfx.setPosition(sprite.x, sprite.y);
           this.shieldGraphics.set(player.id, shieldGfx);
         }
-        // Oscillating alpha (redraw only every ~3 frames for performance)
-        const time = this.scene.time.now;
-        const oscillation = 0.25 + 0.15 * Math.sin(time * 0.005);
-
-        shieldGfx.clear();
-        shieldGfx.fillStyle(0x44ff44, oscillation);
-        shieldGfx.fillCircle(0, 0, (TILE_SIZE - 4) / 2 + 4);
-        shieldGfx.lineStyle(2, 0x88ffaa, oscillation + 0.2);
-        shieldGfx.strokeCircle(0, 0, (TILE_SIZE - 4) / 2 + 4);
-        shieldGfx.setPosition(sprite.x, sprite.y);
       } else {
         // Remove shield graphic if it exists
         const shieldGfx = this.shieldGraphics.get(player.id);
@@ -439,58 +441,108 @@ export class PlayerSpriteRenderer {
         }
       }
 
-      // Buddy glow aura
-      if (player.id === this.buddyPlayerId) {
-        let glowGfx = this.buddyGlowGraphics.get(player.id);
-        if (!glowGfx) {
-          glowGfx = this.scene.add.graphics();
-          glowGfx.setDepth(8); // Below player (10), above floor
-          this.buddyGlowGraphics.set(player.id, glowGfx);
+      // Buddy glow aura (drawn per frame in frame())
+      if (player.id === this.buddyPlayerId && !this.buddyGlowGraphics.has(player.id)) {
+        const glowGfx = this.scene.add.graphics();
+        glowGfx.setDepth(8); // Below player (10), above floor
+        glowGfx.setPosition(sprite.x, sprite.y);
+        this.buddyGlowGraphics.set(player.id, glowGfx);
+      }
+    });
+  }
+
+  /**
+   * Per-frame pass, driven from GameScene.update(): moves every sprite toward its target, keeps
+   * the overlays (label, team bar, shield, buddy glow, trail, wrap ghosts) on it and redraws the
+   * time-animated ones. `delta` is the frame time in ms. (audit F2)
+   */
+  frame(delta: number): void {
+    if (this.sprites.size === 0) return;
+
+    // Same visual speed as the old 0.45-per-tick lerp, whatever the frame rate.
+    const k = 1 - Math.pow(1 - LERP_PER_TICK, delta / TICK_MS);
+    const time = this.scene.time.now;
+    const shieldAlpha = 0.25 + 0.15 * Math.sin(time * 0.005);
+    const glowPulse = 0.15 + 0.08 * Math.sin(time * 0.003);
+    const wrap = this.wrappingWorldSize;
+    const buddySize = (TILE_SIZE - 4) * (this.buddySizePercent / 100);
+
+    for (const [id, sprite] of this.sprites) {
+      const target = this.targetPositions.get(id);
+      if (target) {
+        // Sprite stays in canonical range [0, worldW) on wrapping maps; ghosts cover the seam.
+        if (wrap) {
+          const { w, h } = wrap;
+          let dx = target.x - sprite.x;
+          let dy = target.y - sprite.y;
+          if (dx > w / 2) dx -= w;
+          else if (dx < -w / 2) dx += w;
+          if (dy > h / 2) dy -= h;
+          else if (dy < -h / 2) dy += h;
+          sprite.x += dx * k;
+          sprite.y += dy * k;
+          sprite.x = ((sprite.x % w) + w) % w;
+          sprite.y = ((sprite.y % h) + h) % h;
+        } else {
+          sprite.x = Phaser.Math.Linear(sprite.x, target.x, k);
+          sprite.y = Phaser.Math.Linear(sprite.y, target.y, k);
         }
+      }
 
-        const time = this.scene.time.now;
-        const pulse = 0.15 + 0.08 * Math.sin(time * 0.003);
-        const buddyDisplaySize = (TILE_SIZE - 4) * (this.buddySizePercent / 100);
-        const glowRadius = buddyDisplaySize / 2 + 6;
+      const isBuddy = id === this.buddyPlayerId;
 
+      const trail = this.trailEmitters.get(id);
+      if (trail) trail.setPosition(sprite.x, sprite.y);
+
+      const shieldGfx = this.shieldGraphics.get(id);
+      if (shieldGfx) {
+        this.drawShield(shieldGfx, shieldAlpha);
+        shieldGfx.setPosition(sprite.x, sprite.y);
+      }
+
+      const glowGfx = this.buddyGlowGraphics.get(id);
+      if (glowGfx) {
+        const glowRadius = buddySize / 2 + 6;
         glowGfx.clear();
-        glowGfx.fillStyle(this.buddyGlowColor, pulse * 0.5);
+        glowGfx.fillStyle(this.buddyGlowColor, glowPulse * 0.5);
         glowGfx.fillCircle(0, 0, glowRadius + 4);
-        glowGfx.fillStyle(this.buddyGlowColor, pulse);
+        glowGfx.fillStyle(this.buddyGlowColor, glowPulse);
         glowGfx.fillCircle(0, 0, glowRadius);
-        glowGfx.lineStyle(1.5, this.buddyGlowColor, pulse + 0.1);
+        glowGfx.lineStyle(1.5, this.buddyGlowColor, glowPulse + 0.1);
         glowGfx.strokeCircle(0, 0, glowRadius + 2);
         glowGfx.setPosition(sprite.x, sprite.y);
       }
 
-      // Update label position to follow sprite
-      const label = this.labels.get(player.id);
+      const label = this.labels.get(id);
       if (label) {
-        const isBuddyPlayer = player.id === this.buddyPlayerId;
-        const labelYOffset = isBuddyPlayer
-          ? ((TILE_SIZE - 4) * (this.buddySizePercent / 100)) / 2 + 2
-          : TILE_SIZE / 2 + 2;
         label.x = sprite.x;
-        label.y = sprite.y - labelYOffset;
+        label.y = sprite.y - (isBuddy ? buddySize / 2 + 2 : TILE_SIZE / 2 + 2);
       }
 
-      // Update team indicator position (setPosition only — no clear/redraw)
-      const teamGfx = this.teamIndicators.get(player.id);
-      if (teamGfx) {
-        teamGfx.setPosition(sprite.x, sprite.y);
-      }
+      // Team indicator: setPosition only — no clear/redraw
+      const teamGfx = this.teamIndicators.get(id);
+      if (teamGfx) teamGfx.setPosition(sprite.x, sprite.y);
 
-      // Ghost sprites for wrapping maps (entity visible on both sides of the edge)
-      if (this.wrappingWorldSize) {
+      // Ghost sprites for wrapping maps follow the interpolated position, not the tick target
+      if (wrap) {
         this.updatePlayerGhosts(
-          player.id,
+          id,
           sprite.x,
           sprite.y,
           sprite.texture.key,
           sprite.displayWidth,
+          shieldAlpha,
         );
       }
-    });
+    }
+  }
+
+  private drawShield(gfx: Phaser.GameObjects.Graphics, alpha: number): void {
+    gfx.clear();
+    gfx.fillStyle(0x44ff44, alpha);
+    gfx.fillCircle(0, 0, SHIELD_RADIUS);
+    gfx.lineStyle(2, 0x88ffaa, alpha + 0.2);
+    gfx.strokeCircle(0, 0, SHIELD_RADIUS);
   }
 
   /** Create/update ghost copies of a player sprite and overlays near wrapping edges */
@@ -500,6 +552,7 @@ export class PlayerSpriteRenderer {
     py: number,
     textureKey: string,
     displaySize: number,
+    shieldAlpha: number,
   ): void {
     if (!this.wrappingWorldSize) return;
     const { w, h } = this.wrappingWorldSize;
@@ -559,15 +612,8 @@ export class PlayerSpriteRenderer {
         });
         this.ghostShieldGraphics.set(playerId, gShields);
       }
-      const time = this.scene.time.now;
-      const oscillation = 0.25 + 0.15 * Math.sin(time * 0.005);
-      const radius = (TILE_SIZE - 4) / 2 + 4;
       for (let i = 0; i < offsets.length; i++) {
-        gShields[i].clear();
-        gShields[i].fillStyle(0x44ff44, oscillation);
-        gShields[i].fillCircle(0, 0, radius);
-        gShields[i].lineStyle(2, 0x88ffaa, oscillation + 0.2);
-        gShields[i].strokeCircle(0, 0, radius);
+        this.drawShield(gShields[i], shieldAlpha);
         gShields[i].setPosition(
           canonicalShield.x + offsets[i].ox,
           canonicalShield.y + offsets[i].oy,
@@ -700,6 +746,7 @@ export class PlayerSpriteRenderer {
     this.playerTeams.clear();
     this.prevShieldState.clear();
     this.prevPositions.clear();
+    this.targetPositions.clear();
     this.activeMoveAnim.clear();
     this.teamPlayerCount = {};
   }
@@ -756,6 +803,7 @@ export class PlayerSpriteRenderer {
 
     this.prevShieldState.delete(id);
     this.prevPositions.delete(id);
+    this.targetPositions.delete(id);
     this.playerColorIndex.delete(id);
     this.playerTeams.delete(id);
     this.customTexturePrefix.delete(id);

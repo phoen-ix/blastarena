@@ -49,12 +49,30 @@ export class MapEventRenderer {
   private tracked: Map<string, TrackedMeteor> = new Map();
   private trackedWarnings: Map<string, TrackedWarning> = new Map();
   private trackedUfos: Map<string, TrackedUfo> = new Map();
+  /**
+   * Spectator action flashes, tracked apart from the meteors. They used to be stored as fake
+   * TrackedMeteor entries padded with a dummy Graphics and a dummy Text — neither of which the
+   * flash tween destroyed, so every spectator action leaked two game objects. (audit C5)
+   */
+  private flashes: Map<string, Phaser.GameObjects.Graphics> = new Map();
   /** Reusable set to detect removed events */
   private activeKeys = new Set<string>();
   private lastBombSurgeTick: number = -1;
+  /**
+   * Map size in pixels, for effects that span a whole row/column. Set by the scene; falls back to
+   * the viewport size when unknown. (audit C10)
+   */
+  private worldWidth: number = 0;
+  private worldHeight: number = 0;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+  }
+
+  /** Tell the renderer how large the map is (tiles). Call again when the map changes. */
+  setMapSize(width: number, height: number): void {
+    this.worldWidth = width * TILE_SIZE;
+    this.worldHeight = height * TILE_SIZE;
   }
 
   update(mapEvents: MapEvent[] | undefined, currentTick: number): void {
@@ -126,8 +144,8 @@ export class MapEventRenderer {
       if (event.type === 'spectator_wall' && event.position) {
         const key = `specwall_${event.position.x}_${event.position.y}_${event.tick}`;
         this.activeKeys.add(key);
-        if (!this.tracked.has(key)) {
-          this.createSpectatorFlash(key, event.position, 0x8888ff, currentTick);
+        if (!this.flashes.has(key)) {
+          this.createSpectatorFlash(key, event.position, 0x8888ff);
         }
       }
 
@@ -135,8 +153,8 @@ export class MapEventRenderer {
       if (event.type === 'spectator_powerup' && event.position) {
         const key = `specpu_${event.position.x}_${event.position.y}_${event.tick}`;
         this.activeKeys.add(key);
-        if (!this.tracked.has(key)) {
-          this.createSpectatorFlash(key, event.position, 0xffdd00, currentTick);
+        if (!this.flashes.has(key)) {
+          this.createSpectatorFlash(key, event.position, 0xffdd00);
         }
       }
 
@@ -144,36 +162,38 @@ export class MapEventRenderer {
       if (event.type === 'spectator_speed_zone' && event.position) {
         const key = `speczone_${event.position.x}_${event.position.y}_${event.tick}`;
         this.activeKeys.add(key);
-        if (!this.tracked.has(key)) {
-          this.createSpectatorFlash(key, event.position, 0x44aaff, currentTick);
+        if (!this.flashes.has(key)) {
+          this.createSpectatorFlash(key, event.position, 0x44aaff);
         }
       }
     }
 
-    // Clean up meteors that are no longer in mapEvents (they've impacted)
+    // Clean up meteors that are no longer in mapEvents (they've impacted).
+    //
+    // The impact is flagged on the first tick the event is missing, and the delayed teardown is
+    // armed in that same branch. It used to sit outside the `impacted` check, so every tick of the
+    // 1.2s grace window re-armed another timer — ~24 duplicate delayedCalls per meteor, each
+    // running destroyTracked() on already-destroyed objects. Same for the warnings and UFOs
+    // below. (audit C5)
     for (const [key, tracked] of this.tracked) {
-      if (!this.activeKeys.has(key)) {
-        if (!tracked.impacted) {
-          this.triggerImpact(tracked);
-        }
+      if (!this.activeKeys.has(key) && !tracked.impacted) {
+        tracked.impacted = true;
+        this.triggerImpact(tracked);
         this.scene.time.delayedCall(1200, () => {
           this.destroyTracked(tracked);
           this.tracked.delete(key);
         });
-        tracked.impacted = true;
       }
     }
 
     // Clean up area warnings that have resolved
     for (const [key, tw] of this.trackedWarnings) {
-      if (!this.activeKeys.has(key)) {
-        if (!tw.impacted) {
-          tw.impacted = true;
-          // Flash effect on impact
-          const settings = getSettings();
-          if (settings.screenShake && tw.type === 'wall_collapse') {
-            this.scene.cameras.main.shake(250, 0.015);
-          }
+      if (!this.activeKeys.has(key) && !tw.impacted) {
+        tw.impacted = true;
+        // Flash effect on impact
+        const settings = getSettings();
+        if (settings.screenShake && tw.type === 'wall_collapse') {
+          this.scene.cameras.main.shake(250, 0.015);
         }
         this.scene.time.delayedCall(500, () => {
           if (tw.graphics?.active) tw.graphics.destroy();
@@ -188,15 +208,22 @@ export class MapEventRenderer {
 
     // Clean up UFO abductions that have resolved
     for (const [key, ufo] of this.trackedUfos) {
-      if (!this.activeKeys.has(key)) {
-        if (!ufo.impacted) {
-          ufo.impacted = true;
-          this.triggerUfoImpact(ufo);
-        }
+      if (!this.activeKeys.has(key) && !ufo.impacted) {
+        ufo.impacted = true;
+        this.triggerUfoImpact(ufo);
         this.scene.time.delayedCall(800, () => {
           this.destroyUfo(ufo);
           this.trackedUfos.delete(key);
         });
+      }
+    }
+
+    // Spectator flashes whose event has left the state: the tween owns the Graphics' lifetime,
+    // so just make sure nothing lingers once the event is gone.
+    for (const [key, gfx] of this.flashes) {
+      if (!this.activeKeys.has(key)) {
+        this.destroyFlash(gfx);
+        this.flashes.delete(key);
       }
     }
   }
@@ -493,21 +520,24 @@ export class MapEventRenderer {
       gfx.lineStyle(2, 0xff4400, alpha + 0.2);
       gfx.strokeRect(x, y, w, h);
     } else {
-      // Freeze wave — highlight row or column
+      // Freeze wave — highlight row or column across the whole map. This used the viewport size,
+      // so on maps wider than the screen the highlight stopped short of the far edge. (audit C10)
       const isRow = tw.direction === 'row';
       const color = 0x44ccff;
+      const worldW = this.worldWidth || this.scene.scale.width;
+      const worldH = this.worldHeight || this.scene.scale.height;
       if (isRow) {
         const y = tw.index! * TILE_SIZE;
         gfx.fillStyle(color, alpha);
-        gfx.fillRect(0, y, this.scene.scale.width, TILE_SIZE);
+        gfx.fillRect(0, y, worldW, TILE_SIZE);
         gfx.lineStyle(2, color, alpha + 0.2);
-        gfx.strokeRect(0, y, this.scene.scale.width, TILE_SIZE);
+        gfx.strokeRect(0, y, worldW, TILE_SIZE);
       } else {
         const x = tw.index! * TILE_SIZE;
         gfx.fillStyle(color, alpha);
-        gfx.fillRect(x, 0, TILE_SIZE, this.scene.scale.height);
+        gfx.fillRect(x, 0, TILE_SIZE, worldH);
         gfx.lineStyle(2, color, alpha + 0.2);
-        gfx.strokeRect(x, 0, TILE_SIZE, this.scene.scale.height);
+        gfx.strokeRect(x, 0, TILE_SIZE, worldH);
       }
     }
   }
@@ -672,6 +702,11 @@ export class MapEventRenderer {
     if (tracked.warningText?.active) tracked.warningText.destroy();
   }
 
+  private destroyFlash(gfx: Phaser.GameObjects.Graphics): void {
+    this.scene.tweens.killTweensOf(gfx);
+    if (gfx.active) gfx.destroy();
+  }
+
   destroy(): void {
     for (const tracked of this.tracked.values()) {
       this.destroyTracked(tracked);
@@ -689,14 +724,22 @@ export class MapEventRenderer {
       this.destroyUfo(ufo);
     }
     this.trackedUfos.clear();
+    for (const gfx of this.flashes.values()) {
+      this.destroyFlash(gfx);
+    }
+    this.flashes.clear();
   }
 
-  /** Create a brief flash effect for spectator actions (wall/powerup/speed zone). */
+  /**
+   * Create a brief flash effect for spectator actions (wall/powerup/speed zone).
+   *
+   * The key is released when the tween completes, so while the event is still in the state the
+   * flash re-fires every 600ms — a pulsing marker for the lifetime of the wall/zone. (audit C5)
+   */
   private createSpectatorFlash(
     key: string,
     position: { x: number; y: number },
     color: number,
-    _currentTick: number,
   ): void {
     const px = position.x * TILE_SIZE + TILE_SIZE / 2;
     const py = position.y * TILE_SIZE + TILE_SIZE / 2;
@@ -705,6 +748,7 @@ export class MapEventRenderer {
     gfx.fillStyle(color, 0.6);
     gfx.fillCircle(px, py, TILE_SIZE * 0.6);
     gfx.setDepth(120);
+    this.flashes.set(key, gfx);
 
     // Animate: pulse then fade
     this.scene.tweens.add({
@@ -715,22 +759,8 @@ export class MapEventRenderer {
       ease: 'Quad.easeOut',
       onComplete: () => {
         gfx.destroy();
-        this.tracked.delete(key);
+        if (this.flashes.get(key) === gfx) this.flashes.delete(key);
       },
-    });
-
-    // Store as tracked meteor shape for cleanup compatibility
-    const dummyGfx = this.scene.add.graphics();
-    const dummyText = this.scene.add.text(0, 0, '', { fontSize: '1px' }).setVisible(false);
-    this.tracked.set(key, {
-      tileX: position.x,
-      tileY: position.y,
-      impactTick: 0,
-      warningTick: 0,
-      targetGraphics: gfx,
-      shadowGraphics: dummyGfx,
-      warningText: dummyText,
-      impacted: true, // Already handled, no further impact needed
     });
   }
 }

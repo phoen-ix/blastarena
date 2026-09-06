@@ -1,6 +1,7 @@
 import { ReplayLogEntry, ReplayLogEventType, TICK_RATE } from '@blast-arena/shared';
 import { escapeHtml, setHtml } from '../utils/html';
 import { t } from '../i18n';
+import { findTickRange, sortByTick } from './replayLogIndex';
 
 interface FilterState {
   kill: boolean;
@@ -16,69 +17,86 @@ interface FilterState {
   game_over: boolean;
 }
 
-const EVENT_CONFIG: Record<ReplayLogEventType, { icon: string; color: string; label: string }> = {
-  kill: { icon: '\u2620\uFE0F', color: 'var(--danger)', label: 'Kills' },
-  bomb_place: { icon: '\uD83D\uDCA3', color: 'var(--primary)', label: 'Bombs' },
-  bomb_detonate: { icon: '\uD83D\uDCA5', color: 'var(--warning)', label: 'Bombs' },
-  bot_decision: { icon: '\uD83E\uDD16', color: 'var(--info)', label: 'Bot AI' },
-  movement: { icon: '\uD83D\uDC63', color: 'var(--text-dim)', label: 'Movement' },
-  powerup_pickup: { icon: '\u2B50', color: 'var(--success)', label: 'Power-ups' },
-  explosion_detail: {
-    icon: '\uD83D\uDD25',
-    color: 'var(--warning)',
-    label: 'Explosions',
-  },
-  player_leave: { icon: '\uD83D\uDEAA', color: 'var(--warning)', label: 'Leave' },
-  player_disconnect: { icon: '\u26A0\uFE0F', color: 'var(--warning)', label: 'Disconnect' },
-  player_disconnect_kill: { icon: '\u26A0\uFE0F', color: 'var(--danger)', label: 'Disconnect' },
-  game_over: { icon: '\uD83C\uDFC1', color: 'var(--accent)', label: 'Game Over' },
+// Icon and accent per event type. Labels live in the locale files (`ui:replayLog.*`) and are
+// resolved at render time, so nothing here calls t() at module load. (audit G12)
+const EVENT_CONFIG: Record<ReplayLogEventType, { icon: string; color: string }> = {
+  kill: { icon: '\u2620\uFE0F', color: 'var(--danger)' },
+  bomb_place: { icon: '\uD83D\uDCA3', color: 'var(--primary)' },
+  bomb_detonate: { icon: '\uD83D\uDCA5', color: 'var(--warning)' },
+  bot_decision: { icon: '\uD83E\uDD16', color: 'var(--info)' },
+  movement: { icon: '\uD83D\uDC63', color: 'var(--text-dim)' },
+  powerup_pickup: { icon: '\u2B50', color: 'var(--success)' },
+  explosion_detail: { icon: '\uD83D\uDD25', color: 'var(--warning)' },
+  player_leave: { icon: '\uD83D\uDEAA', color: 'var(--warning)' },
+  player_disconnect: { icon: '\u26A0\uFE0F', color: 'var(--warning)' },
+  player_disconnect_kill: { icon: '\u26A0\uFE0F', color: 'var(--danger)' },
+  game_over: { icon: '\uD83C\uDFC1', color: 'var(--accent)' },
 };
 
-// Filter groups (some event types share a filter)
+// Filter groups (some event types share a filter). `labelKey` is an i18n key under `ui:`.
 const FILTER_GROUPS: {
   key: string;
-  label: string;
+  icon: string;
+  labelKey: string;
   types: ReplayLogEventType[];
   defaultOn: boolean;
 }[] = [
-  { key: 'kills', label: '\u2620\uFE0F Kills', types: ['kill'], defaultOn: true },
+  {
+    key: 'kills',
+    icon: '\u2620\uFE0F',
+    labelKey: 'ui:replayLog.filters.kills',
+    types: ['kill'],
+    defaultOn: true,
+  },
   {
     key: 'bombs',
-    label: '\uD83D\uDCA3 Bombs',
+    icon: '\uD83D\uDCA3',
+    labelKey: 'ui:replayLog.filters.bombs',
     types: ['bomb_place', 'bomb_detonate'],
     defaultOn: true,
   },
   {
     key: 'bot',
-    label: '\uD83E\uDD16 Bot AI',
+    icon: '\uD83E\uDD16',
+    labelKey: 'ui:replayLog.filters.bot',
     types: ['bot_decision'],
     defaultOn: false,
   },
   {
     key: 'powerups',
-    label: '\u2B50 Power-ups',
+    icon: '\u2B50',
+    labelKey: 'ui:replayLog.filters.powerups',
     types: ['powerup_pickup'],
     defaultOn: true,
   },
   {
     key: 'movement',
-    label: '\uD83D\uDC63 Movement',
+    icon: '\uD83D\uDC63',
+    labelKey: 'ui:replayLog.filters.movement',
     types: ['movement'],
     defaultOn: false,
   },
   {
     key: 'explosions',
-    label: '\uD83D\uDD25 Explosions',
+    icon: '\uD83D\uDD25',
+    labelKey: 'ui:replayLog.filters.explosions',
     types: ['explosion_detail'],
     defaultOn: false,
   },
   {
     key: 'players',
-    label: '\u26A0\uFE0F Leave/DC',
+    icon: '\u26A0\uFE0F',
+    labelKey: 'ui:replayLog.filters.players',
     types: ['player_leave', 'player_disconnect', 'player_disconnect_kill'],
     defaultOn: true,
   },
 ];
+
+/** A rendered log row, indexed by tick for highlightTick's binary search. (audit F3) */
+interface RenderedEntry {
+  tick: number;
+  el: HTMLElement;
+}
 
 export class ReplayLogPanel {
   private entries: ReplayLogEntry[];
@@ -90,9 +108,12 @@ export class ReplayLogPanel {
   private filters: FilterState;
 
   // Pre-indexed data
-  private entryByTick: Map<number, ReplayLogEntry[]> = new Map();
   private filteredEntries: ReplayLogEntry[] = [];
-  private entryElements: Map<number, HTMLElement[]> = new Map(); // tick -> DOM elements
+  /** Rendered rows sorted by tick — rebuilt in renderLogEntries. (audit F3) */
+  private tickIndex: RenderedEntry[] = [];
+  /** Rows currently highlighted, so clearing them needs no querySelectorAll. (audit F3) */
+  private highlightedEls: HTMLElement[] = [];
+  private lastScrollTarget: HTMLElement | null = null;
 
   constructor(entries: ReplayLogEntry[], onSeek: (tick: number) => void) {
     this.entries = entries;
@@ -112,16 +133,6 @@ export class ReplayLogPanel {
       player_disconnect_kill: true,
       game_over: true,
     };
-
-    // Index entries by tick
-    for (const entry of entries) {
-      const existing = this.entryByTick.get(entry.tick);
-      if (existing) {
-        existing.push(entry);
-      } else {
-        this.entryByTick.set(entry.tick, [entry]);
-      }
-    }
 
     this.rebuildFilteredEntries();
   }
@@ -174,12 +185,12 @@ export class ReplayLogPanel {
         border:1px solid var(--border); background:${group.defaultOn ? 'var(--bg-hover)' : 'transparent'};
         color:${group.defaultOn ? 'var(--text)' : 'var(--text-dim)'};
       `;
-      btn.textContent = group.label;
+      btn.textContent = `${group.icon} ${t(group.labelKey)}`;
       btn.dataset.filterKey = group.key;
       btn.addEventListener('click', () => {
-        const isOn = group.types.every((t) => this.filters[t]);
-        for (const t of group.types) {
-          this.filters[t] = !isOn;
+        const isOn = group.types.every((type) => this.filters[type]);
+        for (const type of group.types) {
+          this.filters[type] = !isOn;
         }
         btn.style.background = !isOn ? 'var(--bg-hover)' : 'transparent';
         btn.style.color = !isOn ? 'var(--text)' : 'var(--text-dim)';
@@ -210,7 +221,9 @@ export class ReplayLogPanel {
     this.container?.remove();
     this.container = null;
     this.logList = null;
-    this.entryElements.clear();
+    this.tickIndex = [];
+    this.highlightedEls = [];
+    this.lastScrollTarget = null;
   }
 
   private togglePanel(): void {
@@ -227,6 +240,11 @@ export class ReplayLogPanel {
     if (playerList) {
       playerList.style.right = this.isOpen ? '360px' : '20px';
     }
+    // Scrolling is skipped while hidden; catch up with the current position on open
+    if (this.isOpen) {
+      this.lastScrollTarget = null;
+      this.highlightTick(this.currentTick);
+    }
   }
 
   private rebuildFilteredEntries(): void {
@@ -236,21 +254,18 @@ export class ReplayLogPanel {
   private renderLogEntries(): void {
     if (!this.logList) return;
     setHtml(this.logList, '');
-    this.entryElements.clear();
+    this.highlightedEls = [];
+    this.lastScrollTarget = null;
 
+    const index: RenderedEntry[] = [];
     const fragment = document.createDocumentFragment();
     for (const entry of this.filteredEntries) {
       const el = this.createEntryElement(entry);
       fragment.appendChild(el);
-
-      const existing = this.entryElements.get(entry.tick);
-      if (existing) {
-        existing.push(el);
-      } else {
-        this.entryElements.set(entry.tick, [el]);
-      }
+      index.push({ tick: entry.tick, el });
     }
     this.logList.appendChild(fragment);
+    this.tickIndex = sortByTick(index);
   }
 
   private createEntryElement(entry: ReplayLogEntry): HTMLElement {
@@ -301,105 +316,122 @@ export class ReplayLogPanel {
     return el;
   }
 
+  /** A player name wrapped in an accent colour; the name is escaped before it goes into HTML. */
+  private static name(value: unknown, color: string): string {
+    return `<span style="color:${color}">${escapeHtml(String(value || ''))}</span>`;
+  }
+
+  // Log lines are translated (`ui:replayLog.*`); the interpolated names are already escaped
+  // HTML, which i18next passes through untouched (escapeValue is off). (audit G12)
   private formatEntry(entry: ReplayLogEntry): string {
     const d = entry.data;
     switch (entry.event) {
       case 'kill': {
-        const killer = escapeHtml(String(d.killerName || ''));
-        const victim = escapeHtml(String(d.victimName || ''));
         if (d.selfKill) {
-          return `<span style="color:var(--warning)">${victim}</span> self-destructed`;
+          return t('ui:replayLog.selfDestructed', {
+            victim: ReplayLogPanel.name(d.victimName, 'var(--warning)'),
+          });
         }
-        return `<span style="color:var(--danger)">${killer}</span> killed <span style="color:var(--text-dim)">${victim}</span>`;
+        return t('ui:replayLog.killed', {
+          killer: ReplayLogPanel.name(d.killerName, 'var(--danger)'),
+          victim: ReplayLogPanel.name(d.victimName, 'var(--text-dim)'),
+        });
       }
       case 'bomb_place': {
-        const owner = escapeHtml(String(d.ownerName || ''));
-        const pos = d.pos as { x: number; y: number };
-        return `<span style="color:var(--primary)">${owner}</span> placed bomb at (${pos?.x},${pos?.y})`;
+        const pos = d.pos as { x: number; y: number } | undefined;
+        return t('ui:replayLog.bombPlaced', {
+          owner: ReplayLogPanel.name(d.ownerName, 'var(--primary)'),
+          x: pos?.x,
+          y: pos?.y,
+        });
       }
       case 'bomb_detonate': {
-        const owner = escapeHtml(String(d.ownerName || ''));
-        const pos = d.pos as { x: number; y: number };
-        return `<span style="color:var(--warning)">${owner}</span> bomb detonated at (${pos?.x},${pos?.y})`;
+        const pos = d.pos as { x: number; y: number } | undefined;
+        return t('ui:replayLog.bombDetonated', {
+          owner: ReplayLogPanel.name(d.ownerName, 'var(--warning)'),
+          x: pos?.x,
+          y: pos?.y,
+        });
       }
-      case 'bot_decision': {
-        const bot = escapeHtml(String(d.botName || ''));
-        const decision = escapeHtml(String(d.decision || ''));
-        return `<span style="color:var(--info)">${bot}</span>: ${decision}`;
-      }
+      case 'bot_decision':
+        return t('ui:replayLog.botDecision', {
+          bot: ReplayLogPanel.name(d.botName, 'var(--info)'),
+          decision: escapeHtml(String(d.decision || '')),
+        });
       case 'movement': {
-        const player = escapeHtml(String(d.playerName || ''));
-        const to = d.to as { x: number; y: number };
-        const dir = escapeHtml(String(d.direction || ''));
-        return `<span style="color:var(--text-dim)">${player}</span> moved ${dir} to (${to?.x},${to?.y})`;
+        const to = d.to as { x: number; y: number } | undefined;
+        return t('ui:replayLog.moved', {
+          player: ReplayLogPanel.name(d.playerName, 'var(--text-dim)'),
+          direction: escapeHtml(String(d.direction || '')),
+          x: to?.x,
+          y: to?.y,
+        });
       }
-      case 'powerup_pickup': {
-        const player = escapeHtml(String(d.playerName || ''));
-        const type = escapeHtml(String(d.type || ''));
-        return `<span style="color:var(--success)">${player}</span> picked up ${type}`;
-      }
-      case 'explosion_detail': {
-        const owner = escapeHtml(String(d.ownerName || ''));
-        return `<span style="color:var(--warning)">${owner}</span> explosion: ${d.cellCount} cells, ${d.destroyedWalls} walls`;
-      }
-      case 'player_leave': {
-        const player = escapeHtml(String(d.playerName || ''));
-        return `<span style="color:var(--warning)">${player}</span> left the game`;
-      }
-      case 'player_disconnect': {
-        const player = escapeHtml(String(d.playerName || ''));
-        return `<span style="color:var(--warning)">${player}</span> disconnected`;
-      }
-      case 'player_disconnect_kill': {
-        const player = escapeHtml(String(d.playerName || ''));
-        return `<span style="color:var(--danger)">${player}</span> killed (disconnect timeout)`;
-      }
+      case 'powerup_pickup':
+        return t('ui:replayLog.pickedUp', {
+          player: ReplayLogPanel.name(d.playerName, 'var(--success)'),
+          type: escapeHtml(String(d.type || '')),
+        });
+      case 'explosion_detail':
+        return t('ui:replayLog.explosion', {
+          owner: ReplayLogPanel.name(d.ownerName, 'var(--warning)'),
+          cells: d.cellCount,
+          walls: d.destroyedWalls,
+        });
+      case 'player_leave':
+        return t('ui:replayLog.left', {
+          player: ReplayLogPanel.name(d.playerName, 'var(--warning)'),
+        });
+      case 'player_disconnect':
+        return t('ui:replayLog.disconnected', {
+          player: ReplayLogPanel.name(d.playerName, 'var(--warning)'),
+        });
+      case 'player_disconnect_kill':
+        return t('ui:replayLog.disconnectKilled', {
+          player: ReplayLogPanel.name(d.playerName, 'var(--danger)'),
+        });
       case 'game_over':
-        return `Game over`;
+        return t('ui:replayLog.gameOver');
       default:
         return escapeHtml(JSON.stringify(d));
     }
   }
 
+  /**
+   * Highlight the rows at `tick` and keep the nearest row in view. Two binary searches on the
+   * sorted index replace the old per-tick reverse scan of every row. (audit F3)
+   */
   private highlightTick(tick: number): void {
     if (!this.logList) return;
 
-    // Remove previous highlights
-    const highlighted = this.logList.querySelectorAll('[data-highlighted="true"]');
-    for (const el of highlighted) {
-      (el as HTMLElement).style.borderLeftColor = 'transparent';
-      (el as HTMLElement).style.background = '';
-      el.removeAttribute('data-highlighted');
-    }
+    const { start, end, nearest } = findTickRange(this.tickIndex, tick);
 
-    // Find the closest entry at or before the current tick and scroll to it
-    let scrollTarget: HTMLElement | null = null;
+    // Nothing to do when the same rows are already lit (the common case between events)
+    const same =
+      this.highlightedEls.length === end - start &&
+      this.highlightedEls.every((el, i) => el === this.tickIndex[start + i].el);
 
-    // Highlight entries at the current tick
-    const tickEntries = this.entryElements.get(tick);
-    if (tickEntries) {
-      for (const el of tickEntries) {
+    if (!same) {
+      for (const el of this.highlightedEls) {
+        el.style.borderLeftColor = 'transparent';
+        el.style.background = '';
+        el.removeAttribute('data-highlighted');
+      }
+      this.highlightedEls = [];
+      for (let i = start; i < end; i++) {
+        const el = this.tickIndex[i].el;
         el.style.borderLeftColor = el.dataset.borderColor || 'var(--primary)';
         el.style.background = 'rgba(255,255,255,0.04)';
         el.setAttribute('data-highlighted', 'true');
-        if (!scrollTarget) scrollTarget = el;
+        this.highlightedEls.push(el);
       }
     }
 
-    // If no entries at exact tick, find nearest preceding entry for scroll
-    if (!scrollTarget) {
-      const allEntryDivs = this.logList.children;
-      for (let i = allEntryDivs.length - 1; i >= 0; i--) {
-        const el = allEntryDivs[i] as HTMLElement;
-        const entryTick = parseInt(el.dataset.tick || '0');
-        if (entryTick <= tick) {
-          scrollTarget = el;
-          break;
-        }
-      }
-    }
-
-    if (scrollTarget) {
+    // Exact matches scroll to the first of them; otherwise the nearest preceding entry
+    const scrollTarget =
+      end > start ? this.tickIndex[start].el : (this.tickIndex[nearest]?.el ?? null);
+    if (scrollTarget && this.isOpen && scrollTarget !== this.lastScrollTarget) {
+      this.lastScrollTarget = scrollTarget;
       scrollTarget.scrollIntoView({ block: 'center', behavior: 'auto' });
     }
   }

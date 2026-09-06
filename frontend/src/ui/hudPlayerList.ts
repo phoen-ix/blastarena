@@ -131,7 +131,7 @@ export class HudPlayerList {
           ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${TEAM_COLORS[p.team ?? 0]};margin-right:4px;vertical-align:middle;"></span>`
           : '';
         const buddyTag = p.isBuddy
-          ? '<span style="color:var(--accent);font-size:10px;font-weight:700;margin-left:4px;">[BUDDY]</span>'
+          ? `<span style="color:var(--accent);font-size:10px;font-weight:700;margin-left:4px;">${escapeHtml(t('ui:hud.buddyTag'))}</span>`
           : '';
         setHtml(
           row.nameEl,

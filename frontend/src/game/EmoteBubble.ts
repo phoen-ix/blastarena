@@ -89,6 +89,14 @@ export class EmoteBubbleRenderer {
     });
   }
 
+  /**
+   * Whether any bubble is alive (including one fading out). GameScene skips building the
+   * per-frame player position map when this is false — which is nearly always. (audit F5)
+   */
+  hasActive(): boolean {
+    return this.activeEmotes.length > 0;
+  }
+
   update(playerPositions: Map<number, { x: number; y: number }>): void {
     const now = Date.now();
     const totalLifetime = EMOTE_DISPLAY_MS + FADE_DURATION;

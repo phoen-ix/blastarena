@@ -17,13 +17,17 @@ export class ExplosionRenderer {
   private tracked: Map<string, TrackedExplosion> = new Map();
   public wrappingWorldSize: { w: number; h: number } | null = null;
   private activeEmitterCount: number = 0;
+  /** Reused across ticks instead of a fresh Set per update, like BombSpriteRenderer. (audit F5) */
+  private _activeIds = new Set<string>();
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
   }
 
   update(explosions: ExplosionState[]): void {
-    const activeIds = new Set(explosions.map((e) => e.id));
+    this._activeIds.clear();
+    for (const e of explosions) this._activeIds.add(e.id);
+    const activeIds = this._activeIds;
 
     // Remove sprites for explosions no longer in state
     for (const [id, tracked] of this.tracked) {

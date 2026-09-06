@@ -207,16 +207,15 @@ export class ReplayControls {
       this.gamepadRAF = requestAnimationFrame(poll);
 
       const pad = this.getPad();
+      const prev = this.prevGamepadButtons;
       if (!pad) {
-        this.prevGamepadButtons = [];
+        prev.length = 0;
         return;
       }
 
-      const justPressed = (index: number): boolean => {
-        const down = pad.buttons[index]?.pressed ?? false;
-        const prev = this.prevGamepadButtons[index] ?? false;
-        return down && !prev;
-      };
+      const buttons = pad.buttons;
+      const justPressed = (index: number): boolean =>
+        (buttons[index]?.pressed ?? false) && !(prev[index] ?? false);
 
       // A (0) = play/pause
       if (justPressed(0)) {
@@ -246,7 +245,10 @@ export class ReplayControls {
         this.cycleSpeed();
       }
 
-      this.prevGamepadButtons = pad.buttons.map((b) => b.pressed);
+      // Write this frame's states into the preallocated array instead of allocating a fresh
+      // `buttons.map()` result 60 times a second. (audit F10)
+      prev.length = buttons.length;
+      for (let i = 0; i < buttons.length; i++) prev[i] = buttons[i].pressed;
     };
 
     this.gamepadRAF = requestAnimationFrame(poll);

@@ -6,7 +6,6 @@ import { LobbyScene } from './scenes/LobbyScene';
 import { GameScene } from './scenes/GameScene';
 import { HUDScene } from './scenes/HUDScene';
 import { GameOverScene } from './scenes/GameOverScene';
-import { LevelEditorScene } from './scenes/LevelEditorScene';
 import { themeManager } from './themes/ThemeManager';
 import { initI18n } from './i18n';
 import { audioManager } from './game/AudioManager';
@@ -31,19 +30,17 @@ async function boot(): Promise<Phaser.Game> {
       mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    physics: {
-      default: 'arcade',
-      arcade: {
-        debug: false,
-      },
-    },
+    // No `physics` block: nothing uses this.physics (the server is authoritative), and the
+    // arcade plugin would step a physics world per active scene for nothing. (audit F9)
     audio: {
       noAudio: true, // Phaser audio unused — we use Web Audio API via AudioManager
     },
     input: {
       gamepad: true,
     },
-    scene: [BootScene, MenuScene, LobbyScene, GameScene, HUDScene, GameOverScene, LevelEditorScene],
+    // LevelEditorScene is registered on demand by scenes/levelEditorLoader.ts so the editor
+    // ships as its own chunk instead of in the main bundle. (audit F9)
+    scene: [BootScene, MenuScene, LobbyScene, GameScene, HUDScene, GameOverScene],
   };
 
   game = new Phaser.Game(config);

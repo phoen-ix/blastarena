@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
-import { TileType, Position } from '@blast-arena/shared';
+import { TileType, Position, TileDiff } from '@blast-arena/shared';
 import { TILE_SIZE } from '@blast-arena/shared';
-import { getSettings } from './Settings';
-import { wrapGhostTileSpans, ghostTileSpanKey } from '../utils/wrapGhosts';
+import { getSettings, VisualSettings } from './Settings';
+import { wrapGhostTileSpans } from '../utils/wrapGhosts';
 import { getTileTexture, isConveyorTile, conveyorAnimKey } from '../utils/tileTextures';
 
 export class TileMapRenderer {
@@ -19,7 +19,15 @@ export class TileMapRenderer {
   // its ghosts in O(1). (audit TILE-GHOST-1)
   private ghostPool: Phaser.GameObjects.Image[] = [];
   private ghostsByTile: Map<number, Phaser.GameObjects.Image[]> = new Map();
-  private ghostLayoutKey = '';
+  /**
+   * The camera's visible tile range when the ghosts were last laid out. The span layout is a
+   * function of these four ints alone, so comparing them is the whole per-frame cost — no span
+   * array or string key is built unless the camera actually crossed a tile boundary. (audit F5)
+   */
+  private ghostViewX0 = Number.NaN;
+  private ghostViewY0 = Number.NaN;
+  private ghostViewX1 = Number.NaN;
+  private ghostViewY1 = Number.NaN;
 
   constructor(
     scene: Phaser.Scene,
@@ -81,10 +89,28 @@ export class TileMapRenderer {
     const cam = this.scene.cameras?.main;
     if (!cam) return;
 
-    const spans = wrapGhostTileSpans(cam.worldView, this.width, this.height, TILE_SIZE);
-    const key = ghostTileSpanKey(spans);
-    if (key === this.ghostLayoutKey) return;
-    this.ghostLayoutKey = key;
+    // Tile-space bounds of the view. Identical bounds mean identical spans (wrapGhostTileSpans
+    // floors these same values); the only exception is a view edge sitting exactly on a tile
+    // boundary, where the differing column is the one fully off screen. (audit F5)
+    const view = cam.worldView;
+    const vx0 = Math.floor(view.x / TILE_SIZE);
+    const vy0 = Math.floor(view.y / TILE_SIZE);
+    const vx1 = Math.floor((view.x + view.width) / TILE_SIZE);
+    const vy1 = Math.floor((view.y + view.height) / TILE_SIZE);
+    if (
+      vx0 === this.ghostViewX0 &&
+      vy0 === this.ghostViewY0 &&
+      vx1 === this.ghostViewX1 &&
+      vy1 === this.ghostViewY1
+    ) {
+      return;
+    }
+    this.ghostViewX0 = vx0;
+    this.ghostViewY0 = vy0;
+    this.ghostViewX1 = vx1;
+    this.ghostViewY1 = vy1;
+
+    const spans = wrapGhostTileSpans(view, this.width, this.height, TILE_SIZE);
 
     this.ghostsByTile.clear();
     let used = 0;
@@ -140,6 +166,10 @@ export class TileMapRenderer {
     for (const img of ghosts) img.setTexture(textureKey);
   }
 
+  /**
+   * Full-grid sync: every cell is compared against the last known type. Used for the paths that
+   * carry the whole grid (initial state, replays, simulations, open-world round start).
+   */
   updateTiles(tiles: TileType[][]): Position[] {
     const destroyedPositions: Position[] = [];
     const settings = getSettings();
@@ -147,152 +177,182 @@ export class TileMapRenderer {
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
         const newType = tiles[y][x];
-        const prevType = this.previousTiles[y]?.[x];
-
-        if (newType === prevType) continue;
-
-        // A destructible block was destroyed (changed to empty/spawn)
-        const wasDestructible =
-          prevType === 'destructible' ||
-          prevType === ('destructible_cracked' as TileType) ||
-          prevType === ('vine' as TileType);
-        const isNowEmpty = newType === 'empty' || newType === 'spawn';
-
-        if (wasDestructible && isNowEmpty) {
-          destroyedPositions.push({ x, y });
-
-          if (settings.animations) {
-            const oldSprite = this.tileSprites[y][x];
-            // Animate destruction: scale down and fade out, then replace
-            this.scene.tweens.add({
-              targets: oldSprite,
-              alpha: 0,
-              scaleX: 0.3,
-              scaleY: 0.3,
-              duration: 300,
-              ease: 'Power2',
-              onComplete: () => {
-                oldSprite.destroy();
-              },
-            });
-
-            // Create the new floor sprite immediately underneath
-            const newTexture = getTileTexture(newType, x, y, this.theme);
-            const newSprite = this.scene.add.sprite(
-              x * TILE_SIZE + TILE_SIZE / 2,
-              y * TILE_SIZE + TILE_SIZE / 2,
-              newTexture,
-            );
-            this.tileSprites[y][x] = newSprite;
-            this.updateGhostTexture(x, y, newTexture);
-          } else {
-            // No animation: just swap the texture
-            const newTexture = getTileTexture(newType, x, y, this.theme);
-            this.tileSprites[y][x].setTexture(newTexture);
-            this.tileSprites[y][x].setAlpha(1);
-            this.tileSprites[y][x].setScale(1);
-            this.updateGhostTexture(x, y, newTexture);
-          }
-        } else if (this.isGateOpening(prevType, newType)) {
-          // Gate opening: scale down old bars, reveal open gate underneath
-          const newTexture = getTileTexture(newType, x, y, this.theme);
-          if (settings.animations) {
-            const oldSprite = this.tileSprites[y][x];
-            this.scene.tweens.add({
-              targets: oldSprite,
-              alpha: 0,
-              scaleX: 0.3,
-              scaleY: 0.3,
-              duration: 200,
-              ease: 'Power2',
-              onComplete: () => {
-                oldSprite.destroy();
-              },
-            });
-            const newSprite = this.scene.add.sprite(
-              x * TILE_SIZE + TILE_SIZE / 2,
-              y * TILE_SIZE + TILE_SIZE / 2,
-              newTexture,
-            );
-            this.tileSprites[y][x] = newSprite;
-          } else {
-            this.tileSprites[y][x].setTexture(newTexture);
-            this.tileSprites[y][x].setAlpha(1);
-            this.tileSprites[y][x].setScale(1);
-          }
-          this.updateGhostTexture(x, y, newTexture);
-        } else if (this.isGateClosing(prevType, newType)) {
-          // Gate closing: new bars scale up from small to full
-          const newTexture = getTileTexture(newType, x, y, this.theme);
-          if (settings.animations) {
-            const oldSprite = this.tileSprites[y][x];
-            oldSprite.destroy();
-            const newSprite = this.scene.add.sprite(
-              x * TILE_SIZE + TILE_SIZE / 2,
-              y * TILE_SIZE + TILE_SIZE / 2,
-              newTexture,
-            );
-            newSprite.setScale(0.3);
-            this.scene.tweens.add({
-              targets: newSprite,
-              scaleX: 1,
-              scaleY: 1,
-              duration: 200,
-              ease: 'Power2',
-            });
-            this.tileSprites[y][x] = newSprite;
-          } else {
-            this.tileSprites[y][x].setTexture(newTexture);
-            this.tileSprites[y][x].setAlpha(1);
-            this.tileSprites[y][x].setScale(1);
-          }
-          this.updateGhostTexture(x, y, newTexture);
-        } else if (prevType === ('crumbling' as TileType) && newType === ('pit' as TileType)) {
-          // Crumbling floor collapses into pit
-          const newTexture = getTileTexture(newType, x, y, this.theme);
-          if (settings.animations) {
-            const oldSprite = this.tileSprites[y][x];
-            this.scene.tweens.add({
-              targets: oldSprite,
-              alpha: 0,
-              scaleX: 0.3,
-              scaleY: 0.3,
-              duration: 300,
-              ease: 'Power2',
-              onComplete: () => {
-                oldSprite.destroy();
-              },
-            });
-            const newSprite = this.scene.add.sprite(
-              x * TILE_SIZE + TILE_SIZE / 2,
-              y * TILE_SIZE + TILE_SIZE / 2,
-              newTexture,
-            );
-            this.tileSprites[y][x] = newSprite;
-          } else {
-            this.tileSprites[y][x].setTexture(newTexture);
-            this.tileSprites[y][x].setAlpha(1);
-            this.tileSprites[y][x].setScale(1);
-          }
-          this.updateGhostTexture(x, y, newTexture);
-        } else {
-          // Non-destructive tile change (e.g. conveyor placed, teleporter toggled,
-          // switch state change — simple texture swap)
-          const newTexture = getTileTexture(newType, x, y, this.theme);
-          const sprite = this.tileSprites[y][x];
-          sprite.stop();
-          sprite.setTexture(newTexture);
-          if (isConveyorTile(newType)) {
-            this.playConveyorAnim(sprite, newType);
-          }
-          this.updateGhostTexture(x, y, newTexture);
-        }
-
-        this.previousTiles[y][x] = newType;
+        if (newType === this.previousTiles[y]?.[x]) continue;
+        this.applyTileChange(x, y, newType, settings, destroyedPositions);
       }
     }
 
     return destroyedPositions;
+  }
+
+  /**
+   * Per-tick sync from the server's `tileDiffs`: only the listed cells are touched. The tick path
+   * used to call updateTiles() with the full stored grid, rescanning every cell (2,091 on the open
+   * world) to find the two or three a diff had already named. (audit F5)
+   */
+  applyTileDiffs(diffs: readonly TileDiff[]): Position[] {
+    const destroyedPositions: Position[] = [];
+    if (diffs.length === 0) return destroyedPositions;
+    const settings = getSettings();
+
+    for (const diff of diffs) {
+      const { x, y, type } = diff;
+      if (y < 0 || y >= this.height || x < 0 || x >= this.width) continue;
+      if (type === this.previousTiles[y]?.[x]) continue;
+      this.applyTileChange(x, y, type, settings, destroyedPositions);
+    }
+
+    return destroyedPositions;
+  }
+
+  /** Transition one cell from its last known type to `newType`, animating where appropriate. */
+  private applyTileChange(
+    x: number,
+    y: number,
+    newType: TileType,
+    settings: VisualSettings,
+    destroyedPositions: Position[],
+  ): void {
+    const prevType = this.previousTiles[y]?.[x];
+
+    // A destructible block was destroyed (changed to empty/spawn)
+    const wasDestructible =
+      prevType === 'destructible' ||
+      prevType === ('destructible_cracked' as TileType) ||
+      prevType === ('vine' as TileType);
+    const isNowEmpty = newType === 'empty' || newType === 'spawn';
+
+    if (wasDestructible && isNowEmpty) {
+      destroyedPositions.push({ x, y });
+
+      if (settings.animations) {
+        const oldSprite = this.tileSprites[y][x];
+        // Animate destruction: scale down and fade out, then replace
+        this.scene.tweens.add({
+          targets: oldSprite,
+          alpha: 0,
+          scaleX: 0.3,
+          scaleY: 0.3,
+          duration: 300,
+          ease: 'Power2',
+          onComplete: () => {
+            oldSprite.destroy();
+          },
+        });
+
+        // Create the new floor sprite immediately underneath
+        const newTexture = getTileTexture(newType, x, y, this.theme);
+        const newSprite = this.scene.add.sprite(
+          x * TILE_SIZE + TILE_SIZE / 2,
+          y * TILE_SIZE + TILE_SIZE / 2,
+          newTexture,
+        );
+        this.tileSprites[y][x] = newSprite;
+        this.updateGhostTexture(x, y, newTexture);
+      } else {
+        // No animation: just swap the texture
+        const newTexture = getTileTexture(newType, x, y, this.theme);
+        this.tileSprites[y][x].setTexture(newTexture);
+        this.tileSprites[y][x].setAlpha(1);
+        this.tileSprites[y][x].setScale(1);
+        this.updateGhostTexture(x, y, newTexture);
+      }
+    } else if (this.isGateOpening(prevType, newType)) {
+      // Gate opening: scale down old bars, reveal open gate underneath
+      const newTexture = getTileTexture(newType, x, y, this.theme);
+      if (settings.animations) {
+        const oldSprite = this.tileSprites[y][x];
+        this.scene.tweens.add({
+          targets: oldSprite,
+          alpha: 0,
+          scaleX: 0.3,
+          scaleY: 0.3,
+          duration: 200,
+          ease: 'Power2',
+          onComplete: () => {
+            oldSprite.destroy();
+          },
+        });
+        const newSprite = this.scene.add.sprite(
+          x * TILE_SIZE + TILE_SIZE / 2,
+          y * TILE_SIZE + TILE_SIZE / 2,
+          newTexture,
+        );
+        this.tileSprites[y][x] = newSprite;
+      } else {
+        this.tileSprites[y][x].setTexture(newTexture);
+        this.tileSprites[y][x].setAlpha(1);
+        this.tileSprites[y][x].setScale(1);
+      }
+      this.updateGhostTexture(x, y, newTexture);
+    } else if (this.isGateClosing(prevType, newType)) {
+      // Gate closing: new bars scale up from small to full
+      const newTexture = getTileTexture(newType, x, y, this.theme);
+      if (settings.animations) {
+        const oldSprite = this.tileSprites[y][x];
+        oldSprite.destroy();
+        const newSprite = this.scene.add.sprite(
+          x * TILE_SIZE + TILE_SIZE / 2,
+          y * TILE_SIZE + TILE_SIZE / 2,
+          newTexture,
+        );
+        newSprite.setScale(0.3);
+        this.scene.tweens.add({
+          targets: newSprite,
+          scaleX: 1,
+          scaleY: 1,
+          duration: 200,
+          ease: 'Power2',
+        });
+        this.tileSprites[y][x] = newSprite;
+      } else {
+        this.tileSprites[y][x].setTexture(newTexture);
+        this.tileSprites[y][x].setAlpha(1);
+        this.tileSprites[y][x].setScale(1);
+      }
+      this.updateGhostTexture(x, y, newTexture);
+    } else if (prevType === ('crumbling' as TileType) && newType === ('pit' as TileType)) {
+      // Crumbling floor collapses into pit
+      const newTexture = getTileTexture(newType, x, y, this.theme);
+      if (settings.animations) {
+        const oldSprite = this.tileSprites[y][x];
+        this.scene.tweens.add({
+          targets: oldSprite,
+          alpha: 0,
+          scaleX: 0.3,
+          scaleY: 0.3,
+          duration: 300,
+          ease: 'Power2',
+          onComplete: () => {
+            oldSprite.destroy();
+          },
+        });
+        const newSprite = this.scene.add.sprite(
+          x * TILE_SIZE + TILE_SIZE / 2,
+          y * TILE_SIZE + TILE_SIZE / 2,
+          newTexture,
+        );
+        this.tileSprites[y][x] = newSprite;
+      } else {
+        this.tileSprites[y][x].setTexture(newTexture);
+        this.tileSprites[y][x].setAlpha(1);
+        this.tileSprites[y][x].setScale(1);
+      }
+      this.updateGhostTexture(x, y, newTexture);
+    } else {
+      // Non-destructive tile change (e.g. conveyor placed, teleporter toggled,
+      // switch state change — simple texture swap)
+      const newTexture = getTileTexture(newType, x, y, this.theme);
+      const sprite = this.tileSprites[y][x];
+      sprite.stop();
+      sprite.setTexture(newTexture);
+      if (isConveyorTile(newType)) {
+        this.playConveyorAnim(sprite, newType);
+      }
+      this.updateGhostTexture(x, y, newTexture);
+    }
+
+    this.previousTiles[y][x] = newType;
   }
 
   private isGateOpening(prev: TileType | undefined, next: TileType): boolean {
@@ -329,7 +389,10 @@ export class TileMapRenderer {
     this.tileSprites = [];
     this.ghostPool = [];
     this.ghostsByTile.clear();
-    this.ghostLayoutKey = '';
+    this.ghostViewX0 = Number.NaN;
+    this.ghostViewY0 = Number.NaN;
+    this.ghostViewX1 = Number.NaN;
+    this.ghostViewY1 = Number.NaN;
     this.previousTiles = [];
   }
 }

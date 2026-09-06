@@ -35,6 +35,10 @@ export class SpectatorActionBar {
   private selectedAction: ActionType | null = null;
   private energy: number = 0;
   private cooldownRemaining: number = 0;
+  /** What the DOM currently shows; updateFromState is a no-op while these match. (audit F4) */
+  private renderedEnergy: number = -1;
+  private renderedCooldown: number = -1;
+  private renderedSelection: ActionType | null = null;
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
   private onTargetSelect: ((type: ActionType) => void) | null = null;
   private onTargetCancel: (() => void) | null = null;
@@ -166,6 +170,21 @@ export class SpectatorActionBar {
 
     this.energy = myState.energy;
     this.cooldownRemaining = myState.cooldownTicksRemaining;
+
+    // Every tick used to rewrite the bar width, restarting its CSS transition 20 times a second,
+    // and re-style all four buttons — with nothing having changed. (audit F4)
+    const cooldownActive = this.cooldownRemaining > 0;
+    const renderedCooldownActive = this.renderedCooldown > 0;
+    if (
+      this.energy === this.renderedEnergy &&
+      cooldownActive === renderedCooldownActive &&
+      this.selectedAction === this.renderedSelection
+    ) {
+      return;
+    }
+    this.renderedEnergy = this.energy;
+    this.renderedCooldown = this.cooldownRemaining;
+    this.renderedSelection = this.selectedAction;
 
     // Update energy bar
     const pct = Math.round((this.energy / SPECTATOR_MAX_ENERGY) * 100);

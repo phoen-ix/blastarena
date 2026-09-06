@@ -417,17 +417,9 @@ export class EnemyTextureGenerator {
       const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
       points.push(cx + Math.cos(angle) * 18, cy + Math.sin(angle) * 18);
     }
-    gfx.fillPoints(
-      points.map(
-        (v, i) =>
-          new Phaser.Geom.Point(
-            i % 2 === 0 ? points[i] : points[i],
-            i % 2 === 0 ? points[i] : points[i],
-          ),
-      ),
-    );
-
-    // Simple filled polygon
+    // (A fillPoints() call used to precede this, mapping every flat coordinate to a Point with
+    // x === y — a zero-area polygon on the diagonal that drew nothing. The path below is the
+    // pentagon. audit G4)
     gfx.beginPath();
     gfx.moveTo(points[0], points[1]);
     for (let i = 2; i < points.length; i += 2) {

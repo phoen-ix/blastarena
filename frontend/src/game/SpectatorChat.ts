@@ -22,7 +22,6 @@ const ROLE_COLORS: Record<string, string> = {
 
 export class SpectatorChat {
   private socketClient: SocketClient;
-  private userId: number;
   private userRole: string;
   private messages: SpectatorChatMessage[] = [];
   private chatMode: ChatMode = 'everyone';
@@ -34,9 +33,8 @@ export class SpectatorChat {
   private chatHandler: ((data: SpectatorChatMessage) => void) | null = null;
   private settingsHandler: ((data: { key: string; value?: unknown }) => void) | null = null;
 
-  constructor(socketClient: SocketClient, userId: number, userRole: string) {
+  constructor(socketClient: SocketClient, userRole: string) {
     this.socketClient = socketClient;
-    this.userId = userId;
     this.userRole = userRole;
   }
 

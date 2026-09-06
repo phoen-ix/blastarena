@@ -9,6 +9,13 @@ export class EnemySpriteRenderer {
   private sprites: Map<number, Phaser.GameObjects.Sprite> = new Map();
   private hpBars: Map<number, Phaser.GameObjects.Graphics> = new Map();
   private prevPositions: Map<number, { x: number; y: number }> = new Map();
+  /**
+   * Enemies whose death animation has already been started. A dead enemy stays in the state for
+   * several ticks while `sprite.visible` is still true (the tween hides it only on completion), so
+   * without this guard every tick re-tinted the sprite and stacked another shrink/fade tween on
+   * it — ~6 per death. Same idea as PlayerSprite's activeMoveAnim. (audit C5)
+   */
+  private dying: Set<number> = new Set();
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -54,8 +61,9 @@ export class EnemySpriteRenderer {
       }
 
       if (!enemy.alive) {
-        // Death animation
-        if (sprite.visible) {
+        // Death animation — once per enemy (audit C5)
+        if (sprite.visible && !this.dying.has(enemy.id)) {
+          this.dying.add(enemy.id);
           if (settings.animations) {
             sprite.setTint(0xff0000);
             this.scene.tweens.add({
@@ -125,9 +133,17 @@ export class EnemySpriteRenderer {
     bar.fillRect(barX, barY, barWidth * hpRatio, barHeight);
   }
 
+  /** True once the death animation for this enemy has been started (test seam). */
+  isDying(id: number): boolean {
+    return this.dying.has(id);
+  }
+
   private removeEnemy(id: number): void {
     const sprite = this.sprites.get(id);
-    if (sprite) sprite.destroy();
+    if (sprite) {
+      this.scene.tweens.killTweensOf(sprite);
+      sprite.destroy();
+    }
     this.sprites.delete(id);
 
     const bar = this.hpBars.get(id);
@@ -135,11 +151,13 @@ export class EnemySpriteRenderer {
     this.hpBars.delete(id);
 
     this.prevPositions.delete(id);
+    this.dying.delete(id);
   }
 
   destroy(): void {
     for (const [id] of this.sprites) {
       this.removeEnemy(id);
     }
+    this.dying.clear();
   }
 }

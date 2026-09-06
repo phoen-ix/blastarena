@@ -357,9 +357,19 @@ function generateThemedExitGoal(scene: Phaser.Scene, palette: CampaignThemePalet
   gl.destroy();
 }
 
+/**
+ * The theme the `themed_*` textures currently hold. Those keys carry no theme name, so a theme
+ * change must redraw them — but reopening the editor or restarting a level of the same theme
+ * used to re-rasterise all ~60 of them every time. Textures live on the game-wide TextureManager,
+ * so one module-level record is enough. (audit F10)
+ */
+let generatedTheme: CampaignWorldTheme | null = null;
+
 export function generateThemedTileTextures(scene: Phaser.Scene, theme: CampaignWorldTheme): void {
   const palette = CAMPAIGN_THEME_PALETTES[theme];
   if (!palette) return;
+  if (generatedTheme === theme && scene.textures.exists('themed_wall')) return;
+  generatedTheme = theme;
   generateThemedWall(scene, palette);
   generateThemedDestructible(scene, palette);
   generateThemedFloors(scene, palette);
@@ -372,6 +382,10 @@ export function generateThemedTileTextures(scene: Phaser.Scene, theme: CampaignW
 }
 
 export function generateHazardTileTextures(scene: Phaser.Scene): void {
+  // Theme-independent keys: once generated they are valid for the rest of the session.
+  // (audit F10)
+  if (scene.textures.exists('vine') && scene.textures.exists('dark_rift')) return;
+
   // Vine: green tendrils over earthy floor
   const vineGfx = scene.make.graphics({ x: 0, y: 0 });
   vineGfx.fillStyle(0x2a3a1e, 1);

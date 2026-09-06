@@ -2,10 +2,24 @@ import Phaser from 'phaser';
 import { themeManager } from '../themes/ThemeManager';
 import { POWERUP_ICON_DRAWERS } from '../utils/powerUpIcons';
 import { generateHazardTileTextures } from '../utils/campaignThemes';
+import { t } from '../i18n';
 
 export const PLAYER_COLORS = [
   0xe94560, 0x44aaff, 0x44ff44, 0xff8800, 0xcc44ff, 0xffff44, 0xff44ff, 0x44ffff,
 ];
+
+/** Accent colour per power-up type: the texture tint here, the pickup burst in EffectSystem. */
+export const POWERUP_COLORS: Record<string, number> = {
+  bomb_up: 0xff4444,
+  fire_up: 0xff8800,
+  speed_up: 0x44aaff,
+  shield: 0x44ff44,
+  kick: 0xcc44ff,
+  pierce_bomb: 0xff2222,
+  remote_bomb: 0x4488ff,
+  line_bomb: 0xffaa44,
+  bomb_throw: 0xff66ff,
+};
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -23,7 +37,7 @@ export class BootScene extends Phaser.Scene {
 
     const colors = themeManager.getCanvasColors();
     const loadingText = this.add
-      .text(width / 2, height / 2 - 40, 'Loading...', {
+      .text(width / 2, height / 2 - 40, t('common:actions.loading'), {
         fontSize: '18px',
         color: colors.primaryHex,
       })
@@ -575,19 +589,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   private generatePowerUpTextures(): void {
-    const defs: Record<string, { color: string }> = {
-      bomb_up: { color: '#ff4444' },
-      fire_up: { color: '#ff8800' },
-      speed_up: { color: '#44aaff' },
-      shield: { color: '#44ff44' },
-      kick: { color: '#cc44ff' },
-      pierce_bomb: { color: '#ff2222' },
-      remote_bomb: { color: '#4488ff' },
-      line_bomb: { color: '#ffaa44' },
-      bomb_throw: { color: '#ff66ff' },
-    };
-
-    for (const [type, def] of Object.entries(defs)) {
+    for (const [type, colorInt] of Object.entries(POWERUP_COLORS)) {
+      const color = '#' + colorInt.toString(16).padStart(6, '0');
       const canvas = document.createElement('canvas');
       canvas.width = 48;
       canvas.height = 48;
@@ -595,14 +598,14 @@ export class BootScene extends Phaser.Scene {
 
       // Glow behind
       ctx.globalAlpha = 0.1;
-      ctx.fillStyle = def.color;
+      ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(24, 24, 22, 0, Math.PI * 2);
       ctx.fill();
 
       // Background rounded rect
       ctx.globalAlpha = 0.8;
-      ctx.fillStyle = def.color;
+      ctx.fillStyle = color;
       this.canvasRoundRect(ctx, 4, 4, 40, 40, 8);
       ctx.fill();
 
