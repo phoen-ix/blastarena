@@ -17,6 +17,7 @@ import {
   sendEmailTakenRegistrationWarning,
 } from './email';
 import { AppError } from '../middleware/errorHandler';
+import { ACCESS_TOKEN_TYPE } from '../middleware/auth';
 import {
   AuthPayload,
   PublicUser,
@@ -43,7 +44,7 @@ function toPublicUser(row: UserRow | RefreshTokenJoinRow): PublicUser {
 
 function generateAccessToken(payload: AuthPayload): string {
   const config = getConfig();
-  return jwt.sign({ ...payload }, config.JWT_SECRET, {
+  return jwt.sign({ ...payload, typ: ACCESS_TOKEN_TYPE }, config.JWT_SECRET, {
     expiresIn: config.JWT_EXPIRES_IN,
   } as jwt.SignOptions);
 }
@@ -70,6 +71,36 @@ export function verifyLocalCoopToken(token: string): { userId: number; username:
     };
     if (decoded.purpose !== 'local-coop-p2') return null;
     return { userId: decoded.userId, username: decoded.username };
+  } catch {
+    return null;
+  }
+}
+
+/** Pending local co-op P2 sign-in that still needs P2's 2FA code (bound to the host account). */
+export function generateLocalCoopTotpToken(
+  userId: number,
+  hostUserId: number,
+  duration: number,
+): string {
+  const config = getConfig();
+  return jwt.sign({ userId, hostUserId, duration, purpose: 'local-coop-totp' }, config.JWT_SECRET, {
+    expiresIn: '5m',
+  } as jwt.SignOptions);
+}
+
+export function verifyLocalCoopTotpToken(
+  token: string,
+  hostUserId: number,
+): { userId: number; duration: number } | null {
+  try {
+    const decoded = jwt.verify(token, getConfig().JWT_SECRET) as {
+      userId: number;
+      hostUserId: number;
+      duration: number;
+      purpose?: string;
+    };
+    if (decoded.purpose !== 'local-coop-totp' || decoded.hostUserId !== hostUserId) return null;
+    return { userId: decoded.userId, duration: decoded.duration };
   } catch {
     return null;
   }

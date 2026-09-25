@@ -159,6 +159,8 @@ export interface EnemyAIRow extends RowDataPacket {
   uploaded_at: Date;
   version: number;
   file_size: number;
+  /** Set for the built-in AIs (enemy-ai-defaults); null for uploads. */
+  builtin_key: string | null;
   uploader_username?: string;
 }
 

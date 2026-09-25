@@ -64,6 +64,35 @@ describe('Auth & Admin Middleware', () => {
       expect(mockRes.status).not.toHaveBeenCalled();
     });
 
+    it('accepts an access token and a legacy token without typ', () => {
+      for (const payload of [
+        { userId: 1, username: 'a', role: 'user', typ: 'access' },
+        { userId: 1, username: 'a', role: 'user' },
+      ]) {
+        mockVerify.mockReturnValue(payload);
+        mockReq.headers.authorization = 'Bearer t';
+        mockNext.mockClear();
+        authMiddleware(mockReq, mockRes as any, mockNext);
+        expect(mockNext).toHaveBeenCalled();
+      }
+    });
+
+    it('refuses tokens issued for another purpose', () => {
+      for (const payload of [
+        { userId: 1, username: 'a', role: 'user', purpose: 'totp-challenge' },
+        { userId: 1, username: 'a', purpose: 'local-coop-socket' },
+        { userId: 1, username: 'a', typ: 'refresh' },
+      ]) {
+        mockVerify.mockReturnValue(payload);
+        mockReq.headers.authorization = 'Bearer t';
+        mockNext.mockClear();
+        mockRes.status.mockClear();
+        authMiddleware(mockReq, mockRes as any, mockNext);
+        expect(mockNext).not.toHaveBeenCalled();
+        expect(mockRes.status).toHaveBeenCalledWith(401);
+      }
+    });
+
     it('should return 401 when Authorization header is missing', () => {
       authMiddleware(mockReq, mockRes as any, mockNext);
 

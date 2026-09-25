@@ -10,8 +10,32 @@ import {
   generateBackupCodes,
 } from '../utils/crypto';
 import { getConfig } from '../config';
+import { getRedis } from '../db/redis';
 import { UserRow } from '../db/types';
 import { TotpSetupResponse } from '@blast-arena/shared';
+
+/** Wrong codes allowed per account in the window below, across all clients. */
+const MAX_CODE_FAILURES = 10;
+const CODE_FAILURE_WINDOW_SECONDS = 15 * 60;
+
+const failureKey = (userId: number) => `totp:fails:${userId}`;
+
+async function assertAttemptsLeft(userId: number): Promise<void> {
+  const failures = Number(await getRedis().get(failureKey(userId))) || 0;
+  if (failures >= MAX_CODE_FAILURES) {
+    throw new AppError('Too many attempts, try again later', 429, 'TOTP_RATE_LIMITED');
+  }
+}
+
+async function recordFailure(userId: number): Promise<void> {
+  const redis = getRedis();
+  const failures = await redis.incr(failureKey(userId));
+  if (failures === 1) await redis.expire(failureKey(userId), CODE_FAILURE_WINDOW_SECONDS);
+}
+
+async function clearFailures(userId: number): Promise<void> {
+  await getRedis().del(failureKey(userId));
+}
 
 function getEncryptionKey(): string {
   const key = getConfig().TOTP_ENCRYPTION_KEY;
@@ -153,6 +177,8 @@ async function verifyCodeInternal(
   code: string,
   userId: number,
 ): Promise<boolean> {
+  await assertAttemptsLeft(userId);
+
   // Try TOTP code first
   const secret = decryptTotpSecret(encryptedSecret, key);
   const totp = new OTPAuth.TOTP({
@@ -164,11 +190,25 @@ async function verifyCodeInternal(
 
   const delta = totp.validate({ token: code, window: 1 });
   if (delta !== null) {
+    // Each time step is accepted once.
+    const step = totp.counter() + delta;
+    const result = await execute(
+      'UPDATE users SET totp_last_step = ? WHERE id = ? AND (totp_last_step IS NULL OR totp_last_step < ?)',
+      [step, userId, step],
+    );
+    if (result.affectedRows === 0) {
+      await recordFailure(userId);
+      return false;
+    }
+    await clearFailures(userId);
     return true;
   }
 
   // Try backup codes
-  if (!backupCodesJson) return false;
+  if (!backupCodesJson) {
+    await recordFailure(userId);
+    return false;
+  }
 
   const hashedCodes: string[] = JSON.parse(backupCodesJson);
   const normalizedCode = code.toLowerCase().trim();
@@ -177,7 +217,10 @@ async function verifyCodeInternal(
   // cannot match, so there is no reason to bcrypt-compare it against all ten hashes. At cost 12
   // that loop is ~2.5s of CPU on the libuv pool per failed attempt, which starves every other
   // bcrypt and gzip operation in the process. (audit TOTP-BACKUP-CPU-1)
-  if (!/^[0-9a-z]{4}-[0-9a-z]{4}$/.test(normalizedCode)) return false;
+  if (!/^[0-9a-z]{4}-[0-9a-z]{4}$/.test(normalizedCode)) {
+    await recordFailure(userId);
+    return false;
+  }
 
   for (let i = 0; i < hashedCodes.length; i++) {
     const match = await comparePassword(normalizedCode, hashedCodes[i]);
@@ -193,11 +236,14 @@ async function verifyCodeInternal(
       );
       if (result.affectedRows === 0) {
         // Concurrent modification consumed a code first — treat this attempt as invalid.
+        await recordFailure(userId);
         return false;
       }
+      await clearFailures(userId);
       return true;
     }
   }
 
+  await recordFailure(userId);
   return false;
 }

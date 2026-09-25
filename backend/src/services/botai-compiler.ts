@@ -1,6 +1,7 @@
 import * as esbuild from 'esbuild';
 import vm from 'vm';
 import { logger } from '../utils/logger';
+import { inspectAIModule, AIModuleCheck } from './IsolatedAIRunner';
 
 const MAX_FILE_SIZE = 500 * 1024; // 500KB
 const VM_TIMEOUT_MS = 5000;
@@ -187,6 +188,35 @@ export async function scanAndBuildAI(source: string): Promise<CompileResult> {
   return { success: true, compiledCode, errors: [] };
 }
 
+/** Error message for a module without a usable AI class, or null when it is fine. */
+export function checkStructure(
+  method: 'generateInput' | 'decide',
+  compiledCode: string,
+  ctorArgs: unknown[],
+): string | null {
+  let check: AIModuleCheck;
+  try {
+    check = inspectAIModule(method, compiledCode, ctorArgs);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return `Structure validation failed: ${msg}`;
+  }
+  const signature =
+    method === 'generateInput'
+      ? 'generateInput(player, state, logger?): PlayerInput | null'
+      : 'decide(context: EnemyAIContext): { direction, placeBomb }';
+  switch (check.status) {
+    case 'ok':
+      return null;
+    case 'no_class':
+      return 'No exported class found. The module must export a class (default or named).';
+    case 'no_method':
+      return `Exported class does not have a ${method}() method. The class must implement: ${signature}`;
+    case 'ctor_error':
+      return `Class instantiation failed with difficulty="normal": ${check.message}`;
+  }
+}
+
 export async function compileBotAI(source: string): Promise<CompileResult> {
   // Steps 1-4: shared scan + build
   const buildResult = await scanAndBuildAI(source);
@@ -194,62 +224,9 @@ export async function compileBotAI(source: string): Promise<CompileResult> {
 
   const compiledCode = buildResult.compiledCode!;
 
-  // 5. Structure validation — run in VM sandbox, check exports
-  try {
-    const mod = loadBotAIInSandbox(compiledCode);
-
-    // Find the exported class — check default export, then named exports
-    let AIClass: unknown = mod.default || mod;
-    if (typeof AIClass === 'object' && AIClass !== null) {
-      // Look for a class in named exports
-      const exportValues = Object.values(mod);
-      AIClass = exportValues.find(
-        (v) =>
-          typeof v === 'function' && v.prototype && typeof v.prototype.generateInput === 'function',
-      );
-    }
-
-    if (!AIClass || typeof AIClass !== 'function') {
-      return {
-        success: false,
-        errors: ['No exported class found. The module must export a class (default or named).'],
-      };
-    }
-
-    if (
-      typeof (AIClass as { prototype: Record<string, unknown> }).prototype.generateInput !==
-      'function'
-    ) {
-      return {
-        success: false,
-        errors: [
-          'Exported class does not have a generateInput() method. ' +
-            'The class must implement: generateInput(player, state, logger?): PlayerInput | null',
-        ],
-      };
-    }
-
-    // Try instantiation
-    try {
-      const Constructor = AIClass as new (difficulty: string) => unknown;
-      const instance = new Constructor('normal');
-      if (typeof (instance as Record<string, unknown>).generateInput !== 'function') {
-        return {
-          success: false,
-          errors: ['Instantiated class does not have a generateInput method on the instance.'],
-        };
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return {
-        success: false,
-        errors: [`Class instantiation failed with difficulty="normal": ${msg}`],
-      };
-    }
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { success: false, errors: [`Structure validation failed: ${msg}`] };
-  }
+  // 5. Structure validation, inside an isolate like every later run of the code
+  const structureError = checkStructure('generateInput', compiledCode, ['normal', undefined]);
+  if (structureError) return { success: false, errors: [structureError] };
 
   logger.info('Bot AI compilation and validation successful');
   return { success: true, compiledCode, errors: [] };

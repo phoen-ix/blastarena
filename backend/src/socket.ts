@@ -1,6 +1,5 @@
 import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
-import jwt from 'jsonwebtoken';
 import { getConfig } from './config';
 import { logger } from './utils/logger';
 import * as lobbyService from './services/lobby';
@@ -12,7 +11,6 @@ import {
   ServerToClientEvents,
   InterServerEvents,
   SocketData,
-  AuthPayload,
   PublicUser,
   CampaignGameState,
   UserRole,
@@ -57,6 +55,7 @@ import {
 } from './utils/socketValidation';
 import { query } from './db/connection';
 import { AppError } from './middleware/errorHandler';
+import { verifyAccessToken } from './middleware/auth';
 import { UserRow } from './db/types';
 import { verifyLocalCoopSocketToken } from './services/auth';
 import { openWorldManager } from './game/OpenWorldManager';
@@ -85,6 +84,9 @@ const spectatorActionLimiter = createSocketRateLimiter(2);
 // socket owned a private Map that nothing ever pruned. (audit E10)
 const campaignStartLimiter = createSocketRateLimiter(1);
 const campaignPauseLimiter = createSocketRateLimiter(2);
+// Each join serialises the whole world and each join/leave broadcasts the full leaderboard.
+const openWorldJoinLimiter = createSocketRateLimiter(1);
+const openWorldJoinIpLimiter = createSocketRateLimiter(5);
 // lobby:subscribe/unsubscribe, admin:spectate and admin:roomMessage had no limiter at all — each
 // is a cheap call, but socket.join/leave and a room-wide broadcast are not free at 1000/s. (audit B16)
 const lobbySubscribeLimiter = createSocketRateLimiter(5);
@@ -153,7 +155,16 @@ const matchConfigSchema = z.object({
 });
 
 const createRoomRequestSchema = z.object({
-  name: z.string().min(1).max(50),
+  // Trimmed, inner whitespace collapsed, control and format (e.g. bidi) characters removed.
+  name: z
+    .string()
+    .transform((n) =>
+      n
+        .replace(/[\p{Cc}\p{Cf}]/gu, '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
+    .pipe(z.string().min(1).max(50)),
   config: matchConfigSchema,
 });
 
@@ -237,7 +248,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     }
 
     try {
-      const payload = jwt.verify(token, getConfig().JWT_SECRET) as AuthPayload;
+      const payload = verifyAccessToken(token);
 
       // Check email verification status from database
       const rows = await query<UserRow[]>(
@@ -762,6 +773,8 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Restart room (play again)
     socket.on('room:restart', async (callback) => {
+      if (!lobbyActionLimiter(socket.id))
+        return callback({ success: false, error: 'Rate limited' });
       try {
         const roomCode = socket.data.activeRoomCode;
         if (!roomCode) {
@@ -772,6 +785,14 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         const room = await lobbyService.getRoom(roomCode);
         if (!room) {
           callback({ success: false, error: 'Room not found' });
+          return;
+        }
+
+        // A direct restart is the solo "Play Again"; with other humans in the room it goes
+        // through the rematch vote.
+        const humans = room.players.filter((p) => p.user.id > 0);
+        if (humans.length !== 1 || humans[0].user.id !== socket.data.userId) {
+          callback({ success: false, error: 'Use the rematch vote' });
           return;
         }
 
@@ -1116,6 +1137,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           if (s.data.userId === parsed.userId) {
             s.emit('admin:kicked', { reason: parsed.reason || 'Kicked by admin' });
             s.leave(`room:${parsed.roomCode}`);
+            if (s.data.activeRoomCode === parsed.roomCode) s.data.activeRoomCode = undefined;
           }
         }
 
@@ -1157,6 +1179,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           sockets.map(async (s) => {
             await lobbyService.leaveRoom(parsed.roomCode, s.data.userId);
             s.leave(`room:${parsed.roomCode}`);
+            if (s.data.activeRoomCode === parsed.roomCode) s.data.activeRoomCode = undefined;
           }),
         );
 
@@ -1654,6 +1677,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           carriedPowerups,
           data.buddyMode,
           worldTheme,
+          !!data.localCoopMode,
         );
 
         // EnemyTypeEntry[] (id + config): the replay metadata and the co-op partner's textures are
@@ -1800,15 +1824,24 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     // Campaign: player input
     socket.on('campaign:input', (input) => {
       if (!campaignInputLimiter(socket.id)) return; // audit RATE-1
+      if (!isValidPlayerInput(input)) return;
       const sessionId = socket.data.activeCampaignSession;
       if (!sessionId) return;
-      // For local co-op, playerId is specified in the input payload
-      // For online co-op/solo, use the socket's userId
-      const userId = input.playerId ?? socket.data.userId;
-
-      // Validate: only allow playerId that belongs to this session
       const game = getCampaignGameManager().getSession(sessionId);
-      if (!game || !game.userIds.includes(userId)) return;
+      if (!game) return;
+
+      // A socket drives its own player. Only the owner of a local co-op or buddy session may also
+      // send for the second character, which shares their client.
+      let userId = socket.data.userId;
+      if (input.playerId !== undefined && input.playerId !== socket.data.userId) {
+        const drivesSecond =
+          (game.localCoop || game.buddyMode) &&
+          game.userIds[0] === socket.data.userId &&
+          game.userIds.includes(input.playerId);
+        if (!drivesSecond) return;
+        userId = input.playerId;
+      }
+      if (!game.userIds.includes(userId)) return;
 
       getCampaignGameManager().handleInput(sessionId, userId, input);
     });
@@ -1867,6 +1900,12 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // ---- Open World events ----
     socket.on('openworld:join', (_data, callback) => {
+      if (
+        !openWorldJoinLimiter.isAllowed(socket.id) ||
+        !openWorldJoinIpLimiter.isAllowed(clientIp)
+      ) {
+        return callback({ success: false, error: 'Rate limited' });
+      }
       if (!openWorldManager.isEnabled()) {
         return callback({ success: false, error: 'Open world is not available' });
       }
@@ -1947,6 +1986,8 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         // Guest connections skip room/lobby/friend cleanup
         if (socket.data.isGuest) {
           removeSocket(socket.id);
+          guestRejectLogLimiter.remove(socket.id);
+          openWorldJoinLimiter.remove(socket.id);
           return;
         }
 
@@ -1962,6 +2003,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         campaignPauseLimiter.remove(socket.id);
         lobbySubscribeLimiter.remove(socket.id); // audit B16
         adminRoomLimiter.remove(socket.id); // audit B16
+        openWorldJoinLimiter.remove(socket.id);
         // Capture before clearing: the room-cleanup block further down reads this, and clearing it
         // first made its `||` dead, forcing a Redis lookup every disconnect — and if the
         // `player:<id>:room` key had expired during a long session, that lookup returned null and

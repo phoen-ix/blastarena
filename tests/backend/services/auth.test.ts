@@ -65,6 +65,7 @@ jest.mock('../../../backend/src/utils/logger', () => ({
 
 import * as authService from '../../../backend/src/services/auth';
 import { AppError } from '../../../backend/src/middleware/errorHandler';
+import { verifyAccessToken } from '../../../backend/src/middleware/auth';
 
 describe('Auth Service', () => {
   beforeEach(() => {
@@ -479,6 +480,49 @@ describe('Auth Service', () => {
       );
       expect(revokeCall).toBeDefined();
       expect(revokeCall![1]).toEqual([10]);
+    });
+  });
+
+  describe('token types', () => {
+    const userRow = {
+      id: 10,
+      username: 'testuser',
+      password_hash: 'hashed',
+      role: 'admin',
+      language: 'en',
+      is_deactivated: false,
+      email_verified: true,
+    };
+
+    it('issues access tokens that verifyAccessToken accepts', async () => {
+      mockQuery.mockResolvedValue([{ ...userRow, totp_enabled: false }]);
+      mockExecute.mockResolvedValue({ affectedRows: 1 });
+      const result = await authService.login('testuser', 'password');
+      if (!('auth' in result)) throw new Error('expected a session');
+      expect(verifyAccessToken(result.auth.accessToken).userId).toBe(10);
+    });
+
+    it('never accepts the 2FA challenge token as an access token', async () => {
+      mockQuery.mockResolvedValue([{ ...userRow, totp_enabled: true }]);
+      const result = await authService.login('testuser', 'password');
+      if (!('totpToken' in result)) throw new Error('expected a challenge');
+      expect(() => verifyAccessToken(result.totpToken)).toThrow();
+    });
+
+    it('never accepts local co-op tokens as access tokens', () => {
+      for (const token of [
+        authService.generateLocalCoopToken(10, 'p2', 1),
+        authService.generateLocalCoopSocketToken(10, 'p2'),
+        authService.generateLocalCoopTotpToken(10, 3, 1),
+      ]) {
+        expect(() => verifyAccessToken(token)).toThrow();
+      }
+    });
+
+    it('binds the pending local co-op 2FA token to the host account', () => {
+      const token = authService.generateLocalCoopTotpToken(10, 3, 6);
+      expect(authService.verifyLocalCoopTotpToken(token, 3)).toEqual({ userId: 10, duration: 6 });
+      expect(authService.verifyLocalCoopTotpToken(token, 4)).toBeNull();
     });
   });
 });

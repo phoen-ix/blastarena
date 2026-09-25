@@ -15,6 +15,7 @@ export class CampaignGameManager {
     carriedPowerups?: StartingPowerUps | null,
     buddyMode?: boolean,
     theme?: string,
+    localCoop?: boolean,
   ): CampaignGame {
     // End any existing session for ALL users
     for (const userId of userIds) {
@@ -33,6 +34,7 @@ export class CampaignGameManager {
       carriedPowerups,
       buddyMode,
       theme,
+      localCoop,
     );
     this.sessions.set(game.sessionId, game);
 

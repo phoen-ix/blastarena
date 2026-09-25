@@ -7,6 +7,7 @@ import { logAdminAction } from './admin-audit';
 import { EnemyAIRow } from '../db/types';
 import { compileEnemyAI } from './enemyai-compiler';
 import { getEnemyAIRegistry } from './enemyai-registry';
+import { loadBuiltinEnemyAI } from '../game/enemy-ai-defaults';
 import { logger } from '../utils/logger';
 import { AppError } from '../middleware/errorHandler';
 
@@ -190,10 +191,9 @@ export async function updateEnemyAI(
   if (updates.isActive !== undefined) {
     if (updates.isActive) {
       try {
-        // Same trust rule as EnemyAIRegistry.initialize(): a seeded AI (no uploader) runs
-        // in-process; an upload is isolated. Without the flag, re-activating a seeded AI silently
-        // moved it into the isolate (with its 20 ms invoke budget) until restart. (audit B10)
-        getEnemyAIRegistry().loadAI(id, rows[0].uploaded_by == null);
+        const builtinKey = rows[0].builtin_key;
+        if (builtinKey) await loadBuiltinEnemyAI(id, builtinKey);
+        else getEnemyAIRegistry().loadAI(id);
       } catch (err: unknown) {
         logger.warn(
           { aiId: id, error: err instanceof Error ? err.message : String(err) },
@@ -222,6 +222,7 @@ export async function reuploadEnemyAI(
 ): Promise<{ success: boolean; errors?: string[] }> {
   const rows = await query<EnemyAIRow[]>('SELECT * FROM enemy_ais WHERE id = ?', [id]);
   if (rows.length === 0) throw new AppError('Enemy AI not found', 404, 'AI_NOT_FOUND');
+  if (rows[0].builtin_key) throw new AppError('Cannot re-upload built-in AI', 400, 'AI_BUILTIN');
 
   const source = fileBuffer.toString('utf-8');
   const result = await compileEnemyAI(source);
@@ -240,8 +241,7 @@ export async function reuploadEnemyAI(
 
   if (rows[0].is_active) {
     try {
-      // Same trust rule as initialize() — see updateEnemyAI. (audit B10)
-      getEnemyAIRegistry().reloadAI(id, rows[0].uploaded_by == null);
+      getEnemyAIRegistry().reloadAI(id);
     } catch (_err: unknown) {
       logger.warn({ aiId: id }, 'Failed to reload enemy AI after re-upload');
     }
@@ -261,6 +261,7 @@ export async function reuploadEnemyAI(
 export async function deleteEnemyAI(id: string, adminId: number): Promise<void> {
   const rows = await query<EnemyAIRow[]>('SELECT * FROM enemy_ais WHERE id = ?', [id]);
   if (rows.length === 0) throw new AppError('Enemy AI not found', 404, 'AI_NOT_FOUND');
+  if (rows[0].builtin_key) throw new AppError('Cannot delete built-in AI', 400, 'AI_BUILTIN');
 
   getEnemyAIRegistry().unloadAI(id);
 

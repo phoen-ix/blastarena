@@ -16,6 +16,8 @@ const mockForgotPassword = jest.fn<AnyFn>();
 const mockResetPassword = jest.fn<AnyFn>();
 const mockVerifyCredentials = jest.fn<AnyFn>();
 const mockGenerateLocalCoopToken = jest.fn<AnyFn>();
+const mockGenerateLocalCoopTotpToken = jest.fn<AnyFn>();
+const mockVerifyLocalCoopTotpToken = jest.fn<AnyFn>();
 
 jest.mock('../../../backend/src/services/auth', () => ({
   register: mockRegister,
@@ -27,6 +29,18 @@ jest.mock('../../../backend/src/services/auth', () => ({
   resetPassword: mockResetPassword,
   verifyCredentials: mockVerifyCredentials,
   generateLocalCoopToken: mockGenerateLocalCoopToken,
+  generateLocalCoopTotpToken: mockGenerateLocalCoopTotpToken,
+  verifyLocalCoopTotpToken: mockVerifyLocalCoopTotpToken,
+}));
+
+const mockVerifyCode = jest.fn<AnyFn>();
+jest.mock('../../../backend/src/services/totp', () => ({
+  verifyCode: mockVerifyCode,
+}));
+
+const mockQuery = jest.fn<AnyFn>();
+jest.mock('../../../backend/src/db/connection', () => ({
+  query: mockQuery,
 }));
 
 const mockGetPlayerCosmeticsForGame = jest.fn<AnyFn>();
@@ -51,6 +65,7 @@ const mockAuthMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
 
 jest.mock('../../../backend/src/middleware/auth', () => ({
   authMiddleware: mockAuthMiddleware,
+  ACCESS_TOKEN_TYPE: 'access',
 }));
 
 const mockRateLimiter = jest.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next());
@@ -578,6 +593,78 @@ describe('Middleware presence', () => {
     // verify-email has rateLimiter but NOT validate — only 2 entries
     const verifyStack = getRouteStack('get', '/auth/verify-email/:token');
     expect(verifyStack.length).toBe(2);
+  });
+});
+
+// ============================== local co-op P2 with 2FA =====================
+
+describe('local co-op P2 with 2FA', () => {
+  const p2 = {
+    id: 2,
+    username: 'p2',
+    role: 'user',
+    language: 'en',
+    emailVerified: true,
+    twoFactorEnabled: true,
+  };
+
+  beforeEach(() => {
+    mockGetConfig.mockReturnValue({ APP_URL: 'http://localhost:8080' });
+    mockGenerateLocalCoopToken.mockReturnValue('p2-token');
+    mockGetPlayerCosmeticsForGame.mockResolvedValue(new Map());
+  });
+
+  it('asks for the code instead of signing P2 in', async () => {
+    mockVerifyCredentials.mockResolvedValue(p2);
+    mockGenerateLocalCoopTotpToken.mockReturnValue('pending');
+    const res = mockRes();
+    await getHandler('post', '/local-coop/login')(
+      mockReq({ user: { userId: 1 }, body: { username: 'p2', password: 'pw', duration: 6 } }),
+      res,
+      jest.fn(),
+    );
+    expect(res._json).toEqual({ totpRequired: true, totpToken: 'pending' });
+    expect(res._cookie).toBeNull();
+    expect(mockGenerateLocalCoopTotpToken).toHaveBeenCalledWith(2, 1, 6);
+  });
+
+  it('rejects a wrong code', async () => {
+    mockVerifyLocalCoopTotpToken.mockReturnValue({ userId: 2, duration: 6 });
+    mockVerifyCode.mockResolvedValue(false);
+    const res = mockRes();
+    await getHandler('post', '/local-coop/verify-totp')(
+      mockReq({ user: { userId: 1 }, body: { totpToken: 'pending', code: '000000' } }),
+      res,
+      jest.fn(),
+    );
+    expect(res._status).toBe(401);
+    expect(res._cookie).toBeNull();
+  });
+
+  it('rejects a pending token from another host', async () => {
+    mockVerifyLocalCoopTotpToken.mockReturnValue(null);
+    const res = mockRes();
+    await getHandler('post', '/local-coop/verify-totp')(
+      mockReq({ user: { userId: 9 }, body: { totpToken: 'pending', code: '123456' } }),
+      res,
+      jest.fn(),
+    );
+    expect(res._status).toBe(401);
+    expect(mockVerifyCode).not.toHaveBeenCalled();
+  });
+
+  it('signs P2 in after the right code', async () => {
+    mockVerifyLocalCoopTotpToken.mockReturnValue({ userId: 2, duration: 6 });
+    mockVerifyCode.mockResolvedValue(true);
+    mockQuery.mockResolvedValue([{ id: 2, username: 'p2', is_deactivated: 0, email_verified: 1 }]);
+    const res = mockRes();
+    await getHandler('post', '/local-coop/verify-totp')(
+      mockReq({ user: { userId: 1 }, body: { totpToken: 'pending', code: '123456' } }),
+      res,
+      jest.fn(),
+    );
+    expect(res._cookie).toMatchObject({ name: 'localCoopP2', value: 'p2-token' });
+    expect(res._json).toEqual({ user: { id: 2, username: 'p2' }, cosmetics: {} });
   });
 });
 

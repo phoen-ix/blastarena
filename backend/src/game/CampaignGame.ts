@@ -32,7 +32,7 @@ import { Player } from './Player';
 import { Bomb } from './Bomb';
 import { processEnemyAI, IEnemyAI, EnemyAIContext, EnemyAIResult } from './EnemyAI';
 import { getEnemyAIRegistry } from './registry';
-import { disposeAI } from '../services/IsolatedAIRunner';
+import { disposeAI, toEnemyAIResult } from '../services/IsolatedAIRunner';
 import { PuzzleTileProcessor } from './PuzzleTileProcessor';
 import { ReplayRecorder } from '../utils/replayRecorder';
 import { GameLogger } from '../utils/gameLogger';
@@ -77,6 +77,8 @@ export class CampaignGame {
   public readonly usernames: string[];
   public readonly coopMode: boolean;
   public readonly buddyMode: boolean;
+  /** Both players share one client (P2's inputs arrive on P1's socket). */
+  public readonly localCoop: boolean;
   public readonly level: CampaignLevel;
 
   public getGameState(): GameStateManager {
@@ -214,8 +216,10 @@ export class CampaignGame {
     carriedPowerups?: StartingPowerUps | null,
     buddyMode?: boolean,
     theme?: string,
+    localCoop?: boolean,
   ) {
     this.sessionId = uuidv4();
+    this.localCoop = !!localCoop;
     this.userIds = userIds;
     this.usernames = usernames;
     this.coopMode = !buddyMode && userIds.length > 1;
@@ -716,7 +720,7 @@ export class CampaignGame {
         if (customAI) {
           try {
             const context = this.buildEnemyAIContext(enemy, bombPositions);
-            result = customAI.decide(context);
+            result = toEnemyAIResult(customAI.decide(context));
           } catch (err: unknown) {
             // Crash recovery: dispose the isolate and fall back to built-in pattern for this enemy
             disposeAI(customAI);

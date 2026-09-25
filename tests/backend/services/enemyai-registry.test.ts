@@ -68,23 +68,22 @@ describe('EnemyAIRegistry', () => {
       });
     });
 
-    it('loads seeded AIs (uploaded_by NULL) in-process and uploads in isolates', async () => {
-      const MockClass = makeMockEnemyAIClass();
+    it('loads uploads (with or without an uploader) in isolates and leaves built-ins to the seeder', async () => {
       mockQuery.mockResolvedValue([
-        { id: 'seed-1', name: 'Hunter', is_active: true, uploaded_by: null },
-        { id: 'upload-1', name: 'Custom', is_active: true, uploaded_by: 7 },
+        { id: 'seed-1', name: 'Hunter', is_active: true, uploaded_by: null, builtin_key: 'hunter' },
+        { id: 'orphan-1', name: 'Hunter', is_active: true, uploaded_by: null, builtin_key: null },
+        { id: 'upload-1', name: 'Custom', is_active: true, uploaded_by: 7, builtin_key: null },
       ]);
       mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue('compiled code');
-      mockLoadBotAIInSandbox.mockReturnValue({ default: MockClass });
 
       await registry.initialize();
 
-      expect(registry.isLoaded('seed-1')).toBe(true);
+      expect(registry.isLoaded('seed-1')).toBe(false); // loaded later from repository source
+      expect(registry.isLoaded('orphan-1')).toBe(true);
       expect(registry.isLoaded('upload-1')).toBe(true);
-      expect(registry.getLoadedIds()).toHaveLength(2);
-      // The trusted seed went through the in-process loader; the upload did NOT.
-      expect(mockLoadBotAIInSandbox).toHaveBeenCalledTimes(1);
+      // Nothing read from disk runs in-process.
+      expect(mockLoadBotAIInSandbox).not.toHaveBeenCalled();
     });
 
     it('should skip AIs whose compiled file is missing and continue with others', async () => {
@@ -117,16 +116,22 @@ describe('EnemyAIRegistry', () => {
       expect(registry.isLoaded('upload-1')).toBe(true);
     });
 
-    it('trusted: loads the class in-process via the sandbox loader', () => {
+    it('built-in: loads the given (repository-compiled) code in-process, not the file on disk', () => {
       const MockClass = makeMockEnemyAIClass();
-      mockExistsSync.mockReturnValue(true);
-      mockReadFileSync.mockReturnValue('var EnemyAI = ...');
       mockLoadBotAIInSandbox.mockReturnValue({ default: MockClass });
 
-      registry.loadAI('seed-1', true);
+      registry.loadBuiltin('seed-1', 'var EnemyAI = ...');
 
       expect(mockLoadBotAIInSandbox).toHaveBeenCalledWith('var EnemyAI = ...');
+      expect(mockReadFileSync).not.toHaveBeenCalled();
       expect(registry.isLoaded('seed-1')).toBe(true);
+    });
+
+    it('an upload never runs in-process, whoever uploaded it', () => {
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue('code');
+      registry.loadAI('orphaned-upload');
+      expect(mockLoadBotAIInSandbox).not.toHaveBeenCalled();
     });
 
     it('should throw when compiled file does not exist', () => {
@@ -134,23 +139,19 @@ describe('EnemyAIRegistry', () => {
       expect(() => registry.loadAI('missing-ai')).toThrow('Compiled enemy AI file not found');
     });
 
-    it('trusted: throws when no class with decide() is found', () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReadFileSync.mockReturnValue('code');
+    it('built-in: throws when no class with decide() is found', () => {
       mockLoadBotAIInSandbox.mockReturnValue({ default: 'not a class' });
 
-      expect(() => registry.loadAI('bad-ai', true)).toThrow('No class with decide() found');
+      expect(() => registry.loadBuiltin('bad-ai', 'code')).toThrow('No class with decide() found');
     });
   });
 
   describe('createInstance', () => {
     it('trusted: instantiates the in-process class', () => {
       const MockClass = makeMockEnemyAIClass();
-      mockExistsSync.mockReturnValue(true);
-      mockReadFileSync.mockReturnValue('code');
       mockLoadBotAIInSandbox.mockReturnValue({ default: MockClass });
 
-      registry.loadAI('seed-1', true);
+      registry.loadBuiltin('seed-1', 'code');
       const instance = registry.createInstance('seed-1', 'normal', { speed: 1 } as never);
 
       expect(instance).not.toBeNull();

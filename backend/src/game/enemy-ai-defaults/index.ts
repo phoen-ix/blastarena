@@ -1,106 +1,74 @@
 import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import { getEnemyAIByName } from '../../services/enemyai';
+import type { RowDataPacket } from 'mysql2';
 import { compileEnemyAI } from '../../services/enemyai-compiler';
 import { getEnemyAIRegistry } from '../../services/enemyai-registry';
-import { execute } from '../../db/connection';
+import { query, execute } from '../../db/connection';
 import { logger } from '../../utils/logger';
-
-import { HUNTER_SOURCE } from './hunter';
-import { PATROL_GUARD_SOURCE } from './patrol-guard';
-import { BOMBER_SOURCE } from './bomber';
-import { COWARD_SOURCE } from './coward';
-import { SWARM_SOURCE } from './swarm';
-import { AMBUSHER_SOURCE } from './ambusher';
-
-interface DefaultEnemyAIDef {
-  name: string;
-  description: string;
-  filename: string;
-  source: string;
-}
+import { BUILTIN_ENEMY_AIS, BuiltinEnemyAIDef } from './sources';
 
 const ENEMY_AI_BASE_DIR = path.join(process.cwd(), 'enemy-ai');
 
-const DEFAULT_ENEMY_AIS: DefaultEnemyAIDef[] = [
-  {
-    name: 'Hunter',
-    description:
-      'Aggressive chaser that relentlessly pursues the nearest player using BFS pathfinding. Places bombs when close. Difficulty scales chase accuracy and bomb aggression.',
-    filename: 'hunter.ts',
-    source: HUNTER_SOURCE,
-  },
-  {
-    name: 'Patrol Guard',
-    description:
-      'Follows patrol path faithfully, switches to aggressive chase when a player enters detection range. Returns to patrol when player escapes. Difficulty scales detection range and chase intelligence.',
-    filename: 'patrol-guard.ts',
-    source: PATROL_GUARD_SOURCE,
-  },
-  {
-    name: 'Bomber',
-    description:
-      'Area denial specialist that prioritizes positions near destructible walls or player chokepoints. Retreats to safety after placing bombs. Difficulty scales bomb frequency and escape planning.',
-    filename: 'bomber.ts',
-    source: BOMBER_SOURCE,
-  },
-  {
-    name: 'Coward',
-    description:
-      'Flees from the nearest player while dropping bombs as traps behind it. Creates dangerous corridors. Difficulty scales flee intelligence, bomb frequency, and chokepoint awareness.',
-    filename: 'coward.ts',
-    source: COWARD_SOURCE,
-  },
-  {
-    name: 'Swarm',
-    description:
-      'Coordinates with other enemies to surround the player. Moves to flanking positions rather than chasing directly. Difficulty scales coordination quality and bombing triggers.',
-    filename: 'swarm.ts',
-    source: SWARM_SOURCE,
-  },
-  {
-    name: 'Ambusher',
-    description:
-      'Waits motionless until a player enters detection range, then rushes aggressively. Returns to hiding after a chase timeout. Difficulty scales detection range, chase duration, and bomb usage.',
-    filename: 'ambusher.ts',
-    source: AMBUSHER_SOURCE,
-  },
-];
+interface BuiltinRow extends RowDataPacket {
+  id: string;
+  is_active: boolean | number;
+}
 
+/**
+ * Compile a built-in from the repository source and load it in-process. Built-ins never run code
+ * read back from the (writable) data directory.
+ */
+export async function loadBuiltinEnemyAI(id: string, key: string): Promise<boolean> {
+  const def = BUILTIN_ENEMY_AIS.find((d) => d.key === key);
+  if (!def) return false;
+  const result = await compileEnemyAI(def.source);
+  if (!result.success) {
+    logger.error({ key, errors: result.errors }, 'Failed to compile built-in enemy AI');
+    return false;
+  }
+  getEnemyAIRegistry().loadBuiltin(id, result.compiledCode!);
+  return true;
+}
+
+/** Keep the stored copy (download/export) in step with the repository source. */
+function writeBuiltinFiles(id: string, def: BuiltinEnemyAIDef): void {
+  const aiDir = path.join(ENEMY_AI_BASE_DIR, id);
+  fs.mkdirSync(aiDir, { recursive: true });
+  fs.writeFileSync(path.join(aiDir, 'source.ts'), def.source);
+}
+
+/**
+ * Create any missing built-in enemy AIs and load every active one from the repository source.
+ * Runs at startup after the registry has loaded the uploaded (isolated) AIs.
+ */
 export async function seedDefaultEnemyAIs(): Promise<void> {
   let seeded = 0;
 
-  for (const def of DEFAULT_ENEMY_AIS) {
+  for (const def of BUILTIN_ENEMY_AIS) {
     try {
-      const existing = await getEnemyAIByName(def.name);
-      if (existing) continue;
-
-      const result = await compileEnemyAI(def.source);
-      if (!result.success) {
-        logger.error(
-          { name: def.name, errors: result.errors },
-          'Failed to compile default enemy AI',
+      const rows = await query<BuiltinRow[]>(
+        'SELECT id, is_active FROM enemy_ais WHERE builtin_key = ?',
+        [def.key],
+      );
+      let id: string;
+      let active = true;
+      if (rows.length > 0) {
+        id = rows[0].id;
+        active = !!rows[0].is_active;
+      } else {
+        id = uuidv4();
+        await execute(
+          `INSERT INTO enemy_ais (id, name, description, filename, is_active, uploaded_by, version, file_size, builtin_key)
+           VALUES (?, ?, ?, ?, TRUE, NULL, 1, ?, ?)`,
+          [id, def.name, def.description, def.filename, Buffer.byteLength(def.source), def.key],
         );
-        continue;
+        seeded++;
+        logger.info({ aiId: id, name: def.name }, 'Seeded default enemy AI');
       }
 
-      const id = uuidv4();
-      const aiDir = path.join(ENEMY_AI_BASE_DIR, id);
-      fs.mkdirSync(aiDir, { recursive: true });
-      fs.writeFileSync(path.join(aiDir, 'source.ts'), def.source);
-      fs.writeFileSync(path.join(aiDir, 'compiled.js'), result.compiledCode!);
-
-      await execute(
-        `INSERT INTO enemy_ais (id, name, description, filename, is_active, uploaded_by, version, file_size)
-         VALUES (?, ?, ?, ?, TRUE, NULL, 1, ?)`,
-        [id, def.name, def.description, def.filename, Buffer.byteLength(def.source)],
-      );
-
-      getEnemyAIRegistry().loadAI(id, true); // seeded AIs are trusted — run in-process
-      seeded++;
-
-      logger.info({ aiId: id, name: def.name }, 'Seeded default enemy AI');
+      writeBuiltinFiles(id, def);
+      if (active) await loadBuiltinEnemyAI(id, def.key);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.error({ name: def.name, error: msg }, 'Error seeding default enemy AI');

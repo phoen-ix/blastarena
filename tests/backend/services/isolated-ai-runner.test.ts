@@ -119,8 +119,8 @@ describe('IsolatedAIRunner — security', () => {
     const ai = new IsolatedBotAI(BOT_ESCAPE, 'normal');
     try {
       const out = ai.generateInput(self, state);
-      // process was unreachable in the isolate, so the escape produced no object → action stays null
-      expect(out?.action).toBeNull();
+      // process was unreachable in the isolate, so the escape produced no usable input at all
+      expect(out?.action ?? null).toBeNull();
     } finally {
       ai.dispose();
     }

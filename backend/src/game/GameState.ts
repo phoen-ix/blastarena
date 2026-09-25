@@ -54,6 +54,7 @@ import { InputBuffer } from './InputBuffer';
 import { IBotAI } from './BotAI';
 import { getBotAIRegistry } from '../services/botai-registry';
 import { disposeAI } from '../services/IsolatedAIRunner';
+import { isValidPlayerInput } from '../utils/socketValidation';
 import { GameLogger } from '../utils/gameLogger';
 import { PuzzleTileProcessor } from './PuzzleTileProcessor';
 import { SeededRandom } from './SeededRandom';
@@ -602,7 +603,7 @@ export class GameStateManager {
           if (runFullBotAI) {
             try {
               const input = ai.generateInput(botPlayer, this, this.gameLogger);
-              if (input) {
+              if (input && isValidPlayerInput(input)) {
                 this.inputBuffer.addInput(botId, input);
                 this._lastBotInputs.set(botId, input);
               } else {

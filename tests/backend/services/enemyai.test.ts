@@ -35,6 +35,11 @@ const mockWriteFileSync = jest.fn<AnyFn>();
 const mockExistsSync = jest.fn<AnyFn>();
 const mockRmSync = jest.fn<AnyFn>();
 const mockReadFileSync = jest.fn<AnyFn>();
+const mockLoadBuiltinEnemyAI = jest.fn<AnyFn>().mockResolvedValue(true);
+jest.mock('../../../backend/src/game/enemy-ai-defaults', () => ({
+  loadBuiltinEnemyAI: mockLoadBuiltinEnemyAI,
+}));
+
 jest.mock('fs', () => ({
   mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
   writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
@@ -460,19 +465,28 @@ describe('EnemyAI Service', () => {
         true,
         'enemy-ai-1',
       ]);
-      // Uploaded (uploaded_by = 1) → untrusted → isolated. (audit B10)
-      expect(mockLoadAI).toHaveBeenCalledWith('enemy-ai-1', false);
+      // An upload always runs isolated.
+      expect(mockLoadAI).toHaveBeenCalledWith('enemy-ai-1');
+      expect(mockLoadBuiltinEnemyAI).not.toHaveBeenCalled();
     });
 
-    it('re-activates a seeded AI (no uploader) as trusted, like initialize() does', async () => {
-      // Without the flag a seeded enemy AI silently moved into the isolate on re-activation.
-      // (audit B10)
+    it('re-activates a built-in from the repository source', async () => {
+      mockQuery.mockResolvedValue([makeAIRow({ is_active: false, builtin_key: 'hunter' })]);
+      mockExecute.mockResolvedValue({});
+
+      await updateEnemyAI('enemy-ai-1', { isActive: true }, 1);
+
+      expect(mockLoadBuiltinEnemyAI).toHaveBeenCalledWith('enemy-ai-1', 'hunter');
+      expect(mockLoadAI).not.toHaveBeenCalled();
+    });
+
+    it('treats an upload with no uploader (e.g. deleted account) as an upload', async () => {
       mockQuery.mockResolvedValue([makeAIRow({ is_active: false, uploaded_by: null })]);
       mockExecute.mockResolvedValue({});
 
       await updateEnemyAI('enemy-ai-1', { isActive: true }, 1);
 
-      expect(mockLoadAI).toHaveBeenCalledWith('enemy-ai-1', true);
+      expect(mockLoadAI).toHaveBeenCalledWith('enemy-ai-1');
     });
 
     it('should unload AI from registry when deactivating', async () => {
@@ -561,14 +575,22 @@ describe('EnemyAI Service', () => {
         'enemy-ai-1',
       ]);
 
-      // Reloaded because active; uploaded_by = 1 → untrusted. (audit B10)
-      expect(mockReloadAI).toHaveBeenCalledWith('enemy-ai-1', false);
+      // Reloaded because active, isolated like every upload
+      expect(mockReloadAI).toHaveBeenCalledWith('enemy-ai-1');
 
       // Audit logged
       expect(mockExecute).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO admin_actions'),
         expect.arrayContaining([1, 'reupload_enemy_ai', 'enemy_ai', 0]),
       );
+    });
+
+    it('refuses to replace a built-in', async () => {
+      mockQuery.mockResolvedValue([makeAIRow({ builtin_key: 'hunter' })]);
+      await expect(reuploadEnemyAI('enemy-ai-1', fileBuffer, 'x.ts', 1)).rejects.toMatchObject({
+        code: 'AI_BUILTIN',
+      });
+      expect(mockCompileEnemyAI).not.toHaveBeenCalled();
     });
 
     it('should not reload registry when AI is inactive', async () => {

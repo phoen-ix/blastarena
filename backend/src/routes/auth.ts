@@ -1,10 +1,11 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { z } from 'zod';
 import { validate } from '../middleware/validation';
 import { authMiddleware } from '../middleware/auth';
 import { rateLimiter } from '../middleware/rateLimiter';
 import * as authService from '../services/auth';
 import * as cosmeticsService from '../services/cosmetics';
+import * as totpService from '../services/totp';
 import { isRegistrationEnabled } from '../services/settings';
 import { getConfig } from '../config';
 import { query } from '../db/connection';
@@ -276,37 +277,92 @@ router.post(
         return res.status(403).json({ error: 'Email not verified', code: 'EMAIL_NOT_VERIFIED' });
       }
 
-      const token = authService.generateLocalCoopToken(p2User.id, p2User.username, duration);
-      const config = getConfig();
-
-      const cookieOptions: {
-        httpOnly: boolean;
-        secure: boolean;
-        sameSite: 'strict';
-        path: string;
-        maxAge?: number;
-      } = {
-        httpOnly: true,
-        secure: config.APP_URL.startsWith('https'),
-        sameSite: 'strict',
-        path: LOCAL_COOP_COOKIE_PATH,
-      };
-
-      if (duration > 0) {
-        cookieOptions.maxAge = duration * 60 * 60 * 1000;
+      if (p2User.twoFactorEnabled) {
+        return res.json({
+          totpRequired: true,
+          totpToken: authService.generateLocalCoopTotpToken(p2User.id, req.user!.userId, duration),
+        });
       }
 
-      res.cookie(LOCAL_COOP_COOKIE, token, cookieOptions);
-
-      const cosmeticsMap = await cosmeticsService.getPlayerCosmeticsForGame([p2User.id]);
-      const cosmetics = cosmeticsMap.get(p2User.id) || {};
-
-      res.json({ user: { id: p2User.id, username: p2User.username }, cosmetics });
+      await startLocalCoopSession(res, p2User.id, p2User.username, duration);
     } catch (err) {
       next(err);
     }
   },
 );
+
+const localCoopTotpSchema = z.object({
+  totpToken: z.string(),
+  code: z.string().min(6).max(10),
+  duration: z.number().optional(),
+});
+
+router.post(
+  '/local-coop/verify-totp',
+  rateLimiter({ windowMs: 15 * 60 * 1000, maxRequests: 10 }),
+  authMiddleware,
+  validate(localCoopTotpSchema),
+  async (req, res, next) => {
+    try {
+      const pending = authService.verifyLocalCoopTotpToken(req.body.totpToken, req.user!.userId);
+      if (!pending) {
+        return res
+          .status(401)
+          .json({ error: 'Invalid or expired 2FA token', code: 'INVALID_TOKEN' });
+      }
+      if (!(await totpService.verifyCode(pending.userId, req.body.code))) {
+        return res
+          .status(401)
+          .json({ error: 'Invalid verification code', code: 'INVALID_TOTP_CODE' });
+      }
+      const rows = await query<UserRow[]>(
+        'SELECT id, username, is_deactivated, email_verified FROM users WHERE id = ?',
+        [pending.userId],
+      );
+      if (rows.length === 0 || rows[0].is_deactivated || !rows[0].email_verified) {
+        return res.status(403).json({ error: 'Account unavailable', code: 'FORBIDDEN' });
+      }
+      await startLocalCoopSession(res, rows[0].id, rows[0].username, pending.duration);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Set the P2 cookie and answer with P2's identity and cosmetics. */
+async function startLocalCoopSession(
+  res: Response,
+  userId: number,
+  username: string,
+  duration: number,
+): Promise<void> {
+  const token = authService.generateLocalCoopToken(userId, username, duration);
+  const config = getConfig();
+
+  const cookieOptions: {
+    httpOnly: boolean;
+    secure: boolean;
+    sameSite: 'strict';
+    path: string;
+    maxAge?: number;
+  } = {
+    httpOnly: true,
+    secure: config.APP_URL.startsWith('https'),
+    sameSite: 'strict',
+    path: LOCAL_COOP_COOKIE_PATH,
+  };
+
+  if (duration > 0) {
+    cookieOptions.maxAge = duration * 60 * 60 * 1000;
+  }
+
+  res.cookie(LOCAL_COOP_COOKIE, token, cookieOptions);
+
+  const cosmeticsMap = await cosmeticsService.getPlayerCosmeticsForGame([userId]);
+  const cosmetics = cosmeticsMap.get(userId) || {};
+
+  res.json({ user: { id: userId, username }, cosmetics });
+}
 
 router.get('/local-coop/session', async (req, res, next) => {
   try {

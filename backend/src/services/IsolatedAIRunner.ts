@@ -214,6 +214,59 @@ function buildEnemyBootstrap(compiledCode: string, argsLiteral: string): string 
   );
 }
 
+export type AIModuleCheck =
+  | { status: 'ok' }
+  | { status: 'no_class' }
+  | { status: 'no_method' }
+  | { status: 'ctor_error'; message: string };
+
+/**
+ * Upload-time structure check, run inside a throwaway isolate: finds the exported class with
+ * `method`, instantiates it with `ctorArgs` and reports what it found. Throws if the module itself
+ * fails to evaluate or times out.
+ */
+export function inspectAIModule(
+  method: 'generateInput' | 'decide',
+  compiledCode: string,
+  ctorArgs: unknown[],
+): AIModuleCheck {
+  const isolate = new ivm.Isolate({ memoryLimit: ISOLATE_MEMORY_LIMIT_MB });
+  try {
+    const context = isolate.createContextSync();
+    const script = `${CJS_SHIM}
+${compiledCode}
+;(function () {
+  var mod = module.exports;
+  var candidates = [];
+  if (typeof mod === 'function') candidates.push(mod);
+  if (mod && typeof mod.default === 'function') candidates.push(mod.default);
+  if (mod && typeof mod === 'object') {
+    for (var k in mod) if (typeof mod[k] === 'function') candidates.push(mod[k]);
+  }
+  var AI = null;
+  for (var i = 0; i < candidates.length; i++) {
+    var c = candidates[i];
+    if (c.prototype && typeof c.prototype.${method} === 'function') { AI = c; break; }
+  }
+  if (!AI) {
+    var defaultClass = mod && typeof mod.default === 'function' && mod.default.prototype;
+    return JSON.stringify({ status: defaultClass ? 'no_method' : 'no_class' });
+  }
+  try {
+    var instance = new AI(${argsToLiteral(ctorArgs)});
+    if (typeof instance.${method} !== 'function') return JSON.stringify({ status: 'no_method' });
+  } catch (e) {
+    return JSON.stringify({ status: 'ctor_error', message: String((e && e.message) || e) });
+  }
+  return JSON.stringify({ status: 'ok' });
+})()`;
+    const out = context.evalSync(script, { timeout: AI_COMPILE_TIMEOUT_MS }) as string;
+    return JSON.parse(out) as AIModuleCheck;
+  } finally {
+    if (!isolate.isDisposed) isolate.dispose();
+  }
+}
+
 function argsToLiteral(args: unknown[]): string {
   // ctorArgs are OUR trusted values (difficulty enum, mapSize/typeConfig) — JSON-encode them.
   // `undefined` must stay `undefined` (not the string) to match the in-process constructor call.
@@ -394,6 +447,32 @@ export function buildBotSnapshotJson(
   });
 }
 
+// ── Output normalisation ──────────────────────────────────────────────────────
+
+const DIRECTIONS: ReadonlySet<unknown> = new Set(['up', 'down', 'left', 'right']);
+const ACTIONS: ReadonlySet<unknown> = new Set(['bomb', 'detonate', 'throw']);
+
+/** A bot's output as a well-formed PlayerInput, or null. Only known values reach the game state. */
+export function toPlayerInput(value: unknown, tick: number): PlayerInput | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Record<string, unknown>;
+  const direction = DIRECTIONS.has(v.direction) ? (v.direction as PlayerInput['direction']) : null;
+  const action = ACTIONS.has(v.action) ? (v.action as PlayerInput['action']) : null;
+  if (direction === null && action === null) return null;
+  const seq = typeof v.seq === 'number' && Number.isFinite(v.seq) && v.seq >= 0 ? v.seq : 0;
+  return { direction, action, seq, tick };
+}
+
+/** An enemy AI's output as a well-formed result (no move, no bomb when unusable). */
+export function toEnemyAIResult(value: unknown): EnemyAIResult {
+  if (!value || typeof value !== 'object') return { direction: null, placeBomb: false };
+  const v = value as Record<string, unknown>;
+  return {
+    direction: DIRECTIONS.has(v.direction) ? (v.direction as EnemyAIResult['direction']) : null,
+    placeBomb: v.placeBomb === true,
+  };
+}
+
 // ── Wrappers implementing the in-process AI interfaces ───────────────────────
 
 /** Untrusted bot AI: implements IBotAI by running generateInput inside an isolate. */
@@ -423,7 +502,7 @@ export class IsolatedBotAI implements IBotAI {
         : { tileDiffs: this.tileLogIndex < log.length ? log.slice(this.tileLogIndex) : [] };
     const out = this.runner.invoke(buildBotSnapshotJson(self, state, tileSync)); // throws on timeout/error → caller fallback
     if (log) this.tileLogIndex = log.length;
-    return out ? (JSON.parse(out) as PlayerInput) : null;
+    return out ? toPlayerInput(JSON.parse(out), state.tick) : null;
   }
 
   dispose(): void {
@@ -452,7 +531,7 @@ export class IsolatedEnemyAI implements IEnemyAI {
     // Strip the rng function (not serializable); the isolate re-attaches it via the host Reference.
     const { rng: _rng, ...plain } = context;
     const out = this.runner.invoke(JSON.stringify(plain)); // throws on timeout/error → caller fallback
-    return JSON.parse(out as string) as EnemyAIResult;
+    return toEnemyAIResult(out == null ? null : JSON.parse(out));
   }
 
   dispose(): void {
