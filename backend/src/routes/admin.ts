@@ -2401,7 +2401,15 @@ const challengeSchema = z.object({
   title: z.string().min(1).max(150),
   description: z.string().max(2000).optional().default(''),
   customMapId: z.number().int().positive(),
-  gameMode: z.string().min(1).max(30),
+  // Room modes only (any string up to 30 characters used to be stored)
+  gameMode: z.enum([
+    'ffa',
+    'teams',
+    'battle_royale',
+    'sudden_death',
+    'deathmatch',
+    'king_of_the_hill',
+  ]),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
@@ -2455,7 +2463,7 @@ router.put(
 router.delete('/admin/challenges/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     await challengesService.deleteChallenge(id);
     await logAdminAction(
       req.user!.userId,
@@ -2473,7 +2481,7 @@ router.delete('/admin/challenges/:id', adminOnlyMiddleware, async (req, res, nex
 router.post('/admin/challenges/:id/activate', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     await challengesService.activateChallenge(id);
     await logAdminAction(
       req.user!.userId,
@@ -2491,7 +2499,7 @@ router.post('/admin/challenges/:id/activate', adminOnlyMiddleware, async (req, r
 router.post('/admin/challenges/:id/deactivate', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     await challengesService.deactivateChallenge(id);
     await logAdminAction(
       req.user!.userId,

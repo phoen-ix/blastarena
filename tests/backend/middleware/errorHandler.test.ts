@@ -174,6 +174,14 @@ describe('errorHandler middleware', () => {
     });
   });
 
+  it('AppError without a code takes it from the status', () => {
+    // A bare `new AppError('Map not found', 404)` used to go out as BAD_REQUEST
+    expect(new AppError('Map not found', 404).code).toBe('NOT_FOUND');
+    expect(new AppError('Nope', 403).code).toBe('FORBIDDEN');
+    expect(new AppError('Odd', 418).code).toBe('BAD_REQUEST');
+    expect(new AppError('Explicit', 404, 'MAP_GONE').code).toBe('MAP_GONE');
+  });
+
   // ── Client-fault classification (audit ERRORHANDLER-4XX-1) ─────────────────────────────────
   //
   // Errors from body-parser carry a status and an `expose` flag from `http-errors`. They used to

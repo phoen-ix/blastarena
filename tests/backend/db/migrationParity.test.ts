@@ -70,6 +70,19 @@ describe('migration files', () => {
     expect(droppedInUp).toEqual(['idx_progress_user_level@campaign_progress']);
   });
 
+  it('030 down undoes the unique index and NOT NULL as well, so 030 can be applied again', () => {
+    // It only re-added the dropped columns; re-applying 030 then failed with
+    // "Duplicate key name 'idx_users_email_hash'" (checked on MariaDB 11).
+    const down = fs.readFileSync(
+      path.join(DOWN_DIR, '030_finalize_email_hashing.down.sql'),
+      'utf-8',
+    );
+    expect(down).toMatch(/DROP INDEX IF EXISTS idx_users_email_hash/);
+    expect(down).toMatch(/MODIFY COLUMN email_hash VARCHAR\(64\) DEFAULT NULL/);
+    expect(down).toMatch(/ADD COLUMN IF NOT EXISTS email VARCHAR\(255\)/);
+    expect(down).toMatch(/ADD COLUMN IF NOT EXISTS pending_email VARCHAR\(255\)/);
+  });
+
   it('041 drops login_attempts and its down recreates the 001 definition verbatim', () => {
     const up = fs.readFileSync(path.join(MIGRATIONS_DIR, '041_drop_login_attempts.sql'), 'utf-8');
     expect(up).toMatch(/DROP TABLE IF EXISTS login_attempts;/);

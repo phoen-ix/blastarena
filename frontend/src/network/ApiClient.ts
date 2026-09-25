@@ -36,6 +36,20 @@ async function toApiError(response: Response): Promise<ApiError> {
   );
 }
 
+/**
+ * Whether a 401 means the access token was refused (missing, invalid or expired). Other 401s — a
+ * wrong current password, say — used to trigger a refresh and a second identical request, which
+ * also spent a second attempt against the endpoint's rate limit.
+ */
+async function isTokenRejection(response: Response): Promise<boolean> {
+  const body = await response
+    .clone()
+    .json()
+    .catch(() => null);
+  const code = (body as { code?: unknown } | null)?.code;
+  return code === 'INVALID_TOKEN' || code === 'UNAUTHORIZED';
+}
+
 class ApiClientClass {
   private authManager: AuthManager | null = null;
   private refreshPromise: Promise<boolean> | null = null;
@@ -80,7 +94,12 @@ class ApiClientClass {
       credentials: 'include',
     });
 
-    if (response.status === 401 && this.authManager && !skipAuthRetry) {
+    if (
+      response.status === 401 &&
+      this.authManager &&
+      !skipAuthRetry &&
+      (await isTokenRejection(response))
+    ) {
       const refreshed = await this.refreshToken();
       if (refreshed) {
         headers['Authorization'] = `Bearer ${this.authManager.getAccessToken()}`;

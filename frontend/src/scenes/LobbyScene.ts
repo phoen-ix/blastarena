@@ -9,6 +9,7 @@ import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { t } from '../i18n';
 import { setHtml } from '../utils/html';
 import { enterCoopLevel } from './coopStart';
+import { themeManager } from '../themes/ThemeManager';
 
 export class LobbyScene extends Phaser.Scene {
   private authManager!: AuthManager;
@@ -24,6 +25,7 @@ export class LobbyScene extends Phaser.Scene {
   private partyJoinRoomHandler: ((data: { roomCode: string }) => void) | null = null;
   private campaignCoopStartHandler: ((data: CoopStartData) => void) | null = null;
   private reconnectHandler: (() => void) | null = null;
+  private settingsChangedHandler: ((data: { key: string; value?: unknown }) => void) | null = null;
 
   constructor() {
     super({ key: 'LobbyScene' });
@@ -195,6 +197,15 @@ export class LobbyScene extends Phaser.Scene {
     };
     this.socketClient.onReconnect(this.reconnectHandler);
 
+    // An admin changing the default theme is broadcast to everyone, but nothing applied it until
+    // the next page load. It changes the look only for users who never picked a theme.
+    this.settingsChangedHandler = (data) => {
+      if (data.key === 'default_theme' && typeof data.value === 'string') {
+        themeManager.handleAdminSettingChanged(data.key, data.value);
+      }
+    };
+    this.socketClient.on('admin:settingsChanged', this.settingsChangedHandler);
+
     // Background
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
@@ -304,6 +315,10 @@ export class LobbyScene extends Phaser.Scene {
     if (this.reconnectHandler) {
       this.socketClient.offReconnect(this.reconnectHandler);
       this.reconnectHandler = null;
+    }
+    if (this.settingsChangedHandler) {
+      this.socketClient.off('admin:settingsChanged', this.settingsChangedHandler);
+      this.settingsChangedHandler = null;
     }
     this.lobbyUI?.hide(); // destroys the PartyBar/LobbyChatPanel pair as well (audit C1)
     this.roomUI?.hide();

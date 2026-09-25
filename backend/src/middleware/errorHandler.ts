@@ -5,7 +5,12 @@ export class AppError extends Error {
   public readonly statusCode: number;
   public readonly code: string;
 
-  constructor(message: string, statusCode: number = 400, code: string = 'BAD_REQUEST') {
+  // Without an explicit code the status decides it: a bare 404 used to go out as BAD_REQUEST.
+  constructor(
+    message: string,
+    statusCode: number = 400,
+    code: string = BY_STATUS[statusCode]?.code ?? 'BAD_REQUEST',
+  ) {
     super(message);
     this.statusCode = statusCode;
     this.code = code;

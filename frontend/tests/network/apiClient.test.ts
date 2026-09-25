@@ -77,14 +77,16 @@ describe('ApiClient 401 handling', () => {
   it('does not log out when the failed request carried no token (guest)', async () => {
     const auth = fakeAuth(null, false);
     ApiClient.setAuthManager(auth as unknown as AuthManager);
-    fetchMock.mockResolvedValueOnce(jsonResponse(401, { error: 'Unauthorized', code: 'NO_TOKEN' }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(401, { error: 'Authentication required', code: 'UNAUTHORIZED' }),
+    );
 
     const err = await ApiClient.get('/user/rank').catch((e) => e);
     expect(auth.refresh).toHaveBeenCalledTimes(1);
     expect(auth.logout).not.toHaveBeenCalled();
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(401);
-    expect(err.code).toBe('NO_TOKEN');
+    expect(err.code).toBe('UNAUTHORIZED');
     // No Authorization header was invented for the guest
     const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>;
     expect(headers.Authorization).toBeUndefined();
@@ -93,7 +95,9 @@ describe('ApiClient 401 handling', () => {
   it('logs out when a token-bearing request fails and the refresh fails', async () => {
     const auth = fakeAuth('expired', false);
     ApiClient.setAuthManager(auth as unknown as AuthManager);
-    fetchMock.mockResolvedValueOnce(jsonResponse(401, { error: 'Unauthorized' }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(401, { error: 'Invalid or expired token', code: 'INVALID_TOKEN' }),
+    );
 
     const err = await ApiClient.get('/user/profile').catch((e) => e);
     expect(auth.logout).toHaveBeenCalledTimes(1);
@@ -113,13 +117,34 @@ describe('ApiClient 401 handling', () => {
     };
     ApiClient.setAuthManager(auth as unknown as AuthManager);
     fetchMock
-      .mockResolvedValueOnce(jsonResponse(401, { error: 'Unauthorized' }))
+      .mockResolvedValueOnce(
+        jsonResponse(401, { error: 'Invalid or expired token', code: 'INVALID_TOKEN' }),
+      )
       .mockResolvedValueOnce(jsonResponse(200, { ok: true }));
 
     await expect(ApiClient.get('/user/profile')).resolves.toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer new');
     expect(auth.logout).not.toHaveBeenCalled();
+  });
+});
+
+describe('ApiClient non-token 401', () => {
+  it('returns a wrong-password 401 as is, without refreshing or sending the request again', async () => {
+    // It used to refresh and retry, so one wrong password cost two attempts against the limit.
+    const auth = fakeAuth('tok', true);
+    ApiClient.setAuthManager(auth as unknown as AuthManager);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(401, { error: 'Password is incorrect', code: 'INVALID_PASSWORD' }),
+    );
+
+    const err = await ApiClient.post('/user/totp/disable', { password: 'x', code: '1' }).catch(
+      (e) => e,
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(auth.refresh).not.toHaveBeenCalled();
+    expect(auth.logout).not.toHaveBeenCalled();
+    expect(err.code).toBe('INVALID_PASSWORD');
   });
 });
 

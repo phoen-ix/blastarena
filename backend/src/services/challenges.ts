@@ -111,6 +111,31 @@ export async function listChallenges(
   return { challenges: rows.map(toSummary), total: countRows[0].total };
 }
 
+function assertDateRange(startDate: string, endDate: string): void {
+  if (new Date(endDate) <= new Date(startDate)) {
+    throw new AppError('End date must be after start date', 400, 'INVALID_DATE_RANGE');
+  }
+}
+
+/**
+ * A challenge is played by creating a room on its map, so the map must exist and be published.
+ * An unknown id used to fail the foreign key and answer 500.
+ */
+async function assertPlayableMap(customMapId: number): Promise<void> {
+  const rows = await query<(RowDataPacket & { is_published: number | boolean })[]>(
+    'SELECT is_published FROM custom_maps WHERE id = ?',
+    [customMapId],
+  );
+  if (rows.length === 0) throw new AppError('Map not found', 400, 'MAP_NOT_FOUND');
+  if (!rows[0].is_published) {
+    throw new AppError('The map must be published', 400, 'MAP_NOT_PUBLISHED');
+  }
+}
+
+function notFound(): AppError {
+  return new AppError('Challenge not found', 404, 'NOT_FOUND');
+}
+
 export async function createChallenge(
   title: string,
   description: string,
@@ -120,9 +145,8 @@ export async function createChallenge(
   endDate: string,
   createdBy: number,
 ): Promise<MapChallenge> {
-  if (new Date(endDate) <= new Date(startDate)) {
-    throw new AppError('End date must be after start date', 400, 'INVALID_DATE_RANGE');
-  }
+  assertDateRange(startDate, endDate);
+  await assertPlayableMap(customMapId);
   const result = await execute(
     `INSERT INTO map_challenges (title, description, custom_map_id, game_mode, start_date, end_date, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -147,11 +171,26 @@ export async function updateChallenge(
   updates: {
     title?: string;
     description?: string;
+    customMapId?: number;
     gameMode?: string;
     startDate?: string;
     endDate?: string;
   },
 ): Promise<void> {
+  const existing = await query<ChallengeRow[]>(
+    'SELECT start_date, end_date FROM map_challenges WHERE id = ?',
+    [id],
+  );
+  if (existing.length === 0) throw notFound();
+  // A partial update can move either end of the range, so check it against the stored other end
+  if (updates.startDate !== undefined || updates.endDate !== undefined) {
+    assertDateRange(
+      updates.startDate ?? existing[0].start_date.toISOString().split('T')[0],
+      updates.endDate ?? existing[0].end_date.toISOString().split('T')[0],
+    );
+  }
+  if (updates.customMapId !== undefined) await assertPlayableMap(updates.customMapId);
+
   const sets: string[] = [];
   const params: unknown[] = [];
 
@@ -162,6 +201,11 @@ export async function updateChallenge(
   if (updates.description !== undefined) {
     sets.push('description = ?');
     params.push(updates.description);
+  }
+  // Validated by the route, then dropped here: changing a challenge's map did nothing
+  if (updates.customMapId !== undefined) {
+    sets.push('custom_map_id = ?');
+    params.push(updates.customMapId);
   }
   if (updates.gameMode !== undefined) {
     sets.push('game_mode = ?');
@@ -182,17 +226,27 @@ export async function updateChallenge(
 }
 
 export async function deleteChallenge(id: number): Promise<void> {
-  await execute('DELETE FROM map_challenges WHERE id = ?', [id]);
+  const result = await execute('DELETE FROM map_challenges WHERE id = ?', [id]);
+  if (result.affectedRows === 0) throw notFound();
 }
 
 export async function activateChallenge(id: number): Promise<void> {
   await withTransaction(async (conn) => {
+    // Checked before anything changes: an unknown id used to switch off the active challenge and
+    // switch on nothing, still answering 200.
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      'SELECT id FROM map_challenges WHERE id = ? FOR UPDATE',
+      [id],
+    );
+    if (rows.length === 0) throw notFound();
     await conn.execute('UPDATE map_challenges SET is_active = FALSE');
     await conn.execute('UPDATE map_challenges SET is_active = TRUE WHERE id = ?', [id]);
   });
 }
 
 export async function deactivateChallenge(id: number): Promise<void> {
+  const rows = await query<RowDataPacket[]>('SELECT id FROM map_challenges WHERE id = ?', [id]);
+  if (rows.length === 0) throw notFound();
   await execute('UPDATE map_challenges SET is_active = FALSE WHERE id = ?', [id]);
 }
 
