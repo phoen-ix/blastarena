@@ -23,6 +23,7 @@ const mockUpdateLevel = jest.fn<AnyFn>();
 const mockDeleteLevel = jest.fn<AnyFn>();
 const mockReorderLevel = jest.fn<AnyFn>();
 
+const mockGetWorld = jest.fn<AnyFn>(async () => ({ id: 1 }));
 jest.mock('../../../backend/src/services/campaign', () => ({
   listWorldsWithProgress: mockListWorldsWithProgress,
   listLevelsWithProgress: mockListLevelsWithProgress,
@@ -35,6 +36,7 @@ jest.mock('../../../backend/src/services/campaign', () => ({
   reorderWorld: mockReorderWorld,
   listLevels: mockListLevels,
   createLevel: mockCreateLevel,
+  getWorld: mockGetWorld,
   updateLevel: mockUpdateLevel,
   deleteLevel: mockDeleteLevel,
   reorderLevel: mockReorderLevel,
@@ -1425,6 +1427,27 @@ describe('GET /admin/campaign/enemy-types/:id/export', () => {
 
 describe('POST /admin/campaign/levels/import', () => {
   const handler = getHandler('post', '/admin/campaign/levels/import');
+
+  it('refuses an unknown world before creating any enemy type', async () => {
+    // createLevel checks it too, but only after phase 2 had created the enemy types
+    mockGetWorld.mockResolvedValueOnce(null);
+    const req = mockReq({
+      user: { userId: 1 },
+      body: {
+        worldId: 404,
+        level: { name: 'L', tiles: [['empty']], enemyPlacements: [{ enemyTypeId: 7, x: 1, y: 1 }] },
+        enemyTypes: [{ id: 7, name: 'E', config: {} }],
+        enemyIdMap: { '7': 'create' },
+      },
+    });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+
+    expect(res._status).toBe(400);
+    expect(res._json).toMatchObject({ code: 'WORLD_NOT_FOUND' });
+    expect(mockCreateEnemyType).not.toHaveBeenCalled();
+    expect(mockCreateLevel).not.toHaveBeenCalled();
+  });
 
   it('imports a plain level export (no enemy placements)', async () => {
     mockCreateLevel.mockResolvedValue(20);

@@ -700,6 +700,12 @@ router.post(
         });
       }
 
+      // Before anything is created: createLevel checks the world too, but only after phase 2 has
+      // created the enemy types mapped to `create`, which an unknown world then left behind.
+      if (!(await campaignService.getWorld(worldId))) {
+        return res.status(400).json({ error: 'World not found', code: 'WORLD_NOT_FOUND' });
+      }
+
       // Collect enemy type IDs referenced in placements
       const referencedIds = [
         ...new Set((levelData.enemyPlacements || []).map((ep: EnemyPlacement) => ep.enemyTypeId)),
