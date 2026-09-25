@@ -83,6 +83,29 @@ describe('migration files', () => {
     expect(down).toMatch(/ADD COLUMN IF NOT EXISTS pending_email VARCHAR\(255\)/);
   });
 
+  it("046 drops only the index 035 added, which 008's composite index covers", () => {
+    const composite = fs.readFileSync(path.join(MIGRATIONS_DIR, '008_campaign.sql'), 'utf-8');
+    expect(composite).toMatch(/INDEX idx_levels_world_order \(world_id, sort_order\)/);
+    const added = fs.readFileSync(
+      path.join(MIGRATIONS_DIR, '035_campaign_world_index.sql'),
+      'utf-8',
+    );
+    expect(added).toMatch(/CREATE INDEX idx_levels_world ON campaign_levels\(world_id\)/);
+
+    const up = fs.readFileSync(
+      path.join(MIGRATIONS_DIR, '046_drop_redundant_levels_world_index.sql'),
+      'utf-8',
+    );
+    const down = fs.readFileSync(
+      path.join(DOWN_DIR, '046_drop_redundant_levels_world_index.down.sql'),
+      'utf-8',
+    );
+    expect(up).toMatch(/DROP INDEX IF EXISTS idx_levels_world ON campaign_levels;/);
+    expect(down).toMatch(
+      /CREATE INDEX IF NOT EXISTS idx_levels_world ON campaign_levels \(world_id\);/,
+    );
+  });
+
   it('041 drops login_attempts and its down recreates the 001 definition verbatim', () => {
     const up = fs.readFileSync(path.join(MIGRATIONS_DIR, '041_drop_login_attempts.sql'), 'utf-8');
     expect(up).toMatch(/DROP TABLE IF EXISTS login_attempts;/);
