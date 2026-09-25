@@ -6,20 +6,13 @@
     "passwordMinLength": "A senha deve ter pelo menos {{min}} caracteres",
     "passwordMaxLength": "A senha deve ter no m\u00e1ximo {{max}} caracteres",
     "emailInvalid": "Endere\u00e7o de email inv\u00e1lido",
-    "emailMaxLength": "O email deve ter no m\u00e1ximo {{max}} caracteres",
-    "roomNameMinLength": "O nome da sala deve ter pelo menos {{min}} caracteres",
-    "roomNameMaxLength": "O nome da sala deve ter no m\u00e1ximo {{max}} caracteres",
-    "roomNameInvalidChars": "O nome da sala s\u00f3 pode conter letras, n\u00fameros, espa\u00e7os, underlines e h\u00edfens"
+    "emailMaxLength": "O email deve ter no m\u00e1ximo {{max}} caracteres"
   },
   "actions": {
-    "save": "Salvar",
     "cancel": "Cancelar",
     "delete": "Excluir",
     "close": "Fechar",
-    "back": "Voltar",
     "confirm": "Confirmar",
-    "create": "Criar",
-    "edit": "Editar",
     "loading": "Carregando..."
   },
   "roles": {

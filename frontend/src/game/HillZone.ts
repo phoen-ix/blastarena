@@ -103,11 +103,6 @@ export class HillZoneRenderer {
     }
   }
 
-  hide(): void {
-    this.graphics.clear();
-    this.graphics.setVisible(false);
-  }
-
   destroy(): void {
     if (this.graphics && this.graphics.active) {
       this.graphics.destroy();

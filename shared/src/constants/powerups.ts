@@ -1,7 +1,5 @@
 import { PowerUpType } from '../types/game';
 
-export const POWERUP_DROP_CHANCE = 0.3;
-
 export interface PowerUpDefinition {
   type: PowerUpType;
   name: string;

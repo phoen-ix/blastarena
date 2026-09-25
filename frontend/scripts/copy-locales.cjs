@@ -2,7 +2,7 @@
  * Copies locale JSON files from shared and frontend source directories
  * into frontend/public/locales/ for serving via HTTP at runtime.
  *
- * Run: node frontend/scripts/copy-locales.js
+ * Run: node frontend/scripts/copy-locales.cjs (npm runs it before dev and build)
  */
 
 const fs = require('fs');

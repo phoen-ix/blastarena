@@ -6,20 +6,13 @@
     "passwordMinLength": "Has\u0142o musi mie\u0107 co najmniej {{min}} znak\u00f3w",
     "passwordMaxLength": "Has\u0142o mo\u017ce mie\u0107 maksymalnie {{max}} znak\u00f3w",
     "emailInvalid": "Nieprawid\u0142owy adres e-mail",
-    "emailMaxLength": "Adres e-mail mo\u017ce mie\u0107 maksymalnie {{max}} znak\u00f3w",
-    "roomNameMinLength": "Nazwa pokoju musi mie\u0107 co najmniej {{min}} znaki",
-    "roomNameMaxLength": "Nazwa pokoju mo\u017ce mie\u0107 maksymalnie {{max}} znak\u00f3w",
-    "roomNameInvalidChars": "Nazwa pokoju mo\u017ce zawiera\u0107 tylko litery, cyfry, spacje, podkre\u015blenia i my\u015blniki"
+    "emailMaxLength": "Adres e-mail mo\u017ce mie\u0107 maksymalnie {{max}} znak\u00f3w"
   },
   "actions": {
-    "save": "Zapisz",
     "cancel": "Anuluj",
     "delete": "Usu\u0144",
     "close": "Zamknij",
-    "back": "Wstecz",
     "confirm": "Potwierd\u017a",
-    "create": "Utw\u00f3rz",
-    "edit": "Edytuj",
     "loading": "\u0141adowanie..."
   },
   "roles": {

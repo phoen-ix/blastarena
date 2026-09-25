@@ -89,11 +89,6 @@ class AudioManagerImpl {
     this.generator!.bombPlace();
   }
 
-  bombTick(urgency: number): void {
-    if (!this.ensureResumed()) return;
-    this.generator!.bombTick(urgency);
-  }
-
   powerUpCollect(): void {
     if (!this.ensureResumed()) return;
     this.generator!.powerUpCollect();
@@ -107,11 +102,6 @@ class AudioManagerImpl {
   shieldBreak(): void {
     if (!this.ensureResumed()) return;
     this.generator!.shieldBreak();
-  }
-
-  kick(): void {
-    if (!this.ensureResumed()) return;
-    this.generator!.kick();
   }
 
   bombThrow(): void {
@@ -139,16 +129,6 @@ class AudioManagerImpl {
     this.generator!.defeat();
   }
 
-  uiClick(): void {
-    if (!this.ensureResumed()) return;
-    this.generator!.uiClick();
-  }
-
-  step(): void {
-    if (!this.ensureResumed()) return;
-    this.generator!.step();
-  }
-
   // --- Volume control ---
 
   private applyVolume(): void {
@@ -166,12 +146,6 @@ class AudioManagerImpl {
 
   setSfxVolume(vol: number): void {
     this.settings.sfxVolume = Math.max(0, Math.min(1, vol));
-    this.applyVolume();
-    this.saveSettings();
-  }
-
-  toggleMute(): void {
-    this.settings.muted = !this.settings.muted;
     this.applyVolume();
     this.saveSettings();
   }

@@ -1166,17 +1166,6 @@
       flex: 1;
     }
 
-    /* ============ SETTINGS ============ */
-    .settings-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--primary);
-      margin-bottom: 8px;
-      font-family: var(--font-display);
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-    }
-
     /* ============ HELP ============ */
     .help-section {
       margin-bottom: 16px;
@@ -2083,33 +2072,6 @@
     }
 
     /* ============ ADMIN PANEL ============ */
-    .admin-container {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: var(--bg-base);
-      padding: 24px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .admin-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-
-    .admin-header h1 {
-      font-family: var(--font-display);
-      font-weight: 700;
-      letter-spacing: 2px;
-      color: var(--primary);
-    }
-
     .admin-tabs {
       display: flex;
       gap: 0;

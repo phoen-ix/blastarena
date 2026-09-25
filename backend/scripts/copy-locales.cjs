@@ -2,7 +2,7 @@
  * Copies locale JSON files from shared and backend source directories
  * into backend/locales/ for loading via i18next-fs-backend at runtime.
  *
- * Run: node backend/scripts/copy-locales.js
+ * Run: node backend/scripts/copy-locales.cjs (npm runs it before dev and build)
  */
 
 const fs = require('fs');

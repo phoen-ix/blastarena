@@ -6,20 +6,13 @@
     "passwordMinLength": "Lösenord måste vara minst {{min}} tecken",
     "passwordMaxLength": "Lösenord får vara högst {{max}} tecken",
     "emailInvalid": "Ogiltig e-postadress",
-    "emailMaxLength": "E-postadress får vara högst {{max}} tecken",
-    "roomNameMinLength": "Rumsnamn måste vara minst {{min}} tecken",
-    "roomNameMaxLength": "Rumsnamn får vara högst {{max}} tecken",
-    "roomNameInvalidChars": "Rumsnamn kan bara innehålla bokstäver, siffror, mellanslag, understreck och bindestreck"
+    "emailMaxLength": "E-postadress får vara högst {{max}} tecken"
   },
   "actions": {
-    "save": "Spara",
     "cancel": "Avbryt",
     "delete": "Ta bort",
     "close": "Stäng",
-    "back": "Tillbaka",
     "confirm": "Bekräfta",
-    "create": "Skapa",
-    "edit": "Redigera",
     "loading": "Laddar..."
   },
   "roles": {

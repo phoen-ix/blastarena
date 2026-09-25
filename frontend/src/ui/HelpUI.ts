@@ -1,6 +1,5 @@
 import { AuthManager } from '../network/AuthManager';
 import { ApiClient } from '../network/ApiClient';
-import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import {
   POWERUP_DEFINITIONS,
   GAME_MODES,
@@ -81,24 +80,19 @@ function getStaffDocs() {
 export class HelpUI {
   private container: HTMLElement;
   private authManager: AuthManager;
-  private onClose: () => void;
   private activeTabId: string;
   private contentEl: HTMLElement | null = null;
   private tabs: HelpTab[];
   private markdownCache: Map<string, string> = new Map();
   private displayGithub = false;
   private displayImprint = false;
-  private isEmbedded = false;
   // Embedded, `container` is the lobby's shared .main-body; a render still awaiting its settings
   // after destroy() wrote the help page over whatever view came next.
   private destroyed = false;
-  private onLanguageChanged = () => this.render();
 
-  constructor(authManager: AuthManager, onClose: () => void, initialTab?: string) {
+  constructor(authManager: AuthManager, initialTab?: string) {
     this.authManager = authManager;
-    this.onClose = onClose;
     this.container = document.createElement('div');
-    this.container.className = 'admin-container';
 
     const role = (authManager.getUser()?.role || 'user') as UserRole;
     const isStaff = role === 'admin' || role === 'moderator';
@@ -106,85 +100,6 @@ export class HelpUI {
     this.tabs = isStaff ? [...allTabs] : allTabs.filter((tab) => !tab.staffOnly);
     this.activeTabId =
       initialTab && this.tabs.some((tab) => tab.id === initialTab) ? initialTab : 'getting-started';
-  }
-
-  async show(): Promise<void> {
-    const uiOverlay = document.getElementById('ui-overlay');
-    if (uiOverlay && !uiOverlay.contains(this.container)) {
-      uiOverlay.appendChild(this.container);
-    }
-    window.addEventListener('language-changed', this.onLanguageChanged);
-    await this.render();
-    this.pushGamepadContext();
-  }
-
-  hide(): void {
-    window.removeEventListener('language-changed', this.onLanguageChanged);
-    UIGamepadNavigator.getInstance().popContext('help-ui');
-    this.container.remove();
-  }
-
-  private async render(): Promise<void> {
-    // Refresh tab labels for current language
-    const freshTabs = getAllTabs();
-    for (const tab of this.tabs) {
-      const fresh = freshTabs.find((ft) => ft.id === tab.id);
-      if (fresh) tab.label = fresh.label;
-    }
-
-    await this.loadFooterSettings();
-
-    const rightLinks: string[] = [];
-    if (this.displayGithub) {
-      rightLinks.push(
-        `<a class="admin-tab help-external-link" href="https://github.com/phoen-ix/blastarena/" target="_blank" rel="noopener">${t('help:github')}</a>`,
-      );
-    }
-    if (this.displayImprint) {
-      rightLinks.push(
-        `<button class="admin-tab help-external-link" data-tab="imprint">${t('help:imprint.tab')}</button>`,
-      );
-    }
-
-    setHtml(
-      this.container,
-      `
-      <div class="admin-header">
-        <h1>${t('help:title')}</h1>
-        <button class="btn btn-secondary" id="help-ui-close">${t('help:backToLobby')}</button>
-      </div>
-      <div class="admin-tabs" id="help-tab-bar">
-        ${this.tabs
-          .map(
-            (tab) =>
-              `<button class="admin-tab ${tab.id === this.activeTabId ? 'active' : ''}" data-tab="${tab.id}">${tab.label}</button>`,
-          )
-          .join('')}
-        ${rightLinks.length > 0 ? `<span class="help-tab-spacer"></span>${rightLinks.join('')}` : ''}
-      </div>
-      <div class="admin-tab-content" id="help-tab-content"></div>
-    `,
-    );
-
-    this.container.querySelector('#help-ui-close')!.addEventListener('click', () => {
-      this.hide();
-      this.onClose();
-    });
-
-    this.container.querySelector('#help-tab-bar')!.addEventListener('click', (e: Event) => {
-      const target = e.target as HTMLElement;
-      const tabId = target.getAttribute('data-tab');
-      if (tabId === 'imprint') {
-        this.showImprintTab();
-        return;
-      }
-      if (tabId && tabId !== this.activeTabId) {
-        this.switchTab(tabId);
-      }
-    });
-
-    this.contentEl = this.container.querySelector('#help-tab-content');
-    await this.renderActiveTab();
   }
 
   private async switchTab(tabId: string): Promise<void> {
@@ -196,7 +111,6 @@ export class HelpUI {
       setHtml(this.contentEl, '');
     }
     await this.renderActiveTab();
-    this.pushGamepadContext();
   }
 
   private async renderActiveTab(): Promise<void> {
@@ -725,7 +639,6 @@ export class HelpUI {
   }
 
   async renderEmbedded(container: HTMLElement): Promise<void> {
-    this.isEmbedded = true;
     this.destroyed = false;
     this.container = container;
     await this.loadFooterSettings();
@@ -775,7 +688,7 @@ export class HelpUI {
 
     this.contentEl = this.container.querySelector('#help-tab-content');
     await this.renderActiveTab();
-    // No context of its own when embedded: the lobby's covers .main-body, sidebar and Back.
+    // No gamepad context of its own: the lobby's covers .main-body, sidebar and Back.
   }
 
   private async loadFooterSettings(): Promise<void> {
@@ -819,32 +732,5 @@ export class HelpUI {
 
   destroy(): void {
     this.destroyed = true;
-    UIGamepadNavigator.getInstance().popContext('help-ui');
-  }
-
-  private pushGamepadContext(): void {
-    // Embedded, a context of its own (pushed again on every tab switch) sat on top of the lobby's
-    // with no sidebar and a Back that did nothing — the pad user was stuck in Help.
-    if (this.isEmbedded) return;
-    UIGamepadNavigator.getInstance().popContext('help-ui');
-    UIGamepadNavigator.getInstance().pushContext({
-      id: 'help-ui',
-      elements: () => [
-        // No close button in embedded mode — a `!`-asserted single query put `null` in this list
-        // and the first D-pad press threw. (audit C3)
-        ...this.container.querySelectorAll<HTMLElement>('#help-ui-close'),
-        ...this.container.querySelectorAll<HTMLElement>('.admin-tab'),
-        ...this.container.querySelectorAll<HTMLElement>(
-          '.help-guide-section summary, .help-markdown a, .btn',
-        ),
-      ],
-      onBack: () => {
-        // Embedded, `container` IS the lobby's `.main-body`: hide() would remove it and leave the
-        // lobby shell empty. The lobby context's own onBack handles navigation. (audit C3)
-        if (this.isEmbedded) return;
-        this.hide();
-        this.onClose();
-      },
-    });
   }
 }

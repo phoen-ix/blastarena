@@ -58,10 +58,6 @@ export class LobbyChatPanel {
     this.render();
   }
 
-  unmount(): void {
-    this.container.remove();
-  }
-
   destroy(): void {
     this.socketClient.off('lobby:chat', this.lobbyChatHandler);
     this.socketClient.off('admin:settingsChanged', this.settingsChangedHandler);

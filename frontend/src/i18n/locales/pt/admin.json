@@ -1,6 +1,4 @@
 {
-  "title": "Painel de Admin",
-  "backToLobby": "Voltar ao Lobby",
   "tabs": {
     "dashboard": "Painel",
     "users": "Usuários",

@@ -1,7 +1,6 @@
 import { SocketClient } from '../network/SocketClient';
 import { AuthManager } from '../network/AuthManager';
 import { NotificationUI } from './NotificationUI';
-import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { UserRole } from '@blast-arena/shared';
 import { DashboardTab } from './admin/DashboardTab';
 import { UsersTab } from './admin/UsersTab';
@@ -27,24 +26,19 @@ interface Tab {
 
 export class AdminUI {
   private container: HTMLElement;
-  private onClose: () => void;
   private tabs: Tab[];
   private activeTabId: string;
   private contentEl: HTMLElement | null = null;
-  private onLanguageChanged = () => this.render();
 
   constructor(
     socketClient: SocketClient,
     authManager: AuthManager,
     notifications: NotificationUI,
-    onClose: () => void,
     initialTab?: string,
   ) {
     // socketClient / authManager / notifications are only needed to build the tabs below; they
     // were also stored on the instance and never read again. (audit G4)
-    this.onClose = onClose;
     this.container = document.createElement('div');
-    this.container.className = 'admin-container';
 
     const role = (authManager.getUser()?.role || 'user') as UserRole;
     const isAdmin = role === 'admin';
@@ -135,67 +129,6 @@ export class AdminUI {
       'users';
   }
 
-  async show(): Promise<void> {
-    const uiOverlay = document.getElementById('ui-overlay');
-    if (uiOverlay && !uiOverlay.contains(this.container)) {
-      uiOverlay.appendChild(this.container);
-    }
-    window.addEventListener('language-changed', this.onLanguageChanged);
-    await this.render();
-    this.pushGamepadContext();
-  }
-
-  hide(): void {
-    window.removeEventListener('language-changed', this.onLanguageChanged);
-    UIGamepadNavigator.getInstance().popContext('admin');
-    // Destroy active tab
-    const activeTab = this.tabs.find((tab) => tab.id === this.activeTabId);
-    activeTab?.instance.destroy();
-    this.container.remove();
-  }
-
-  private async render(): Promise<void> {
-    // Refresh tab labels for current language
-    for (const tab of this.tabs) {
-      tab.label = t(`admin:tabs.${tab.id}`);
-    }
-
-    setHtml(
-      this.container,
-      `
-      <div class="admin-header">
-        <h1 style="color:var(--primary);margin:0;">${t('admin:title')}</h1>
-        <button class="btn btn-secondary" id="admin-close">${t('admin:backToLobby')}</button>
-      </div>
-      <div class="admin-tabs" id="admin-tab-bar">
-        ${this.tabs
-          .map(
-            (tab) => `
-          <button class="admin-tab ${tab.id === this.activeTabId ? 'active' : ''}" data-tab="${tab.id}">${tab.label}</button>
-        `,
-          )
-          .join('')}
-      </div>
-      <div class="admin-tab-content" id="admin-tab-content"></div>
-    `,
-    );
-
-    this.container.querySelector('#admin-close')!.addEventListener('click', () => {
-      this.hide();
-      this.onClose();
-    });
-
-    this.container.querySelector('#admin-tab-bar')!.addEventListener('click', (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (target.dataset.tab && target.dataset.tab !== this.activeTabId) {
-        this.switchTab(target.dataset.tab);
-      }
-    });
-
-    this.contentEl = this.container.querySelector('#admin-tab-content');
-    await this.renderActiveTab();
-  }
-
   private async switchTab(tabId: string): Promise<void> {
     // Destroy current tab
     const currentTab = this.tabs.find((tab) => tab.id === this.activeTabId);
@@ -216,7 +149,6 @@ export class AdminUI {
       setHtml(this.contentEl, '');
     }
     await this.renderActiveTab();
-    this.pushGamepadContext();
   }
 
   private async renderActiveTab(): Promise<void> {
@@ -226,10 +158,7 @@ export class AdminUI {
     }
   }
 
-  private isEmbedded = false;
-
   async renderEmbedded(container: HTMLElement): Promise<void> {
-    this.isEmbedded = true;
     this.container = container;
 
     const viewContent = document.createElement('div');
@@ -261,40 +190,11 @@ export class AdminUI {
 
     this.contentEl = this.container.querySelector('#admin-tab-content');
     await this.renderActiveTab();
-    // No context of its own when embedded: the lobby's covers .main-body, sidebar and Back.
+    // No gamepad context of its own: the lobby's covers .main-body, sidebar and Back.
   }
 
   destroy(): void {
     const activeTab = this.tabs.find((tab) => tab.id === this.activeTabId);
     activeTab?.instance.destroy();
-    UIGamepadNavigator.getInstance().popContext('admin');
-  }
-
-  private pushGamepadContext(): void {
-    // Embedded, a context of its own (pushed again on every tab switch) sat on top of the lobby's
-    // with no sidebar and a Back that did nothing — the pad user was stuck in the admin panel.
-    if (this.isEmbedded) return;
-    const gpNav = UIGamepadNavigator.getInstance();
-    gpNav.popContext('admin');
-
-    const closeBtn = this.container.querySelector<HTMLElement>('#admin-close');
-
-    gpNav.pushContext({
-      id: 'admin',
-      elements: () => [
-        ...(closeBtn ? [closeBtn] : []),
-        ...this.container.querySelectorAll<HTMLElement>('.admin-tab'),
-        ...(this.contentEl?.querySelectorAll<HTMLElement>(
-          'input, select, textarea, button, .btn, .log-row',
-        ) || []),
-      ],
-      onBack: () => {
-        if (this.isEmbedded) {
-          return;
-        }
-        this.hide();
-        this.onClose();
-      },
-    });
   }
 }

@@ -133,18 +133,6 @@ export class ReplayPlayer {
     this.seekTo(found);
   }
 
-  stepForward(): void {
-    if (this.currentFrame < this.getTotalFrames() - 1) {
-      this.seekTo(this.currentFrame + 1);
-    }
-  }
-
-  stepBackward(): void {
-    if (this.currentFrame > 0) {
-      this.seekTo(this.currentFrame - 1);
-    }
-  }
-
   getCurrentFrame(): number {
     return this.currentFrame;
   }
@@ -161,10 +149,6 @@ export class ReplayPlayer {
   getTotalTime(): number {
     if (this.replayData.frames.length === 0) return 0;
     return this.replayData.frames[this.replayData.frames.length - 1].timeElapsed;
-  }
-
-  getReplayData(): ReplayData {
-    return this.replayData;
   }
 
   /** Call from Phaser's update() with delta in ms. Returns true if frame changed. */

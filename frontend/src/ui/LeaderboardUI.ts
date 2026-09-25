@@ -15,7 +15,6 @@ const PAGE_LIMIT = 25;
 export class LeaderboardUI {
   private container: HTMLElement;
   private notifications: NotificationUI;
-  private onBack: () => void;
   private currentPage: number = 1;
   private currentSeasonId: number | null = null;
   private onViewProfile?: (userId: number) => void;
@@ -25,39 +24,17 @@ export class LeaderboardUI {
   private profileClickHandler: ((e: Event) => void) | null = null;
   private profileKeyHandler: ((e: KeyboardEvent) => void) | null = null;
   private embeddedContainer: HTMLElement | null = null;
-  private isEmbedded = false;
   // Embedded, `container` is the lobby's shared .main-body: loads that finish after destroy()
   // must not touch it.
   private destroyed = false;
 
-  constructor(
-    notifications: NotificationUI,
-    onBack: () => void,
-    onViewProfile?: (userId: number) => void,
-  ) {
+  constructor(notifications: NotificationUI, onViewProfile?: (userId: number) => void) {
     this.notifications = notifications;
-    this.onBack = onBack;
     this.onViewProfile = onViewProfile;
     this.container = document.createElement('div');
-    this.container.className = 'admin-container';
-  }
-
-  show(): void {
-    const uiOverlay = document.getElementById('ui-overlay');
-    if (uiOverlay && !uiOverlay.contains(this.container)) {
-      uiOverlay.appendChild(this.container);
-    }
-    this.currentPage = 1;
-    this.renderShell();
-    this.loadInitialData();
-  }
-
-  hide(): void {
-    this.container.remove();
   }
 
   async renderEmbedded(container: HTMLElement): Promise<void> {
-    this.isEmbedded = true;
     this.destroyed = false;
     this.container = container;
     setHtml(
@@ -137,54 +114,6 @@ export class LeaderboardUI {
         ...this.container.querySelectorAll<HTMLElement>('.lb-user-link'),
         ...this.container.querySelectorAll<HTMLElement>('#lb-prev, #lb-next'),
       ],
-      onBack: () => {
-        // Embedded, `container` IS the lobby's `.main-body`: hide() would remove it and leave the
-        // lobby shell empty. The lobby context's own onBack handles navigation.
-        if (this.isEmbedded) return;
-        this.hide();
-        this.onBack();
-      },
-    });
-  }
-
-  private renderShell(): void {
-    setHtml(
-      this.container,
-      `
-      <div class="admin-header">
-        <h1>${t('ui:leaderboard.title')}</h1>
-        <button class="btn btn-secondary" id="lb-back">${t('ui:leaderboard.backToLobby')}</button>
-      </div>
-      <div class="lb-filter-bar">
-        <label>${t('ui:leaderboard.season')}</label>
-        <select id="lb-season-select" class="admin-select">
-          <option value="">${t('ui:leaderboard.loading')}</option>
-        </select>
-      </div>
-      <div id="lb-table-container" class="lb-content">
-        <div class="lb-status">${t('ui:leaderboard.loading')}</div>
-      </div>
-      <div id="lb-pagination" class="admin-pagination"></div>
-    `,
-    );
-
-    this.container.querySelector('#lb-back')!.addEventListener('click', () => {
-      this.hide();
-      this.onBack();
-    });
-
-    this.container.querySelector('#lb-season-select')!.addEventListener('change', (e) => {
-      const val = (e.target as HTMLSelectElement).value;
-      this.currentSeasonId = val ? parseInt(val, 10) : null;
-      this.currentPage = 1;
-      this.loadLeaderboard();
-    });
-
-    this.container.addEventListener('click', (e: Event) => {
-      const target = (e.target as HTMLElement).closest('[data-user-id]') as HTMLElement | null;
-      if (target && this.onViewProfile) {
-        this.onViewProfile(parseInt(target.dataset.userId!, 10));
-      }
     });
   }
 

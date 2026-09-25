@@ -68,12 +68,10 @@ export class CampaignUI {
   private notifications: NotificationUI;
   private socketClient: SocketClient;
   private authManager: AuthManager | null;
-  private onClose: () => void;
   private partyBar: PartyBar | null;
   private expandedWorldId: number | null = null;
   private selectedLevelId: number | null = null;
   private worlds: CampaignWorld[] = [];
-  private embedded = false;
   // Embedded, `container` is the lobby's shared .main-body. A load that finished after destroy()
   // appended the campaign under whatever view came next (and pushed a stale gamepad context).
   private destroyed = false;
@@ -81,46 +79,17 @@ export class CampaignUI {
   constructor(
     socketClient: SocketClient,
     notifications: NotificationUI,
-    onClose: () => void,
     partyBar?: PartyBar,
     authManager?: AuthManager,
   ) {
     this.socketClient = socketClient;
     this.notifications = notifications;
-    this.onClose = onClose;
     this.partyBar = partyBar ?? null;
     this.authManager = authManager ?? null;
     this.container = document.createElement('div');
-    this.container.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: var(--bg-base);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    `;
-  }
-
-  async show(): Promise<void> {
-    const uiOverlay = document.getElementById('ui-overlay');
-    if (uiOverlay && !uiOverlay.contains(this.container)) {
-      uiOverlay.appendChild(this.container);
-    }
-    await this.loadCampaignData();
-    this.render();
-    this.pushGamepadContext();
-  }
-
-  hide(): void {
-    UIGamepadNavigator.getInstance().popContext('campaign');
-    this.container.remove();
   }
 
   async renderEmbedded(container: HTMLElement): Promise<void> {
-    this.embedded = true;
     this.destroyed = false;
     this.container = container;
     await this.loadCampaignData();
@@ -133,7 +102,6 @@ export class CampaignUI {
     this.destroyed = true;
     UIGamepadNavigator.getInstance().popContext('campaign');
     setHtml(this.container, '');
-    this.embedded = false;
     this.worlds = [];
     this.expandedWorldId = null;
     this.selectedLevelId = null;
@@ -176,49 +144,8 @@ export class CampaignUI {
     }
   }
 
-  private render(): void {
-    setHtml(this.container, '');
-
-    // Header
-    const header = document.createElement('div');
-    header.style.cssText = `
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 16px 24px;
-      background: var(--bg-surface);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    `;
-
-    const title = document.createElement('h1');
-    title.style.cssText = `
-      color: var(--primary);
-      font-size: 24px;
-      font-family: var(--font-display);
-      font-weight: 700;
-      letter-spacing: 3px;
-      margin: 0;
-    `;
-    setHtml(title, t('campaign:titleBrand'));
-
-    const backBtn = document.createElement('button');
-    backBtn.className = 'btn btn-secondary';
-    backBtn.textContent = t('campaign:backToLobby');
-    backBtn.addEventListener('click', () => {
-      this.hide();
-      this.onClose();
-    });
-
-    header.appendChild(title);
-    header.appendChild(backBtn);
-    this.container.appendChild(header);
-
-    this.renderContent();
-  }
-
   private renderContent(): void {
-    // Remove any existing content area (preserve header if present)
+    // Replace the content area from the previous render
     const existingContent = this.container.querySelector('[data-campaign-content]');
     if (existingContent) existingContent.remove();
 
@@ -707,11 +634,7 @@ export class CampaignUI {
         } else {
           this.selectedLevelId = level.id;
         }
-        if (this.embedded) {
-          this.renderContent();
-        } else {
-          this.render();
-        }
+        this.renderContent();
         // The re-render replaced the card; keep keyboard focus on it.
         if (hadFocus) {
           this.container
@@ -778,13 +701,6 @@ export class CampaignUI {
         ),
         ...this.container.querySelectorAll<HTMLElement>('.btn-primary'),
       ],
-      onBack: () => {
-        // Embedded, `container` IS the lobby's `.main-body`: hide() would remove it and leave the
-        // lobby shell empty. The lobby context's own onBack handles navigation. (audit C3)
-        if (this.embedded) return;
-        this.hide();
-        this.onClose();
-      },
     });
   }
 

@@ -4,7 +4,6 @@ import {
   BR_ZONE_INITIAL_DELAY_SECONDS,
   BR_ZONE_SHRINK_AMOUNT,
   BR_ZONE_MIN_RADIUS,
-  BR_ZONE_DAMAGE_PER_TICK,
   TICK_RATE,
 } from '@blast-arena/shared';
 
@@ -122,35 +121,15 @@ describe('BattleRoyaleZone', () => {
     expect(state.targetRadius).toBeGreaterThanOrEqual(BR_ZONE_MIN_RADIUS);
   });
 
-  it('should return BR_ZONE_DAMAGE_PER_TICK from getDamagePerTick', () => {
+  it('leaves a far corner outside and the centre inside once shrunk', () => {
     const zone = new BattleRoyaleZone(15, 11);
-    expect(zone.getDamagePerTick()).toBe(BR_ZONE_DAMAGE_PER_TICK);
-  });
-
-  it('should apply zone damage to a player outside zone after shrinking', () => {
-    const zone = new BattleRoyaleZone(15, 11);
-    const delayticks = BR_ZONE_INITIAL_DELAY_SECONDS * TICK_RATE;
-
-    // Shrink zone substantially
-    let tick = delayticks;
-    for (let phase = 0; phase < 50; phase++) {
-      zone.tick(tick);
-      tick++;
-    }
-    // Let currentRadius converge to targetRadius
-    for (let i = 0; i < 500; i++) {
-      zone.tick(tick);
-      tick++;
-    }
+    // A whole 300 s round: the zone reaches its minimum radius before time-up
+    for (let tick = 0; tick <= 300 * TICK_RATE; tick++) zone.tick(tick);
 
     const state = zone.toState();
-    // Check a far corner - if it's outside the zone, damage should apply
-    const cornerInside = zone.isInsideZone(0, 0);
-    if (!cornerInside) {
-      // Player at (0,0) would take damage each tick
-      expect(zone.getDamagePerTick()).toBeGreaterThan(0);
-    }
-    // Center should always be safe
+    expect(state.currentRadius).toBe(BR_ZONE_MIN_RADIUS);
+    // Outside the zone a player dies outright (there is no per-tick zone damage)
+    expect(zone.isInsideZone(0, 0)).toBe(false);
     expect(zone.isInsideZone(state.centerX, state.centerY)).toBe(true);
   });
 
@@ -208,7 +187,7 @@ describe('BattleRoyaleZone', () => {
     expect(zone.isInsideZone(state.centerX, state.centerY)).toBe(true);
   });
 
-  it('toState() should include center, radius, shrinkRate, damagePerTick', () => {
+  it('toState() should include center, radius, shrinkRate', () => {
     const zone = new BattleRoyaleZone(15, 11);
     const state = zone.toState();
 
@@ -217,7 +196,6 @@ describe('BattleRoyaleZone', () => {
     expect(state).toHaveProperty('currentRadius');
     expect(state).toHaveProperty('targetRadius');
     expect(state).toHaveProperty('shrinkRate');
-    expect(state).toHaveProperty('damagePerTick');
     expect(state).toHaveProperty('nextShrinkTick');
 
     expect(typeof state.centerX).toBe('number');
@@ -225,7 +203,6 @@ describe('BattleRoyaleZone', () => {
     expect(typeof state.currentRadius).toBe('number');
     expect(typeof state.targetRadius).toBe('number');
     expect(typeof state.shrinkRate).toBe('number');
-    expect(typeof state.damagePerTick).toBe('number');
     expect(typeof state.nextShrinkTick).toBe('number');
   });
 });

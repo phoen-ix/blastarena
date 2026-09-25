@@ -11,7 +11,7 @@ export class LeaderboardView implements ILobbyView {
   private panel: LeaderboardUI;
 
   constructor(deps: ViewDeps, onViewProfile: (userId: number) => void) {
-    this.panel = new LeaderboardUI(deps.notifications, () => {}, onViewProfile);
+    this.panel = new LeaderboardUI(deps.notifications, onViewProfile);
   }
 
   async render(container: HTMLElement): Promise<void> {

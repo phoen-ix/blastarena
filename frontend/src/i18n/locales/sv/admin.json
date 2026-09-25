@@ -1,6 +1,4 @@
 {
-  "title": "Adminpanel",
-  "backToLobby": "Tillbaka till lobbyn",
   "tabs": {
     "dashboard": "Instrumentpanel",
     "users": "Användare",

@@ -79,10 +79,6 @@ class ThemeManager {
     this.listeners.push(callback);
   }
 
-  offChange(callback: ThemeListener): void {
-    this.listeners = this.listeners.filter((cb) => cb !== callback);
-  }
-
   /** Handle admin:settingsChanged for default_theme */
   handleAdminSettingChanged(key: string, value: string): void {
     if (key !== 'default_theme') return;

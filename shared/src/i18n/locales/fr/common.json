@@ -6,20 +6,13 @@
     "passwordMinLength": "Le mot de passe doit contenir au moins {{min}} caract\u00e8res",
     "passwordMaxLength": "Le mot de passe doit contenir au maximum {{max}} caract\u00e8res",
     "emailInvalid": "Adresse e-mail invalide",
-    "emailMaxLength": "L'adresse e-mail doit contenir au maximum {{max}} caract\u00e8res",
-    "roomNameMinLength": "Le nom du salon doit contenir au moins {{min}} caract\u00e8res",
-    "roomNameMaxLength": "Le nom du salon doit contenir au maximum {{max}} caract\u00e8res",
-    "roomNameInvalidChars": "Le nom du salon ne peut contenir que des lettres, des chiffres, des espaces, des tirets bas et des tirets"
+    "emailMaxLength": "L'adresse e-mail doit contenir au maximum {{max}} caract\u00e8res"
   },
   "actions": {
-    "save": "Enregistrer",
     "cancel": "Annuler",
     "delete": "Supprimer",
     "close": "Fermer",
-    "back": "Retour",
     "confirm": "Confirmer",
-    "create": "Cr\u00e9er",
-    "edit": "Modifier",
     "loading": "Chargement..."
   },
   "roles": {

@@ -13,7 +13,6 @@ export class RoomsTab {
   private socketClient: SocketClient;
   private role: UserRole;
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
-  private abortController: AbortController | null = null;
   // Live updates: the server broadcasts `room:list` to the lobby room on every room mutation, so
   // subscribe to that instead of polling /admin/rooms every 5 s. The interval stays as a 60 s
   // safety net for a missed broadcast. (audit F7)
@@ -26,7 +25,6 @@ export class RoomsTab {
   }
 
   async render(parent: HTMLElement): Promise<void> {
-    this.abortController = new AbortController();
     const container = document.createElement('div');
     this.container = container;
     parent.appendChild(container);
@@ -46,8 +44,6 @@ export class RoomsTab {
   }
 
   destroy(): void {
-    this.abortController?.abort();
-    this.abortController = null;
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
       this.refreshInterval = null;

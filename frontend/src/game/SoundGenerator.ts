@@ -110,17 +110,6 @@ export class SoundGenerator {
     this.playTone({ frequency: 400, type: 'triangle', duration: 0.06, volume: 0.08, decay: 0.04 });
   }
 
-  /** Bomb fuse tick — rising urgency */
-  bombTick(urgency: number): void {
-    const freq = 600 + urgency * 400;
-    this.playTone({
-      frequency: freq,
-      type: 'square',
-      duration: 0.04,
-      volume: 0.06 + urgency * 0.04,
-    });
-  }
-
   /** Power-up collect — bright ascending chime */
   powerUpCollect(): void {
     this.playTone({ frequency: 523, type: 'sine', duration: 0.08, volume: 0.18, attack: 0.005 });
@@ -163,12 +152,6 @@ export class SoundGenerator {
     });
   }
 
-  /** Bomb kick — whoosh */
-  kick(): void {
-    this.playNoise(0.12, 0.08, 0.1);
-    this.playTone({ frequency: 300, type: 'sine', duration: 0.1, volume: 0.08, pitchSlide: 200 });
-  }
-
   /** Bomb throw */
   bombThrow(): void {
     this.playTone({ frequency: 250, type: 'sine', duration: 0.15, volume: 0.1, pitchSlide: 300 });
@@ -209,21 +192,6 @@ export class SoundGenerator {
           attack: 0.01,
         });
       }, i * 150);
-    });
-  }
-
-  /** UI click */
-  uiClick(): void {
-    this.playTone({ frequency: 700, type: 'sine', duration: 0.04, volume: 0.06 });
-  }
-
-  /** Movement step */
-  step(): void {
-    this.playTone({
-      frequency: 150 + Math.random() * 50,
-      type: 'triangle',
-      duration: 0.03,
-      volume: 0.03,
     });
   }
 }

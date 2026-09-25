@@ -72,9 +72,3 @@ export function getGateColor(tile: TileType): PuzzleColor | null {
 export function getGateTile(color: PuzzleColor, open: boolean): TileType {
   return (open ? `gate_${color}_open` : `gate_${color}`) as TileType;
 }
-
-// --- All puzzle tiles ---
-
-export function isPuzzleTile(tile: TileType): boolean {
-  return isSwitchTile(tile) || isGateTile(tile) || tile === 'crumbling' || tile === 'pit';
-}

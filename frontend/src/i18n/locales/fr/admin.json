@@ -1,6 +1,4 @@
 {
-  "title": "Panneau d'administration",
-  "backToLobby": "Retour au lobby",
   "tabs": {
     "dashboard": "Tableau de bord",
     "users": "Utilisateurs",

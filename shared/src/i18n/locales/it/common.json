@@ -6,20 +6,13 @@
     "passwordMinLength": "La password deve avere almeno {{min}} caratteri",
     "passwordMaxLength": "La password deve avere al massimo {{max}} caratteri",
     "emailInvalid": "Indirizzo email non valido",
-    "emailMaxLength": "L'email deve avere al massimo {{max}} caratteri",
-    "roomNameMinLength": "Il nome della stanza deve avere almeno {{min}} caratteri",
-    "roomNameMaxLength": "Il nome della stanza deve avere al massimo {{max}} caratteri",
-    "roomNameInvalidChars": "Il nome della stanza può contenere solo lettere, numeri, spazi, trattini bassi e trattini"
+    "emailMaxLength": "L'email deve avere al massimo {{max}} caratteri"
   },
   "actions": {
-    "save": "Salva",
     "cancel": "Annulla",
     "delete": "Elimina",
     "close": "Chiudi",
-    "back": "Indietro",
     "confirm": "Conferma",
-    "create": "Crea",
-    "edit": "Modifica",
     "loading": "Caricamento..."
   },
   "roles": {

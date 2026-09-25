@@ -6,20 +6,13 @@
     "passwordMinLength": "Wachtwoord moet minimaal {{min}} tekens bevatten",
     "passwordMaxLength": "Wachtwoord mag maximaal {{max}} tekens bevatten",
     "emailInvalid": "Ongeldig e-mailadres",
-    "emailMaxLength": "E-mailadres mag maximaal {{max}} tekens bevatten",
-    "roomNameMinLength": "Kamernaam moet minimaal {{min}} tekens bevatten",
-    "roomNameMaxLength": "Kamernaam mag maximaal {{max}} tekens bevatten",
-    "roomNameInvalidChars": "Kamernaam mag alleen letters, cijfers, spaties, underscores en koppeltekens bevatten"
+    "emailMaxLength": "E-mailadres mag maximaal {{max}} tekens bevatten"
   },
   "actions": {
-    "save": "Opslaan",
     "cancel": "Annuleren",
     "delete": "Verwijderen",
     "close": "Sluiten",
-    "back": "Terug",
     "confirm": "Bevestigen",
-    "create": "Aanmaken",
-    "edit": "Bewerken",
     "loading": "Laden..."
   },
   "roles": {

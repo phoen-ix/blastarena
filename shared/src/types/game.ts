@@ -255,7 +255,6 @@ export interface ZoneState {
   centerX: number;
   centerY: number;
   shrinkRate: number;
-  damagePerTick: number;
   nextShrinkTick: number;
 }
 

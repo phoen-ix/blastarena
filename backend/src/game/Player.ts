@@ -186,11 +186,6 @@ export class Player {
     return state;
   }
 
-  /** Re-send cosmetics on the next tick (e.g. after they were loaded or changed). */
-  markCosmeticsDirty(): void {
-    this.cosmeticsSent = false;
-  }
-
   toState(): PlayerState {
     return {
       id: this.id,

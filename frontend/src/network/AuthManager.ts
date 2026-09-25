@@ -32,10 +32,6 @@ export class AuthManager {
     return this.currentUser;
   }
 
-  isAuthenticated(): boolean {
-    return this.currentUser !== null;
-  }
-
   get isGuest(): boolean {
     return this._isGuest;
   }
@@ -97,10 +93,6 @@ export class AuthManager {
       },
       true,
     );
-  }
-
-  get hasPendingTotp(): boolean {
-    return this.pendingTotpToken !== null;
   }
 
   async login(username: string, password: string): Promise<'success' | 'totp-required'> {

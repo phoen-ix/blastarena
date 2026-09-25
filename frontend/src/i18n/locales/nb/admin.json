@@ -1,6 +1,4 @@
 {
-  "title": "Adminpanel",
-  "backToLobby": "Tilbake til lobbyen",
   "tabs": {
     "dashboard": "Dashbord",
     "users": "Brukere",

@@ -104,7 +104,6 @@ export const GAME_MODES: Record<GameMode, GameModeConfig> = {
 export const BR_ZONE_INITIAL_DELAY_SECONDS = 30;
 // The shrink interval is derived from the round length — see BattleRoyaleZone.
 export const BR_ZONE_SHRINK_AMOUNT = 1;
-export const BR_ZONE_DAMAGE_PER_TICK = 1;
 export const BR_ZONE_MIN_RADIUS = 3;
 
 // Deathmatch config

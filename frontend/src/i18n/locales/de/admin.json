@@ -1,6 +1,4 @@
 {
-  "title": "Admin-Bereich",
-  "backToLobby": "Zurück zur Lobby",
   "tabs": {
     "dashboard": "Dashboard",
     "users": "Benutzer",

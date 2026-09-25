@@ -2,7 +2,6 @@ import { ZoneState } from '@blast-arena/shared';
 import {
   BR_ZONE_INITIAL_DELAY_SECONDS,
   BR_ZONE_SHRINK_AMOUNT,
-  BR_ZONE_DAMAGE_PER_TICK,
   BR_ZONE_MIN_RADIUS,
   TICK_RATE,
 } from '@blast-arena/shared';
@@ -18,7 +17,6 @@ export class BattleRoyaleZone {
   private currentRadius: number;
   private targetRadius: number;
   private shrinkRate: number = 0.1;
-  private damagePerTick: number = BR_ZONE_DAMAGE_PER_TICK;
   private nextShrinkTick: number;
   private readonly shrinkIntervalTicks: number;
 
@@ -68,10 +66,6 @@ export class BattleRoyaleZone {
     return Math.sqrt(dx * dx + dy * dy) <= this.currentRadius;
   }
 
-  getDamagePerTick(): number {
-    return this.damagePerTick;
-  }
-
   toState(): ZoneState {
     return {
       currentRadius: this.currentRadius,
@@ -79,7 +73,6 @@ export class BattleRoyaleZone {
       centerX: this.centerX,
       centerY: this.centerY,
       shrinkRate: this.shrinkRate,
-      damagePerTick: this.damagePerTick,
       nextShrinkTick: this.nextShrinkTick,
     };
   }

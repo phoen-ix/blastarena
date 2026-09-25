@@ -70,9 +70,10 @@ const configSchema = z.object({
 
   // GAME_TICK_RATE, MAX_ROOMS, MAX_PLAYERS_PER_ROOM, BOMB_TIMER_SECONDS, POWERUP_DROP_CHANCE and
   // RATE_LIMIT_LOGIN/REGISTER/API used to be declared here, in docker-compose.yml and in
-  // .env.example, and were read by nothing: the tick rate, room/player caps and bomb timings are
-  // constants in shared/src/constants/game.ts, and every rate limit is set at its route/socket
-  // handler. Declaring them told operators a knob existed that did nothing. (audit DEAD-CONFIG-1)
+  // .env.example, and were read by nothing: the tick rate and bomb timings are constants in
+  // shared/src/constants, a room's player cap is validated with its config (2-8), there is no
+  // room-count cap, and every rate limit is set at its route/socket handler. Declaring them told
+  // operators a knob existed that did nothing. (audit DEAD-CONFIG-1)
 });
 
 export type Config = z.infer<typeof configSchema>;

@@ -239,10 +239,6 @@ export class SpectatorActionBar {
     this.onTargetCancel?.();
   }
 
-  getSelectedAction(): ActionType | null {
-    return this.selectedAction;
-  }
-
   /** Send the action to the server for the selected tile. */
   executeAction(x: number, y: number): void {
     if (!this.selectedAction) return;

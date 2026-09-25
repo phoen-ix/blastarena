@@ -12,13 +12,7 @@ export class CampaignView implements ILobbyView {
   private panel: CampaignUI;
 
   constructor(deps: ViewDeps, partyBar: PartyBar) {
-    this.panel = new CampaignUI(
-      deps.socketClient,
-      deps.notifications,
-      () => {},
-      partyBar,
-      deps.authManager,
-    );
+    this.panel = new CampaignUI(deps.socketClient, deps.notifications, partyBar, deps.authManager);
   }
 
   async render(container: HTMLElement): Promise<void> {

@@ -3,7 +3,6 @@ import {
   validateUsername,
   validatePassword,
   validateEmail,
-  validateRoomName,
 } from '../../shared/src/utils/validation';
 
 describe('Validation Utils', () => {
@@ -56,22 +55,6 @@ describe('Validation Utils', () => {
       expect(validateEmail('notanemail')).not.toBeNull();
       expect(validateEmail('@domain.com')).not.toBeNull();
       expect(validateEmail('user@')).not.toBeNull();
-    });
-  });
-
-  describe('validateRoomName', () => {
-    it('should accept valid room names', () => {
-      expect(validateRoomName('My Room')).toBeNull();
-      expect(validateRoomName('room-123')).toBeNull();
-      expect(validateRoomName('test_room')).toBeNull();
-    });
-
-    it('should reject too short names', () => {
-      expect(validateRoomName('ab')).not.toBeNull();
-    });
-
-    it('should reject invalid characters', () => {
-      expect(validateRoomName('room@123')).not.toBeNull();
     });
   });
 });

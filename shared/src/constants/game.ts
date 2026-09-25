@@ -17,8 +17,8 @@ export const MAX_SPEED = 3;
 export const MAX_BOMBS = 8;
 export const MAX_FIRE_RANGE = 8;
 
-// Movement cooldown (in ticks) - higher = slower
-// At speed 1: 5 ticks (4 moves/sec), speed 2 (max): 4 ticks (5 moves/sec)
+// Movement cooldown (in ticks) - higher = slower. Players: BASE - (speed - 1), so speed 1 = 5 ticks
+// (4 moves/sec), 2 = 4 ticks (5/sec), 3 (MAX_SPEED) = 3 ticks (~6.7/sec)
 export const MOVE_COOLDOWN_BASE = 5;
 
 // Bomb throw
@@ -31,10 +31,6 @@ export const INVULNERABILITY_TICKS = 40; // 2 seconds after spawn
 
 /** Square map sizes offered when creating a room; the server accepts 9–51. */
 export const ROOM_MAP_SIZES = [21, 31, 39, 51] as const;
-
-// Game limits
-export const MAX_PLAYERS_PER_ROOM = 8;
-export const MAX_ROOMS = 50;
 
 // Spectator Game Master
 export const SPECTATOR_ENERGY_PER_TICK = 1; // 1 energy per tick = 20/sec

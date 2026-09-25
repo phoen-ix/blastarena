@@ -11,7 +11,7 @@ export class SettingsView implements ILobbyView {
   private panel: SettingsUI;
 
   constructor(deps: ViewDeps) {
-    this.panel = new SettingsUI(deps.authManager, deps.notifications, () => {});
+    this.panel = new SettingsUI(deps.authManager, deps.notifications);
   }
 
   async render(container: HTMLElement): Promise<void> {

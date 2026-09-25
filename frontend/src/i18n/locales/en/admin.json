@@ -1,6 +1,4 @@
 {
-  "title": "Admin Panel",
-  "backToLobby": "Back to Lobby",
   "tabs": {
     "dashboard": "Dashboard",
     "users": "Users",

@@ -206,7 +206,7 @@ describe('FriendsView', () => {
     const onMessage = vi.fn();
     const counts = listenerCounts(container);
 
-    const view = new FriendsView(deps, onMessage);
+    const view = new FriendsView(deps, onMessage, vi.fn());
     await view.render(container);
     await view.render(container);
     // click + keydown (search) + keydown (enableKeyboardActions)
@@ -236,7 +236,7 @@ describe('FriendsView', () => {
     deps.socket.emit.mockImplementation((event: string, ...rest: unknown[]) => {
       if (event === 'friend:block') (rest[1] as (r: unknown) => void)({ success: true });
     });
-    const view = new FriendsView(deps, vi.fn());
+    const view = new FriendsView(deps, vi.fn(), vi.fn());
     await view.render(container);
     deps.socket.fire('friend:update', {
       friends: [{ userId: 2, username: 'bob', activity: 'online', status: 'accepted' }],
@@ -284,7 +284,7 @@ describe('LeaderboardUI (embedded)', () => {
     const { LeaderboardUI } = await import('../../src/ui/LeaderboardUI');
     const onViewProfile = vi.fn();
     const counts = listenerCounts(container);
-    const ui = new LeaderboardUI(makeDeps().notifications, () => {}, onViewProfile);
+    const ui = new LeaderboardUI(makeDeps().notifications, onViewProfile);
 
     await ui.renderEmbedded(container);
     await ui.renderEmbedded(container);

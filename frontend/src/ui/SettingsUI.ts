@@ -14,7 +14,6 @@ import {
 import type { ThemeId, UserRole } from '@blast-arena/shared';
 import { getSettings, saveSettings, VisualSettings } from '../game/Settings';
 import { i18n, t } from '../i18n';
-import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { themeManager } from '../themes/ThemeManager';
 import { THEME_DEFINITIONS } from '../themes/definitions';
 import { PLAYER_COLORS } from '../scenes/BootScene';
@@ -59,13 +58,8 @@ export class SettingsUI {
   private container: HTMLElement;
   private authManager: AuthManager;
   private notifications: NotificationUI;
-  private onClose: () => void;
   private activeTabId: string;
   private contentEl: HTMLElement | null = null;
-  private onLanguageChanged: () => void;
-  private rendering = false;
-  private delegationBound = false;
-  private isEmbedded = false;
   // The preferences tab's `change` listener lives on contentEl, which survives tab switches; it is
   // bound once per contentEl instead of once per render so it does not stack. (audit C2)
   private prefsChangeHandler: ((e: Event) => void) | null = null;
@@ -88,37 +82,12 @@ export class SettingsUI {
     ];
   }
 
-  constructor(
-    authManager: AuthManager,
-    notifications: NotificationUI,
-    onClose: () => void,
-    initialTab?: string,
-  ) {
+  constructor(authManager: AuthManager, notifications: NotificationUI, initialTab?: string) {
     this.authManager = authManager;
     this.notifications = notifications;
-    this.onClose = onClose;
     this.container = document.createElement('div');
-    this.container.className = 'admin-container';
     this.activeTabId =
       initialTab && this.tabs.some((tab) => tab.id === initialTab) ? initialTab : 'account';
-    this.onLanguageChanged = () => this.render();
-  }
-
-  async show(): Promise<void> {
-    const uiOverlay = document.getElementById('ui-overlay');
-    if (uiOverlay && !uiOverlay.contains(this.container)) {
-      uiOverlay.appendChild(this.container);
-    }
-    window.addEventListener('language-changed', this.onLanguageChanged);
-    await this.render();
-    this.pushGamepadContext();
-  }
-
-  hide(): void {
-    window.removeEventListener('language-changed', this.onLanguageChanged);
-    UIGamepadNavigator.getInstance().popContext('settings-ui');
-    this.unbindPrefsChange();
-    this.container.remove();
   }
 
   private unbindPrefsChange(): void {
@@ -137,55 +106,6 @@ export class SettingsUI {
     return this.profileCache;
   }
 
-  private async render(): Promise<void> {
-    if (this.rendering) return;
-    this.rendering = true;
-
-    try {
-      // Bind event delegation once on the stable container element
-      if (!this.delegationBound) {
-        this.delegationBound = true;
-        this.container.addEventListener('click', (e: Event) => {
-          const target = e.target as HTMLElement;
-          if (target.id === 'settings-ui-close' || target.closest('#settings-ui-close')) {
-            this.hide();
-            this.onClose();
-            return;
-          }
-          const tabBtn = target.closest<HTMLElement>('[data-tab]');
-          if (tabBtn?.dataset.tab && tabBtn.dataset.tab !== this.activeTabId) {
-            this.switchTab(tabBtn.dataset.tab);
-          }
-        });
-      }
-
-      setHtml(
-        this.container,
-        `
-        <div class="admin-header">
-          <h1>${t('settings.title')}</h1>
-          <button class="btn btn-secondary" id="settings-ui-close">${t('settings.backToLobby')}</button>
-        </div>
-        <div class="admin-tabs" id="settings-tab-bar">
-          ${this.tabs
-            .map(
-              (tab) => `
-            <button class="admin-tab ${tab.id === this.activeTabId ? 'active' : ''}" data-tab="${tab.id}">${tab.label}</button>
-          `,
-            )
-            .join('')}
-        </div>
-        <div class="admin-tab-content" id="settings-tab-content"></div>
-      `,
-      );
-
-      this.contentEl = this.container.querySelector('#settings-tab-content');
-      await this.renderActiveTab();
-    } finally {
-      this.rendering = false;
-    }
-  }
-
   private async switchTab(tabId: string): Promise<void> {
     this.activeTabId = tabId;
 
@@ -200,7 +120,6 @@ export class SettingsUI {
       setHtml(this.contentEl, '');
     }
     await this.renderActiveTab();
-    this.pushGamepadContext();
   }
 
   private async renderActiveTab(): Promise<void> {
@@ -1296,7 +1215,6 @@ export class SettingsUI {
   }
 
   async renderEmbedded(container: HTMLElement): Promise<void> {
-    this.isEmbedded = true;
     this.container = container;
 
     setHtml(
@@ -1326,34 +1244,10 @@ export class SettingsUI {
 
     this.contentEl = this.container.querySelector('#settings-tab-content');
     await this.renderActiveTab();
-    // No context of its own when embedded: the lobby's covers .main-body, sidebar and Back.
+    // No gamepad context of its own: the lobby's covers .main-body, sidebar and Back.
   }
 
   destroy(): void {
     this.unbindPrefsChange();
-    UIGamepadNavigator.getInstance().popContext('settings-ui');
-  }
-
-  private pushGamepadContext(): void {
-    // Embedded, a context of its own (pushed again on every tab switch) sat on top of the lobby's
-    // with no sidebar and a Back that did nothing — the pad user was stuck in Settings.
-    if (this.isEmbedded) return;
-    const gpNav = UIGamepadNavigator.getInstance();
-    gpNav.popContext('settings-ui');
-    gpNav.pushContext({
-      id: 'settings-ui',
-      elements: () => [
-        ...this.container.querySelectorAll<HTMLElement>('#settings-ui-close'),
-        ...this.container.querySelectorAll<HTMLElement>('.admin-tab'),
-        ...(this.contentEl?.querySelectorAll<HTMLElement>('input, button, .btn') || []),
-      ],
-      onBack: () => {
-        // Embedded, `container` IS the lobby's `.main-body`: hide() would remove it and leave the
-        // lobby shell empty. The lobby context's own onBack handles navigation. (audit C3)
-        if (this.isEmbedded) return;
-        this.hide();
-        this.onClose();
-      },
-    });
   }
 }

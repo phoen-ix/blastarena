@@ -6,20 +6,13 @@
     "passwordMinLength": "Sifre en az {{min}} karakter olmalidir",
     "passwordMaxLength": "Sifre en fazla {{max}} karakter olmalidir",
     "emailInvalid": "Gecersiz e-posta adresi",
-    "emailMaxLength": "E-posta en fazla {{max}} karakter olmalidir",
-    "roomNameMinLength": "Oda adi en az {{min}} karakter olmalidir",
-    "roomNameMaxLength": "Oda adi en fazla {{max}} karakter olmalidir",
-    "roomNameInvalidChars": "Oda adi yalnizca harf, rakam, bosluk, alt cizgi ve tire icerebilir"
+    "emailMaxLength": "E-posta en fazla {{max}} karakter olmalidir"
   },
   "actions": {
-    "save": "Kaydet",
     "cancel": "Iptal",
     "delete": "Sil",
     "close": "Kapat",
-    "back": "Geri",
     "confirm": "Onayla",
-    "create": "Olustur",
-    "edit": "Duzenle",
     "loading": "Yukleniyor..."
   },
   "roles": {

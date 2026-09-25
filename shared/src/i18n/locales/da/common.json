@@ -6,20 +6,13 @@
     "passwordMinLength": "Adgangskode skal v\u00e6re mindst {{min}} tegn",
     "passwordMaxLength": "Adgangskode m\u00e5 h\u00f8jst v\u00e6re {{max}} tegn",
     "emailInvalid": "Ugyldig emailadresse",
-    "emailMaxLength": "Email m\u00e5 h\u00f8jst v\u00e6re {{max}} tegn",
-    "roomNameMinLength": "Rumnavn skal v\u00e6re mindst {{min}} tegn",
-    "roomNameMaxLength": "Rumnavn m\u00e5 h\u00f8jst v\u00e6re {{max}} tegn",
-    "roomNameInvalidChars": "Rumnavn m\u00e5 kun indeholde bogstaver, tal, mellemrum, understregninger og bindestreger"
+    "emailMaxLength": "Email m\u00e5 h\u00f8jst v\u00e6re {{max}} tegn"
   },
   "actions": {
-    "save": "Gem",
     "cancel": "Annuller",
     "delete": "Slet",
     "close": "Luk",
-    "back": "Tilbage",
     "confirm": "Bekr\u00e6ft",
-    "create": "Opret",
-    "edit": "Rediger",
     "loading": "Indl\u00e6ser..."
   },
   "roles": {

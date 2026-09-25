@@ -133,7 +133,8 @@ export class LobbyUI {
     }
     UIGamepadNavigator.getInstance().popContext('lobby');
     this.container.remove();
-    // The panels' socket handlers (7 on PartyBar, 2 on LobbyChatPanel) must go with the UI.
+    // The panels' socket handlers (6 on PartyBar plus its reconnect hook, 2 on LobbyChatPanel)
+    // must go with the UI.
     // LobbyScene builds a fresh LobbyUI on every return from a room, and only scene shutdown
     // used to destroy the panels — so N room round-trips left N sets of live handlers: N invite
     // toasts per invite, N chat renders per message. (audit C1)

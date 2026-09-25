@@ -9,7 +9,6 @@ import {
   isGateOpen,
   getGateColor,
   getGateTile,
-  isPuzzleTile,
   PUZZLE_COLORS,
   CRUMBLE_DELAY_TICKS,
   PUZZLE_COLOR_VALUES,
@@ -121,31 +120,6 @@ describe('Puzzle Utils', () => {
 
     it.each(COLORS)('constructs open gate for %s', (color) => {
       expect(getGateTile(color, true)).toBe(`gate_${color}_open`);
-    });
-  });
-
-  describe('isPuzzleTile', () => {
-    it('returns true for switch tiles', () => {
-      expect(isPuzzleTile('switch_red' as TileType)).toBe(true);
-      expect(isPuzzleTile('switch_blue_active' as TileType)).toBe(true);
-    });
-
-    it('returns true for gate tiles', () => {
-      expect(isPuzzleTile('gate_green' as TileType)).toBe(true);
-      expect(isPuzzleTile('gate_yellow_open' as TileType)).toBe(true);
-    });
-
-    it('returns true for crumbling and pit', () => {
-      expect(isPuzzleTile('crumbling' as TileType)).toBe(true);
-      expect(isPuzzleTile('pit' as TileType)).toBe(true);
-    });
-
-    it('returns false for regular tiles', () => {
-      expect(isPuzzleTile('empty' as TileType)).toBe(false);
-      expect(isPuzzleTile('wall' as TileType)).toBe(false);
-      expect(isPuzzleTile('destructible' as TileType)).toBe(false);
-      expect(isPuzzleTile('spawn' as TileType)).toBe(false);
-      expect(isPuzzleTile('teleporter_a' as TileType)).toBe(false);
     });
   });
 
