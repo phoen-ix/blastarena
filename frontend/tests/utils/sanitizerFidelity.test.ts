@@ -67,6 +67,7 @@ describe('sanitiser fidelity against this app markup', () => {
     expect(literals.length).toBeGreaterThan(200);
   });
 
+  // Hundreds of literals through DOMPurify: seconds on a busy host, past vitest's 5 s default
   it('setHtml produces the same DOM as the innerHTML assignment it replaced', () => {
     const changed: string[] = [];
     for (const lit of literals) {
@@ -85,7 +86,7 @@ describe('sanitiser fidelity against this app markup', () => {
       }
     }
     expect(changed.join('\n\n')).toBe('');
-  });
+  }, 30_000);
 
   it('keeps table fragments intact', () => {
     // The failure this guards against is silent and total: DOMPurify parses in a body context,

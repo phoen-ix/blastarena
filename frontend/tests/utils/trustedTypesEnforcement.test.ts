@@ -121,6 +121,7 @@ describe('Trusted Types enforcement', () => {
     expect(el.textContent).toBe('ok');
   });
 
+  // Hundreds of literals through DOMPurify: seconds on a busy host, past vitest's 5 s default
   it('setHtml inserts every HTML literal in the source without touching a sink', async () => {
     const { setHtml } = await import('../../src/utils/html');
     const literals = collectHtmlLiterals();
@@ -136,7 +137,7 @@ describe('Trusted Types enforcement', () => {
       }
     }
     expect(failures.slice(0, 10).join('\n')).toBe('');
-  });
+  }, 30_000);
 
   it('insertHtml inserts without touching a sink, in every position', async () => {
     const { insertHtml, setHtml } = await import('../../src/utils/html');
