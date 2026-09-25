@@ -19,13 +19,12 @@ export class LeaderboardUI {
   private currentSeasonId: number | null = null;
   private onViewProfile?: (userId: number) => void;
   private seasons: Season[] = [];
-  // Delegated profile-link handler on the embedded container (the persistent `.main-body`),
-  // removed in destroy() — it used to accumulate one copy per visit. (audit C2)
+  // Delegated profile-link handler on the embedded container, removed in destroy() — on the
+  // lobby's shared .main-body it used to accumulate one copy per visit. (audit C2)
   private profileClickHandler: ((e: Event) => void) | null = null;
   private profileKeyHandler: ((e: KeyboardEvent) => void) | null = null;
   private embeddedContainer: HTMLElement | null = null;
-  // Embedded, `container` is the lobby's shared .main-body: loads that finish after destroy()
-  // must not touch it.
+  // Embedded: loads that finish after destroy() must not touch the container.
   private destroyed = false;
 
   constructor(notifications: NotificationUI, onViewProfile?: (userId: number) => void) {

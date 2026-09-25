@@ -72,7 +72,7 @@ export class CampaignUI {
   private expandedWorldId: number | null = null;
   private selectedLevelId: number | null = null;
   private worlds: CampaignWorld[] = [];
-  // Embedded, `container` is the lobby's shared .main-body. A load that finished after destroy()
+  // A load that finishes after destroy() must stop: when views shared the lobby's .main-body, it
   // appended the campaign under whatever view came next (and pushed a stale gamepad context).
   private destroyed = false;
 

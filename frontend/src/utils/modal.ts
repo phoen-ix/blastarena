@@ -28,6 +28,8 @@ let modalSeq = 0;
  * Returns the overlay element, the inner content div, and a close function.
  */
 export function createModal(options: ModalOptions): ModalResult {
+  // Taken now: the focus trap starts a frame later, when focus may already be in the modal
+  const opener = document.activeElement;
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.setAttribute('role', 'dialog');
@@ -84,7 +86,7 @@ export function createModal(options: ModalOptions): ModalResult {
 
   // Defer focus trap to after caller sets innerHTML
   requestAnimationFrame(() => {
-    if (!closed) cleanupFocus = trapFocus(overlay);
+    if (!closed) cleanupFocus = trapFocus(overlay, opener);
   });
 
   return { overlay, content, close };

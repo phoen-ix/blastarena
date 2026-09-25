@@ -3577,8 +3577,14 @@
       flex-direction: column;
     }
 
+    /* A lobby view's own root (LobbyUI.navigateTo): no box, so the view lays out as before */
+    .view-root {
+      display: contents;
+    }
+
     /* Watermark */
-    .main-body > * {
+    .main-body > *,
+    .view-root > * {
       position: relative;
       z-index: 1;
     }

@@ -16,8 +16,8 @@ export class MapsView implements ILobbyView {
   private deps: ViewDeps;
   private container: HTMLElement | null = null;
   private maps: CustomMapSummary[] = [];
-  // Delegated click handler, bound once per render() on the persistent `.main-body` and removed
-  // in destroy(). Binding it inside renderContent() stacked one copy per re-render — after two
+  // Delegated click handler, bound once per render() on the view's container and removed in
+  // destroy(). Binding it inside renderContent() stacked one copy per re-render — after two
   // publishes a single Delete click ran three times. (audit C2)
   private clickHandler: ((e: Event) => void) | null = null;
   private boundContainer: HTMLElement | null = null;

@@ -44,6 +44,7 @@ function deferred<T>() {
 
 // Fake lazily-imported views whose render() is held open by the test.
 const slowRender = { gate: deferred<void>() };
+const containerClicks = vi.fn();
 const created: Array<{
   id: string;
   render: ReturnType<typeof vi.fn>;
@@ -56,6 +57,7 @@ function fakeView(id: string) {
     render = vi.fn(async (container: HTMLElement) => {
       if (id === 'matchHistory') await slowRender.gate.promise;
       container.textContent = `view:${id}`;
+      container.addEventListener('click', () => containerClicks(id));
     });
     destroy = vi.fn();
     constructor() {
@@ -106,6 +108,7 @@ beforeEach(() => {
     return null;
   });
   gamepad.pushContext.mockClear();
+  containerClicks.mockClear();
   created.length = 0;
   slowRender.gate = deferred<void>();
 });
@@ -205,6 +208,50 @@ describe('LobbyUI navigation token (item 11)', () => {
     expect(maps.destroy).toHaveBeenCalledTimes(1);
     expect(history.render).toHaveBeenCalledTimes(1);
     expect(document.querySelector('.main-body')!.textContent).toBe('view:matchHistory');
+    lobby.hide();
+  });
+});
+
+describe('LobbyUI gives every view a root of its own', () => {
+  async function lobbyOn(view: string) {
+    const { LobbyUI } = await import('../../src/ui/LobbyUI');
+    const lobby = new LobbyUI(
+      fakeSocket() as unknown as SocketClient,
+      authManager(false, 'token'),
+      notifications as unknown as NotificationUI,
+      () => {},
+    );
+    lobby.show(view);
+    await flush();
+    return lobby;
+  }
+  const body = () => document.querySelector('.main-body')!;
+
+  it('a render that finishes after the user moved on stays out of the next view', async () => {
+    const lobby = await lobbyOn('rooms');
+    lobby.showView('matchHistory'); // render held open by the gate
+    await flush();
+    lobby.showView('maps');
+    await flush();
+    expect(body().textContent).toBe('view:maps');
+
+    slowRender.gate.resolve(); // it used to write over the maps view
+    await flush();
+    expect(body().textContent).toBe('view:maps');
+    lobby.hide();
+  });
+
+  it('what a view binds on its container goes with it', async () => {
+    const lobby = await lobbyOn('rooms');
+    lobby.showView('maps');
+    await flush();
+    slowRender.gate.resolve();
+    lobby.showView('matchHistory');
+    await flush();
+    await flush();
+
+    body().querySelector<HTMLElement>('.view-root')!.click();
+    expect(containerClicks.mock.calls).toEqual([['matchHistory']]);
     lobby.hide();
   });
 });

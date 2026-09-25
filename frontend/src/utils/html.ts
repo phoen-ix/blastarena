@@ -8,8 +8,19 @@ const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabi
  */
 const OWNS_ARROW_KEYS = 'input, textarea, select, [role="radio"], [contenteditable="true"]';
 
-/** Trap Tab/Arrow focus within a modal element. Returns a cleanup function. */
-export function trapFocus(modal: HTMLElement): () => void {
+/**
+ * Trap Tab/Arrow focus within a modal element. Returns a cleanup function, which also hands focus
+ * back to `opener` — what had it when the modal opened, usually the button that opened it.
+ * Keyboard and screen-reader users used to land on <body>, back at the top of the page.
+ */
+export function trapFocus(
+  modal: HTMLElement,
+  opener: Element | null = document.activeElement,
+): () => void {
+  const returnTo =
+    opener instanceof HTMLElement && opener !== document.body && !modal.contains(opener)
+      ? opener
+      : null;
   const handler = (e: KeyboardEvent) => {
     if (e.key.startsWith('Arrow') && (e.target as Element | null)?.closest?.(OWNS_ARROW_KEYS)) {
       return;
@@ -47,15 +58,23 @@ export function trapFocus(modal: HTMLElement): () => void {
   // Auto-focus first focusable element
   const first = modal.querySelector<HTMLElement>(FOCUSABLE);
   if (first && !modal.querySelector(':focus')) first.focus();
-  return () => modal.removeEventListener('keydown', handler);
+  return () => {
+    modal.removeEventListener('keydown', handler);
+    // Only while the modal still holds focus (or nothing does): never take it from an element
+    // the user has moved to since, or from another modal opened on top.
+    const active = document.activeElement;
+    if (returnTo?.isConnected && (!active || active === document.body || modal.contains(active))) {
+      returnTo.focus();
+    }
+  };
 }
 
 /**
  * Enable keyboard activation (Enter/Space) for [data-action] elements
  * within a container using event delegation.
  *
- * Returns a disposer. Views bind this to the persistent `.main-body`, which outlives them, so a
- * view that does not remove the listener in destroy() leaves one copy per visit. (audit C2)
+ * Returns a disposer, for destroy(): a view that binds this on every render() and never removes
+ * it stacks one listener per render. (audit C2)
  */
 export function enableKeyboardActions(container: HTMLElement): () => void {
   const handler = (e: KeyboardEvent) => {

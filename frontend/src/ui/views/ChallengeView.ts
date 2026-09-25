@@ -23,8 +23,8 @@ export class ChallengeView implements ILobbyView {
 
   private deps: ViewDeps;
   private onJoinRoom: (room: Room) => void;
-  // render() awaits the API and then writes into the shared .main-body; once the user has moved
-  // on, that write landed on top of the next view.
+  // render() awaits the API and then writes into its container; when views shared the lobby's
+  // .main-body, a write after the user had moved on landed on top of the next view.
   private destroyed = false;
   private creating = false;
 

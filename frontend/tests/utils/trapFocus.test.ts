@@ -6,6 +6,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
  * - trapFocus moved focus on every arrow key, including inside a text field, a select or a
  *   radio group — the caret could not move and a select could not change value by keyboard.
  * - createModal pushed no gamepad context: the pad kept driving the page underneath.
+ * - Closing a modal left focus on <body>, back at the top of the page, instead of on the control
+ *   that opened it.
  */
 
 vi.mock('../../src/i18n', () => ({ t: (key: string) => key, i18n: { language: 'en' } }));
@@ -127,5 +129,42 @@ describe('createModal gamepad context', () => {
     const dialog2 = document.querySelector<HTMLElement>('[role="dialog"]')!;
     dialog2.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await expect(no).resolves.toBe(false);
+  });
+});
+
+describe('focus goes back to the opener', () => {
+  function opener() {
+    const button = document.createElement('button');
+    document.body.appendChild(button);
+    button.focus();
+    return button;
+  }
+
+  it('when the trap is released', () => {
+    const openedBy = opener();
+    const release = trapFocus(modal);
+    expect(document.activeElement).toBe(modal.querySelector('#a'));
+    release();
+    expect(document.activeElement).toBe(openedBy);
+  });
+
+  it('but never from an element the user has moved to outside the modal', () => {
+    opener();
+    const release = trapFocus(modal);
+    const elsewhere = document.createElement('button');
+    document.body.appendChild(elsewhere);
+    elsewhere.focus();
+    release();
+    expect(document.activeElement).toBe(elsewhere);
+  });
+
+  it('when a createModal modal closes, although its trap starts a frame later', async () => {
+    const openedBy = opener();
+    const { content, close } = createModal({ ariaLabel: 'Test' });
+    content.innerHTML = '<button id="inside">x</button>';
+    await new Promise((r) => requestAnimationFrame(r));
+    expect(document.activeElement?.id).toBe('inside');
+    close();
+    expect(document.activeElement).toBe(openedBy);
   });
 });

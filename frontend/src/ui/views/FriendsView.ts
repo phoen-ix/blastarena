@@ -39,7 +39,7 @@ export class FriendsView implements ILobbyView {
   }) => void;
   private friendOfflineHandler!: (data: { userId: number }) => void;
 
-  // Delegated DOM handlers on the persistent `.main-body`, removed in destroy(). They used to be
+  // Delegated DOM handlers on the view's container, removed in destroy(). They used to be
   // re-added on every render() and never removed, so each visit multiplied every action. (audit C2)
   private clickHandler: ((e: Event) => void) | null = null;
   private keydownHandler: ((e: KeyboardEvent) => void) | null = null;

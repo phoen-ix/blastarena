@@ -86,8 +86,8 @@ export class HelpUI {
   private markdownCache: Map<string, string> = new Map();
   private displayGithub = false;
   private displayImprint = false;
-  // Embedded, `container` is the lobby's shared .main-body; a render still awaiting its settings
-  // after destroy() wrote the help page over whatever view came next.
+  // A render still awaiting its settings after destroy() must stop: when views shared the lobby's
+  // .main-body, it wrote the help page over whatever view came next.
   private destroyed = false;
 
   constructor(authManager: AuthManager, initialTab?: string) {

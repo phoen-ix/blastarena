@@ -189,11 +189,15 @@ export class LobbyUI {
       mainHeader.style.display = viewsWithOwnHeader.includes(viewId) ? 'none' : '';
     }
 
-    // Clear and render main body
+    // Clear and render main body. Each view renders into a fresh root of its own, so what it
+    // binds on its container, and whatever a render still in flight writes after the user has
+    // moved on, go with it instead of landing in the next view.
     const mainBody = this.container.querySelector('.main-body') as HTMLElement;
     if (mainBody) {
-      setHtml(mainBody, '');
-      await view.render(mainBody);
+      const root = document.createElement('div');
+      root.className = 'view-root';
+      mainBody.replaceChildren(root);
+      await view.render(root);
     }
     // A newer navigation destroyed this view while it rendered and owns the gamepad context now.
     if (seq !== this.navSeq) return;

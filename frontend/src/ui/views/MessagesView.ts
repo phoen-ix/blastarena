@@ -29,8 +29,8 @@ export class MessagesView implements ILobbyView {
   private dmReadHandler: (data: { fromUserId: number; readAt: string }) => void;
   private settingsChangedHandler: (data: { key: string; value?: unknown }) => void;
 
-  // Delegated DOM handlers on the persistent `.main-body`, removed in destroy(). Without that,
-  // every visit to this view added another copy: Enter in the input sent the DM N times. (audit C2)
+  // Delegated DOM handlers on the view's container, removed in destroy(). When views shared the
+  // lobby's .main-body, every visit added another copy: Enter sent the DM N times. (audit C2)
   private clickHandler: ((e: Event) => void) | null = null;
   private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
   private boundContainer: HTMLElement | null = null;
