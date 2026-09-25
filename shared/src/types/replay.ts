@@ -10,6 +10,7 @@ import {
   MapEvent,
   TileType,
   Position,
+  KillCause,
 } from './game';
 import { CampaignEnemyState, EnemyTypeEntry, CampaignWinCondition } from './campaign';
 
@@ -34,7 +35,8 @@ export interface ReplayLogEntry {
 
 export interface ReplayTickEvents {
   explosions: { cells: Position[]; ownerId: number }[];
-  playerDied: { playerId: number; killerId: number | null }[];
+  /** `cause` is what the live kill feed shows; replays have always recorded it. */
+  playerDied: { playerId: number; killerId: number | null; cause?: KillCause }[];
   powerupCollected: {
     playerId: number;
     type: string;

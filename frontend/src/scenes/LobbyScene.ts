@@ -10,6 +10,7 @@ import { t } from '../i18n';
 import { setHtml } from '../utils/html';
 import { enterCoopLevel } from './coopStart';
 import { themeManager } from '../themes/ThemeManager';
+import type { AdminReturn } from '../ui/admin/adminReturn';
 
 export class LobbyScene extends Phaser.Scene {
   private authManager!: AuthManager;
@@ -93,7 +94,7 @@ export class LobbyScene extends Phaser.Scene {
     const currentRoom = this.registry.get('currentRoom') as Room | undefined;
     const openCampaign = this.registry.get('openCampaign');
     this.registry.remove('openCampaign');
-    const returnToAdmin = this.registry.get('returnToAdmin') as string | undefined;
+    const returnToAdmin = this.registry.get('returnToAdmin') as AdminReturn | undefined;
     this.registry.remove('returnToAdmin');
     if (currentRoom && currentRoom.status === 'waiting') {
       this.onJoinRoom(currentRoom);
@@ -103,7 +104,7 @@ export class LobbyScene extends Phaser.Scene {
       this.showLobby('campaign');
     } else if (returnToAdmin) {
       this.registry.remove('currentRoom');
-      this.showLobby('admin', { initialTab: returnToAdmin });
+      this.showLobby('admin', { initialTab: returnToAdmin.tab, initialView: returnToAdmin.view });
     } else if (guestOpenWorld) {
       this.registry.remove('currentRoom');
       this.showLobby('openWorld');

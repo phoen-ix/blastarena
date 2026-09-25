@@ -2,8 +2,8 @@ import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
 import { escapeHtml, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
-import { GameState, ReplayData, RoomListItem, gameModeName } from '@blast-arena/shared';
-import { game } from '../../main';
+import { ReplayData, RoomListItem, gameModeName } from '@blast-arena/shared';
+import { startReplay } from './replayLauncher';
 import { t } from '../../i18n';
 
 /** Row returned by GET /admin/matches (snake_case DB columns, dates serialized as strings). */
@@ -66,6 +66,7 @@ export class MatchesTab {
   private container: HTMLElement | null = null;
   private notifications: NotificationUI;
   private page = 1;
+  private restoredPage: number | null = null;
   private isAdmin = false;
   // Codes of rooms with a match running right now. A playing/countdown row without finished_at
   // is live when its room is still playing, and abandoned otherwise — all were "abandoned".
@@ -76,10 +77,16 @@ export class MatchesTab {
     this.isAdmin = isAdmin;
   }
 
+  /** Back from a replay: reopen the page it was started from. */
+  restore(view: Record<string, unknown>): void {
+    if (typeof view.page === 'number' && view.page >= 1) this.restoredPage = Math.floor(view.page);
+  }
+
   async render(parent: HTMLElement): Promise<void> {
     this.container = document.createElement('div');
     parent.appendChild(this.container);
-    this.page = 1;
+    this.page = this.restoredPage ?? 1;
+    this.restoredPage = null;
     await this.loadMatches();
   }
 
@@ -299,7 +306,7 @@ export class MatchesTab {
       const replayBtn = overlay.querySelector('#match-watch-replay');
       if (replayBtn) {
         replayBtn.addEventListener('click', async () => {
-          await this.launchReplay(matchId);
+          await this.launchReplay(matchId, close);
         });
       }
     } catch {
@@ -307,7 +314,7 @@ export class MatchesTab {
     }
   }
 
-  private async launchReplay(matchId: number): Promise<void> {
+  private async launchReplay(matchId: number, closeModal?: () => void): Promise<void> {
     try {
       this.notifications.info(t('admin:matches.loadingReplay'));
       const replayData = await ApiClient.get<ReplayData>(`/admin/replays/${matchId}`);
@@ -317,45 +324,9 @@ export class MatchesTab {
         return;
       }
 
-      // Reconstruct initial GameState from first frame + stored map
-      const firstFrame = replayData.frames[0];
-      const initialState: GameState = {
-        tick: firstFrame.tick,
-        players: firstFrame.players,
-        bombs: firstFrame.bombs,
-        explosions: firstFrame.explosions,
-        powerUps: firstFrame.powerUps,
-        map: replayData.map,
-        status: firstFrame.status,
-        winnerId: firstFrame.winnerId,
-        winnerTeam: firstFrame.winnerTeam,
-        roundTime: firstFrame.roundTime,
-        timeElapsed: firstFrame.timeElapsed,
-      };
-      if (firstFrame.zone) initialState.zone = firstFrame.zone;
-      if (firstFrame.hillZone) initialState.hillZone = firstFrame.hillZone;
-      if (firstFrame.kothScores) initialState.kothScores = firstFrame.kothScores;
-
-      // Clear all DOM overlays (admin panel, lobby, etc.)
-      const uiOverlay = document.getElementById('ui-overlay');
-      if (uiOverlay) {
-        while (uiOverlay.firstChild) {
-          uiOverlay.removeChild(uiOverlay.firstChild);
-        }
-      }
-
-      // Set registry values for GameScene
-      const registry = game.registry;
-      registry.set('initialGameState', initialState);
-      registry.set('replayMode', true);
-      registry.set('replayData', replayData);
-
-      // Start GameScene and HUDScene
-      const activeScene = game.scene.getScene('LobbyScene') || game.scene.getScene('MenuScene');
-      if (activeScene) {
-        activeScene.scene.start('GameScene');
-        activeScene.scene.launch('HUDScene');
-      }
+      // The detail modal is still open: close it properly, or its gamepad context outlives it
+      closeModal?.();
+      startReplay(replayData, { tab: 'matches', view: { page: this.page } });
     } catch {
       this.notifications.error(t('admin:matches.failedToLoadReplay'));
     }

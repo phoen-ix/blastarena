@@ -48,6 +48,11 @@ export class HUDScene extends Phaser.Scene {
     | ((data: { playerId: number; killerId: number | null; cause?: KillCause }) => void)
     | null = null;
   private killFeedEntries: { text: string; time: number; el?: HTMLElement }[] = [];
+  /** Replay playback feeds the kill feed from the recorded frames, and a seek clears it. */
+  private replayPlayerDiedHandler:
+    | ((data: { playerId: number; killerId: number | null; cause?: KillCause }) => void)
+    | null = null;
+  private replaySeekHandler: (() => void) | null = null;
   private stateUpdateHandler: ((state: GameState) => void) | null = null;
   private campaignStateHandler: ((state: CampaignGameState) => void) | null = null;
   private campaignPlayerDiedHandler: (() => void) | null = null;
@@ -330,6 +335,13 @@ export class HUDScene extends Phaser.Scene {
     };
     gameScene.events.on('localPlayerChanged', this.localPlayerChangedHandler);
 
+    if (replayMode) {
+      this.replayPlayerDiedHandler = (data) => this.onPlayerDied(data);
+      gameScene.events.on('replayPlayerDied', this.replayPlayerDiedHandler);
+      this.replaySeekHandler = () => this.clearKillFeed();
+      gameScene.events.on('replaySeek', this.replaySeekHandler);
+    }
+
     // Seed the minimap: GameScene emits stateUpdate during its create(), before this listener
     // exists. From its live grid rather than the registry's initial state — the landing's
     // background arena mounts this HUD long after joining, and open-world rounds replace the map,
@@ -480,8 +492,8 @@ export class HUDScene extends Phaser.Scene {
     }
     this.renderKillFeed();
 
-    // Show death banner when local player dies
-    if (data.playerId === this.localPlayerId) {
+    // Show death banner when local player dies — not to someone watching a replay of their match
+    if (data.playerId === this.localPlayerId && !this.spectatorOnly) {
       this.showDeathBanner(killer, data.cause);
     }
   }
@@ -510,6 +522,11 @@ export class HUDScene extends Phaser.Scene {
   }
 
   private lastKnownPlayers: PlayerState[] = [];
+
+  private clearKillFeed(): void {
+    for (const entry of this.killFeedEntries) entry.el?.remove();
+    this.killFeedEntries = [];
+  }
 
   private renderKillFeed(): void {
     // Runs every tick; the feed is empty for most of a match. (audit F4)
@@ -1297,6 +1314,14 @@ export class HUDScene extends Phaser.Scene {
     if (this.localPlayerChangedHandler) {
       this.scene.get('GameScene')?.events.off('localPlayerChanged', this.localPlayerChangedHandler);
       this.localPlayerChangedHandler = null;
+    }
+    if (this.replayPlayerDiedHandler) {
+      this.scene.get('GameScene')?.events.off('replayPlayerDied', this.replayPlayerDiedHandler);
+      this.replayPlayerDiedHandler = null;
+    }
+    if (this.replaySeekHandler) {
+      this.scene.get('GameScene')?.events.off('replaySeek', this.replaySeekHandler);
+      this.replaySeekHandler = null;
     }
     if (this.playerDiedHandler && this.socketClient) {
       this.socketClient.off('game:playerDied', this.playerDiedHandler);

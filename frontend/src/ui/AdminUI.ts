@@ -21,7 +21,12 @@ interface Tab {
   id: string;
   label: string;
   adminOnly: boolean;
-  instance: { render(parent: HTMLElement): Promise<void>; destroy(): void };
+  instance: {
+    render(parent: HTMLElement): Promise<void>;
+    destroy(): void;
+    /** Reopen a view inside the tab (see AdminReturn) before its first render. */
+    restore?(view: Record<string, unknown>): void;
+  };
 }
 
 export class AdminUI {
@@ -35,6 +40,7 @@ export class AdminUI {
     authManager: AuthManager,
     notifications: NotificationUI,
     initialTab?: string,
+    initialView?: Record<string, unknown>,
   ) {
     // socketClient / authManager / notifications are only needed to build the tabs below; they
     // were also stored on the instance and never read again. (audit G4)
@@ -127,6 +133,9 @@ export class AdminUI {
       (initialTab && this.tabs.find((tab) => tab.id === initialTab) ? initialTab : null) ||
       this.tabs[0]?.id ||
       'users';
+    if (initialView && this.activeTabId === initialTab) {
+      this.tabs.find((tab) => tab.id === initialTab)?.instance.restore?.(initialView);
+    }
   }
 
   private async switchTab(tabId: string): Promise<void> {

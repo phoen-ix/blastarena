@@ -15,6 +15,8 @@ export interface ReplayCallbacks {
   onLogUpdate: (tick: number) => void;
   onComplete: () => void;
   onStateChange: (playing: boolean, speed: number) => void;
+  /** Before a seek's frame is emitted: whatever accumulated from the old position is stale. */
+  onSeek?: () => void;
   onCampaignFrame?: (data: {
     enemies: CampaignEnemyState[];
     lives: number;
@@ -108,6 +110,7 @@ export class ReplayPlayer {
     }
 
     this.currentFrame = target;
+    this.callbacks.onSeek?.();
     this.emitCurrentFrame();
   }
 

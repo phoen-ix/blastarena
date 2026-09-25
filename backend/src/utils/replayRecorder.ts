@@ -15,6 +15,7 @@ import {
   ReplayTickEvents,
   CampaignReplayMeta,
   CampaignEnemyState,
+  KillCause,
   TICK_RATE,
 } from '@blast-arena/shared';
 import { logger } from './logger';
@@ -110,7 +111,7 @@ type RecordedReplayData = Omit<ReplayData, 'gameOver'> & { gameOver: ReplayGameO
 
 interface TickEvents {
   explosions: { cells: { x: number; y: number }[]; ownerId: number }[];
-  playerDied: { playerId: number; killerId: number | null }[];
+  playerDied: { playerId: number; killerId: number | null; cause?: KillCause }[];
   powerupCollected: {
     playerId: number;
     type: string;

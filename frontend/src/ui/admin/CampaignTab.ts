@@ -21,7 +21,6 @@ import {
   EnemyAIEntry,
   CampaignReplayListItem,
   ReplayData,
-  GameState,
   getErrorMessage,
 } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
@@ -29,6 +28,7 @@ import { createModal, confirmModal } from '../../utils/modal';
 import { EnemyTextureGenerator } from '../../game/EnemyTextureGenerator';
 import { game } from '../../main';
 import { ensureLevelEditorScene } from '../../scenes/levelEditorLoader';
+import { startReplay } from './replayLauncher';
 
 type ViewMode = 'worlds' | 'enemies' | 'replays';
 
@@ -81,6 +81,16 @@ export class CampaignTab {
 
   constructor(notifications: NotificationUI) {
     this.notifications = notifications;
+  }
+
+  /** Back from a replay: reopen the replay list at the page it was started from. */
+  restore(view: Record<string, unknown>): void {
+    if (view.viewMode === 'worlds' || view.viewMode === 'enemies' || view.viewMode === 'replays') {
+      this.viewMode = view.viewMode;
+    }
+    if (typeof view.page === 'number' && view.page >= 1) {
+      this.campaignReplaysPage = Math.floor(view.page);
+    }
   }
 
   async render(parent: HTMLElement): Promise<void> {
@@ -588,7 +598,7 @@ export class CampaignTab {
     } else {
       game.registry.set('editorWorldTheme', 'classic');
     }
-    game.registry.set('returnToAdmin', 'campaign');
+    game.registry.set('returnToAdmin', { tab: 'campaign' });
 
     // The editor is a lazy chunk: fetch it while the admin UI is still on screen. (audit F9)
     await ensureLevelEditorScene(game);
@@ -1635,48 +1645,10 @@ export class CampaignTab {
         return;
       }
 
-      // Reconstruct initial GameState from first frame + stored map
-      const firstFrame = replayData.frames[0];
-      const initialState: GameState = {
-        tick: firstFrame.tick,
-        players: firstFrame.players,
-        bombs: firstFrame.bombs,
-        explosions: firstFrame.explosions,
-        powerUps: firstFrame.powerUps,
-        map: replayData.map,
-        status: firstFrame.status,
-        winnerId: firstFrame.winnerId,
-        winnerTeam: firstFrame.winnerTeam,
-        roundTime: firstFrame.roundTime,
-        timeElapsed: firstFrame.timeElapsed,
-      };
-      if (firstFrame.zone) initialState.zone = firstFrame.zone;
-      if (firstFrame.hillZone) initialState.hillZone = firstFrame.hillZone;
-      if (firstFrame.kothScores) initialState.kothScores = firstFrame.kothScores;
-
-      // Clear all DOM overlays
-      const uiOverlay = document.getElementById('ui-overlay');
-      if (uiOverlay) {
-        while (uiOverlay.firstChild) {
-          uiOverlay.removeChild(uiOverlay.firstChild);
-        }
-      }
-
-      // Set registry values for GameScene
-      const registry = game.registry;
-      registry.set('initialGameState', initialState);
-      registry.set('replayMode', true);
-      registry.set('replayData', replayData);
-      if (replayData.campaign) {
-        registry.set('campaignMode', true);
-      }
-
-      // Start GameScene and HUDScene
-      const activeScene = game.scene.getScene('LobbyScene') || game.scene.getScene('MenuScene');
-      if (activeScene) {
-        activeScene.scene.start('GameScene');
-        activeScene.scene.launch('HUDScene');
-      }
+      startReplay(replayData, {
+        tab: 'campaign',
+        view: { viewMode: 'replays', page: this.campaignReplaysPage },
+      });
     } catch {
       this.notifications.error(t('admin:campaign.replays.loadFailed'));
     }

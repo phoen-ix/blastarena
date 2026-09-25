@@ -19,6 +19,7 @@ import {
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { game } from '../../main';
+import { startReplay } from './replayLauncher';
 import { t } from '../../i18n';
 
 type ViewMode = 'list' | 'detail';
@@ -30,6 +31,7 @@ export class SimulationsTab {
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
   private viewMode: ViewMode = 'list';
   private detailBatchId: string | null = null;
+  private restoreBatchId: string | null = null;
   private detailResults: SimulationGameResult[] = [];
   private activeBatch: SimulationBatchStatus | null = null;
 
@@ -44,6 +46,10 @@ export class SimulationsTab {
     this.socketClient = socketClient;
   }
 
+  restore(view: Record<string, unknown>): void {
+    if (typeof view.batchId === 'string') this.restoreBatchId = view.batchId;
+  }
+
   async render(parent: HTMLElement): Promise<void> {
     const container = document.createElement('div');
     this.container = container;
@@ -55,7 +61,11 @@ export class SimulationsTab {
     this.socketClient.on('sim:completed', this.handleCompleted);
     this.socketClient.on('sim:queueUpdate', this.handleQueueUpdate);
 
-    await this.loadBatchList();
+    // Back from a replay or a spectated game: straight to that batch, not the list
+    const restoreBatchId = this.restoreBatchId;
+    this.restoreBatchId = null;
+    if (restoreBatchId) await this.showBatchDetail(restoreBatchId);
+    else await this.loadBatchList();
     // destroy() ran during the load (a quick tab switch): starting the poll now would leak it.
     if (this.container !== container) return;
     if (this.refreshInterval) clearInterval(this.refreshInterval);
@@ -332,45 +342,7 @@ export class SimulationsTab {
         return;
       }
 
-      // Reconstruct initial GameState from first frame + stored map
-      const firstFrame = replayData.frames[0];
-      const initialState: GameState = {
-        tick: firstFrame.tick,
-        players: firstFrame.players,
-        bombs: firstFrame.bombs,
-        explosions: firstFrame.explosions,
-        powerUps: firstFrame.powerUps,
-        map: replayData.map,
-        status: firstFrame.status,
-        winnerId: firstFrame.winnerId,
-        winnerTeam: firstFrame.winnerTeam,
-        roundTime: firstFrame.roundTime,
-        timeElapsed: firstFrame.timeElapsed,
-      };
-      if (firstFrame.zone) initialState.zone = firstFrame.zone;
-      if (firstFrame.hillZone) initialState.hillZone = firstFrame.hillZone;
-      if (firstFrame.kothScores) initialState.kothScores = firstFrame.kothScores;
-
-      // Clear all DOM overlays (admin panel, lobby, etc.)
-      const uiOverlay = document.getElementById('ui-overlay');
-      if (uiOverlay) {
-        while (uiOverlay.firstChild) {
-          uiOverlay.removeChild(uiOverlay.firstChild);
-        }
-      }
-
-      // Set registry values for GameScene
-      const registry = game.registry;
-      registry.set('initialGameState', initialState);
-      registry.set('replayMode', true);
-      registry.set('replayData', replayData);
-
-      // Start GameScene and HUDScene
-      const activeScene = game.scene.getScene('LobbyScene') || game.scene.getScene('MenuScene');
-      if (activeScene) {
-        activeScene.scene.start('GameScene');
-        activeScene.scene.launch('HUDScene');
-      }
+      startReplay(replayData, { tab: 'simulations', view: { batchId } });
     } catch {
       this.notifications.error(t('admin:simulations.errors.replayLoadFailed'));
     }

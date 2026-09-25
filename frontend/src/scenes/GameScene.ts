@@ -52,6 +52,7 @@ import type { ServerToClientEvents, ChatMode } from '@blast-arena/shared';
 import { audioManager } from '../game/AudioManager';
 import { getSettings } from '../game/Settings';
 import { enterCoopLevel, clearCampaignRun, localP2StartData } from './coopStart';
+import type { AdminReturn } from '../ui/admin/adminReturn';
 
 /** After a reconnect, how long a match waits for the server to re-send its state. */
 const RESYNC_TIMEOUT_MS = 5000;
@@ -572,6 +573,7 @@ export class GameScene extends Phaser.Scene {
         onStateChange: () => {
           this.replayControls?.update();
         },
+        onSeek: () => this.events.emit('replaySeek'),
         onCampaignFrame: isCampaignReplay
           ? (data) => {
               this.enemyRenderer?.update(data.enemies);
@@ -643,15 +645,19 @@ export class GameScene extends Phaser.Scene {
       };
       this.socketClient.on('sim:gameTransition', this.simTransitionHandler);
 
-      // When the batch completes, return to lobby
-      this.simCompletedHandler = () => {
-        this.removeSimListeners();
-        this.socketClient.emit('sim:unspectate', { batchId: simSpectate.batchId });
-        this.registry.remove('simulationSpectate');
-        this.scene.stop('HUDScene');
-        this.scene.start('LobbyScene');
-      };
+      // When the batch completes, back to it in the admin panel
+      this.simCompletedHandler = () => this.leaveSimulationSpectate(simSpectate.batchId);
       this.socketClient.on('sim:completed', this.simCompletedHandler);
+
+      // Escape stops watching. There was no way out before the batch finished — Escape and
+      // Start were switched off here, and the HUD has no leave button.
+      this.pauseKeyHandler = (e: KeyboardEvent) => {
+        if (e.code === 'Escape') {
+          e.preventDefault();
+          if (!e.repeat) this.leaveSimulationSpectate(simSpectate.batchId);
+        }
+      };
+      window.addEventListener('keydown', this.pauseKeyHandler);
     } else if (this.registry.get('campaignMode')) {
       // Campaign mode: listen on campaign-specific events
       this.campaignMode = true;
@@ -903,20 +909,21 @@ export class GameScene extends Phaser.Scene {
 
       if (!this.spectatorOnly) void this.loadEmoteMode();
 
-      // Escape key to toggle leave game menu (multiplayer)
-      if (!this.registry.get('replayMode') && !this.registry.get('simulationSpectate')) {
-        this.pauseKeyHandler = (e: KeyboardEvent) => {
-          if (e.code === 'Escape') {
-            e.preventDefault();
-            if (this.paused) {
-              this.hideLeaveOverlay();
-            } else {
-              this.showLeaveOverlay();
-            }
+      // Escape key to toggle leave game menu (multiplayer). Staff watching a room lose nothing by
+      // leaving — the menu's "you will die and lose all progress" is not about them.
+      this.pauseKeyHandler = (e: KeyboardEvent) => {
+        if (e.code === 'Escape') {
+          e.preventDefault();
+          if (adminSpectate) {
+            if (!e.repeat) this.leaveAdminSpectate();
+          } else if (this.paused) {
+            this.hideLeaveOverlay();
+          } else {
+            this.showLeaveOverlay();
           }
-        };
-        window.addEventListener('keydown', this.pauseKeyHandler);
-      }
+        }
+      };
+      window.addEventListener('keydown', this.pauseKeyHandler);
     }
 
     if (!replayMode) {
@@ -1368,6 +1375,8 @@ export class GameScene extends Phaser.Scene {
     }
     for (const death of events.playerDied) {
       this.effectSystem?.triggerPlayerDied(death);
+      // The HUD kill feed listens to the socket, which carries nothing during a replay
+      this.events.emit('replayPlayerDied', death);
     }
   }
 
@@ -1383,6 +1392,10 @@ export class GameScene extends Phaser.Scene {
     this.registry.remove('initialGameState');
     this.registry.remove('campaignMode');
     this.registry.remove('campaignTheme');
+    // Back to the admin tab (and page, or batch) the replay was started from
+    const returnTo = this.registry.get('replayReturnTo') as AdminReturn | undefined;
+    this.registry.remove('replayReturnTo');
+    if (returnTo) this.registry.set('returnToAdmin', returnTo);
     this.scene.stop('HUDScene');
     this.scene.start('LobbyScene');
   }
@@ -1507,12 +1520,19 @@ export class GameScene extends Phaser.Scene {
     if (!this.gamepadManager) return;
     const menu = this.gamepadManager.pollMenu();
 
-    // Start button = pause toggle (campaign) or leave overlay (multiplayer)
+    // Start button = pause toggle (campaign) or leave overlay (multiplayer); spectators leave
     if (menu.pause) {
+      const simSpectate = this.registry.get('simulationSpectate') as
+        | { batchId: string }
+        | undefined;
       if (this.campaignMode) {
         if (this.paused) this.resumeCampaign();
         else this.pauseCampaign();
-      } else if (!this.registry.get('replayMode') && !this.registry.get('simulationSpectate')) {
+      } else if (simSpectate) {
+        this.leaveSimulationSpectate(simSpectate.batchId);
+      } else if (this.registry.get('adminSpectate')) {
+        this.leaveAdminSpectate();
+      } else if (!this.registry.get('replayMode')) {
         if (this.paused) this.hideLeaveOverlay();
         else this.showLeaveOverlay();
       }
@@ -1998,7 +2018,21 @@ export class GameScene extends Phaser.Scene {
 
   /** Close the admin spectator view (shutdown() tells the server) and return to the Rooms tab. */
   private leaveAdminSpectate(): void {
-    this.registry.set('returnToAdmin', 'rooms');
+    this.registry.set('returnToAdmin', { tab: 'rooms' } satisfies AdminReturn);
+    this.scene.stop('HUDScene');
+    this.scene.start('LobbyScene');
+  }
+
+  /** Stop watching a simulation (it finished, or the viewer left) and reopen its batch. */
+  private leaveSimulationSpectate(batchId: string): void {
+    this.removeSimListeners();
+    // Leaves the server's sim room; without it the batch kept streaming here until it ended
+    this.socketClient.emit('sim:unspectate', { batchId });
+    this.registry.remove('simulationSpectate');
+    this.registry.set('returnToAdmin', {
+      tab: 'simulations',
+      view: { batchId },
+    } satisfies AdminReturn);
     this.scene.stop('HUDScene');
     this.scene.start('LobbyScene');
   }
