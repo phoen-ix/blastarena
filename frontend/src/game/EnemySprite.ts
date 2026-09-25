@@ -1,14 +1,27 @@
 import Phaser from 'phaser';
-import { CampaignEnemyState, TILE_SIZE } from '@blast-arena/shared';
+import { CampaignEnemyState, TILE_SIZE, TICK_MS } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 
-const LERP_FACTOR = 0.45;
+/** Fraction of the remaining distance covered per server tick; frame() rescales it per frame. */
+const LERP_PER_TICK = 0.45;
+/**
+ * A target that moves further than this between two states (a teleporter, a replay seek) is drawn
+ * as a jump instead of a slide across the map. One tick moves an enemy two tiles at most (a step
+ * or conveyor push onto ice, then the slide).
+ */
+const SNAP_DISTANCE = TILE_SIZE * 3;
 
 export class EnemySpriteRenderer {
   private scene: Phaser.Scene;
   private sprites: Map<number, Phaser.GameObjects.Sprite> = new Map();
   private hpBars: Map<number, Phaser.GameObjects.Graphics> = new Map();
-  private prevPositions: Map<number, { x: number; y: number }> = new Map();
+  /**
+   * Where each sprite is heading. frame() moves it there once per rendered frame, like players;
+   * enemies used to be lerped only when a state arrived, so they stepped at 20 Hz.
+   */
+  private targets: Map<number, { x: number; y: number }> = new Map();
+  /** What each HP bar last showed; bars are drawn at their origin and only redrawn on change. */
+  private drawnHp: Map<number, string> = new Map();
   /**
    * Enemies whose death animation has already been started. A dead enemy stays in the state for
    * several ticks while `sprite.visible` is still true (the tween hides it only on completion), so
@@ -51,7 +64,6 @@ export class EnemySpriteRenderer {
         }
 
         this.sprites.set(enemy.id, sprite);
-        this.prevPositions.set(enemy.id, { x: targetX, y: targetY });
       }
 
       // Update texture for direction changes
@@ -84,6 +96,7 @@ export class EnemySpriteRenderer {
           if (hpBar) {
             hpBar.destroy();
             this.hpBars.delete(enemy.id);
+            this.drawnHp.delete(enemy.id);
           }
         }
         continue;
@@ -94,17 +107,41 @@ export class EnemySpriteRenderer {
         sprite.setAlpha(0.7);
       }
 
-      // Smooth position interpolation
-      const prev = this.prevPositions.get(enemy.id) ?? { x: targetX, y: targetY };
-      const newX = prev.x + (targetX - prev.x) * LERP_FACTOR;
-      const newY = prev.y + (targetY - prev.y) * LERP_FACTOR;
-      sprite.setPosition(newX, newY);
-      this.prevPositions.set(enemy.id, { x: newX, y: newY });
+      // Record where the sprite should head; frame() moves it there
+      const target = this.targets.get(enemy.id);
+      if (target) {
+        const dx = targetX - target.x;
+        const dy = targetY - target.y;
+        if (dx * dx + dy * dy > SNAP_DISTANCE * SNAP_DISTANCE) sprite.setPosition(targetX, targetY);
+        target.x = targetX;
+        target.y = targetY;
+      } else {
+        this.targets.set(enemy.id, { x: targetX, y: targetY });
+      }
 
       // HP bar for enemies with HP > 1
       if (enemy.maxHp > 1) {
-        this.updateHPBar(enemy, newX, newY);
+        this.updateHPBar(enemy, sprite.x, sprite.y);
       }
+    }
+  }
+
+  /**
+   * Per-frame pass, driven from GameScene.update(): moves every living enemy toward its target
+   * at the players' visual speed, whatever the frame rate, and keeps its HP bar on it.
+   */
+  frame(delta: number): void {
+    if (this.sprites.size === 0) return;
+    const k = 1 - Math.pow(1 - LERP_PER_TICK, delta / TICK_MS);
+    for (const [id, sprite] of this.sprites) {
+      if (this.dying.has(id)) continue;
+      const target = this.targets.get(id);
+      if (!target) continue;
+      sprite.setPosition(
+        sprite.x + (target.x - sprite.x) * k,
+        sprite.y + (target.y - sprite.y) * k,
+      );
+      this.hpBars.get(id)?.setPosition(sprite.x, sprite.y);
     }
   }
 
@@ -113,14 +150,19 @@ export class EnemySpriteRenderer {
     if (!bar) {
       bar = this.scene.add.graphics();
       bar.setDepth(11);
+      bar.setPosition(x, y);
       this.hpBars.set(enemy.id, bar);
     }
+    const shown = `${enemy.hp}/${enemy.maxHp}/${enemy.isBoss}`;
+    if (this.drawnHp.get(enemy.id) === shown) return;
+    this.drawnHp.set(enemy.id, shown);
 
+    // Drawn around the bar's origin; frame() moves the Graphics with the sprite
     bar.clear();
     const barWidth = enemy.isBoss ? 40 : 28;
     const barHeight = 4;
-    const barX = x - barWidth / 2;
-    const barY = y - TILE_SIZE / 2 - 6;
+    const barX = -barWidth / 2;
+    const barY = -TILE_SIZE / 2 - 6;
 
     // Background
     bar.fillStyle(0x000000, 0.6);
@@ -149,8 +191,9 @@ export class EnemySpriteRenderer {
     const bar = this.hpBars.get(id);
     if (bar) bar.destroy();
     this.hpBars.delete(id);
+    this.drawnHp.delete(id);
 
-    this.prevPositions.delete(id);
+    this.targets.delete(id);
     this.dying.delete(id);
   }
 

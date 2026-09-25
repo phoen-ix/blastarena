@@ -15,10 +15,12 @@ export interface FakeSprite {
   alpha: number;
   scaleX: number;
   scaleY: number;
+  displayWidth: number;
   tint: number | null;
   setTexture(key: string): FakeSprite;
   setAlpha(a: number): FakeSprite;
   setScale(s: number): FakeSprite;
+  setDisplaySize(w: number, h: number): FakeSprite;
   setPosition(x: number, y: number): FakeSprite;
   setDepth(d: number): FakeSprite;
   setVisible(v: boolean): FakeSprite;
@@ -43,6 +45,7 @@ export function makeSprite(x: number, y: number, key: string): FakeSprite {
     alpha: 1,
     scaleX: 1,
     scaleY: 1,
+    displayWidth: 0,
     tint: null,
     setTexture(k) {
       sprite.texture = { key: k };
@@ -55,6 +58,10 @@ export function makeSprite(x: number, y: number, key: string): FakeSprite {
     setScale(s) {
       sprite.scaleX = s;
       sprite.scaleY = s;
+      return sprite;
+    },
+    setDisplaySize(w) {
+      sprite.displayWidth = w;
       return sprite;
     },
     setPosition(px, py) {
@@ -121,12 +128,39 @@ export function makeGraphics() {
   return gfx;
 }
 
+export function makeText(x: number, y: number, text: string, style: object = {}) {
+  const label = {
+    x,
+    y,
+    text,
+    style,
+    active: true,
+    setOrigin() {
+      return label;
+    },
+    setDepth() {
+      return label;
+    },
+    setPosition(px: number, py: number) {
+      label.x = px;
+      label.y = py;
+      return label;
+    },
+    destroy() {
+      label.active = false;
+    },
+  };
+  return label;
+}
+
 export function makeFakeScene(options: { textures?: string[] } = {}) {
   const sprites: FakeSprite[] = [];
   const tweens: FakeTween[] = [];
+  const graphics: ReturnType<typeof makeGraphics>[] = [];
   const known = new Set(options.textures ?? []);
   const scene = {
     sprites,
+    graphics,
     tweens: {
       list: tweens,
       add(config: { targets: unknown } & Record<string, unknown>) {
@@ -149,7 +183,12 @@ export function makeFakeScene(options: { textures?: string[] } = {}) {
         return sprite;
       },
       graphics() {
-        return makeGraphics();
+        const gfx = makeGraphics();
+        graphics.push(gfx);
+        return gfx;
+      },
+      text(x: number, y: number, text: string, style?: object) {
+        return makeText(x, y, text, style);
       },
     },
     anims: {

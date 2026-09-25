@@ -16,6 +16,14 @@ const TEAM_COLOR_INDICES: Record<number, number[]> = {
  */
 const LERP_PER_TICK = 0.45;
 
+/**
+ * A target that moves further than this between two states is a jump, not a step — a teleporter,
+ * an open-world round start, a replay seek — and the sprite is put there instead of sliding
+ * across the map. One tick moves a player two tiles at most (a step or conveyor push onto ice,
+ * then the slide). Compared target to target: the sprite itself trails a fast walker by more.
+ */
+const SNAP_DISTANCE = TILE_SIZE * 3;
+
 const SHIELD_RADIUS = (TILE_SIZE - 4) / 2 + 4;
 
 export class PlayerSpriteRenderer {
@@ -310,6 +318,9 @@ export class PlayerSpriteRenderer {
       // Record where the sprite should head; frame() moves it there. (audit F2)
       const target = this.targetPositions.get(player.id);
       if (target) {
+        if (this.jumpDistanceSq(target, targetX, targetY) > SNAP_DISTANCE * SNAP_DISTANCE) {
+          sprite.setPosition(targetX, targetY);
+        }
         target.x = targetX;
         target.y = targetY;
       } else {
@@ -449,6 +460,20 @@ export class PlayerSpriteRenderer {
         this.buddyGlowGraphics.set(player.id, glowGfx);
       }
     });
+  }
+
+  /** Squared distance from an old target to a new one, the short way round on a wrapping map. */
+  private jumpDistanceSq(from: { x: number; y: number }, x: number, y: number): number {
+    let dx = x - from.x;
+    let dy = y - from.y;
+    const wrap = this.wrappingWorldSize;
+    if (wrap) {
+      if (dx > wrap.w / 2) dx -= wrap.w;
+      else if (dx < -wrap.w / 2) dx += wrap.w;
+      if (dy > wrap.h / 2) dy -= wrap.h;
+      else if (dy < -wrap.h / 2) dy += wrap.h;
+    }
+    return dx * dx + dy * dy;
   }
 
   /**

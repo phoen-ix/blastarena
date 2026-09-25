@@ -15,9 +15,17 @@ interface ToneParams {
   pitchSlide?: number;
 }
 
+/** Length of the shared white-noise buffer; every burst plays a random slice of it. */
+const NOISE_SECONDS = 1;
+
 export class SoundGenerator {
   private ctx: AudioContext;
   private masterGain: GainNode;
+  /**
+   * Filled once. Every explosion used to allocate and fill a fresh buffer — 20k+ random samples
+   * per blast, many per frame in a chain reaction.
+   */
+  private noiseBuffer: AudioBuffer | null = null;
 
   constructor(ctx: AudioContext, masterGain: GainNode) {
     this.ctx = ctx;
@@ -54,14 +62,23 @@ export class SoundGenerator {
     osc.stop(now + duration + 0.05);
   }
 
+  private getNoiseBuffer(): AudioBuffer {
+    if (!this.noiseBuffer) {
+      const length = Math.floor(this.ctx.sampleRate * NOISE_SECONDS);
+      const buffer = this.ctx.createBuffer(1, length, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < length; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      this.noiseBuffer = buffer;
+    }
+    return this.noiseBuffer;
+  }
+
   private playNoise(duration: number, volume: number, decay?: number): void {
     const now = this.ctx.currentTime;
-    const bufferSize = Math.floor(this.ctx.sampleRate * duration);
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
+    const buffer = this.getNoiseBuffer();
+    const length = Math.min(duration, buffer.duration);
 
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
@@ -79,7 +96,8 @@ export class SoundGenerator {
     source.connect(filter);
     filter.connect(gain);
     gain.connect(this.masterGain);
-    source.start(now);
+    // A random slice, so back-to-back bursts don't repeat the same samples
+    source.start(now, Math.random() * (buffer.duration - length), length);
   }
 
   /** Explosion — rumbling boom with noise burst. Intensity 1-3 scales volume/pitch for batched blasts. */

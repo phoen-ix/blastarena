@@ -1113,6 +1113,7 @@ export class GameScene extends Phaser.Scene {
     // Sprites move toward their tick targets once per rendered frame, before the camera follows
     // them, so both are smooth at the display's rate rather than the 20 Hz state rate. (audit F2)
     this.playerRenderer?.frame(delta);
+    this.enemyRenderer?.frame(delta);
     this.updateCamera();
     // After updateCamera, so the ghosts are culled against this frame's worldView. No-ops for
     // non-wrapping maps and when the visible tile range hasn't changed. (audit TILE-GHOST-1)
