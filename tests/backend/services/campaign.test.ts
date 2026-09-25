@@ -790,6 +790,15 @@ describe('Campaign Service', () => {
   });
 
   describe('createLevel', () => {
+    it('refuses an unknown world instead of failing the foreign key as a 500', async () => {
+      mockQuery.mockResolvedValueOnce([]); // getWorld
+      await expect(createLevel(404, { name: 'x' }, 1)).rejects.toMatchObject({
+        statusCode: 400,
+        code: 'WORLD_NOT_FOUND',
+      });
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
     it('should auto-calculate sortOrder and return insertId', async () => {
       mockQuery.mockResolvedValue([{ total: 4 }]);
       mockExecute.mockResolvedValue({ insertId: 25 });

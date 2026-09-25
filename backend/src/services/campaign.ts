@@ -1,6 +1,7 @@
 import { CampaignWorld, CampaignLevel, CampaignLevelSummary } from '@blast-arena/shared';
 import { query, execute } from '../db/connection';
 import { CampaignWorldRow, CampaignLevelRow, CampaignProgressRow, CountRow } from '../db/types';
+import { AppError } from '../middleware/errorHandler';
 
 function worldRowToEntry(row: CampaignWorldRow): CampaignWorld {
   return {
@@ -264,6 +265,10 @@ export async function createLevel(
   data: Partial<CampaignLevel>,
   createdBy: number,
 ): Promise<number> {
+  // Level create and import both land here; an unknown world failed the foreign key as a 500
+  if (!(await getWorld(worldId))) {
+    throw new AppError('World not found', 400, 'WORLD_NOT_FOUND');
+  }
   const [maxOrder] = await query<CountRow[]>(
     `SELECT COALESCE(MAX(sort_order), -1) AS total FROM campaign_levels WHERE world_id = ?`,
     [worldId],

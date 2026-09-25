@@ -180,6 +180,33 @@ describe('errorHandler middleware', () => {
     expect(new AppError('Nope', 403).code).toBe('FORBIDDEN');
     expect(new AppError('Odd', 418).code).toBe('BAD_REQUEST');
     expect(new AppError('Explicit', 404, 'MAP_GONE').code).toBe('MAP_GONE');
+    expect(new AppError('Taken', 409).code).toBe('CONFLICT');
+    expect(new AppError('Slow down', 429).code).toBe('RATE_LIMITED');
+    // A 5xx AppError no longer claims to be a BAD_REQUEST
+    expect(new AppError('Socket server not available', 500).code).toBe('INTERNAL_ERROR');
+  });
+
+  it("answers multer errors as the uploader's fault, not a 500", () => {
+    const tooBig = Object.assign(new Error('File too large'), {
+      name: 'MulterError',
+      code: 'LIMIT_FILE_SIZE',
+    });
+    const res = mockRes();
+    errorHandler(tooBig, mockReq(), res, next);
+    expect(res.status).toHaveBeenCalledWith(413);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'File is too large',
+      code: 'PAYLOAD_TOO_LARGE',
+    });
+
+    const unexpected = Object.assign(new Error('Unexpected field'), {
+      name: 'MulterError',
+      code: 'LIMIT_UNEXPECTED_FILE',
+    });
+    const res2 = mockRes();
+    errorHandler(unexpected, mockReq(), res2, next);
+    expect(res2.status).toHaveBeenCalledWith(400);
+    expect(res2.json).toHaveBeenCalledWith({ error: 'Invalid upload', code: 'INVALID_UPLOAD' });
   });
 
   // ── Client-fault classification (audit ERRORHANDLER-4XX-1) ─────────────────────────────────

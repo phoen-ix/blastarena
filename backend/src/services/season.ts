@@ -1,3 +1,4 @@
+import type { RowDataPacket } from 'mysql2';
 import { query, execute, withTransaction } from '../db/connection';
 import { SeasonRow, CountRow } from '../db/types';
 import { Season } from '@blast-arena/shared';
@@ -9,8 +10,18 @@ function toSeason(row: SeasonRow): Season {
     name: row.name,
     startDate: row.start_date.toISOString().split('T')[0],
     endDate: row.end_date.toISOString().split('T')[0],
-    isActive: row.is_active,
+    isActive: !!row.is_active, // TINYINT(1): 0/1 from the driver
   };
+}
+
+function notFound(): AppError {
+  return new AppError('Season not found', 404, 'NOT_FOUND');
+}
+
+function assertDateRange(startDate: string, endDate: string): void {
+  if (new Date(endDate) <= new Date(startDate)) {
+    throw new AppError('End date must be after start date', 400, 'INVALID_DATE_RANGE');
+  }
 }
 
 export async function getActiveSeason(): Promise<Season | null> {
@@ -43,9 +54,7 @@ export async function createSeason(
   startDate: string,
   endDate: string,
 ): Promise<Season> {
-  if (new Date(endDate) <= new Date(startDate)) {
-    throw new AppError('End date must be after start date', 400, 'INVALID_DATE_RANGE');
-  }
+  assertDateRange(startDate, endDate);
 
   const result = await execute(
     'INSERT INTO seasons (name, start_date, end_date) VALUES (?, ?, ?)',
@@ -59,6 +68,14 @@ export async function updateSeason(
   id: number,
   updates: { name?: string; startDate?: string; endDate?: string },
 ): Promise<void> {
+  const existing = await query<SeasonRow[]>('SELECT * FROM seasons WHERE id = ?', [id]);
+  if (existing.length === 0) throw notFound();
+  // Either end can move on its own; check it against the stored other end (it wasn't checked)
+  if (updates.startDate !== undefined || updates.endDate !== undefined) {
+    const current = toSeason(existing[0]);
+    assertDateRange(updates.startDate ?? current.startDate, updates.endDate ?? current.endDate);
+  }
+
   const sets: string[] = [];
   const params: unknown[] = [];
 
@@ -81,11 +98,18 @@ export async function updateSeason(
 }
 
 export async function deleteSeason(id: number): Promise<void> {
-  await execute('DELETE FROM seasons WHERE id = ?', [id]);
+  const result = await execute('DELETE FROM seasons WHERE id = ?', [id]);
+  if (result.affectedRows === 0) throw notFound();
 }
 
 export async function activateSeason(id: number): Promise<void> {
   await withTransaction(async (conn) => {
+    // Checked before anything changes: an unknown id switched every season off and none on.
+    const [found] = await conn.execute<RowDataPacket[]>(
+      'SELECT id FROM seasons WHERE id = ? FOR UPDATE',
+      [id],
+    );
+    if (found.length === 0) throw notFound();
     // Deactivate all seasons
     await conn.execute('UPDATE seasons SET is_active = FALSE');
     // Activate target
@@ -101,6 +125,16 @@ export async function activateSeason(id: number): Promise<void> {
 
 export async function endSeason(id: number, resetMode: 'hard' | 'soft'): Promise<void> {
   await withTransaction(async (conn) => {
+    // Only the active season can end. Ending an unknown or already ended one used to reset every
+    // player's Elo all the same.
+    const [found] = await conn.execute<RowDataPacket[]>(
+      'SELECT is_active FROM seasons WHERE id = ? FOR UPDATE',
+      [id],
+    );
+    if (found.length === 0) throw notFound();
+    if (!found[0].is_active) {
+      throw new AppError('Only the active season can be ended', 409, 'SEASON_NOT_ACTIVE');
+    }
     await conn.execute('UPDATE seasons SET is_active = FALSE WHERE id = ?', [id]);
 
     if (resetMode === 'hard') {

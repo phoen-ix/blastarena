@@ -91,10 +91,15 @@ const BY_STATUS: Record<number, { code: string; error: string }> = {
   403: { code: 'FORBIDDEN', error: 'Forbidden' },
   404: { code: 'NOT_FOUND', error: 'Not found' },
   405: { code: 'METHOD_NOT_ALLOWED', error: 'Method not allowed' },
+  409: { code: 'CONFLICT', error: 'Conflict' },
   413: { code: 'PAYLOAD_TOO_LARGE', error: 'Request body is too large' },
   414: { code: 'URI_TOO_LONG', error: 'Request URI is too long' },
   415: { code: 'UNSUPPORTED_MEDIA_TYPE', error: 'Unsupported media type' },
+  429: { code: 'RATE_LIMITED', error: 'Too many requests' },
   431: { code: 'HEADERS_TOO_LARGE', error: 'Request headers are too large' },
+  // Server statuses: only an AppError's default code comes from these (clientFault is 4xx only)
+  500: { code: 'INTERNAL_ERROR', error: 'Internal server error' },
+  503: { code: 'SERVICE_UNAVAILABLE', error: 'Service unavailable' },
 };
 
 /**
@@ -156,6 +161,19 @@ export function errorHandler(err: unknown, req: Request, res: Response, next: Ne
     res.status(err.statusCode).json({
       error: err.message,
       code: err.code,
+    });
+    return;
+  }
+
+  // multer's own errors (file over the size limit, unexpected field, …) carry no HTTP status and
+  // used to end as a 500. They are the uploader's mistake.
+  const upload = err as { name?: unknown; code?: unknown };
+  if (upload?.name === 'MulterError' && typeof upload.code === 'string') {
+    const tooLarge = upload.code === 'LIMIT_FILE_SIZE';
+    logger.debug({ code: upload.code, path: req.path, method: req.method }, 'Upload rejected');
+    res.status(tooLarge ? 413 : 400).json({
+      error: tooLarge ? 'File is too large' : 'Invalid upload',
+      code: tooLarge ? 'PAYLOAD_TOO_LARGE' : 'INVALID_UPLOAD',
     });
     return;
   }

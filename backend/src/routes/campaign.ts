@@ -668,12 +668,10 @@ router.post(
       let levelData: LevelImportData;
       let bundledEnemyTypes: BundledEnemyType[] | undefined;
 
-      if (
-        req.body.level?._format === 'blast-arena-level-bundle' ||
-        req.body._format === 'blast-arena-level-bundle'
-      ) {
-        // Bundle format posted at top level
-        const bundle = req.body._format === 'blast-arena-level-bundle' ? req.body : req.body.level;
+      if (req.body.level?._format === 'blast-arena-level-bundle') {
+        // Bundle wrapped in `level`. A bundle posted at the top level loses its `_format` to
+        // validation and is handled by the last branch, which reads the same two fields.
+        const bundle = req.body.level;
         levelData = bundle.level;
         bundledEnemyTypes = bundle.enemyTypes;
       } else if (req.body.level?._format === 'blast-arena-level') {
@@ -852,7 +850,13 @@ router.post(
           }
           config.enemyAiId = result.entry.id;
         } else if (enemyAiAction.startsWith('use-existing:')) {
-          config.enemyAiId = enemyAiAction.replace('use-existing:', '');
+          // Checked: an unknown id was stored as is, pointing the enemy type at nothing
+          const aiId = enemyAiAction.replace('use-existing:', '');
+          if (!(await enemyaiService.getEnemyAI(aiId))) {
+            res.status(400).json({ error: 'Enemy AI not found', code: 'AI_NOT_FOUND' });
+            return;
+          }
+          config.enemyAiId = aiId;
         } else {
           // skip - clear the AI reference
           delete config.enemyAiId;

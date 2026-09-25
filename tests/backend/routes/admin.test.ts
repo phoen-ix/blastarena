@@ -1287,6 +1287,7 @@ describe('DELETE /admin/matches/:id', () => {
   const handler = getHandler('delete', '/admin/matches/:id');
 
   it('deletes match, replay, and logs action', async () => {
+    mockQuery.mockResolvedValueOnce([{ id: 10 }]); // the match exists
     mockDeleteReplay.mockReturnValue(true);
     mockExecute.mockResolvedValue({ affectedRows: 1 });
     const req = mockReq({ params: { id: '10' } });
@@ -1302,6 +1303,7 @@ describe('DELETE /admin/matches/:id', () => {
   });
 
   it('still succeeds even if replay does not exist', async () => {
+    mockQuery.mockResolvedValueOnce([{ id: 10 }]);
     mockDeleteReplay.mockReturnValue(false);
     mockExecute.mockResolvedValue({ affectedRows: 1 });
     const req = mockReq({ params: { id: '10' } });
@@ -1310,12 +1312,23 @@ describe('DELETE /admin/matches/:id', () => {
     expect(res._json).toEqual({ message: 'Match deleted' });
   });
 
+  it('answers 404 for an unknown match, deleting and logging nothing', async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    const req = mockReq({ params: { id: '404' } });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+    expect(res._status).toBe(404);
+    expect(mockDeleteReplay).not.toHaveBeenCalled();
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
+
   it('has adminOnlyMiddleware in route stack', () => {
     expect(hasAdminOnly('delete', '/admin/matches/:id')).toBe(true);
   });
 
   it('passes error to next() on failure', async () => {
     const err = new Error('DB error');
+    mockQuery.mockResolvedValueOnce([{ id: 10 }]);
     mockDeleteReplay.mockReturnValue(true);
     mockExecute.mockRejectedValue(err);
     const req = mockReq({ params: { id: '10' } });

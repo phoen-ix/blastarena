@@ -243,6 +243,7 @@ describe('admin service', () => {
 
   describe('changeUserRole', () => {
     it('updates role and logs audit action', async () => {
+      mockQuery.mockResolvedValueOnce([{ id: 5 }]); // the user exists
       mockExecute.mockResolvedValueOnce({}); // UPDATE users
       mockExecute.mockResolvedValueOnce({}); // INSERT admin_actions
 
@@ -251,6 +252,12 @@ describe('admin service', () => {
       expect(mockExecute).toHaveBeenCalledTimes(2);
       expect(mockExecute.mock.calls[0][1]).toEqual(['moderator', 5]);
       expect(mockExecute.mock.calls[1][1]).toEqual([1, 'role_change', 'user', 5, 'moderator']);
+    });
+
+    it('answers 404 for an unknown user, changing and logging nothing', async () => {
+      mockQuery.mockResolvedValueOnce([]);
+      await expect(changeUserRole(1, 99, 'moderator')).rejects.toMatchObject({ statusCode: 404 });
+      expect(mockExecute).not.toHaveBeenCalled();
     });
 
     it('throws 400 SELF_ACTION when admin tries to change own role', async () => {
@@ -270,6 +277,7 @@ describe('admin service', () => {
 
   describe('deactivateUser', () => {
     it('deactivates a user, revokes tokens, and logs audit action', async () => {
+      mockQuery.mockResolvedValueOnce([{ id: 5 }]); // the user exists
       mockExecute.mockResolvedValueOnce({}); // UPDATE users
       mockExecute.mockResolvedValueOnce({}); // INSERT admin_actions
       mockExecute.mockResolvedValueOnce({}); // UPDATE refresh_tokens
@@ -287,6 +295,7 @@ describe('admin service', () => {
     });
 
     it('reactivates a user without revoking tokens', async () => {
+      mockQuery.mockResolvedValueOnce([{ id: 5 }]); // the user exists
       mockExecute.mockResolvedValueOnce({}); // UPDATE users
       mockExecute.mockResolvedValueOnce({}); // INSERT admin_actions
 
@@ -298,6 +307,12 @@ describe('admin service', () => {
       expect(mockExecute.mock.calls[0][1][1]).toBeNull();
       // Verify audit action is 'reactivate'
       expect(mockExecute.mock.calls[1][1][1]).toBe('reactivate');
+    });
+
+    it('answers 404 for an unknown user, changing and logging nothing', async () => {
+      mockQuery.mockResolvedValueOnce([]);
+      await expect(deactivateUser(1, 99, true)).rejects.toMatchObject({ statusCode: 404 });
+      expect(mockExecute).not.toHaveBeenCalled();
     });
 
     it('throws 400 SELF_ACTION when admin tries to deactivate self', async () => {

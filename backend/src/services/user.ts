@@ -47,7 +47,8 @@ export async function getUserProfile(userId: number) {
     username: row.username,
     emailHint: row.email_hint,
     role: row.role,
-    emailVerified: row.email_verified,
+    // TINYINT(1) columns arrive as 0/1; the API promises booleans
+    emailVerified: !!row.email_verified,
     twoFactorEnabled: !!row.totp_enabled,
     pendingEmailHint: row.pending_email_hint || null,
     createdAt: row.created_at,
@@ -66,8 +67,8 @@ export async function getUserProfile(userId: number) {
       totalXp: row.total_xp || 0,
       level: row.level || 1,
     },
-    isProfilePublic: row.is_profile_public ?? true,
-    acceptFriendRequests: row.accept_friend_requests ?? true,
+    isProfilePublic: !!(row.is_profile_public ?? true),
+    acceptFriendRequests: !!(row.accept_friend_requests ?? true),
   };
 }
 

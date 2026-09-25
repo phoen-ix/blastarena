@@ -17,7 +17,7 @@ function toCosmetic(row: CosmeticRow): Cosmetic {
         ? JSON.parse(row.unlock_requirement)
         : row.unlock_requirement
       : null,
-    isActive: row.is_active,
+    isActive: !!row.is_active, // TINYINT(1): 0/1 from the driver
     sortOrder: row.sort_order,
   };
 }
@@ -141,7 +141,7 @@ export async function getUserCosmetics(userId: number): Promise<Cosmetic[]> {
         ? JSON.parse(r.unlock_requirement)
         : r.unlock_requirement
       : null,
-    isActive: r.is_active!,
+    isActive: !!r.is_active,
     sortOrder: r.sort_order!,
   }));
 }

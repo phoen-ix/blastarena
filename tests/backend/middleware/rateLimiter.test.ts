@@ -66,6 +66,25 @@ describe('rateLimiter middleware', () => {
       expect(next).toHaveBeenCalled();
     });
 
+    it('shares one budget across the ids of a parameterised route', async () => {
+      // Keyed by req.path, /replays/1 and /replays/2 each had a budget of their own
+      mockEval.mockResolvedValue(1);
+      const middleware = rateLimiter(config);
+      for (const id of ['1', '2']) {
+        const req = mockReq({
+          path: `/admin/replays/${id}`,
+          baseUrl: '/api',
+          route: { path: '/admin/replays/:matchId' },
+        } as unknown as Partial<Request>);
+        await middleware(req, mockRes(), jest.fn() as unknown as NextFunction);
+      }
+      const keys = mockEval.mock.calls.map((c) => c[2]);
+      expect(keys).toEqual([
+        'ratelimit:127.0.0.1:/api/admin/replays/:matchId',
+        'ratelimit:127.0.0.1:/api/admin/replays/:matchId',
+      ]);
+    });
+
     it('allows requests within limit', async () => {
       mockEval.mockResolvedValue(3);
 

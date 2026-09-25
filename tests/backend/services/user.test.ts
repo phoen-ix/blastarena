@@ -80,6 +80,29 @@ describe('user service', () => {
   // ── getUserProfile ──────────────────────────────────────────────────
 
   describe('getUserProfile', () => {
+    it('sends real booleans for the 0/1 TINYINT columns', async () => {
+      // The driver returns 0/1; the profile promised booleans and sent the numbers
+      mockQuery.mockResolvedValueOnce([
+        {
+          id: 1,
+          username: 'bob',
+          email_hint: 'b***@e***.com',
+          role: 'user',
+          email_verified: 1,
+          pending_email_hint: null,
+          created_at: new Date('2025-01-01'),
+          is_profile_public: 0,
+          accept_friend_requests: 1,
+          totp_enabled: 0,
+        },
+      ]);
+      const profile = await getUserProfile(1);
+      expect(profile.emailVerified).toBe(true);
+      expect(profile.isProfilePublic).toBe(false);
+      expect(profile.acceptFriendRequests).toBe(true);
+      expect(profile.twoFactorEnabled).toBe(false);
+    });
+
     it('returns formatted profile with stats', async () => {
       const row = {
         id: 1,

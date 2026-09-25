@@ -35,6 +35,7 @@ import {
   OPENWORLD_MAX_PLAYERS_CAP,
 } from '@blast-arena/shared';
 import multer from 'multer';
+import { AppError } from '../middleware/errorHandler';
 import { scrubEmailError } from '../utils/crypto';
 
 const router = Router();
@@ -1114,7 +1115,13 @@ router.get('/admin/matches/:id', async (req, res, next) => {
 router.delete('/admin/matches/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const matchId = parseInt(req.params.id);
-    if (isNaN(matchId)) return res.status(400).json({ error: 'Invalid match ID' });
+    if (isNaN(matchId))
+      return res.status(400).json({ error: 'Invalid match ID', code: 'INVALID_ID' });
+    // Checked first: an unknown id answered 200 and wrote an audit entry
+    const found = await query<IdRow[]>('SELECT id FROM matches WHERE id = ?', [matchId]);
+    if (found.length === 0) {
+      return res.status(404).json({ error: 'Match not found', code: 'NOT_FOUND' });
+    }
     // Delete replay file if it exists
     await replayService.deleteReplay(matchId);
     // Delete match record (cascades to match_players)
@@ -1350,6 +1357,8 @@ const simulationConfigSchema = z.object({
   mapHeight: z.number().int().min(11).max(61),
   roundTime: z.number().int().min(30).max(600),
   wallDensity: z.number().min(0).max(1),
+  // All 9 types, as in the simulation defaults: bomb_throw was missing here, so saved defaults
+  // that included it made every simulation start fail validation.
   enabledPowerUps: z.array(
     z.enum([
       'bomb_up',
@@ -1360,6 +1369,7 @@ const simulationConfigSchema = z.object({
       'pierce_bomb',
       'remote_bomb',
       'line_bomb',
+      'bomb_throw',
     ]),
   ),
   powerUpDropRate: z.number().min(0).max(1),
@@ -1470,7 +1480,8 @@ const aiUpload = multer({
   limits: { fileSize: 500 * 1024 }, // 500KB
   fileFilter: (_req, file, cb) => {
     if (!file.originalname.endsWith('.ts')) {
-      cb(new Error('Only TypeScript (.ts) files are accepted'));
+      // An AppError: a plain Error from here answered 500
+      cb(new AppError('Only TypeScript (.ts) files are accepted', 400, 'INVALID_FILE_TYPE'));
       return;
     }
     cb(null, true);
@@ -1593,7 +1604,8 @@ const enemyAiUpload = multer({
   limits: { fileSize: 500 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (!file.originalname.endsWith('.ts')) {
-      cb(new Error('Only TypeScript (.ts) files are accepted'));
+      // An AppError: a plain Error from here answered 500
+      cb(new AppError('Only TypeScript (.ts) files are accepted', 400, 'INVALID_FILE_TYPE'));
       return;
     }
     cb(null, true);
@@ -1950,6 +1962,10 @@ router.put(
       const id = parseInt(req.params.id);
       if (Number.isNaN(id))
         return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
+      // An unknown id used to answer 200 with `null` (and write an audit entry)
+      if (!(await achievementsService.getAchievementById(id))) {
+        return res.status(404).json({ error: 'Achievement not found', code: 'NOT_FOUND' });
+      }
       await achievementsService.updateAchievement(id, req.body);
       await logAdminAction(
         req.user!.userId,
@@ -2000,7 +2016,8 @@ const cosmeticSchema = z.object({
   type: z.enum(['color', 'eyes', 'trail', 'bomb_skin']),
   config: z.record(z.unknown()),
   rarity: z.enum(['common', 'rare', 'epic', 'legendary']).optional(),
-  unlockType: z.enum(['achievement', 'campaign_stars', 'default']).optional(),
+  // level_milestone was missing: those cosmetics could only arrive by import
+  unlockType: z.enum(['achievement', 'campaign_stars', 'level_milestone', 'default']).optional(),
   unlockRequirement: z.record(z.unknown()).nullable().optional(),
   sortOrder: z.number().int().optional(),
 });
@@ -2039,6 +2056,10 @@ router.put(
       const id = parseInt(req.params.id);
       if (Number.isNaN(id))
         return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
+      // An unknown id used to answer 200 with `null` (and write an audit entry)
+      if (!(await cosmeticsService.getCosmeticById(id))) {
+        return res.status(404).json({ error: 'Cosmetic not found', code: 'NOT_FOUND' });
+      }
       await cosmeticsService.updateCosmetic(id, req.body);
       await logAdminAction(req.user!.userId, 'cosmetic_update', 'cosmetic', id, 'Updated cosmetic');
       const cosmetic = await cosmeticsService.getCosmeticById(id);

@@ -37,7 +37,11 @@ export function rateLimiter(config: RateLimitConfig) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const redis = getRedis();
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const key = `ratelimit:${ip}:${req.path}`;
+    // Keyed by the matched route pattern, not the URL: with req.path every id on a route such as
+    // /admin/replays/:matchId had its own budget, which undid the limit on those disk reads.
+    const route: unknown = req.route?.path;
+    const scope = typeof route === 'string' ? `${req.baseUrl ?? ''}${route}` : req.path;
+    const key = `ratelimit:${ip}:${scope}`;
     const windowSeconds = Math.ceil(config.windowMs / 1000);
 
     try {

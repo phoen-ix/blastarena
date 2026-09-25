@@ -241,6 +241,21 @@ describe('PUT /admin/achievements/:id (audit B9)', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('answers 404 for an unknown id without updating or logging', async () => {
+    // It answered 200 with `null`
+    const svc = jest.requireMock<{ getAchievementById: jest.Mock<AnyFn> }>(
+      '../../../backend/src/services/achievements',
+    );
+    svc.getAchievementById.mockResolvedValueOnce(null);
+    const { res } = await run('put', '/admin/achievements/:id', {
+      params: { id: '404' },
+      body: { sortOrder: 1 },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.body).toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockUpdateAchievement).not.toHaveBeenCalled();
+  });
+
   it('returns 400 INVALID_ID for a non-numeric id (PUT and DELETE)', async () => {
     const put = await run('put', '/admin/achievements/:id', { params: { id: 'q' }, body: {} });
     expect(put.res.statusCode).toBe(400);
@@ -261,11 +276,38 @@ describe('PUT /admin/cosmetics/:id (audit B9)', () => {
     expect(mockUpdateCosmetic).toHaveBeenCalledWith(4, { rarity: 'epic', isActive: true });
   });
 
+  it('accepts the level_milestone unlock type', async () => {
+    // Missing from the schema (and the admin form), so editing such a cosmetic flipped it to
+    // an achievement unlock
+    const { res } = await run('put', '/admin/cosmetics/:id', {
+      params: { id: '4' },
+      body: { unlockType: 'level_milestone', unlockRequirement: { level: 10 } },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mockUpdateCosmetic).toHaveBeenCalledWith(4, {
+      unlockType: 'level_milestone',
+      unlockRequirement: { level: 10 },
+    });
+  });
+
   it('rejects an invalid type / rarity / unlockType', async () => {
     for (const body of [{ type: 'hat' }, { rarity: 'mythic' }, { unlockType: 'purchase' }]) {
       const { res } = await run('put', '/admin/cosmetics/:id', { params: { id: '4' }, body });
       expect(res.statusCode).toBe(400);
     }
+    expect(mockUpdateCosmetic).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 for an unknown id without updating or logging', async () => {
+    const svc = jest.requireMock<{ getCosmeticById: jest.Mock<AnyFn> }>(
+      '../../../backend/src/services/cosmetics',
+    );
+    svc.getCosmeticById.mockResolvedValueOnce(null);
+    const { res } = await run('put', '/admin/cosmetics/:id', {
+      params: { id: '404' },
+      body: { rarity: 'epic' },
+    });
+    expect(res.statusCode).toBe(404);
     expect(mockUpdateCosmetic).not.toHaveBeenCalled();
   });
 

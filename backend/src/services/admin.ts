@@ -123,6 +123,12 @@ export async function listUsers(page: number = 1, limit: number = 20, search?: s
   return { users: rows, total, page, limit };
 }
 
+/** Role changes and (de)activation used to accept an unknown id: 200, and an audit entry. */
+async function assertUserExists(userId: number): Promise<void> {
+  const rows = await query<IdRow[]>('SELECT id FROM users WHERE id = ?', [userId]);
+  if (rows.length === 0) throw new AppError('User not found', 404, 'NOT_FOUND');
+}
+
 export async function changeUserRole(
   adminId: number,
   userId: number,
@@ -131,6 +137,7 @@ export async function changeUserRole(
   if (adminId === userId) {
     throw new AppError('Cannot change your own role', 400, 'SELF_ACTION');
   }
+  await assertUserExists(userId);
 
   await execute('UPDATE users SET role = ? WHERE id = ?', [role, userId]);
 
@@ -145,6 +152,7 @@ export async function deactivateUser(
   if (adminId === userId) {
     throw new AppError('Cannot deactivate yourself', 400, 'SELF_ACTION');
   }
+  await assertUserExists(userId);
 
   await execute('UPDATE users SET is_deactivated = ?, deactivated_at = ? WHERE id = ?', [
     deactivated,

@@ -28,7 +28,7 @@ function toAchievement(row: AchievementRow): Achievement {
         : row.condition_config,
     rewardType: row.reward_type as AchievementRewardType,
     rewardId: row.reward_id,
-    isActive: row.is_active,
+    isActive: !!row.is_active, // TINYINT(1): 0/1 from the driver
     sortOrder: row.sort_order,
   };
 }
@@ -185,7 +185,7 @@ export async function getUserAchievementsPublic(userId: number): Promise<UserAch
           : r.condition_config,
       rewardType: r.reward_type as AchievementRewardType,
       rewardId: r.reward_id ?? null,
-      isActive: r.is_active!,
+      isActive: !!r.is_active,
       sortOrder: r.sort_order!,
     },
     unlockedAt: r.unlocked_at!.toISOString(),

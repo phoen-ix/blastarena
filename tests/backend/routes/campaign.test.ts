@@ -58,6 +58,14 @@ jest.mock('../../../backend/src/services/enemy-type', () => ({
 // Campaign progress service mocks
 const mockGetUserState = jest.fn<AnyFn>();
 
+const mockGetEnemyAI = jest.fn<AnyFn>();
+jest.mock('../../../backend/src/services/enemyai', () => ({
+  getEnemyAI: mockGetEnemyAI,
+  getEnemyAIByName: jest.fn(),
+  uploadEnemyAIFromSource: jest.fn(),
+  downloadEnemyAISource: jest.fn(),
+}));
+
 jest.mock('../../../backend/src/services/campaign-progress', () => ({
   getUserState: mockGetUserState,
 }));
@@ -2035,6 +2043,46 @@ describe('POST /admin/campaign/enemy-types/import', () => {
     expect(mockCreateEnemyType).toHaveBeenCalledWith(et.name, et.description, et.config, 1);
     expect(res._status).toBe(201);
     expect(res._json).toEqual({ id: 50 });
+  });
+
+  it('refuses a use-existing reference to an AI that does not exist', async () => {
+    // The id was stored as is, pointing the enemy type at nothing
+    mockGetEnemyAI.mockResolvedValue(null);
+    const req = mockReq({
+      user: { userId: 1 },
+      body: {
+        name: 'X',
+        config: { speed: 1, enemyAiId: 'old-id' },
+        enemyAiSource: 'export class A {}',
+        enemyAiAction: 'use-existing:missing-id',
+      },
+    });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+
+    expect(mockGetEnemyAI).toHaveBeenCalledWith('missing-id');
+    expect(res._status).toBe(400);
+    expect(res._json).toMatchObject({ code: 'AI_NOT_FOUND' });
+    expect(mockCreateEnemyType).not.toHaveBeenCalled();
+  });
+
+  it('keeps a use-existing reference to an AI that exists', async () => {
+    mockGetEnemyAI.mockResolvedValue({ id: 'ai-7' });
+    mockCreateEnemyType.mockResolvedValue(52);
+    const req = mockReq({
+      user: { userId: 1 },
+      body: {
+        name: 'X',
+        config: { speed: 1, enemyAiId: 'old-id' },
+        enemyAiSource: 'export class A {}',
+        enemyAiAction: 'use-existing:ai-7',
+      },
+    });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+
+    expect(mockCreateEnemyType).toHaveBeenCalledWith('X', '', { speed: 1, enemyAiId: 'ai-7' }, 1);
+    expect(res._status).toBe(201);
   });
 
   it('uses empty string for missing description', async () => {

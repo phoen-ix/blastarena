@@ -72,7 +72,14 @@ const COSMETIC_TYPES: CosmeticType[] = ['color', 'eyes', 'trail', 'bomb_skin'];
 
 const RARITY_OPTIONS: CosmeticRarity[] = ['common', 'rare', 'epic', 'legendary'];
 
-const UNLOCK_TYPES: CosmeticUnlockType[] = ['achievement', 'campaign_stars', 'default'];
+// All four types. Without level_milestone the select fell back to its first option when a
+// level-milestone cosmetic was edited, and saving turned it into an achievement unlock.
+const UNLOCK_TYPES: CosmeticUnlockType[] = [
+  'achievement',
+  'campaign_stars',
+  'level_milestone',
+  'default',
+];
 
 const RARITY_COLORS: Record<CosmeticRarity, string> = {
   common: 'var(--text-dim)',
