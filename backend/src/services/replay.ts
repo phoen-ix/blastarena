@@ -155,6 +155,11 @@ interface ReplayIndex {
 
 let replayIndex: ReplayIndex | null = null;
 
+/** Drop the cached directory index; the recorder calls this after writing a new replay. */
+export function invalidateReplayIndex(): void {
+  replayIndex = null;
+}
+
 async function getReplayIndex(): Promise<ReplayIndex> {
   const now = Date.now();
   if (replayIndex && now - replayIndex.builtAt < REPLAY_INDEX_TTL_MS) return replayIndex;

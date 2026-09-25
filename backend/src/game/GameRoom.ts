@@ -69,6 +69,7 @@ export class GameRoom {
    */
   private departedHumans: Set<number> = new Set();
   private onBotsOnly: (() => void) | null = null;
+  private onFinished: (() => void) | null = null;
 
   constructor(io: TypedServer, room: Room, customMap?: GameConfig['customMap']) {
     this.code = room.code;
@@ -452,6 +453,7 @@ export class GameRoom {
     } catch (err) {
       logger.error({ err, code: this.code }, 'Failed to mark room finished');
     }
+    this.onFinished?.();
     logger.info({ code: this.code, winnerId: this.gameState.winnerId }, 'Game over');
   }
 
@@ -742,5 +744,10 @@ export class GameRoom {
 
   setBotsOnlyCallback(cb: () => void): void {
     this.onBotsOnly = cb;
+  }
+
+  /** Runs once the match is over and persisted (e.g. to reset the players' presence). */
+  setFinishedCallback(cb: () => void): void {
+    this.onFinished = cb;
   }
 }

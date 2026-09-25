@@ -56,6 +56,7 @@ import {
   sanitizeGuestUsername,
 } from './utils/socketValidation';
 import { query } from './db/connection';
+import { AppError } from './middleware/errorHandler';
 import { UserRow } from './db/types';
 import { verifyLocalCoopSocketToken } from './services/auth';
 import { openWorldManager } from './game/OpenWorldManager';
@@ -291,12 +292,58 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     });
   }
 
+  /**
+   * The user's other connected sockets (other tabs). Room, party and presence state belong to the
+   * account, but a disconnect is per socket: closing a second tab used to leave the room the first
+   * tab was sitting in, kill its player 10 s into the grace period, drop the party and mark the
+   * user offline. Single node, so the local adapter is authoritative.
+   */
+  function otherSocketsOf(userId: number, exceptSocketId: string) {
+    const result: (typeof io.sockets.sockets extends Map<string, infer S> ? S : never)[] = [];
+    const ids = io.sockets.adapter.rooms.get(`user:${userId}`);
+    if (!ids) return result;
+    for (const id of ids) {
+      if (id === exceptSocketId) continue;
+      const other = io.sockets.sockets.get(id);
+      if (other) result.push(other);
+    }
+    return result;
+  }
+
+  /**
+   * Publish where users are: presence in Redis plus a live update to their online friends. A
+   * waiting room's code rides along so friends can join it; matches and campaign levels used to set
+   * in_game/in_campaign and never reset it, so friends saw "in game" for the rest of the session.
+   */
+  function publishPresence(
+    userIds: number[],
+    status: 'in_lobby' | 'in_game' | 'in_campaign',
+    extra: { roomCode?: string; gameMode?: string } = {},
+  ): void {
+    const real = userIds.filter((id) => id > 0);
+    if (real.length === 0) return;
+    presenceService
+      .setPresenceBatch(real.map((userId) => ({ userId, status, extra })))
+      .catch((err) => {
+        logger.warn({ err: getErrorMessage(err) }, 'Presence update failed');
+      });
+    const joinable = status === 'in_lobby' ? extra.roomCode : undefined;
+    for (const userId of real) notifyFriendsOnline(io, userId, status, joinable);
+  }
+
   /** Clean up stale room membership (e.g. player refreshed during a game) */
   async function cleanupStaleRoom(
     socket: Parameters<Parameters<typeof io.on<'connection'>>[1]>[0],
   ): Promise<void> {
     const existingRoom = await lobbyService.getPlayerRoom(socket.data.userId);
     if (!existingRoom) return;
+    if (
+      otherSocketsOf(socket.data.userId, socket.id).some(
+        (s) => s.data.activeRoomCode === existingRoom,
+      )
+    ) {
+      throw new AppError('You are already in a room in another tab', 409, 'IN_ROOM_ELSEWHERE');
+    }
 
     const existingGameRoom = roomManager.getRoom(existingRoom);
     if (existingGameRoom && existingGameRoom.isRunning()) {
@@ -428,11 +475,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       // Join user-specific room for friend/party notifications
       socket.join(`user:${socket.data.userId}`);
 
-      // Set online presence and notify friends
-      presenceService.setPresence(socket.data.userId, 'in_lobby').catch((err) => {
-        logger.warn({ err: getErrorMessage(err) }, 'Presence update failed');
-      });
-      notifyFriendsOnline(io, socket.data.userId, 'in_lobby');
+      // Set online presence and notify friends — for the first tab only; a second tab must not
+      // overwrite "in game" with "in lobby".
+      if (otherSocketsOf(socket.data.userId, socket.id).length === 0) {
+        publishPresence([socket.data.userId], 'in_lobby');
+      }
 
       // Setup friend and party handlers. Nothing may await ahead of this — see restoreSession.
       setupFriendHandlers(socket, io);
@@ -481,6 +528,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         socket.data.activeRoomCode = room.code;
         callback({ success: true, room });
         broadcastRoomList();
+        publishPresence([socket.data.userId], 'in_lobby', { roomCode: room.code });
 
         // Party follows leader into room
         if (socket.data.activePartyId) {
@@ -514,6 +562,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           .emit('room:playerJoined', { user: currentUser, ready: false, team: null });
         callback({ success: true, room });
         broadcastRoomList();
+        publishPresence([socket.data.userId], 'in_lobby', { roomCode: room.code });
 
         // Party follows leader into room
         if (socket.data.activePartyId) {
@@ -546,6 +595,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           io.to(`room:${roomCode}`).emit('room:playerLeft', socket.data.userId);
           io.to(`room:${roomCode}`).emit('room:state', room);
         }
+        publishPresence([socket.data.userId], 'in_lobby');
 
         // Clean up rematch votes for the leaving player
         for (const [code, voteState] of rematchVotes) {
@@ -675,21 +725,23 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         logger.info({ roomCode, players: room.players.length }, 'Game started');
         broadcastRoomList();
 
-        // Update presence for all players in the room to 'in_game' (batched)
-        presenceService
-          .setPresenceBatch(
-            room.players.map((player) => ({
-              userId: player.user.id,
-              status: 'in_game' as const,
-              extra: { roomCode, gameMode: room.config.gameMode },
-            })),
-          )
-          .catch((err) => {
-            logger.warn({ err: getErrorMessage(err) }, 'Presence batch update failed');
-          });
-        for (const player of room.players) {
-          notifyFriendsOnline(io, player.user.id, 'in_game');
-        }
+        const playerIds = room.players.map((player) => player.user.id);
+        publishPresence(playerIds, 'in_game', { roomCode, gameMode: room.config.gameMode });
+        // Back in the (finished) room when the match ends — not "in game" for the whole session.
+        // Only players still in the room: anyone who left may be in a campaign by now.
+        gameRoom.setFinishedCallback(() => {
+          lobbyService
+            .getRoom(roomCode)
+            .then((current) =>
+              publishPresence(
+                (current?.players ?? []).map((p) => p.user.id),
+                'in_lobby',
+              ),
+            )
+            .catch((err) => {
+              logger.warn({ err: getErrorMessage(err), roomCode }, 'Post-match presence failed');
+            });
+        });
       } catch (err) {
         logger.error({ err, roomCode }, 'Failed to start game');
         io.to(`room:${roomCode}`).emit('error', { message: 'Failed to start game' });
@@ -748,6 +800,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
         callback({ success: true, room });
         broadcastRoomList();
+        publishPresence(
+          room.players.map((p) => p.user.id),
+          'in_lobby',
+          { roomCode },
+        );
       } catch (err: unknown) {
         callback({ success: false, error: clientError(err) });
       }
@@ -824,6 +881,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           io.to(`room:${roomCode}`).emit('rematch:triggered');
           io.to(`room:${roomCode}`).emit('room:state', room);
           broadcastRoomList();
+          publishPresence(
+            room.players.map((p) => p.user.id),
+            'in_lobby',
+            { roomCode },
+          );
         }
       } catch (err: unknown) {
         callback({ success: false, error: clientError(err) });
@@ -1141,31 +1203,55 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         { admin: socket.data.username, roomCode: parsed.roomCode },
         'Admin spectating room',
       );
-      callback({ success: true });
+      // The current state, so the client can open a spectator view (joining the socket room alone
+      // showed nothing while streaming 20 Hz state into the admin's lobby).
+      callback({ success: true, state: gameRoom.getFullState() });
     });
 
-    // Admin: send message to room
-    socket.on('admin:roomMessage', (data) => {
-      if (!adminRoomLimiter.isAllowed(socket.id)) return; // audit B16
+    socket.on('admin:unspectate', (data) => {
+      if (!adminRoomLimiter.isAllowed(socket.id)) return;
       if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') return;
-      if (typeof data.roomCode !== 'string' || !data.roomCode) return;
+      const parsed = validateSocket(adminSpectateSchema, data);
+      if (!parsed) return;
+      // Never pull a player out of their own room.
+      if (socket.data.activeRoomCode === parsed.roomCode) return;
+      socket.leave(`room:${parsed.roomCode}`);
+    });
 
-      // Verify admin has joined (is spectating) this room
-      if (!socket.rooms.has(`room:${data.roomCode}`)) return;
-
-      // Validate and sanitize message
-      if (typeof data.message !== 'string' || !data.message.trim()) return;
+    // Admin: send message to room — any existing room, waiting or running. It used to require the
+    // admin's socket to be in the room, which only Spectate (running games only) achieved, and it
+    // gave no answer, so the admin UI reported success either way.
+    socket.on('admin:roomMessage', async (data, callback) => {
+      const ack = typeof callback === 'function' ? callback : () => {};
+      if (!adminRoomLimiter.isAllowed(socket.id))
+        return ack({ success: false, error: 'Rate limited' }); // audit B16
+      if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') {
+        return ack({ success: false, error: 'Insufficient permissions' });
+      }
+      const parsed = validateSocket(adminSpectateSchema, { roomCode: data?.roomCode });
+      if (!parsed) return ack({ success: false, error: 'Invalid room code' });
+      if (typeof data.message !== 'string' || !data.message.trim()) {
+        return ack({ success: false, error: 'Message cannot be empty' });
+      }
       const sanitizedMessage = data.message.trim().substring(0, 500);
 
-      io.to(`room:${data.roomCode}`).emit('admin:roomMessage', {
-        message: sanitizedMessage,
-        from: socket.data.username,
-      });
+      try {
+        const exists =
+          !!roomManager.getRoom(parsed.roomCode) || !!(await lobbyService.getRoom(parsed.roomCode));
+        if (!exists) return ack({ success: false, error: 'Room not found' });
 
-      logger.info(
-        { admin: socket.data.username, roomCode: data.roomCode },
-        'Admin sent room message',
-      );
+        io.to(`room:${parsed.roomCode}`).emit('admin:roomMessage', {
+          message: sanitizedMessage,
+          from: socket.data.username,
+        });
+        logger.info(
+          { admin: socket.data.username, roomCode: parsed.roomCode },
+          'Admin sent room message',
+        );
+        ack({ success: true });
+      } catch (err: unknown) {
+        ack({ success: false, error: clientError(err) });
+      }
     });
 
     // Simulation: start batch
@@ -1526,6 +1612,10 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
               socket.data.activeCampaignSession = undefined;
               socket.leave(campaignRoom);
               campaignManager.endSession(game.sessionId);
+              publishPresence(
+                userIds.filter((uid) => !game.hasDeparted(uid)),
+                'in_lobby',
+              );
             },
             onGameOver: (reason) => {
               emitToCampaign('campaign:gameOver', { levelId: level.id, reason });
@@ -1555,6 +1645,10 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
               socket.data.activeCampaignSession = undefined;
               socket.leave(campaignRoom);
               campaignManager.endSession(game.sessionId);
+              publishPresence(
+                userIds.filter((uid) => !game.hasDeparted(uid)),
+                'in_lobby',
+              );
             },
           },
           carriedPowerups,
@@ -1655,18 +1749,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           }
         }
 
-        // Update presence for all real players (batched)
-        const realUserIds = userIds.filter((uid) => uid > 0);
-        presenceService
-          .setPresenceBatch(
-            realUserIds.map((uid) => ({ userId: uid, status: 'in_campaign' as const })),
-          )
-          .catch((err) => {
-            logger.warn({ err: getErrorMessage(err) }, 'Presence batch update failed');
-          });
-        for (const uid of realUserIds) {
-          notifyFriendsOnline(io, uid, 'in_campaign');
-        }
+        publishPresence(userIds, 'in_campaign');
 
         // Build initial state
         const campaignState: CampaignGameState = {
@@ -1777,6 +1860,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       }
 
       socket.data.activeCampaignSession = undefined;
+      publishPresence([socket.data.userId], 'in_lobby');
     });
 
     // Buddy mode input — routed through campaign:input with playerId (same as local co-op)
@@ -1871,7 +1955,6 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         cleanupPartyLimiters(socket.id);
         cleanupLobbyLimiters(socket.id);
         cleanupDMLimiters(socket.id);
-        emoteLastUsed.delete(socket.data.userId);
         spectatorChatLimiter.remove(socket.id);
         spectatorActionLimiter.remove(socket.id);
         guestRejectLogLimiter.remove(socket.id);
@@ -1886,8 +1969,20 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         const disconnectRoomCode = socket.data.activeRoomCode;
         socket.data.activeRoomCode = undefined;
 
+        // Room, party and presence belong to the account, not the socket: only release what no other
+        // tab of this user still holds. (Closing a second tab used to evict the user from the room
+        // the first tab was in — or kill them 10 s into a running match — drop their party and mark
+        // them offline.) The Redis fallback is only for the last tab.
+        const others = otherSocketsOf(socket.data.userId, socket.id);
+        const lastTab = others.length === 0;
+        const roomCode =
+          disconnectRoomCode ??
+          (lastTab ? await lobbyService.getPlayerRoom(socket.data.userId) : null);
+        const roomHeldElsewhere =
+          !!roomCode && others.some((s) => s.data.activeRoomCode === roomCode);
+
         // Clean up rematch votes for the disconnecting player
-        for (const [code, voteState] of rematchVotes) {
+        for (const [code, voteState] of roomHeldElsewhere ? [] : rematchVotes) {
           if (voteState.votes.has(socket.data.userId)) {
             voteState.votes.delete(socket.data.userId);
             voteState.humanPlayerIds.delete(socket.data.userId);
@@ -1910,14 +2005,20 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           }
         }
 
-        // Remove presence and notify friends offline
-        presenceService.removePresence(socket.data.userId).catch((err) => {
-          logger.warn({ err: getErrorMessage(err) }, 'Presence update failed');
-        });
-        notifyFriendsOffline(io, socket.data.userId);
+        if (lastTab) {
+          emoteLastUsed.delete(socket.data.userId);
+          // Remove presence and notify friends offline
+          presenceService.removePresence(socket.data.userId).catch((err) => {
+            logger.warn({ err: getErrorMessage(err) }, 'Presence update failed');
+          });
+          notifyFriendsOffline(io, socket.data.userId);
+        }
 
-        // Handle party disconnect (leave/disband)
-        await handlePartyDisconnect(socket, io);
+        // Handle party disconnect (leave/disband) — unless another tab is still in the party
+        const partyId = socket.data.activePartyId;
+        if (partyId && !others.some((s) => s.data.activePartyId === partyId)) {
+          await handlePartyDisconnect(socket, io);
+        }
 
         // Clean up campaign session
         if (socket.data.activeCampaignSession) {
@@ -1936,9 +2037,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           socket.data.activeCampaignSession = undefined;
         }
 
-        const roomCode =
-          disconnectRoomCode || (await lobbyService.getPlayerRoom(socket.data.userId));
-        if (roomCode) {
+        if (roomCode && !roomHeldElsewhere) {
           const gameRoom = roomManager.getRoom(roomCode);
           if (gameRoom && gameRoom.isRunning()) {
             // Game is running — start grace period, do NOT remove from room yet

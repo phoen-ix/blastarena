@@ -53,6 +53,11 @@ jest.mock('../../../backend/src/services/lobby', () => ({
   listRooms: mockListRooms,
 }));
 
+const mockUnlockDefaultCosmetics = jest.fn<AnyFn>().mockResolvedValue(undefined);
+jest.mock('../../../backend/src/services/cosmetics', () => ({
+  unlockDefaultCosmetics: mockUnlockDefaultCosmetics,
+}));
+
 jest.mock('../../../backend/src/utils/logger', () => ({
   logger: {
     error: jest.fn(),
@@ -104,6 +109,8 @@ describe('admin service', () => {
       expect(result).toEqual({ id: 42, username: 'newuser' });
       expect(mockHashPassword).toHaveBeenCalledWith('password123');
       expect(mockExecute).toHaveBeenCalledTimes(3);
+      // Same default cosmetics as self-registration
+      expect(mockUnlockDefaultCosmetics).toHaveBeenCalledWith(42);
       // Verify user insert includes default 'user' role
       expect(mockExecute.mock.calls[0][1]).toEqual([
         'newuser',

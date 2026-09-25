@@ -14,14 +14,23 @@ import {
   OPENWORLD_AFK_CHECK_TICKS,
   OPENWORLD_DEFAULT_AFK_TIMEOUT,
   OpenWorldScoreEntry,
+  XP_PER_KILL,
+  getLevelForXp,
 } from '@blast-arena/shared';
 import { GameStateManager, GameConfig } from './GameState';
 import { GameLoop } from './GameLoop';
-import { OpenWorldSettings, getOpenWorldSettings, isOpenWorldEnabled } from '../services/settings';
+import {
+  OpenWorldSettings,
+  getOpenWorldSettings,
+  isOpenWorldEnabled,
+  getSetting,
+} from '../services/settings';
 import { logger } from '../utils/logger';
 import { GameLogger } from '../utils/gameLogger';
-import { ReplayRecorder } from '../utils/replayRecorder';
-import { execute } from '../db/connection';
+import type { ReplayRecorder } from '../utils/replayRecorder';
+import type { RowDataPacket } from 'mysql2';
+import { withTransaction } from '../db/connection';
+import { checkLevelMilestoneUnlocks } from '../services/cosmetics';
 import {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -46,6 +55,11 @@ interface OpenWorldPlayer {
   kills: number;
   deaths: number;
   score: number;
+}
+
+interface StatsRow extends RowDataPacket {
+  total_xp: number | null;
+  level: number | null;
 }
 
 // Pending stat updates for batched DB writes
@@ -174,14 +188,9 @@ class OpenWorldManager {
     this.lastStatsFlushTick = 0;
     this.lastActivityTick = 0;
 
-    // Set up replay recording for this round
-    const initialState = this.gameState.toState();
-    this.replayRecorder = new ReplayRecorder(
-      `openworld_r${this.roundNumber}`,
-      'open_world',
-      initialState,
-    );
-    this.replayRecorder.setSessionId(`openworld_r${this.roundNumber}_${Date.now()}`);
+    // No round replays: they were saved as `campaign_openworld_…` files with no DB row, so nothing
+    // listed them and the retention pruning skipped them — disk use grew without bound.
+    this.replayRecorder = null;
 
     const gameLogger = new GameLogger(
       `openworld_r${this.roundNumber}`,
@@ -192,7 +201,6 @@ class OpenWorldManager {
       // fidelity regardless of this setting.
       { verbosity: 'normal' },
     );
-    gameLogger.replayRecorder = this.replayRecorder;
     this.gameState.gameLogger = gameLogger;
 
     this.gameLoop = new GameLoop(
@@ -669,7 +677,7 @@ class OpenWorldManager {
     }
     if (type === 'kill') {
       stats.kills++;
-      stats.xp += 50; // kills × 50 XP
+      stats.xp += XP_PER_KILL;
     } else {
       stats.deaths++;
     }
@@ -681,18 +689,7 @@ class OpenWorldManager {
     this.pendingStats.clear();
 
     for (const [userId, stats] of batch) {
-      try {
-        await execute(
-          `UPDATE user_stats SET
-            total_kills = total_kills + ?,
-            total_deaths = total_deaths + ?,
-            total_xp = total_xp + ?
-          WHERE user_id = ?`,
-          [stats.kills, stats.deaths, stats.xp, userId],
-        );
-      } catch (err) {
-        logger.error({ err, userId }, 'Failed to flush open world stats');
-      }
+      await this.writeStats(userId, stats);
     }
   }
 
@@ -700,17 +697,43 @@ class OpenWorldManager {
     const stats = this.pendingStats.get(userId);
     if (!stats) return;
     this.pendingStats.delete(userId);
+    await this.writeStats(userId, stats);
+  }
+
+  /**
+   * Add kills/deaths/XP and keep `level` in step with `total_xp`. Open-world XP used to raise
+   * total_xp only: profile, leaderboard and rank all show the stored level, so it lagged until the
+   * player's next regular match — and the admin XP multiplier and level-milestone unlocks never
+   * applied to open-world play.
+   */
+  private async writeStats(userId: number, stats: PendingStats): Promise<void> {
     try {
-      await execute(
-        `UPDATE user_stats SET
-          total_kills = total_kills + ?,
-          total_deaths = total_deaths + ?,
-          total_xp = total_xp + ?
-        WHERE user_id = ?`,
-        [stats.kills, stats.deaths, stats.xp, userId],
-      );
+      const multiplier = parseFloat((await getSetting('xp_multiplier')) ?? '1') || 1;
+      const xp = Math.round(stats.xp * multiplier);
+      const levels = await withTransaction(async (conn) => {
+        const [rows] = await conn.execute<StatsRow[]>(
+          'SELECT total_xp, level FROM user_stats WHERE user_id = ? FOR UPDATE',
+          [userId],
+        );
+        if (rows.length === 0) return null;
+        const oldLevel = rows[0].level ?? 1;
+        const newLevel = Math.max(oldLevel, getLevelForXp((rows[0].total_xp ?? 0) + xp));
+        await conn.execute(
+          `UPDATE user_stats SET
+            total_kills = total_kills + ?,
+            total_deaths = total_deaths + ?,
+            total_xp = total_xp + ?,
+            level = ?
+          WHERE user_id = ?`,
+          [stats.kills, stats.deaths, xp, newLevel, userId],
+        );
+        return { oldLevel, newLevel };
+      });
+      if (levels && levels.newLevel > levels.oldLevel) {
+        await checkLevelMilestoneUnlocks(userId, levels.newLevel);
+      }
     } catch (err) {
-      logger.error({ err, userId }, 'Failed to flush player stats on leave');
+      logger.error({ err, userId }, 'Failed to flush open world stats');
     }
   }
 }

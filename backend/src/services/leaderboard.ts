@@ -37,7 +37,11 @@ export function getRankForElo(elo: number, config: RankConfig): { name: string; 
     }
   }
 
-  // Fallback to lowest tier
+  // Outside every tier: above the top tier counts as the top tier, anything else as the lowest.
+  // (Everything outside used to fall back to the lowest, so an Elo above the top tier showed as
+  // the bottom rank.)
+  const highest = config.tiers.reduce((a, b) => (a.maxElo > b.maxElo ? a : b), config.tiers[0]);
+  if (elo > highest.maxElo) return { name: highest.name, color: highest.color };
   const lowest = config.tiers.reduce((a, b) => (a.minElo < b.minElo ? a : b), config.tiers[0]);
   return { name: lowest.name, color: lowest.color };
 }

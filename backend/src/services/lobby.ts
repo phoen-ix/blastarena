@@ -201,17 +201,21 @@ export async function joinRoom(code: string, user: PublicUser): Promise<Room> {
 }
 
 // Lua script for atomic leave: removes player, transfers host if needed, deletes empty rooms
-// KEYS[1] = room key, KEYS[2] = player:userId:room key
-// ARGV[1] = userId
+// KEYS[1] = room key, KEYS[2] = player:userId:room key, KEYS[3] = room index
+// ARGV[1] = userId, ARGV[2] = room code
 // Returns: updated room JSON, "DELETED" if room empty, or "ERR:NOT_FOUND"
 const LEAVE_ROOM_LUA = `
 local data = redis.call('GET', KEYS[1])
+-- Only clear the player->room mapping when it points at this room: a leave for a stale code (a
+-- moderator kick, an old socket) used to wipe the mapping of the room the player is really in.
+if redis.call('GET', KEYS[2]) == ARGV[2] then
+  redis.call('DEL', KEYS[2])
+end
 if not data then
   return 'ERR:NOT_FOUND'
 end
 
 local room = cjson.decode(data)
-redis.call('DEL', KEYS[2])
 
 local newPlayers = {}
 for _, p in ipairs(room.players) do
@@ -376,6 +380,7 @@ export async function leaveRoom(code: string, userId: number): Promise<Room | nu
     `player:${userId}:room`,
     ROOM_INDEX_KEY,
     String(userId),
+    code,
   )) as string;
 
   if (result === 'ERR:NOT_FOUND') return null;

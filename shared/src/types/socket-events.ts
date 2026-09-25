@@ -56,9 +56,13 @@ export interface ClientToServerEvents {
   ) => void;
   'admin:spectate': (
     data: { roomCode: string },
-    callback: (response: { success: boolean; error?: string }) => void,
+    callback: (response: { success: boolean; state?: GameState; error?: string }) => void,
   ) => void;
-  'admin:roomMessage': (data: { roomCode: string; message: string }) => void;
+  'admin:unspectate': (data: { roomCode: string }) => void;
+  'admin:roomMessage': (
+    data: { roomCode: string; message: string },
+    callback?: (response: { success: boolean; error?: string }) => void,
+  ) => void;
   'sim:start': (
     config: SimulationConfig,
     callback: (response: {
@@ -133,6 +137,10 @@ export interface ClientToServerEvents {
   ) => void;
 
   // Party
+  /** Current party membership (null when not in one), for a freshly built party UI. */
+  'party:sync': (
+    callback: (response: { success: boolean; party?: Party | null; error?: string }) => void,
+  ) => void;
   'party:create': (
     callback: (response: { success: boolean; party?: Party; error?: string }) => void,
   ) => void;
@@ -293,7 +301,12 @@ export interface ServerToClientEvents {
   }) => void;
   'friend:requestReceived': (data: FriendRequest) => void;
   'friend:removed': (data: { userId: number }) => void;
-  'friend:online': (data: { userId: number; activity: ActivityStatus }) => void;
+  'friend:online': (data: {
+    userId: number;
+    activity: ActivityStatus;
+    /** Set while the friend sits in a joinable (waiting) room. */
+    roomCode?: string;
+  }) => void;
   'friend:offline': (data: { userId: number }) => void;
 
   // Party

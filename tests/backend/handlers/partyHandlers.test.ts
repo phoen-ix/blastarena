@@ -10,7 +10,9 @@ const mockKickFromParty = jest.fn<AnyFn>();
 const mockCreateInvite = jest.fn<AnyFn>();
 const mockGetInvite = jest.fn<AnyFn>();
 const mockRemoveInvite = jest.fn<AnyFn>();
+const mockGetPlayerParty = jest.fn<AnyFn>();
 jest.mock('../../../backend/src/services/party', () => ({
+  getPlayerParty: mockGetPlayerParty,
   createParty: mockCreateParty,
   getParty: mockGetParty,
   joinParty: mockJoinParty,
@@ -66,12 +68,22 @@ function createMockSocket(overrides: Record<string, any> = {}) {
   return socket;
 }
 
-function createMockIO() {
+function createMockIO(userSockets: any[] = []) {
   const emitFn = jest.fn<AnyFn>();
+  // The user's connected sockets (every tab), as the party handlers look them up.
+  const rooms = new Map<string, Set<string>>();
+  const sockets = new Map<string, any>();
+  for (const s of userSockets) {
+    const key = `user:${s.data.userId}`;
+    if (!rooms.has(key)) rooms.set(key, new Set());
+    rooms.get(key)!.add(s.id);
+    sockets.set(s.id, s);
+  }
   const io: any = {
     emit: jest.fn<AnyFn>(),
     to: jest.fn<AnyFn>().mockReturnValue({ emit: emitFn }),
     in: jest.fn<AnyFn>().mockReturnValue({ fetchSockets: jest.fn<AnyFn>().mockResolvedValue([]) }),
+    sockets: { adapter: { rooms }, sockets },
     _toEmit: emitFn,
   };
   return io;
@@ -94,7 +106,7 @@ describe('partyHandlers', () => {
     jest.clearAllMocks();
     mockGetChatMode.mockResolvedValue('everyone');
     socket = createMockSocket();
-    io = createMockIO();
+    io = createMockIO([socket]);
     setupPartyHandlers(socket, io);
   });
 
@@ -497,6 +509,33 @@ describe('partyHandlers', () => {
   describe('cleanupPartyLimiters', () => {
     it('does not throw', () => {
       expect(() => cleanupPartyLimiters('socket-1')).not.toThrow();
+    });
+  });
+
+  describe('multi-tab membership', () => {
+    it('puts every tab of the user into the party on create', async () => {
+      const tabA = createMockSocket();
+      const tabB = createMockSocket();
+      tabB.id = 'socket-2';
+      const multiIo = createMockIO([tabA, tabB]);
+      setupPartyHandlers(tabA, multiIo);
+      mockCreateParty.mockResolvedValue(fakeParty);
+
+      await tabA._handlers['party:create'](jest.fn());
+
+      expect(tabB.data.activePartyId).toBe('party-abc');
+      expect(tabB.join).toHaveBeenCalledWith('party:party-abc');
+    });
+
+    it('party:sync reports the current party', async () => {
+      mockGetPlayerParty.mockResolvedValue('party-abc');
+      mockGetParty.mockResolvedValue(fakeParty);
+      const callback = jest.fn();
+
+      await socket._handlers['party:sync'](callback);
+
+      expect(callback).toHaveBeenCalledWith({ success: true, party: fakeParty });
+      expect(socket.data.activePartyId).toBe('party-abc');
     });
   });
 });

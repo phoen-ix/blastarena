@@ -18,6 +18,7 @@ import {
   TICK_RATE,
 } from '@blast-arena/shared';
 import { logger } from './logger';
+import { invalidateReplayIndex } from '../services/replay';
 
 const REPLAY_DIR = process.env.REPLAY_DIR || '/app/replays';
 
@@ -369,6 +370,8 @@ export class ReplayRecorder {
               { matchId: this.matchId, filePath, sizeKB, frames: frameCount },
               'Replay saved',
             );
+            // A just-finished match's replay is visible immediately, not after the index TTL.
+            invalidateReplayIndex();
             // Bound the directory. Rate-limited internally, and never blocks the write.
             setImmediate(() => void pruneOldReplays(dir));
           }

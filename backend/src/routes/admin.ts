@@ -340,7 +340,7 @@ router.put(
         JSON.stringify({ key: 'spectator_actions_enabled', value: req.body.enabled }),
       );
       const io = getIO();
-      io.to('role:staff').emit('admin:settingsChanged', {
+      io.emit('admin:settingsChanged', {
         key: 'spectator_actions_enabled',
         value: req.body.enabled,
       });
@@ -370,7 +370,7 @@ router.put(
         JSON.stringify({ key: 'party_chat_mode', value: req.body.mode }),
       );
       const io = getIO();
-      io.to('role:staff').emit('admin:settingsChanged', {
+      io.emit('admin:settingsChanged', {
         key: 'party_chat_mode',
         value: req.body.mode,
       });
@@ -396,7 +396,7 @@ router.put(
         JSON.stringify({ key: 'lobby_chat_mode', value: req.body.mode }),
       );
       const io = getIO();
-      io.to('role:staff').emit('admin:settingsChanged', {
+      io.emit('admin:settingsChanged', {
         key: 'lobby_chat_mode',
         value: req.body.mode,
       });
@@ -422,7 +422,7 @@ router.put(
         JSON.stringify({ key: 'dm_mode', value: req.body.mode }),
       );
       const io = getIO();
-      io.to('role:staff').emit('admin:settingsChanged', { key: 'dm_mode', value: req.body.mode });
+      io.emit('admin:settingsChanged', { key: 'dm_mode', value: req.body.mode });
       res.json({ message: 'Setting updated' });
     } catch (err) {
       next(err);
@@ -445,7 +445,7 @@ router.put(
         JSON.stringify({ key: 'emote_mode', value: req.body.mode }),
       );
       const io = getIO();
-      io.to('role:staff').emit('admin:settingsChanged', {
+      io.emit('admin:settingsChanged', {
         key: 'emote_mode',
         value: req.body.mode,
       });
@@ -471,7 +471,7 @@ router.put(
         JSON.stringify({ key: 'spectator_chat_mode', value: req.body.mode }),
       );
       const io = getIO();
-      io.to('role:staff').emit('admin:settingsChanged', {
+      io.emit('admin:settingsChanged', {
         key: 'spectator_chat_mode',
         value: req.body.mode,
       });
@@ -612,7 +612,7 @@ router.put(
         JSON.stringify({ key: 'default_theme', value: req.body.theme }),
       );
       const io = getIO();
-      io.to('role:staff').emit('admin:settingsChanged', {
+      io.emit('admin:settingsChanged', {
         key: 'default_theme',
         value: req.body.theme,
       });
@@ -684,7 +684,7 @@ const gameDefaultsSchema = z.object({
       .optional(),
     maxPlayers: z.number().int().min(2).max(8).optional(),
     roundTime: z.number().int().min(30).max(600).optional(),
-    mapWidth: z.number().int().min(11).max(61).optional(),
+    mapWidth: z.number().int().min(11).max(51).optional(),
     wallDensity: z.number().min(0).max(1).optional(),
     powerUpDropRate: z.number().min(0).max(1).optional(),
     botCount: z.number().int().min(0).max(7).optional(),
@@ -1857,14 +1857,22 @@ router.get('/admin/settings/rank_tiers', adminOnlyMiddleware, async (_req, res, 
 const rankTiersSchema = z.object({
   tiers: z
     .array(
-      z.object({
-        name: z.string().min(1).max(50),
-        minElo: z.number().int(),
-        maxElo: z.number().int(),
-        color: z.string().min(1).max(32),
-      }),
+      z
+        .object({
+          name: z.string().min(1).max(50),
+          minElo: z.number().int(),
+          maxElo: z.number().int(),
+          color: z.string().regex(/^#[0-9a-fA-F]{3,8}$/),
+        })
+        .refine((t) => t.minElo <= t.maxElo, 'minElo must not exceed maxElo'),
     )
-    .min(1),
+    .min(1)
+    // Tiers must tile the Elo range without gaps or overlaps: an Elo in a gap used to fall back
+    // to the lowest tier, so a player could drop from Gold to Bronze by gaining points.
+    .refine((tiers) => {
+      const sorted = [...tiers].sort((a, b) => a.minElo - b.minElo);
+      return sorted.every((t, i) => i === 0 || t.minElo === sorted[i - 1].maxElo + 1);
+    }, 'Tiers must be contiguous (each minElo = previous maxElo + 1)'),
   subTiersEnabled: z.boolean(),
 });
 
@@ -2499,6 +2507,14 @@ router.post('/admin/challenges/:id/deactivate', adminOnlyMiddleware, async (req,
 });
 
 // Global challenges toggle
+router.get('/admin/settings/challenges_enabled', async (_req, res, next) => {
+  try {
+    res.json({ enabled: (await settingsService.getSetting('challenges_enabled')) !== 'false' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.put(
   '/admin/settings/challenges_enabled',
   adminOnlyMiddleware,

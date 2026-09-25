@@ -29,6 +29,9 @@ export const BOMB_TIMER_TICKS = 60; // 3 seconds
 export const EXPLOSION_DURATION_TICKS = 10; // 0.5 seconds
 export const INVULNERABILITY_TICKS = 40; // 2 seconds after spawn
 
+/** Square map sizes offered when creating a room; the server accepts 9–51. */
+export const ROOM_MAP_SIZES = [21, 31, 39, 51] as const;
+
 // Game limits
 export const MAX_PLAYERS_PER_ROOM = 8;
 export const MAX_ROOMS = 50;

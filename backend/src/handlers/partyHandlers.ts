@@ -38,9 +38,43 @@ const inviteLimiter = createSocketRateLimiter(3);
 // a fetchSockets() and were the only party events with no limiter at all. (audit B16)
 const partyActionLimiter = createSocketRateLimiter(5);
 
+/**
+ * Put every connected tab of `userId` into (partyId) or out of (null) the party room. Party state
+ * used to live on the one socket that acted, so the user's other tabs never saw party events and
+ * a PartyBar built in another tab showed "no party".
+ */
+function setUserPartyMembership(io: TypedServer, userId: number, partyId: string | null): void {
+  const socketIds = io.sockets.adapter.rooms.get(`user:${userId}`);
+  if (!socketIds) return;
+  for (const id of socketIds) {
+    const s = io.sockets.sockets.get(id);
+    if (!s) continue;
+    if (s.data.activePartyId && s.data.activePartyId !== partyId) {
+      s.leave(`party:${s.data.activePartyId}`);
+    }
+    s.data.activePartyId = partyId ?? undefined;
+    if (partyId) s.join(`party:${partyId}`);
+  }
+}
+
 export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
   const userId = socket.data.userId;
   const username = socket.data.username;
+
+  // Current membership, for a party UI that was just built (every lobby rebuild made a new one
+  // that started empty until the next party event).
+  socket.on('party:sync', async (callback) => {
+    if (!partyActionLimiter.isAllowed(socket.id))
+      return callback({ success: false, error: 'Rate limited' });
+    try {
+      const partyId = await partyService.getPlayerParty(userId);
+      const party = partyId ? await partyService.getParty(partyId) : null;
+      setUserPartyMembership(io, userId, party ? party.id : null);
+      callback({ success: true, party });
+    } catch (err) {
+      callback({ success: false, error: clientError(err) });
+    }
+  });
 
   // Create party
   socket.on('party:create', async (callback) => {
@@ -48,9 +82,9 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
       return callback({ success: false, error: 'Rate limited' }); // audit B16
     try {
       const party = await partyService.createParty(userId, username);
-      socket.data.activePartyId = party.id;
-      socket.join(`party:${party.id}`);
+      setUserPartyMembership(io, userId, party.id);
       callback({ success: true, party });
+      io.to(`user:${userId}`).emit('party:state', party);
     } catch (err) {
       callback({ success: false, error: clientError(err) });
     }
@@ -120,8 +154,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
       const party = await partyService.joinParty(invite.partyId, userId, username);
       await partyService.removeInvite(userId, parsed.inviteId);
 
-      socket.data.activePartyId = party.id;
-      socket.join(`party:${party.id}`);
+      setUserPartyMembership(io, userId, party.id);
 
       // Broadcast updated party state to all members
       io.to(`party:${party.id}`).emit('party:state', party);
@@ -155,8 +188,9 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
       if (!partyId) return callback({ success: false, error: 'Not in a party' });
 
       const result = await partyService.leaveParty(partyId, userId);
-      socket.leave(`party:${partyId}`);
-      socket.data.activePartyId = undefined;
+      setUserPartyMembership(io, userId, null);
+      // The leaver's own tabs are out of the party room now, so tell them directly.
+      io.to(`user:${userId}`).emit('party:disbanded');
 
       if (result === 'disbanded') {
         io.to(`party:${partyId}`).emit('party:disbanded');

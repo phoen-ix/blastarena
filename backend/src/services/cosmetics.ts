@@ -191,6 +191,9 @@ export async function equipCosmetic(
     if (!cosmetic || cosmetic.type !== slot) {
       throw new AppError('Cosmetic type does not match slot', 400, 'COSMETIC_SLOT_MISMATCH');
     }
+    if (!cosmetic.isActive) {
+      throw new AppError('This cosmetic is no longer available', 400, 'COSMETIC_INACTIVE');
+    }
   }
 
   const columnMap: Record<CosmeticType, string> = {
@@ -207,6 +210,17 @@ export async function equipCosmetic(
      ON DUPLICATE KEY UPDATE ${column} = ?`,
     [userId, cosmeticId, cosmeticId],
   );
+}
+
+/**
+ * A cosmetic colour as a number. Seeds store 0x… numbers or '0x…' strings; the admin editor stores
+ * '#rrggbb', which parseInt(…, 16) turned into NaN (sent as null, so the default colour showed).
+ */
+function toColorNumber(value: unknown): number | undefined {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (typeof value !== 'string') return undefined;
+  const parsed = parseInt(value.trim().replace(/^(#|0x)/i, ''), 16);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 export async function getPlayerCosmeticsForGame(
@@ -232,10 +246,10 @@ export async function getPlayerCosmeticsForGame(
             tc.config as trail_config,
             bc.config as bomb_skin_config
      FROM user_equipped_cosmetics ue
-     LEFT JOIN cosmetics cc ON cc.id = ue.color_id
-     LEFT JOIN cosmetics ec ON ec.id = ue.eyes_id
-     LEFT JOIN cosmetics tc ON tc.id = ue.trail_id
-     LEFT JOIN cosmetics bc ON bc.id = ue.bomb_skin_id
+     LEFT JOIN cosmetics cc ON cc.id = ue.color_id AND cc.is_active = TRUE
+     LEFT JOIN cosmetics ec ON ec.id = ue.eyes_id AND ec.is_active = TRUE
+     LEFT JOIN cosmetics tc ON tc.id = ue.trail_id AND tc.is_active = TRUE
+     LEFT JOIN cosmetics bc ON bc.id = ue.bomb_skin_id AND bc.is_active = TRUE
      WHERE ue.user_id IN (${placeholders})`,
     userIds,
   );
@@ -246,10 +260,8 @@ export async function getPlayerCosmeticsForGame(
     if (row.color_config) {
       const colorConf =
         typeof row.color_config === 'string' ? JSON.parse(row.color_config) : row.color_config;
-      if (colorConf.hex !== undefined) {
-        data.colorHex =
-          typeof colorConf.hex === 'string' ? parseInt(colorConf.hex, 16) : colorConf.hex;
-      }
+      const colorHex = toColorNumber(colorConf.hex);
+      if (colorHex !== undefined) data.colorHex = colorHex;
     }
 
     if (row.eyes_config) {
@@ -264,7 +276,7 @@ export async function getPlayerCosmeticsForGame(
       if (trailConf.particleKey) {
         data.trailConfig = {
           particleKey: trailConf.particleKey,
-          tint: trailConf.tint ?? 0xffffff,
+          tint: toColorNumber(trailConf.tint) ?? 0xffffff,
           frequency: trailConf.frequency ?? 50,
         };
       }
@@ -275,10 +287,11 @@ export async function getPlayerCosmeticsForGame(
         typeof row.bomb_skin_config === 'string'
           ? JSON.parse(row.bomb_skin_config)
           : row.bomb_skin_config;
-      if (bombConf.baseColor !== undefined) {
+      const baseColor = toColorNumber(bombConf.baseColor);
+      if (baseColor !== undefined) {
         data.bombSkinConfig = {
-          baseColor: bombConf.baseColor,
-          fuseColor: bombConf.fuseColor ?? 0xff4444,
+          baseColor,
+          fuseColor: toColorNumber(bombConf.fuseColor) ?? 0xff4444,
           label: bombConf.label ?? 'custom',
         };
       }

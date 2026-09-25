@@ -16,6 +16,7 @@ import {
   MatchPlayerRow,
   AdminActionRow,
 } from '../db/types';
+import * as cosmeticsService from './cosmetics';
 
 export async function createUser(
   adminId: number,
@@ -55,6 +56,9 @@ export async function createUser(
   }
 
   await execute('INSERT INTO user_stats (user_id) VALUES (?)', [result.insertId]);
+  // Same grant as self-registration: without it the account owned no colours at all and every
+  // equip attempt failed with COSMETIC_NOT_OWNED.
+  await cosmeticsService.unlockDefaultCosmetics(result.insertId);
 
   await logAdminAction(
     adminId,

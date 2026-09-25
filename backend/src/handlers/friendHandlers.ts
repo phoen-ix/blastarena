@@ -192,13 +192,18 @@ export async function notifyFriendsOnline(
   io: TypedServer,
   userId: number,
   activity: ActivityStatus,
+  roomCode?: string,
 ): Promise<void> {
   try {
     const friendIds = await friendsService.getFriendIds(userId);
     if (friendIds.length === 0) return;
     // One emit to every friend's room at once — io.to() takes an array and de-duplicates
     // sockets — instead of one broadcast per friend. (audit E11)
-    io.to(friendIds.map((id) => `user:${id}`)).emit('friend:online', { userId, activity });
+    io.to(friendIds.map((id) => `user:${id}`)).emit('friend:online', {
+      userId,
+      activity,
+      roomCode,
+    });
   } catch (err) {
     logger.error({ err, userId }, 'Failed to notify friends online');
   }
