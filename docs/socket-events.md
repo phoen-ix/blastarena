@@ -80,15 +80,16 @@ On disconnect, the server:
 | Event | Payload | Description | Rate Limit |
 |-------|---------|-------------|------------|
 | `game:input` | `PlayerInput` (`{ seq: number, tick: number, direction: Direction \| null, action: Action \| null }`) | Send player input during a game. Hot path -- uses cached `activeRoomCode` to skip Redis lookup. Runtime-validated (direction/action enums) | 30/s per socket, 100/s per IP |
-| `game:emote` | `{ emoteId: EmoteId }` | Trigger an in-game emote (keys 1-6). EmoteId 0-5. Subject to admin chat mode setting | 3s cooldown per player |
-| `game:spectatorChat` | `{ message: string }` | Send a chat message as a dead player or admin spectator. Max 200 chars. Only allowed when sender is dead or spectating | 3/s per socket |
+| `game:emote` | `{ emoteId: EmoteId }` | Trigger an in-game emote (keys 1-6). EmoteId 0-5. Room matches only (dropped in the open world and campaign); subject to the admin emote mode | 3s cooldown per player |
+| `game:spectatorChat` | `{ message: string }` | Chat as an eliminated player in your own match. Max 200 chars. Dropped while the sender is alive, and for sockets not in the room (admin spectators included) | 3/s per socket |
+| `spectator:action` | `{ type: 'place_wall' \| 'trigger_meteor' \| 'drop_powerup' \| 'speed_zone', position: { x: number, y: number } }` + callback | Spectator Game Master action by an eliminated player in their own match. Needs the global admin toggle and the room's `enableSpectatorActions`; costs energy (see `GameRoom.handleSpectatorAction`). The callback reports `{ success, error? }` | 2/s per socket |
 
 ### Campaign Events
 
 | Event | Payload | Description | Rate Limit |
 |-------|---------|-------------|------------|
 | `campaign:start` | `{ levelId: number, coopMode?: boolean, localCoopMode?: boolean, localP2?: LocalP2Data, buddyMode?: boolean }` + callback | Start a campaign level. Supports solo, online co-op (party-based), local co-op, and buddy mode. Ends any existing campaign session first | 1/s per socket |
-| `campaign:input` | `PlayerInput & { playerId?: number }` | Send input during campaign. `playerId` used for local co-op/buddy mode; defaults to socket's userId for solo/online co-op. Validated against session player list | -- |
+| `campaign:input` | `PlayerInput & { playerId?: number }` | Send input during campaign. `playerId` used for local co-op/buddy mode (only the session owner may send for the second character); defaults to socket's userId for solo/online co-op. Validated against session player list | 50/s per socket (two local players at 20/s each) |
 | `campaign:pause` | callback | Pause the campaign game. Either co-op player can pause | -- |
 | `campaign:resume` | callback | Resume a paused campaign game. Either co-op player can resume | -- |
 | `campaign:quit` | _(none)_ | Quit the campaign. Co-op: removes player and notifies partner. Solo: ends session | -- |
@@ -141,7 +142,7 @@ On disconnect, the server:
 | `party:invite` | `{ userId: number }` + callback | Invite a friend to the party. Leader-only. Target must be a friend | 3/s (invite) |
 | `party:acceptInvite` | `{ inviteId: string }` + callback | Accept a party invite. Socket joins `party:{partyId}`. All members receive `party:state`. Errors: `Party not found`, `Party is full`, `Already in a party`, `Already in another party` | 5/s (partyAction) |
 | `party:declineInvite` | `{ inviteId: string }` | Decline a party invite. No callback | -- |
-| `party:leave` | callback | Leave the party. If leader leaves, party is disbanded (`party:disbanded` sent to all) | 5/s (partyAction) |
+| `party:leave` | callback | Leave the party. The leaver's own tabs get `party:disbanded`; if the leader leaves, the party is disbanded and every member gets it too | 5/s (partyAction) |
 | `party:kick` | `{ userId: number }` + callback | Kick a member from the party. Leader-only. Kicked user receives `party:disbanded`. Errors: `Only the party leader can kick members`, `Cannot kick yourself`, `User is not in the party` | 5/s (partyAction) |
 | `party:chat` | `{ message: string }` | Send a chat message to the party. Max 200 chars (`PARTY_CHAT_MAX_LENGTH`). Subject to admin chat mode | 5/s (partyChat) |
 
@@ -197,10 +198,10 @@ On disconnect, the server:
 | `game:state` | `GameState` | `room:{code}` | Game state update every tick (20 ticks/sec) |
 | `game:explosion` | `{ cells: { x: number, y: number }[], ownerId: number }` | `room:{code}` | Bomb explosion with affected cell coordinates and owner |
 | `game:powerupCollected` | `{ playerId: number, type: string, position: { x: number, y: number } }` | `room:{code}` | A player collected a power-up |
-| `game:playerDied` | `{ playerId: number, killerId: number \| null }` | `room:{code}` | A player was killed. `killerId` is null for environmental/self deaths |
+| `game:playerDied` | `{ playerId: number, killerId: number \| null, cause: KillCause }` | `room:{code}` | A player was killed. `killerId` is null for environmental/self deaths; `cause` is `bomb`, `self`, `zone`, a hazard (`lava`, `quicksand`, `spikes`, `dark_rift`) or `disconnect` |
 | `game:over` | `{ winnerId: number \| null, winnerTeam: number \| null, reason: string, placements: Placement[] }` | `room:{code}` | Game ended. Placements include userId, username, isBot, placement rank, kills, selfKills, team, alive status |
 | `game:emote` | `{ playerId: number, emoteId: EmoteId }` | `room:{code}` | A player triggered an emote |
-| `game:spectatorChat` | `{ fromUserId: number, fromUsername: string, role: UserRole, message: string, timestamp: number }` | `room:{code}` | Chat message from a dead player or spectating admin |
+| `game:spectatorChat` | `{ fromUserId: number, fromUsername: string, role: UserRole, message: string, timestamp: number }` | `room:{code}` | Chat message from an eliminated player |
 | `game:eloUpdate` | `EloResult[]` | `room:{code}` | Elo rating changes for all players after a ranked game |
 | `game:xpUpdate` | `XpUpdateResult[]` | `room:{code}` | XP gains and level-ups for all players after a game |
 
@@ -227,7 +228,7 @@ On disconnect, the server:
 | `admin:banner` | `{ message: string \| null }` | broadcast (all) | Admin banner message. `null` to clear |
 | `admin:kicked` | `{ reason: string }` | target socket | Player was kicked from a room (or room was force-closed) |
 | `admin:roomMessage` | `{ message: string, from: string }` | `room:{code}` | System message from an admin spectating the room |
-| `admin:settingsChanged` | `{ key: string, value?: unknown }` | `role:staff` | A server setting was changed by an admin (scoped to staff only) |
+| `admin:settingsChanged` | `{ key: string, value?: unknown }` | all sockets or `role:staff` | A server setting changed. Settings that change what every user sees (party/lobby/DM/emote/spectator chat modes, the spectator-actions toggle, default theme) go to everyone; admin-only ones (registration, open world, XP multiplier, game defaults, email) to staff only |
 
 ### Simulation Events
 
@@ -255,7 +256,7 @@ On disconnect, the server:
 | Event | Payload | Scope | Description |
 |-------|---------|-------|-------------|
 | `party:state` | `Party` | `party:{partyId}` | Full party state update (after join, kick, leave) |
-| `party:disbanded` | _(none)_ | `party:{partyId}` or `user:{kickedUserId}` | Party was disbanded (leader left) or user was kicked |
+| `party:disbanded` | _(none)_ | `party:{partyId}` or `user:{userId}` | Party was disbanded (leader left), or this user left or was kicked |
 | `party:invite` | `PartyInvite` (`{ inviteId, type, fromUserId, fromUsername, partyId, createdAt }`) | `user:{targetUserId}` | Incoming party invite notification |
 | `party:chat` | `PartyChatMessage` (`{ fromUserId, fromUsername, message, timestamp }`) | `party:{partyId}` | Party chat message |
 | `party:joinRoom` | `{ roomCode: string }` | `party:{partyId}` (excluding leader) | Party leader created or joined a room -- members should follow |
@@ -330,6 +331,8 @@ All open world events are scoped to the `openworld` room, which a socket enters 
 | lobbyChatLimiter | `lobby:chat` | 3/s | Lobby chat throttle |
 | dmChatLimiter | `dm:send` | 5/s | DM throttle |
 | spectatorChatLimiter | `game:spectatorChat` | 3/s | Spectator chat throttle (per-socket instance) |
+| spectatorActionLimiter | `spectator:action` | 2/s | Spectator Game Master actions |
+| campaignInputLimiter | `campaign:input` | 50/s | Local co-op and buddy runs send for two players over one socket |
 | campaignStartLimiter | `campaign:start` | 1/s | Prevent rapid campaign restarts (module-scoped; entry removed on disconnect) |
 | openWorldInputLimiter | `openworld:input` | 30/s | Same headroom as `game:input`; this path is guest-accessible |
 

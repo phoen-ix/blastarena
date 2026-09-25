@@ -53,11 +53,11 @@ Special tiles (exit, goal, teleporters, conveyors) can be hidden under destructi
 
 ## Campaign Game Session
 
-`CampaignGame.ts` wraps `GameStateManager` with `customMap` (bypasses `generateMap()`). Extended tick order: enemy AI -> movement -> enemy-explosion collision -> player-enemy contact -> covered tile reveals -> hidden powerup reveals -> boss phases -> win condition check.
+`CampaignGame.ts` wraps `GameStateManager` with `customMap` (bypasses `generateMap()`). Each tick, `GameStateManager.processTick()` runs first (player input, movement, bombs, explosions, player deaths), then `campaignTick()`: 60-minute safety cap and the level's own time limit (every win condition except `survive_time`) -> slowing-tile move penalty -> respawns -> enemy-explosion collision (before enemy movement, so enemies cannot dodge a same-tick blast) -> enemy tick, conveyors and AI movement -> slowing tiles for enemies -> enemy-explosion collision again (enemies that walked into fire) -> player-enemy contact -> covered tile reveals -> hidden power-up reveals -> puzzle tiles -> hazard tiles -> boss phases -> win condition check -> post-win grace period. An explosion damages each enemy at most once, so an enemy's HP is the number of blasts it survives.
 
 `GameStateManager.checkWinCondition()` and time limit check skip `campaign` mode — CampaignGame handles its own.
 
-**Skip countdown**: Campaign uses `GameLoop` with `skipCountdown: true` — game starts immediately (no 3-2-1 countdown). Status set to `'playing'` at start.
+**Countdown**: campaign levels start with the normal 3-2-1-GO countdown. State is broadcast during it (the client shows the overlay) but not recorded to the replay, and level time is counted from the first playing tick.
 
 **Respawn**: On death, player respawns after 40 ticks. Frontend detects `me.alive` flipping back to `true` in campaign mode and exits spectator mode, restoring normal controls.
 
@@ -133,13 +133,13 @@ Two views:
 
 ## Socket Events
 
-**Client -> Server**: `campaign:start` (levelId, callback), `campaign:input` (PlayerInput), `campaign:quit`, `campaign:buddyInput` (stub)
+**Client -> Server**: `campaign:start` (levelId, callback), `campaign:input` (PlayerInput; `playerId` lets the session owner drive a local co-op or buddy second player), `campaign:pause` / `campaign:resume` (callback; either co-op player pauses for both), `campaign:quit`
 
-**Server -> Client**: `campaign:gameStart`, `campaign:state`, `campaign:playerDied`, `campaign:enemyDied`, `campaign:exitOpened`, `campaign:levelComplete`, `campaign:gameOver`
+**Server -> Client**: `campaign:gameStart`, `campaign:coopStart` (online co-op partner follows the leader into a level), `campaign:state`, `campaign:playerDied`, `campaign:enemyDied`, `campaign:exitOpened`, `campaign:playerLockedIn`, `campaign:levelComplete`, `campaign:gameOver`, `campaign:partnerLeft`, `campaign:pauseState`
 
-## Buddy Mode Stubs
+## Buddy Mode
 
-`BuddyEntity.ts` (backend, position/direction/active), `BuddySprite.ts` (frontend, empty renderer), `campaign:buddyInput` (no-op handler). Foundation for future second-player mini-character.
+Player 2 as a small, invulnerable support character (`Player.isBuddy`): passes through destructible walls and bombs, picks up power-ups for P1, places limited bombs, and is blocked by closed gates and pits. The host's client drives it through `campaign:input` with `playerId`. Name, colour and size (40-80%) are per-account buddy settings (Settings > Preferences or the launch modal). Buddy runs are not co-op for lives and lock-in (`isCoopMode` is false); Retry and Next Level keep buddy mode, and leaving the run clears it (`clearCampaignRun()`).
 
 ## Seed Data — Training Grounds
 

@@ -103,12 +103,13 @@ export class SmartChaser {
 
 ## Sandbox Restrictions
 
-Enemy AI scripts run in the same sandboxed environment as bot AIs:
-- No `import`/`require` statements
-- No access to `fs`, `process`, `child_process`, etc.
-- No `eval()`, `Function()`, or `Proxy`
-- 5 second compilation timeout
+Enemy AI uploads go through the same checks as bot AIs (see "Upload and Validation" in the [Bot AI guide](bot-ai-guide.md#upload-and-validation)):
 - 500KB max file size
+- No imports except type-only ones, which compilation erases — Node built-ins and everything else are rejected. Write any helper you need into your file
+- The source may not contain `process.` / `process[`, `globalThis`, `__proto__`, `Object.defineProperty`, `Object.setPrototypeOf`, `Reflect.`, `new Proxy(`, `.constructor`, a `'constructor'` string, or `.prototype` (a text match, so comments and strings count too)
+- The exported class must have a `decide()` method
+
+Uploaded enemy AIs run in an `isolated-vm` isolate: a separate heap with a memory cap and a hard timeout per `decide()` call, with no access to the host. The built-in enemy AIs are compiled from the repository source at startup and run in-process. An AI that throws or times out is replaced by the enemy type's built-in movement pattern for that enemy.
 
 ## Boss Phases
 

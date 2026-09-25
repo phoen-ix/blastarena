@@ -2,21 +2,24 @@
 
 ## Admin Panel
 
-Full-screen panel accessible from lobby header (Admin button visible for admin and moderator roles).
+A lobby view (sidebar → Admin, shown to admin and moderator roles). Tabs a moderator may not use are hidden.
 
 ### Tab Navigation & Permissions
 
 | Tab | Access | Features |
 |-----|--------|----------|
 | Dashboard | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings: recordings toggle, registration toggle, party chat mode, email/SMTP config, game defaults, simulation defaults |
-| Users | Admin + Mod | Search, paginated table, role change, deactivate/reactivate, delete (type-to-confirm), create user, password reset |
+| Users | Admin + Mod | Search and paginated table for both roles. Every change is admin only: role change, deactivate/reactivate, delete (type-to-confirm), create user, password reset, 2FA reset, session revocation, bulk cleanup of unverified/inactive/deactivated accounts. Role changes, deactivation and session revocation ask for confirmation |
 | Matches | Admin + Mod | Paginated history, per-player stats modal. Admin delete per row / delete all (cleans up replay files) |
-| Rooms | Admin + Mod | Active rooms with 5s refresh, spectate, send message, kick player, force close (admin only) |
+| Rooms | Admin + Mod | Active rooms, updated live by the `room:list` broadcast (60s safety refresh). Spectate opens a spectator view of the match; send message (any room, waiting or running), kick player, force close (admin only) |
 | Logs | Admin | Audit trail of all admin actions with action type filter |
 | Simulations | Admin | Batch bot-only game simulations (see below) |
 | AI | Admin | Upload/manage custom bot AI implementations (see below) |
-| Campaign | Admin | Create/edit worlds, levels (visual editor), and enemy types |
 | Announcements | Admin + Mod | Toast broadcast (ephemeral) + persistent lobby banner (admin only) |
+| Campaign | Admin | Create/edit worlds, levels (visual editor), and enemy types; campaign replays |
+| Seasons | Admin | Create, activate (with confirmation), end the active season with a hard/soft Elo reset, delete; rank tier editor |
+| Achievements | Admin | Create/edit achievements with conditions and cosmetic rewards |
+| Challenges | Admin | Weekly community-map challenges: create/edit, activate/deactivate, delete; global on/off toggle |
 
 ### Backend Details
 
@@ -56,12 +59,12 @@ Admin-only system for managing multiple bot AI implementations.
 - **Built-in AI**: Default BotAI listed as non-deletable entry (id `'builtin'`); can be deactivated but not deleted/re-uploaded
 
 ### Upload Pipeline
-Admin uploads `.ts` file -> esbuild transpiles to `.js` -> structure validation (must export class with `generateInput` method) -> dangerous import scan (blocks `fs`, `child_process`, `net`, etc.) -> stored in `data/ai/{uuid}/source.ts` + `compiled.js`
+Admin uploads `.ts` file -> size check (500KB) -> Node built-in import scan -> forbidden pattern scan (`process`, `globalThis`, `__proto__`, `Reflect`, `Proxy`, constructor/prototype access, …) -> esbuild bundle, rejecting every import that survives compilation -> structure check inside an `isolated-vm` isolate (exported class with `generateInput`, instantiable) -> stored in `data/ai/{uuid}/source.ts` + `compiled.js`. Uploaded AIs always run isolated; see the [Bot AI guide](bot-ai-guide.md#upload-and-validation)
 
 ### Key Components
 - **IBotAI interface**: `backend/src/game/BotAI.ts` exports `IBotAI` with `generateInput(player, state, logger?): PlayerInput | null`. Constructor signature: `(difficulty: 'easy' | 'normal' | 'hard', mapSize?: { width, height })`
 - **BotAIRegistry** (`backend/src/services/botai-registry.ts`): Singleton managing loaded AI constructors; `createInstance(aiId, difficulty, mapSize)` factory with built-in fallback; initialized at server startup
-- **BotAI Compiler** (`backend/src/services/botai-compiler.ts`): esbuild transpilation + validation; checks file size (500KB max), dangerous imports, compilation, structure, instantiation
+- **BotAI Compiler** (`backend/src/services/botai-compiler.ts`): the pipeline above; the structure check runs in `isolated-vm` via `inspectAIModule()` (`IsolatedAIRunner.ts`)
 - **CRUD Service** (`backend/src/services/botai.ts`): `listAllAIs()`, `listActiveAIs()`, `uploadAI()`, `updateAI()`, `reuploadAI()`, `deleteAI()`, `downloadSource()`
 
 ### Runtime Safety

@@ -56,6 +56,8 @@ tags:
     description: Achievement definitions and player progress
   - name: Custom Maps
     description: User-created map management
+  - name: Challenges
+    description: Community map challenges (public active challenge, admin management)
   - name: Docs
     description: Documentation file serving
   - name: Campaign Replays
@@ -108,6 +110,9 @@ paths:
     post:
       tags: [Auth]
       summary: Register a new user
+      description: |
+        No session is issued; the email address must be verified before logging in. If the email is
+        already registered the response is the same 200 (the owner gets a warning email instead).
       security: []
       operationId: register
       requestBody:
@@ -117,14 +122,22 @@ paths:
             schema:
               $ref: '#/components/schemas/RegisterRequest'
       responses:
-        '201':
-          description: User registered
+        '200':
+          description: Registered, or the email was already registered (indistinguishable)
           content:
             application/json:
               schema:
                 type: object
+                properties:
+                  emailVerificationRequired:
+                    type: boolean
+                    enum: [true]
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation failed (`VALIDATION_ERROR`), or the username, password or email fails the shared validators
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '403':
           description: Registration disabled
           content:
@@ -132,7 +145,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Username or email already taken
+          description: Username already taken (`CONFLICT`)
           content:
             application/json:
               schema:
@@ -144,7 +157,10 @@ paths:
     post:
       tags: [Auth]
       summary: Log in with credentials
-      description: Returns access token in body and sets httpOnly refreshToken cookie.
+      description: |
+        Returns access token in body and sets httpOnly refreshToken cookie. For an account with 2FA
+        enabled it returns a `TotpChallengeResponse` instead (no cookie); finish the login with
+        `/auth/verify-totp`.
       security: []
       operationId: login
       requestBody:
@@ -153,6 +169,65 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful, or a 2FA challenge
+          headers:
+            Set-Cookie:
+              description: httpOnly refreshToken cookie (not set for a 2FA challenge)
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AuthResponse'
+                  - $ref: '#/components/schemas/TotpChallengeResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Unknown username or wrong password (`INVALID_CREDENTIALS`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Account deactivated (`DEACTIVATED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/verify-totp:
+    post:
+      tags: [Auth]
+      summary: Complete a two-factor login
+      description: |
+        Second step of the login for accounts with 2FA enabled. For those accounts `/auth/login`
+        answers a `TotpChallengeResponse` instead of a session; this call exchanges its `totpToken`
+        (valid for 5 minutes) and a TOTP code or unused backup code for the session. Returns the
+        access token in the body and sets the httpOnly refreshToken cookie, like `/auth/login`.
+        Rate limited to 10 requests per 15 minutes per IP.
+      security: []
+      operationId: verifyTotpLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [totpToken, code]
+              properties:
+                totpToken:
+                  type: string
+                  description: Challenge token returned by `/auth/login`
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 10
+                  description: 6-digit TOTP code or a backup code (`xxxx-xxxx`)
       responses:
         '200':
           description: Login successful
@@ -165,29 +240,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation failed (`VALIDATION_ERROR`), or 2FA is not configured on this server (`TOTP_NOT_CONFIGURED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
-          description: Invalid credentials
+          description: Challenge token invalid, expired or not a login challenge (`INVALID_TOKEN`), wrong code (`INVALID_TOTP_CODE`), or account deleted or deactivated (`INVALID_CREDENTIALS`)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          description: Rate limited (`RATE_LIMITED`), or 10 wrong codes for this account within 15 minutes (`TOTP_RATE_LIMITED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /auth/logout:
     post:
       tags: [Auth]
       summary: Log out (revoke refresh token)
+      description: |
+        Revokes the refresh token from the httpOnly refreshToken cookie, if one is sent, and clears
+        the cookie. Needs no Authorization header, so it also works after the access token has expired.
+      security: []
       operationId: logout
       responses:
         '200':
           description: Logged out
+          headers:
+            Set-Cookie:
+              description: Clears the refreshToken cookie
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
 
   /auth/refresh:
     post:
@@ -210,7 +302,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthResponse'
         '401':
-          description: No refresh token or token invalid
+          description: No refresh token cookie (`NO_REFRESH_TOKEN`), unknown token (`INVALID_TOKEN`), expired token (`TOKEN_EXPIRED`), or a revoked token, which then revokes all of the user's refresh tokens (`TOKEN_REUSE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Account deactivated (`DEACTIVATED`)
           content:
             application/json:
               schema:
@@ -220,6 +318,7 @@ paths:
     get:
       tags: [Auth]
       summary: Verify email address
+      description: The link sent by email. On success the browser is redirected to `{APP_URL}?emailVerified=true`.
       security: []
       operationId: verifyEmail
       parameters:
@@ -229,14 +328,10 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: Email verified
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Message'
+        '302':
+          description: Email verified; redirect to the app with `?emailVerified=true`
         '400':
-          description: Invalid or expired token
+          description: Invalid or expired token (`INVALID_TOKEN`)
           content:
             application/json:
               schema:
@@ -268,6 +363,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '429':
           $ref: '#/components/responses/RateLimited'
 
@@ -299,7 +396,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Message'
         '400':
-          description: Invalid token or password
+          description: Validation failed (`VALIDATION_ERROR`), or invalid or expired reset token (`INVALID_TOKEN`)
           content:
             application/json:
               schema:
@@ -322,6 +419,12 @@ paths:
                 $ref: '#/components/schemas/UserProfile'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: User not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     put:
       tags: [User]
       summary: Update user profile
@@ -337,6 +440,7 @@ paths:
                   type: string
                   minLength: 3
                   maxLength: 20
+                  pattern: '^[a-zA-Z0-9_-]+$'
       responses:
         '200':
           description: Updated profile
@@ -345,11 +449,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserProfile'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation failed (`VALIDATION_ERROR`), or the username fails the shared validator (e.g. invalid characters)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
+        '404':
+          description: User not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '409':
-          description: Username taken
+          description: Username taken (`CONFLICT`)
           content:
             application/json:
               schema:
@@ -381,9 +497,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/Message'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation failed (`VALIDATION_ERROR`), or the address fails the shared email validator
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
+        '409':
+          description: Address already in use by another account (`CONFLICT`); only for admins, whose change is applied directly
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       tags: [User]
       summary: Cancel pending email change
@@ -397,6 +525,8 @@ paths:
                 $ref: '#/components/schemas/Message'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   /user/password:
     post:
@@ -413,6 +543,7 @@ paths:
               properties:
                 currentPassword:
                   type: string
+                  minLength: 1
                   maxLength: 128
                 newPassword:
                   type: string
@@ -426,13 +557,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/Message'
         '400':
-          description: Validation error or same password
+          description: Validation failed (`VALIDATION_ERROR`), or the new password is the same as the current one
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          description: Authentication required, or current password incorrect (`INVALID_PASSWORD`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
+        '404':
+          description: User not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /user/confirm-email/{token}:
     get:
@@ -451,7 +594,13 @@ paths:
         '302':
           description: Email updated; redirect to the app with `?emailChanged=true`
         '400':
-          description: Invalid or expired token
+          description: Invalid token (`INVALID_TOKEN`) or expired link (`TOKEN_EXPIRED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: The new address is already in use by another account (`CONFLICT`)
           content:
             application/json:
               schema:
@@ -476,6 +625,8 @@ paths:
                   $ref: '#/components/schemas/RoomListItem'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   # ===================== Campaign (Player) =====================
   /campaign/worlds:
@@ -497,6 +648,8 @@ paths:
                       $ref: '#/components/schemas/CampaignWorldWithLevels'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   /campaign/worlds/{worldId}/levels:
     get:
@@ -521,8 +674,16 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/CampaignLevelSummary'
+        '400':
+          description: Invalid worldId (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   /campaign/levels/{levelId}:
     get:
@@ -546,8 +707,16 @@ paths:
                 properties:
                   level:
                     $ref: '#/components/schemas/CampaignLevel'
+        '400':
+          description: Invalid levelId (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
         '404':
           description: Level not found or not published
           content:
@@ -572,6 +741,8 @@ paths:
                     $ref: '#/components/schemas/CampaignUserState'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   /campaign/enemy-types:
     get:
@@ -592,12 +763,14 @@ paths:
                       $ref: '#/components/schemas/EnemyTypeEntry'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   # ===================== Campaign Admin =====================
   /admin/campaign/worlds:
     get:
       tags: [Campaign Admin]
-      summary: List all worlds (including unpublished)
+      summary: List all worlds (including unpublished, admin only)
       operationId: adminListWorlds
       responses:
         '200':
@@ -617,7 +790,7 @@ paths:
           $ref: '#/components/responses/Forbidden'
     post:
       tags: [Campaign Admin]
-      summary: Create a world
+      summary: Create a world (admin only)
       operationId: adminCreateWorld
       requestBody:
         required: true
@@ -659,7 +832,7 @@ paths:
   /admin/campaign/worlds/{id}:
     put:
       tags: [Campaign Admin]
-      summary: Update a world
+      summary: Update a world (admin only)
       operationId: adminUpdateWorld
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -687,20 +860,30 @@ paths:
         '200':
           $ref: '#/components/responses/Success'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation failed (`VALIDATION_ERROR`) or invalid id (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
     delete:
       tags: [Campaign Admin]
-      summary: Delete a world
+      summary: Delete a world (admin only)
       operationId: adminDeleteWorld
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       responses:
         '200':
           $ref: '#/components/responses/Success'
+        '400':
+          description: Invalid id (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -709,7 +892,7 @@ paths:
   /admin/campaign/worlds/{id}/order:
     put:
       tags: [Campaign Admin]
-      summary: Reorder a world
+      summary: Reorder a world (admin only)
       operationId: adminReorderWorld
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -722,6 +905,12 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+        '400':
+          description: Validation failed (`VALIDATION_ERROR`) or invalid id (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -730,7 +919,7 @@ paths:
   /admin/campaign/levels:
     get:
       tags: [Campaign Admin]
-      summary: List levels in a world
+      summary: List levels in a world (admin only)
       operationId: adminListLevels
       parameters:
         - name: worldId
@@ -740,7 +929,7 @@ paths:
             type: integer
       responses:
         '200':
-          description: Levels
+          description: Level summaries (including unpublished), in sort order
           content:
             application/json:
               schema:
@@ -749,15 +938,28 @@ paths:
                   levels:
                     type: array
                     items:
-                      $ref: '#/components/schemas/CampaignLevel'
+                      $ref: '#/components/schemas/CampaignLevelSummary'
+        '400':
+          description: Missing or invalid `worldId` query parameter (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
     post:
       tags: [Campaign Admin]
-      summary: Create a level
+      summary: Create a level (admin only)
+      description: Missing fields get defaults (15x13 map, 3 lives, kill_all, unpublished). The level is appended to the end of the world.
       operationId: adminCreateLevel
+      parameters:
+        - name: worldId
+          in: query
+          schema:
+            type: integer
+          description: Used when the body has no `worldId`
       requestBody:
         required: true
         content:
@@ -775,7 +977,11 @@ paths:
                   id:
                     type: integer
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation failed (`VALIDATION_ERROR`), `worldId` missing from both the body and the query (`BAD_REQUEST`), or no world with that ID (`WORLD_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -784,7 +990,7 @@ paths:
   /admin/campaign/levels/{id}:
     get:
       tags: [Campaign Admin]
-      summary: Get level detail
+      summary: Get level detail (admin only)
       operationId: adminGetLevel
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -798,6 +1004,12 @@ paths:
                 properties:
                   level:
                     $ref: '#/components/schemas/CampaignLevel'
+        '400':
+          description: Invalid id (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -810,7 +1022,7 @@ paths:
                 $ref: '#/components/schemas/Error'
     put:
       tags: [Campaign Admin]
-      summary: Update a level
+      summary: Update a level (admin only)
       operationId: adminUpdateLevel
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -824,20 +1036,30 @@ paths:
         '200':
           $ref: '#/components/responses/Success'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation failed (`VALIDATION_ERROR`) or invalid id (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
     delete:
       tags: [Campaign Admin]
-      summary: Delete a level
+      summary: Delete a level (admin only)
       operationId: adminDeleteLevel
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       responses:
         '200':
           $ref: '#/components/responses/Success'
+        '400':
+          description: Invalid id (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -846,7 +1068,7 @@ paths:
   /admin/campaign/levels/{id}/order:
     put:
       tags: [Campaign Admin]
-      summary: Reorder a level
+      summary: Reorder a level (admin only)
       operationId: adminReorderLevel
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -859,6 +1081,12 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+        '400':
+          description: Validation failed (`VALIDATION_ERROR`) or invalid id (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -867,7 +1095,7 @@ paths:
   /admin/campaign/levels/{id}/export:
     get:
       tags: [Campaign Admin]
-      summary: Export level as JSON
+      summary: Export level as JSON (admin only)
       operationId: adminExportLevel
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -878,6 +1106,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LevelExportData'
+        '400':
+          description: Invalid id (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -892,7 +1126,7 @@ paths:
   /admin/campaign/levels/{id}/export-bundle:
     get:
       tags: [Campaign Admin]
-      summary: Export level bundle (level + enemy types)
+      summary: Export level bundle (level + enemy types, admin only)
       operationId: adminExportLevelBundle
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -903,6 +1137,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LevelBundleExportData'
+        '400':
+          description: Invalid id (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -917,10 +1157,18 @@ paths:
   /admin/campaign/levels/import:
     post:
       tags: [Campaign Admin]
-      summary: Import a level (two-phase with conflict resolution)
+      summary: Import a level (two-phase with conflict resolution, admin only)
       description: |
-        Phase 1: Post without `enemyIdMap` to get a `conflicts` array for unresolved enemy type IDs.
-        Phase 2: Post with `enemyIdMap` to resolve conflicts (create/use-existing/skip) and create the level.
+        `level` may be a level export (`_format: blast-arena-level`), a bundle export
+        (`_format: blast-arena-level-bundle`, whose `level` and `enemyTypes` are used) or raw level
+        data (bundled types then go in `enemyTypes`). A bundle export can also be posted as the body
+        itself, with `worldId` added. The level is checked against the same bounds as a created
+        level, and the world must exist before anything is created.
+        Phase 1: without `enemyIdMap`, if any referenced enemy type ID is unknown or comes with
+        bundled data, the answer is a 200 with `conflicts` and nothing is created; otherwise the
+        level is created straight away.
+        Phase 2: with `enemyIdMap` (original ID to existing ID, `create` from the bundled data, or
+        `skip` to drop those placements) the level is created.
       operationId: adminImportLevel
       requestBody:
         required: true
@@ -932,12 +1180,12 @@ paths:
               properties:
                 level:
                   type: object
-                  description: Level export data or raw level data
+                  description: Level export, bundle export, or raw level data
                 enemyTypes:
                   type: array
                   items:
-                    type: object
-                  description: Bundled enemy types (from bundle export)
+                    $ref: '#/components/schemas/BundledEnemyType'
+                  description: Bundled enemy types when `level` is raw level data
                 worldId:
                   type: integer
                 enemyIdMap:
@@ -970,7 +1218,7 @@ paths:
                   id:
                     type: integer
         '400':
-          description: Invalid level data
+          description: Validation failed (`VALIDATION_ERROR`), `Invalid level data` (no name or tiles, or out of bounds; then with `details` like a validation error but no `code`), or no world with `worldId` (`WORLD_NOT_FOUND`)
           content:
             application/json:
               schema:
@@ -983,7 +1231,7 @@ paths:
   /admin/campaign/enemy-types:
     get:
       tags: [Campaign Admin]
-      summary: List all enemy types (admin)
+      summary: List all enemy types (admin only)
       operationId: adminListEnemyTypes
       responses:
         '200':
@@ -1003,7 +1251,7 @@ paths:
           $ref: '#/components/responses/Forbidden'
     post:
       tags: [Campaign Admin]
-      summary: Create an enemy type
+      summary: Create an enemy type (admin only)
       operationId: adminCreateEnemyType
       requestBody:
         required: true
@@ -1031,7 +1279,7 @@ paths:
   /admin/campaign/enemy-types/{id}:
     put:
       tags: [Campaign Admin]
-      summary: Update an enemy type
+      summary: Update an enemy type (admin only)
       operationId: adminUpdateEnemyType
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -1045,20 +1293,30 @@ paths:
         '200':
           $ref: '#/components/responses/Success'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation failed (`VALIDATION_ERROR`) or invalid id (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
     delete:
       tags: [Campaign Admin]
-      summary: Delete an enemy type
+      summary: Delete an enemy type (admin only)
       operationId: adminDeleteEnemyType
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       responses:
         '200':
           $ref: '#/components/responses/Success'
+        '400':
+          description: Invalid id (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1067,7 +1325,7 @@ paths:
   /admin/campaign/enemy-types/{id}/export:
     get:
       tags: [Campaign Admin]
-      summary: Export enemy type as JSON
+      summary: Export enemy type as JSON (admin only)
       operationId: adminExportEnemyType
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -1078,6 +1336,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EnemyTypeExportData'
+        '400':
+          description: Invalid id (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1092,15 +1356,61 @@ paths:
   /admin/campaign/enemy-types/import:
     post:
       tags: [Campaign Admin]
-      summary: Import an enemy type
+      summary: Import an enemy type (admin only)
+      description: |
+        Accepts an enemy type export. If it bundles AI source (`enemyAiSource`) and the config has an
+        `enemyAiId`, the first call without `enemyAiAction` only answers `needsResolution` with any
+        existing AI of the same name. The second call picks `create` (compile and add the bundled AI),
+        `use-existing:<aiId>` (point the config at that existing enemy AI) or `skip` (drop
+        `enemyAiId` and `difficulty` from the config).
       operationId: adminImportEnemyType
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EnemyTypeInput'
+              type: object
+              required: [name, config]
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                description:
+                  type: string
+                  maxLength: 2000
+                  default: ''
+                config:
+                  $ref: '#/components/schemas/EnemyTypeConfig'
+                enemyAiSource:
+                  type: string
+                  description: Bundled TypeScript source of the enemy's custom AI
+                enemyAiName:
+                  type: string
+                enemyAiAction:
+                  type: string
+                  pattern: '^(create|skip|use-existing:.+)$'
       responses:
+        '200':
+          description: AI resolution needed (phase 1); nothing was created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  needsResolution:
+                    type: boolean
+                    enum: [true]
+                  conflict:
+                    type: object
+                    properties:
+                      aiName:
+                        type: string
+                      existingId:
+                        type: string
+                        description: Present when an enemy AI with this name exists
+                      existingName:
+                        type: string
         '201':
           description: Enemy type imported
           content:
@@ -1111,7 +1421,20 @@ paths:
                   id:
                     type: integer
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation failed (`VALIDATION_ERROR`), the bundled AI failed to compile (`errors` lists the compiler messages, no `code`), or the `use-existing` enemy AI does not exist (`AI_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+                  errors:
+                    type: array
+                    items:
+                      type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1155,6 +1478,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1197,6 +1522,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1239,6 +1566,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1247,8 +1576,8 @@ paths:
   /admin/settings/simulation_defaults:
     get:
       tags: [Settings]
-      summary: Get simulation defaults
-      security: []
+      summary: Get simulation defaults (staff)
+      description: Requires admin or moderator role.
       operationId: getSimulationDefaults
       responses:
         '200':
@@ -1260,6 +1589,10 @@ paths:
                 properties:
                   defaults:
                     $ref: '#/components/schemas/SimulationDefaults'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     put:
       tags: [Settings]
       summary: Set simulation defaults (admin only)
@@ -1281,6 +1614,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1308,6 +1643,7 @@ paths:
     put:
       tags: [Settings]
       summary: Update email/SMTP settings (admin only)
+      description: Stored values override the environment configuration. `smtpPassword` omitted or equal to the mask keeps the stored password; an empty string removes it.
       operationId: setEmailSettings
       requestBody:
         required: true
@@ -1322,6 +1658,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1351,7 +1689,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Message'
         '400':
-          description: Failed to send
+          description: Validation failed (`VALIDATION_ERROR`), or the test email could not be sent (details are only logged)
           content:
             application/json:
               schema:
@@ -1366,6 +1704,7 @@ paths:
     post:
       tags: [Users Admin]
       summary: Create a user (admin only)
+      description: The account is created with a verified email and the default cosmetics. `role` defaults to `user`.
       operationId: adminCreateUser
       requestBody:
         required: true
@@ -1397,6 +1736,11 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  id:
+                    type: integer
+                  username:
+                    type: string
         '400':
           $ref: '#/components/responses/ValidationError'
         '401':
@@ -1404,7 +1748,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          description: Username or email taken
+          description: Username or email taken (`CONFLICT`)
           content:
             application/json:
               schema:
@@ -1421,7 +1765,7 @@ paths:
           in: query
           schema:
             type: string
-          description: Search by username or email
+          description: Username substring, or (if it contains `@`) an exact email address
       responses:
         '200':
           description: Paginated user list
@@ -1469,15 +1813,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          description: Validation failed (`VALIDATION_ERROR`), invalid user ID, or changing your own role (`SELF_ACTION`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: User not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /admin/users/{id}/deactivate:
     put:
       tags: [Users Admin]
       summary: Activate or deactivate a user (admin only)
+      description: Deactivating also revokes the user's refresh tokens and disconnects their sockets.
       operationId: adminDeactivateUser
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -1498,15 +1855,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          description: Validation failed (`VALIDATION_ERROR`), invalid user ID, or deactivating yourself (`SELF_ACTION`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: User not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /admin/users/{id}/password:
     put:
       tags: [Users Admin]
       summary: Reset a user's password (admin only)
+      description: Also revokes the user's refresh tokens.
       operationId: adminResetUserPassword
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -1529,10 +1899,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          description: Validation failed (`VALIDATION_ERROR`) or invalid user ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: User not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /admin/users/{id}:
     delete:
@@ -1548,6 +1930,111 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid user ID, or deleting yourself (`SELF_ACTION`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: User not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/users/{id}/reset-totp:
+    post:
+      tags: [Users Admin]
+      summary: Reset a user's two-factor authentication (admin only)
+      description: Disables 2FA for the user and clears their TOTP secret and backup codes.
+      operationId: adminResetUserTotp
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: 2FA reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid user ID, or the user does not have 2FA enabled (`TOTP_NOT_ENABLED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: User not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/users/cleanup/preview:
+    post:
+      tags: [Users Admin]
+      summary: Count the accounts a cleanup would delete (admin only)
+      description: Dry run of `/admin/users/cleanup/execute` with the same filter; nothing is deleted.
+      operationId: adminPreviewAccountCleanup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountCleanupRequest'
+      responses:
+        '200':
+          description: Number of matching accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/users/cleanup/execute:
+    post:
+      tags: [Users Admin]
+      summary: Delete the accounts matching a cleanup filter (admin only)
+      description: |
+        Hard-deletes every matching account (related rows are removed by foreign-key cascades),
+        disconnects their sockets and writes a single `bulk_delete` audit entry. The calling admin
+        is never included.
+      operationId: adminExecuteAccountCleanup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountCleanupRequest'
+      responses:
+        '200':
+          description: Number of deleted accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1639,13 +2126,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MatchDetail'
+        '400':
+          description: Invalid match ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Match not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       tags: [Matches]
       summary: Delete a match (admin only)
+      description: Also deletes its replay file.
       operationId: adminDeleteMatch
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -1656,10 +2156,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid match ID (`INVALID_ID`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Match not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   # ===================== Rooms =====================
   /admin/rooms:
@@ -1735,6 +2247,7 @@ paths:
     post:
       tags: [Announcements]
       summary: Set banner (admin only)
+      description: Replaces any active banner and broadcasts it. Rate limited to 10 requests per minute per IP.
       operationId: setBanner
       requestBody:
         required: true
@@ -1755,6 +2268,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1764,6 +2279,7 @@ paths:
     delete:
       tags: [Announcements]
       summary: Clear banner (admin only)
+      description: Rate limited to 10 requests per minute per IP.
       operationId: clearBanner
       responses:
         '200':
@@ -1782,7 +2298,8 @@ paths:
   /admin/announcements/toast:
     post:
       tags: [Announcements]
-      summary: Send a toast notification (staff)
+      summary: Send a toast notification (admin only)
+      description: Broadcast to every connected client. Rate limited to 10 requests per minute per IP.
       operationId: sendToast
       requestBody:
         required: true
@@ -1803,6 +2320,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1815,6 +2334,7 @@ paths:
     get:
       tags: [Replays]
       summary: List replays (staff)
+      description: Rate limited to 15 requests per 10 seconds per IP; all URLs of this route share the budget.
       operationId: adminListReplays
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -1833,19 +2353,18 @@ paths:
                       $ref: '#/components/schemas/ReplayListItem'
                   total:
                     type: integer
-                  page:
-                    type: integer
-                  limit:
-                    type: integer
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /admin/replays/{matchId}:
     get:
       tags: [Replays]
       summary: Get replay data (staff)
+      description: Rate limited to 15 requests per 10 seconds per IP; all URLs of this route share the budget.
       operationId: adminGetReplay
       parameters:
         - name: matchId
@@ -1870,6 +2389,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
     delete:
       tags: [Replays]
       summary: Delete a replay (admin only)
@@ -1903,6 +2424,7 @@ paths:
     get:
       tags: [Simulations]
       summary: List simulation batches (admin only)
+      description: Rate limited to 15 requests per 10 seconds per IP; all URLs of this route share the budget.
       operationId: adminListSimulations
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -1921,14 +2443,12 @@ paths:
                       $ref: '#/components/schemas/SimulationBatchStatus'
                   total:
                     type: integer
-                  page:
-                    type: integer
-                  limit:
-                    type: integer
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
     post:
       tags: [Simulations]
       summary: Start a simulation batch (admin only)
@@ -1941,11 +2461,20 @@ paths:
               $ref: '#/components/schemas/SimulationConfig'
       responses:
         '201':
-          description: Simulation batch started
+          description: Batch started, or queued behind the running one
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SimulationBatchStatus'
+                type: object
+                properties:
+                  batchId:
+                    type: string
+                  queued:
+                    type: boolean
+                    description: Present (true) only when the batch was queued
+                  queuePosition:
+                    type: integer
+                    description: Present only when the batch was queued
         '400':
           $ref: '#/components/responses/ValidationError'
         '401':
@@ -1963,6 +2492,7 @@ paths:
     get:
       tags: [Simulations]
       summary: Get simulation batch results (admin only)
+      description: Rate limited to 15 requests per 10 seconds per IP; all URLs of this route share the budget.
       operationId: adminGetSimulation
       parameters:
         - name: batchId
@@ -1972,18 +2502,18 @@ paths:
             type: string
       responses:
         '200':
-          description: Batch results with game details
+          description: Batch summary and per-game results
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  batch:
-                    $ref: '#/components/schemas/SimulationBatchStatus'
-                  games:
+                  results:
                     type: array
                     items:
                       $ref: '#/components/schemas/SimulationGameResult'
+                  summary:
+                    $ref: '#/components/schemas/SimulationBatchStatus'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1994,6 +2524,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
     delete:
       tags: [Simulations]
       summary: Delete a simulation batch (admin only)
@@ -2026,6 +2558,7 @@ paths:
     get:
       tags: [Simulations]
       summary: Get replay for a simulation game (admin only)
+      description: Rate limited to 15 requests per 10 seconds per IP; all URLs of this route share the budget.
       operationId: adminGetSimulationReplay
       parameters:
         - name: batchId
@@ -2062,6 +2595,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   # ===================== Bot AI =====================
   /admin/ai/active:
@@ -2138,7 +2673,7 @@ paths:
                   ai:
                     $ref: '#/components/schemas/BotAIEntry'
         '400':
-          description: Compilation/validation failed or no file
+          description: No file uploaded, name missing or longer than 100 characters, compilation/validation failed, not a .ts file (`INVALID_FILE_TYPE`), or another malformed upload (`INVALID_UPLOAD`)
           content:
             application/json:
               schema:
@@ -2146,14 +2681,23 @@ paths:
                 properties:
                   error:
                     type: string
+                  code:
+                    type: string
                   errors:
                     type: array
+                    description: Compiler messages, when compilation failed
                     items:
                       type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '413':
+          description: File larger than 500 KB (`PAYLOAD_TOO_LARGE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /admin/ai/{id}:
     put:
@@ -2189,10 +2733,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: AI not found (`AI_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       tags: [Bot AI]
       summary: Delete a bot AI (admin only)
@@ -2210,10 +2762,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          description: Built-in AIs cannot be deleted (`AI_BUILTIN`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: AI not found (`AI_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /admin/ai/{id}/upload:
     put:
@@ -2246,7 +2810,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Message'
         '400':
-          description: Compilation/validation failed or no file
+          description: No file uploaded, compilation/validation failed, the AI is built in (`AI_BUILTIN`), not a .ts file (`INVALID_FILE_TYPE`), or another malformed upload (`INVALID_UPLOAD`)
           content:
             application/json:
               schema:
@@ -2254,14 +2818,29 @@ paths:
                 properties:
                   error:
                     type: string
+                  code:
+                    type: string
                   errors:
                     type: array
+                    description: Compiler messages, when compilation failed
                     items:
                       type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: AI not found (`AI_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: File larger than 500 KB (`PAYLOAD_TOO_LARGE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /admin/ai/{id}/download:
     get:
@@ -2315,20 +2894,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Message'
+                type: object
+                properties:
+                  message:
+                    type: string
+                  remainingResends:
+                    type: integer
+                    description: Resends left for the account; 0 when the email does not match or is already verified
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: Email missing or not a string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          description: Rate limited (`RATE_LIMITED`, 1 request per 2 minutes per IP), or the account's 3 resends are used up (`RESEND_LIMIT_REACHED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   # ===================== Local Co-Op =====================
   /local-coop/login:
     post:
       tags: [Local Co-Op]
       summary: Log in as local co-op player 2
-      description: Authenticates P2 and sets an isolated httpOnly cookie. Requires P1 to be authenticated.
+      description: |
+        Authenticates P2 and sets an isolated httpOnly cookie. Requires P1 to be authenticated.
+        If P2 has 2FA enabled it returns a `TotpChallengeResponse` instead (no cookie); finish with
+        `/local-coop/verify-totp`.
       operationId: localCoopLogin
       requestBody:
         required: true
@@ -2338,21 +2934,100 @@ paths:
               $ref: '#/components/schemas/LocalCoopLoginRequest'
       responses:
         '200':
-          description: P2 session created
+          description: P2 session created, or a 2FA challenge
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LocalCoopSession'
+                oneOf:
+                  - $ref: '#/components/schemas/LocalCoopSession'
+                  - $ref: '#/components/schemas/TotpChallengeResponse'
         '400':
-          description: Invalid credentials or same user as P1
+          description: Validation failed (`VALIDATION_ERROR`), or P2 is the same account as P1
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          description: P1 not authenticated, or unknown P2 username or wrong password (`INVALID_CREDENTIALS`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: P2 account deactivated (`DEACTIVATED`) or its email not verified (`EMAIL_NOT_VERIFIED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '429':
           $ref: '#/components/responses/RateLimited'
+
+  /local-coop/verify-totp:
+    post:
+      tags: [Local Co-Op]
+      summary: Complete a local co-op player 2 login with 2FA
+      description: |
+        Second step of `/local-coop/login` when P2 has 2FA enabled. For such accounts that call
+        answers a `TotpChallengeResponse`; this one exchanges its `totpToken` and P2's TOTP code or
+        unused backup code for the isolated P2 httpOnly cookie. The token is valid for 5 minutes and
+        only for the P1 account that requested it. Requires P1 to be authenticated.
+        Rate limited to 10 requests per 15 minutes per IP.
+      operationId: localCoopVerifyTotp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [totpToken, code]
+              properties:
+                totpToken:
+                  type: string
+                  description: Challenge token returned by `/local-coop/login`
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 10
+                  description: P2's 6-digit TOTP code or a backup code (`xxxx-xxxx`)
+                duration:
+                  type: number
+                  description: Accepted but not used; the session duration is the one sent to `/local-coop/login`, carried in `totpToken`
+      responses:
+        '200':
+          description: P2 session created
+          headers:
+            Set-Cookie:
+              description: httpOnly localCoopP2 cookie (path /api/local-coop)
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocalCoopSession'
+        '400':
+          description: Validation failed (`VALIDATION_ERROR`), or 2FA is not configured on this server (`TOTP_NOT_CONFIGURED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: P1 not authenticated, challenge token invalid, expired or issued to another P1 (`INVALID_TOKEN`), or wrong code (`INVALID_TOTP_CODE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: P2 account deleted, deactivated or with an unverified email (`FORBIDDEN`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limited (`RATE_LIMITED`), or 10 wrong codes for P2's account within 15 minutes (`TOTP_RATE_LIMITED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /local-coop/session:
     get:
@@ -2368,7 +3043,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/LocalCoopSession'
         '401':
-          description: No session or invalid/expired token
+          description: No session cookie, invalid or expired session, or the P2 account was deleted or deactivated (the cookie is then cleared)
           content:
             application/json:
               schema:
@@ -2391,7 +3066,7 @@ paths:
                   token:
                     type: string
         '401':
-          description: No local co-op session or invalid/expired
+          description: P1 not authenticated, no local co-op session cookie, or invalid or expired session
           content:
             application/json:
               schema:
@@ -2430,8 +3105,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserProfile'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
+        '404':
+          description: User not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   # ===================== User — Language =====================
   /user/language:
@@ -2459,6 +3144,8 @@ paths:
                 properties:
                   language:
                     $ref: '#/components/schemas/SupportedLanguage'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -2477,6 +3164,8 @@ paths:
                 $ref: '#/components/schemas/BuddySettings'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
     put:
       tags: [User]
       summary: Update buddy mode settings
@@ -2494,8 +3183,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BuddySettings'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   # ===================== User — Delete Account =====================
   /user/account:
@@ -2514,6 +3207,7 @@ paths:
               properties:
                 password:
                   type: string
+                  minLength: 1
       responses:
         '200':
           description: Account deleted
@@ -2522,29 +3216,274 @@ paths:
               schema:
                 $ref: '#/components/schemas/Message'
         '400':
-          description: Wrong password or admin account
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Authentication required, or wrong password (`INVALID_PASSWORD`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Email not verified (`EMAIL_NOT_VERIFIED`), or admin accounts cannot delete themselves (`FORBIDDEN`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ===================== User — Match History =====================
+  /user/matches:
+    get:
+      tags: [User]
+      summary: Get own match history
+      description: Finished matches the current user played in, most recent first.
+      operationId: getUserMatchHistory
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Paginated match history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  matches:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        gameMode:
+                          type: string
+                        duration:
+                          type: integer
+                          nullable: true
+                          description: Match duration in seconds
+                        finishedAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+                        playerCount:
+                          type: integer
+                        winnerUsername:
+                          type: string
+                          nullable: true
+                        placement:
+                          type: integer
+                          nullable: true
+                        kills:
+                          type: integer
+                        deaths:
+                          type: integer
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
+
+  # ===================== User — Two-Factor Authentication =====================
+  /user/totp/setup:
+    post:
+      tags: [User]
+      summary: Start two-factor authentication setup
+      description: |
+        Generates a TOTP secret (SHA-1, 6 digits, 30-second period) and 10 single-use backup codes
+        and stores them on the account; 2FA stays off until `/user/totp/confirm` succeeds. Calling
+        this again before confirming replaces the pending secret and codes. The backup codes are
+        stored hashed, so this is the only response that contains them.
+        Rate limited to 5 requests per 15 minutes per IP.
+      operationId: beginTotpSetup
+      responses:
+        '200':
+          description: Pending 2FA secret and backup codes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  qrDataUri:
+                    type: string
+                    description: Data URI of a QR code image encoding the otpauth URI
+                  secret:
+                    type: string
+                    description: Base32 secret for manual entry
+                  backupCodes:
+                    type: array
+                    minItems: 10
+                    maxItems: 10
+                    items:
+                      type: string
+                      pattern: '^[0-9a-f]{4}-[0-9a-f]{4}$'
+        '400':
+          description: 2FA is not configured on this server (`TOTP_NOT_CONFIGURED`) or is already enabled (`TOTP_ALREADY_ENABLED`)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
+        '404':
+          description: User not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /user/totp/confirm:
+    post:
+      tags: [User]
+      summary: Confirm two-factor authentication setup
+      description: |
+        Enables 2FA once a code for the pending secret from `/user/totp/setup` verifies. Accepts a
+        6-digit TOTP code or one of the backup codes from that setup (a backup code used here is
+        consumed). Rate limited to 5 requests per 15 minutes per IP.
+      operationId: confirmTotpSetup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 10
+                  description: 6-digit TOTP code or a backup code (`xxxx-xxxx`)
+      responses:
+        '200':
+          description: 2FA enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Validation failed (`VALIDATION_ERROR`), 2FA not configured on this server (`TOTP_NOT_CONFIGURED`), already enabled (`TOTP_ALREADY_ENABLED`), no setup in progress (`NO_TOTP_SETUP`), or wrong code (`INVALID_TOTP_CODE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
+        '404':
+          description: User not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limited (`RATE_LIMITED`), or 10 wrong codes for this account within 15 minutes (`TOTP_RATE_LIMITED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/totp/disable:
+    post:
+      tags: [User]
+      summary: Disable two-factor authentication
+      description: |
+        Requires the account password and a current TOTP code or unused backup code. Clears the
+        TOTP secret and backup codes. Rate limited to 5 requests per 15 minutes per IP.
+      operationId: disableTotp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password, code]
+              properties:
+                password:
+                  type: string
+                  minLength: 1
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 10
+                  description: 6-digit TOTP code or a backup code (`xxxx-xxxx`)
+      responses:
+        '200':
+          description: 2FA disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Validation failed (`VALIDATION_ERROR`), 2FA not configured on this server (`TOTP_NOT_CONFIGURED`), 2FA not enabled (`TOTP_NOT_ENABLED`), or wrong code (`INVALID_TOTP_CODE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required, or wrong password (`INVALID_PASSWORD`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
+        '404':
+          description: User not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limited (`RATE_LIMITED`), or 10 wrong codes for this account within 15 minutes (`TOTP_RATE_LIMITED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   # ===================== Leaderboard =====================
   /leaderboard:
     get:
       tags: [Leaderboard]
       summary: Get paginated leaderboard
+      description: Only active accounts with a public profile are listed. Without `season_id` the active season is shown, or the all-time standings if no season is active.
       operationId: getLeaderboard
       security: []
       parameters:
         - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/Limit'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
         - name: season_id
           in: query
           schema:
             type: integer
-          description: Filter by season ID (omit for current/global)
+          description: Show this season's standings
       responses:
         '200':
           description: Leaderboard page
@@ -2639,6 +3578,8 @@ paths:
                 $ref: '#/components/schemas/UserRankInfo'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   # ===================== Friends =====================
   /friends:
@@ -2672,6 +3613,8 @@ paths:
                       $ref: '#/components/schemas/BlockedUser'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   /friends/blocked:
     get:
@@ -2692,11 +3635,14 @@ paths:
                       $ref: '#/components/schemas/BlockedUser'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   /friends/search:
     post:
       tags: [Friends]
       summary: Search users by username prefix
+      description: Excludes the caller, deactivated accounts, and users blocked in either direction.
       operationId: searchUsers
       requestBody:
         required: true
@@ -2727,8 +3673,12 @@ paths:
                           type: integer
                         username:
                           type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   # ===================== Messages =====================
   /messages:
@@ -2750,6 +3700,8 @@ paths:
                       $ref: '#/components/schemas/ConversationListItem'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   /messages/{userId}:
     get:
@@ -2796,6 +3748,8 @@ paths:
                 $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   /messages/{userId}/read:
     put:
@@ -2823,6 +3777,8 @@ paths:
                 $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   # ===================== Cosmetics =====================
   /cosmetics:
@@ -2863,6 +3819,8 @@ paths:
                       $ref: '#/components/schemas/CosmeticEntry'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   /cosmetics/equipped:
     get:
@@ -2878,6 +3836,8 @@ paths:
                 $ref: '#/components/schemas/EquippedCosmetics'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   /cosmetics/equip:
     put:
@@ -2906,13 +3866,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/EquippedCosmetics'
         '400':
-          description: Do not own cosmetic or type mismatch
+          description: Validation failed (`VALIDATION_ERROR`), unknown cosmetic or wrong type for the slot (`COSMETIC_SLOT_MISMATCH`), or cosmetic no longer active (`COSMETIC_INACTIVE`)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Email not verified (`EMAIL_NOT_VERIFIED`), or the user does not own the cosmetic (`COSMETIC_NOT_OWNED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   # ===================== Achievements =====================
   /achievements:
@@ -2953,6 +3919,8 @@ paths:
                       $ref: '#/components/schemas/UserAchievement'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   /achievements/progress:
     get:
@@ -2973,6 +3941,8 @@ paths:
                       $ref: '#/components/schemas/AchievementProgress'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   # ===================== Custom Maps =====================
   /maps/mine:
@@ -2994,6 +3964,8 @@ paths:
                       $ref: '#/components/schemas/CustomMapSummary'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   /maps/published:
     get:
@@ -3014,6 +3986,8 @@ paths:
                       $ref: '#/components/schemas/CustomMapSummary'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   /maps/{id}:
     get:
@@ -3033,10 +4007,18 @@ paths:
                 properties:
                   map:
                     $ref: '#/components/schemas/CustomMap'
+        '400':
+          description: Invalid map ID (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
         '404':
-          description: Map not found or not accessible
+          description: Map not found or not accessible (`NOT_FOUND`)
           content:
             application/json:
               schema:
@@ -3064,15 +4046,17 @@ paths:
                   success:
                     type: boolean
         '400':
-          description: Invalid map data
+          description: Validation failed (`VALIDATION_ERROR`), or invalid map ID or map data rejected by the map validator (`BAD_REQUEST`)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
         '404':
-          description: Map not found or not owned by user
+          description: Map not found or not owned by user (`NOT_FOUND`)
           content:
             application/json:
               schema:
@@ -3093,14 +4077,108 @@ paths:
                 properties:
                   success:
                     type: boolean
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          description: Map not found or not owned by user
+        '400':
+          description: Invalid map ID (`BAD_REQUEST`)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
+        '404':
+          description: Map not found or not owned by user (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Map is linked to a challenge that is active or has not ended yet (`MAP_IN_USE`); checked before ownership
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /maps/{id}/rate:
+    post:
+      tags: [Custom Maps]
+      summary: Rate a published map
+      description: Sets the current user's 1-5 star rating for a published map they do not own, replacing any earlier rating by them.
+      operationId: rateMap
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+      responses:
+        '200':
+          description: The map's rating aggregate after this rating
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  avgRating:
+                    type: number
+                  ratingCount:
+                    type: integer
+        '400':
+          description: Validation failed (`VALIDATION_ERROR`), or invalid map ID or the map is the user's own (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
+        '404':
+          description: Map not found or not published (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /maps/{id}/rating:
+    get:
+      tags: [Custom Maps]
+      summary: Get own rating for a map
+      operationId: getMyMapRating
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: The current user's rating, or null if they have not rated the map
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rating:
+                    type: integer
+                    minimum: 1
+                    maximum: 5
+                    nullable: true
+        '400':
+          description: Invalid map ID (`BAD_REQUEST`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
 
   /maps:
     post:
@@ -3124,13 +4202,339 @@ paths:
                   id:
                     type: integer
         '400':
-          description: Invalid map data
+          description: Validation failed (`VALIDATION_ERROR`), or map data rejected by the map validator (`BAD_REQUEST`)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EmailNotVerified'
+
+  # ===================== Challenges =====================
+  /challenges/active:
+    get:
+      tags: [Challenges]
+      summary: Get the active map challenge
+      description: |
+        The active challenge with its map tiles and the top 5 scores. When no challenge is active,
+        or challenges are turned off (`/admin/settings/challenges_enabled`), the body is only
+        `{ "challenge": null }`.
+      security: []
+      operationId: getActiveChallenge
+      responses:
+        '200':
+          description: Active challenge, or a null challenge
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  challenge:
+                    nullable: true
+                    allOf:
+                      - $ref: '#/components/schemas/MapChallengeSummary'
+                  mapTiles:
+                    type: array
+                    nullable: true
+                    description: Tile grid of the challenge map (rows of tile type names)
+                    items:
+                      type: array
+                      items:
+                        type: string
+                  topScores:
+                    type: array
+                    maxItems: 5
+                    description: Ordered by wins, then kills, then fewest deaths
+                    items:
+                      type: object
+                      properties:
+                        userId:
+                          type: integer
+                        username:
+                          type: string
+                        wins:
+                          type: integer
+                        kills:
+                          type: integer
+                        deaths:
+                          type: integer
+                        gamesPlayed:
+                          type: integer
+                        bestPlacement:
+                          type: integer
+                          nullable: true
+
+  /admin/challenges:
+    get:
+      tags: [Challenges]
+      summary: List map challenges (admin only)
+      description: Ordered by start date, newest first.
+      operationId: adminListChallenges
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Paginated challenge list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  challenges:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MapChallengeSummary'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Challenges]
+      summary: Create a map challenge (admin only)
+      description: The challenge is created inactive; see `/admin/challenges/{id}/activate`.
+      operationId: adminCreateChallenge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, customMapId, gameMode, startDate, endDate]
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 150
+                description:
+                  type: string
+                  maxLength: 2000
+                  default: ''
+                customMapId:
+                  type: integer
+                  minimum: 1
+                  description: Must be an existing, published custom map
+                gameMode:
+                  $ref: '#/components/schemas/GameMode'
+                startDate:
+                  type: string
+                  format: date
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
+                endDate:
+                  type: string
+                  format: date
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
+                  description: Must be after `startDate`
+      responses:
+        '200':
+          description: Challenge created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  title:
+                    type: string
+                  description:
+                    type: string
+                  customMapId:
+                    type: integer
+                  gameMode:
+                    $ref: '#/components/schemas/GameMode'
+                  startDate:
+                    type: string
+                    format: date
+                  endDate:
+                    type: string
+                    format: date
+                  isActive:
+                    type: boolean
+                    description: Always false for a new challenge
+                  createdBy:
+                    type: integer
+                  createdAt:
+                    type: string
+                    format: date-time
+        '400':
+          description: Validation failed (`VALIDATION_ERROR`), `endDate` not after `startDate` (`INVALID_DATE_RANGE`), unknown map (`MAP_NOT_FOUND`), or map not published (`MAP_NOT_PUBLISHED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/challenges/{id}:
+    put:
+      tags: [Challenges]
+      summary: Update a map challenge (admin only)
+      description: |
+        Updates only the fields sent. When `startDate` or `endDate` is sent, the range is re-checked
+        against the stored value of the other end, so `endDate` must still be after `startDate`.
+        A new `customMapId` must be an existing, published custom map.
+      operationId: adminUpdateChallenge
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 150
+                description:
+                  type: string
+                  maxLength: 2000
+                customMapId:
+                  type: integer
+                  minimum: 1
+                  description: Must be an existing, published custom map
+                gameMode:
+                  $ref: '#/components/schemas/GameMode'
+                startDate:
+                  type: string
+                  format: date
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
+                endDate:
+                  type: string
+                  format: date
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
+      responses:
+        '200':
+          description: Challenge updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid ID (`INVALID_ID`), validation failed (`VALIDATION_ERROR`), `endDate` not after `startDate` (`INVALID_DATE_RANGE`), unknown map (`MAP_NOT_FOUND`), or map not published (`MAP_NOT_PUBLISHED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Challenge not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Challenges]
+      summary: Delete a map challenge (admin only)
+      description: The challenge's scores are removed with it (foreign-key cascade).
+      operationId: adminDeleteChallenge
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Challenge deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid ID (`INVALID_ID`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Challenge not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/challenges/{id}/activate:
+    post:
+      tags: [Challenges]
+      summary: Activate a map challenge (admin only)
+      description: |
+        In one transaction every challenge is set inactive and then this one active, so at most one
+        challenge is active at a time. An unknown ID is rejected before anything is changed.
+      operationId: adminActivateChallenge
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Challenge activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid ID (`INVALID_ID`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Challenge not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/challenges/{id}/deactivate:
+    post:
+      tags: [Challenges]
+      summary: Deactivate a map challenge (admin only)
+      operationId: adminDeactivateChallenge
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Challenge deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid ID (`INVALID_ID`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Challenge not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   # ===================== Docs =====================
   /docs/{filename}:
@@ -3215,7 +4619,7 @@ paths:
     get:
       tags: [Settings]
       summary: Get batched public settings
-      description: Returns registration, imprint, and github display settings in a single request.
+      description: Returns the registration, imprint, GitHub display and open world settings in a single request.
       security: []
       operationId: getPublicSettings
       responses:
@@ -3232,7 +4636,12 @@ paths:
                     type: boolean
                   imprintText:
                     type: string
+                    description: Empty when the imprint is disabled
                   displayGithub:
+                    type: boolean
+                  openWorldEnabled:
+                    type: boolean
+                  openWorldGuestAccess:
                     type: boolean
 
   /admin/settings/party_chat_mode:
@@ -3272,6 +4681,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3314,6 +4725,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3356,6 +4769,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3398,6 +4813,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3440,6 +4857,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/settings/spectator_actions_enabled:
+    get:
+      tags: [Settings]
+      summary: Get spectator actions enabled status
+      security: []
+      operationId: getSpectatorActionsEnabled
+      responses:
+        '200':
+          description: Spectator actions status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+    put:
+      tags: [Settings]
+      summary: Set spectator actions enabled (admin only)
+      operationId: setSpectatorActionsEnabled
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Setting updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3527,7 +4990,7 @@ paths:
               properties:
                 theme:
                   type: string
-                  description: Must be a valid theme ID from THEME_IDS
+                  enum: [inferno, arctic, toxic, crimson, midnight, daylight, sakura, sand, frost, blossom, dune]
       responses:
         '200':
           description: Default theme updated
@@ -3535,6 +4998,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3582,6 +5047,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3624,6 +5091,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3663,11 +5132,148 @@ paths:
               schema:
                 $ref: '#/components/schemas/RankConfig'
         '400':
-          description: Invalid rank config
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/settings/open_world:
+    get:
+      tags: [Settings]
+      summary: Get open world settings (admin only)
+      operationId: adminGetOpenWorldSettings
+      responses:
+        '200':
+          description: Open world settings (every field present)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/OpenWorldSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Settings]
+      summary: Update open world settings (admin only)
+      description: |
+        Partial update: only the fields sent are stored. The running open world is hot-reloaded.
+        Enabling it while disabled starts a new round and disabling it shuts it down; otherwise the
+        new settings are adopted, and `roundTime` and `respawnDelay` also apply to the round in
+        progress.
+      operationId: adminSetOpenWorldSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenWorldSettings'
+      responses:
+        '200':
+          description: Open world settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/settings/open_world/status:
+    get:
+      tags: [Settings]
+      summary: Get open world live status
+      description: Current round and the full standings, highest score first (not truncated).
+      security: []
+      operationId: getOpenWorldStatus
+      responses:
+        '200':
+          description: Open world status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  playerCount:
+                    type: integer
+                  maxPlayers:
+                    type: integer
+                  roundTimeRemaining:
+                    type: number
+                    description: Seconds left in the current round
+                  roundNumber:
+                    type: integer
+                  guestAccess:
+                    type: boolean
+                  leaderboard:
+                    type: array
+                    description: Every player in the open world, sorted by score, then kills
+                    items:
+                      type: object
+                      properties:
+                        playerId:
+                          type: integer
+                          description: Negative for guests
+                        username:
+                          type: string
+                        kills:
+                          type: integer
+                        deaths:
+                          type: integer
+                        score:
+                          type: integer
+                        isGuest:
+                          type: boolean
+
+  /admin/settings/challenges_enabled:
+    get:
+      tags: [Settings]
+      summary: Get map challenges enabled status (staff)
+      description: Requires admin or moderator role. While disabled, `/challenges/active` returns no challenge.
+      operationId: getChallengesEnabled
+      responses:
+        '200':
+          description: Challenges status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Settings]
+      summary: Set map challenges enabled (admin only)
+      operationId: setChallengesEnabled
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Setting updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3690,7 +5296,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Message'
         '400':
-          description: Invalid user ID
+          description: Invalid user ID, or revoking your own sessions (`SELF_ACTION`)
           content:
             application/json:
               schema:
@@ -3751,10 +5357,6 @@ paths:
                       $ref: '#/components/schemas/CampaignReplayListItem'
                   total:
                     type: integer
-                  page:
-                    type: integer
-                  limit:
-                    type: integer
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3764,6 +5366,7 @@ paths:
     get:
       tags: [Campaign Replays]
       summary: Get campaign replay data (staff)
+      description: Rate limited to 15 requests per 10 seconds per IP; all URLs of this route share the budget.
       operationId: adminGetCampaignReplay
       parameters:
         - name: sessionId
@@ -3788,6 +5391,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
     delete:
       tags: [Campaign Replays]
       summary: Delete a campaign replay (admin only)
@@ -3828,7 +5433,7 @@ paths:
                   ais:
                     type: array
                     items:
-                      $ref: '#/components/schemas/BotAIEntry'
+                      $ref: '#/components/schemas/EnemyAIEntry'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3850,7 +5455,7 @@ paths:
                   ais:
                     type: array
                     items:
-                      $ref: '#/components/schemas/BotAIEntry'
+                      $ref: '#/components/schemas/EnemyAIEntry'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3887,9 +5492,9 @@ paths:
                 type: object
                 properties:
                   ai:
-                    $ref: '#/components/schemas/BotAIEntry'
+                    $ref: '#/components/schemas/EnemyAIEntry'
         '400':
-          description: Compilation/validation failed or no file
+          description: No file uploaded, name missing, compilation/validation failed, not a .ts file (`INVALID_FILE_TYPE`), or another malformed upload (`INVALID_UPLOAD`)
           content:
             application/json:
               schema:
@@ -3897,14 +5502,23 @@ paths:
                 properties:
                   error:
                     type: string
+                  code:
+                    type: string
                   errors:
                     type: array
+                    description: Compiler messages, when compilation failed
                     items:
                       type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '413':
+          description: File larger than 500 KB (`PAYLOAD_TOO_LARGE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /admin/enemy-ai/{id}:
     put:
@@ -3940,10 +5554,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Enemy AI not found (`AI_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       tags: [Enemy AI]
       summary: Delete an enemy AI (admin only)
@@ -3961,10 +5583,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          description: Built-in enemy AIs cannot be deleted (`AI_BUILTIN`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Enemy AI not found (`AI_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /admin/enemy-ai/{id}/upload:
     put:
@@ -3997,7 +5631,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Message'
         '400':
-          description: Compilation/validation failed or no file
+          description: No file uploaded, compilation/validation failed, the AI is built in (`AI_BUILTIN`), not a .ts file (`INVALID_FILE_TYPE`), or another malformed upload (`INVALID_UPLOAD`)
           content:
             application/json:
               schema:
@@ -4005,14 +5639,29 @@ paths:
                 properties:
                   error:
                     type: string
+                  code:
+                    type: string
                   errors:
                     type: array
+                    description: Compiler messages, when compilation failed
                     items:
                       type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Enemy AI not found (`AI_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: File larger than 500 KB (`PAYLOAD_TOO_LARGE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /admin/enemy-ai/{id}/download:
     get:
@@ -4051,10 +5700,16 @@ paths:
       operationId: adminGetSeasons
       parameters:
         - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/Limit'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
       responses:
         '200':
-          description: Paginated season list
+          description: Paginated season list, newest start date first
           content:
             application/json:
               schema:
@@ -4065,10 +5720,6 @@ paths:
                     items:
                       $ref: '#/components/schemas/Season'
                   total:
-                    type: integer
-                  page:
-                    type: integer
-                  limit:
                     type: integer
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -4100,13 +5751,17 @@ paths:
                   pattern: '^\d{4}-\d{2}-\d{2}$'
       responses:
         '200':
-          description: Season created
+          description: Season created (inactive)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Season'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation failed (`VALIDATION_ERROR`), or `endDate` not after `startDate` (`INVALID_DATE_RANGE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4116,6 +5771,7 @@ paths:
     put:
       tags: [Seasons]
       summary: Update a season (admin only)
+      description: Updates only the fields sent. When `startDate` or `endDate` is sent, the range is re-checked against the stored value of the other end.
       operationId: adminUpdateSeason
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -4133,22 +5789,34 @@ paths:
                 startDate:
                   type: string
                   format: date
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
                 endDate:
                   type: string
                   format: date
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
       responses:
         '200':
-          description: Updated season
+          description: The updated season
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Season'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation failed (`VALIDATION_ERROR`), invalid ID (`INVALID_ID`), or `endDate` not after `startDate` (`INVALID_DATE_RANGE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Season not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       tags: [Seasons]
       summary: Delete a season (admin only)
@@ -4162,15 +5830,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid ID (`INVALID_ID`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Season not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /admin/seasons/{id}/activate:
     post:
       tags: [Seasons]
       summary: Activate a season (admin only)
+      description: |
+        In one transaction every season is set inactive, this one active, and a season Elo row is
+        created from the current Elo for every user who has none. An unknown ID is rejected before
+        anything is changed.
       operationId: adminActivateSeason
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -4181,15 +5865,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid ID (`INVALID_ID`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Season not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /admin/seasons/{id}/end:
     post:
       tags: [Seasons]
       summary: End a season (admin only)
+      description: Only the active season can be ended. Sets it inactive and resets every user's Elo (peak Elo is raised to the new rating where lower); an unknown or inactive season is rejected before anything is changed.
       operationId: adminEndSeason
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -4204,7 +5901,7 @@ paths:
                 resetMode:
                   type: string
                   enum: [hard, soft]
-                  description: "'hard' resets all Elo to default; 'soft' decays toward default"
+                  description: "'hard' sets every Elo to 1000; 'soft' halves the distance to 1000"
       responses:
         '200':
           description: Season ended
@@ -4212,10 +5909,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          description: Validation failed (`VALIDATION_ERROR`) or invalid ID (`INVALID_ID`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Season not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: The season is not the active one (`SEASON_NOT_ACTIVE`); nothing is changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   # ===================== Achievements Admin =====================
   /admin/achievements:
@@ -4242,6 +5957,7 @@ paths:
     post:
       tags: [Achievements Admin]
       summary: Create an achievement (admin only)
+      description: "Defaults: icon 🏆, category `general`, rewardType `none`, sortOrder 0."
       operationId: adminCreateAchievement
       requestBody:
         required: true
@@ -4275,18 +5991,30 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AchievementInput'
+              $ref: '#/components/schemas/AchievementUpdateInput'
       responses:
         '200':
-          description: Updated achievement
+          description: The updated achievement
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AchievementEntry'
+        '400':
+          description: Validation failed (`VALIDATION_ERROR`) or invalid ID (`INVALID_ID`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Achievement not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       tags: [Achievements Admin]
       summary: Delete an achievement (admin only)
@@ -4300,6 +6028,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid ID (`INVALID_ID`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4352,8 +6086,13 @@ paths:
       tags: [Achievements Admin]
       summary: Import achievements (admin only, two-phase)
       description: |
-        Phase 1: Post without `cosmeticIdMap` to detect cosmetic conflicts.
-        Phase 2: Post with `cosmeticIdMap` to resolve conflicts and import.
+        Phase 1: without `cosmeticIdMap`, if the bundle carries cosmetics the answer lists every one
+        of them in `conflicts` (with `existingId`/`existingName` when a cosmetic of the same name
+        exists) and nothing is imported; without bundled cosmetics the achievements are imported
+        straight away.
+        Phase 2: with `cosmeticIdMap` the bundled cosmetics are created, mapped or skipped, then the
+        achievements are created. A cosmetic reward that ends up skipped or unmatched turns the
+        achievement's reward into `none`. The entries themselves are not validated.
       operationId: adminImportAchievements
       requestBody:
         required: true
@@ -4436,6 +6175,7 @@ paths:
     post:
       tags: [Cosmetics Admin]
       summary: Create a cosmetic (admin only)
+      description: "Defaults: rarity `common`, unlockType `achievement`, sortOrder 0."
       operationId: adminCreateCosmetic
       requestBody:
         required: true
@@ -4469,18 +6209,30 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CosmeticInput'
+              $ref: '#/components/schemas/CosmeticUpdateInput'
       responses:
         '200':
-          description: Updated cosmetic
+          description: The updated cosmetic
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CosmeticEntry'
+        '400':
+          description: Validation failed (`VALIDATION_ERROR`) or invalid ID (`INVALID_ID`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Cosmetic not found (`NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       tags: [Cosmetics Admin]
       summary: Delete a cosmetic (admin only)
@@ -4494,6 +6246,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid ID (`INVALID_ID`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4528,6 +6286,7 @@ paths:
     post:
       tags: [Cosmetics Admin]
       summary: Import a cosmetic (admin only)
+      description: "Only `name`, `type` and `config` are checked (for presence). Defaults: rarity `common`, unlockType `default`, sortOrder 0."
       operationId: adminImportCosmetic
       requestBody:
         required: true
@@ -4591,25 +6350,68 @@ components:
 
   responses:
     Unauthorized:
-      description: Authentication required
+      description: |
+        Missing access token (`UNAUTHORIZED`), invalid or expired access token (`INVALID_TOKEN`),
+        or, on routes that also check the verified email or the staff role against the database,
+        a token whose user no longer exists (`USER_NOT_FOUND`)
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
     Forbidden:
-      description: Insufficient permissions
+      description: Role not allowed (`FORBIDDEN`) or account deactivated (`DEACTIVATED`); the role is read from the database, not the token
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
     ValidationError:
-      description: Request validation failed
+      description: Request validation failed (`VALIDATION_ERROR`); `details` lists each invalid field
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            type: object
+            required: [error, code, details]
+            properties:
+              error:
+                type: string
+                example: Validation failed
+              code:
+                type: string
+                enum: [VALIDATION_ERROR]
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    field:
+                      type: string
+                      description: Dotted path of the invalid field
+                    message:
+                      type: string
     RateLimited:
-      description: Too many requests
+      description: Too many requests (`RATE_LIMITED`)
+      headers:
+        Retry-After:
+          description: Seconds until the limit resets (not sent by the in-memory fallback used when Redis is unavailable)
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error, code]
+            properties:
+              error:
+                type: string
+                example: Too many requests
+              code:
+                type: string
+                enum: [RATE_LIMITED]
+              retryAfter:
+                type: integer
+                description: Same value as the Retry-After header, when sent
+    EmailNotVerified:
+      description: Email address not verified (`EMAIL_NOT_VERIFIED`)
       content:
         application/json:
           schema:
@@ -4632,6 +6434,9 @@ components:
       properties:
         error:
           type: string
+        code:
+          type: string
+          description: Machine-readable error code, where the server sets one; the values an operation can return are listed in its response descriptions
       required: [error]
 
     ErrorWithMessage:
@@ -4649,6 +6454,11 @@ components:
           type: string
       required: [message]
 
+    DbBoolean:
+      type: integer
+      enum: [0, 1]
+      description: A MySQL BOOLEAN column passed through without conversion, so it arrives as 0 or 1 instead of false or true
+
     # ---- Enums ----
     UserRole:
       type: string
@@ -4660,7 +6470,7 @@ components:
 
     PowerUpType:
       type: string
-      enum: [bomb_up, fire_up, speed_up, shield, kick, pierce_bomb, remote_bomb, line_bomb]
+      enum: [bomb_up, fire_up, speed_up, shield, kick, pierce_bomb, remote_bomb, line_bomb, bomb_throw]
 
     BotDifficulty:
       type: string
@@ -4675,6 +6485,7 @@ components:
           type: string
           minLength: 3
           maxLength: 20
+          pattern: '^[a-zA-Z0-9_-]+$'
         email:
           type: string
           format: email
@@ -4700,9 +6511,6 @@ components:
           $ref: '#/components/schemas/PublicUser'
         accessToken:
           type: string
-        expiresIn:
-          type: integer
-          description: Token expiry in seconds
 
     PublicUser:
       type: object
@@ -4713,6 +6521,25 @@ components:
           type: string
         role:
           $ref: '#/components/schemas/UserRole'
+        language:
+          type: string
+          description: Preferred language code, `en` unless changed (see `/user/language` for the supported values)
+        emailVerified:
+          type: boolean
+        twoFactorEnabled:
+          type: boolean
+
+    TotpChallengeResponse:
+      type: object
+      description: Returned instead of a session when the account has 2FA enabled
+      required: [totpRequired, totpToken]
+      properties:
+        totpRequired:
+          type: boolean
+          enum: [true]
+        totpToken:
+          type: string
+          description: Challenge token for the matching verify-totp endpoint, valid for 5 minutes
 
     # ---- User ----
     UserProfile:
@@ -4722,27 +6549,56 @@ components:
           type: integer
         username:
           type: string
-        email:
+        emailHint:
           type: string
-        emailVerified:
-          type: boolean
+          description: Masked email address (e.g. `j***@e***.com`)
         role:
           $ref: '#/components/schemas/UserRole'
-        lastLogin:
+        emailVerified:
+          type: boolean
+        twoFactorEnabled:
+          type: boolean
+        pendingEmailHint:
           type: string
-          format: date-time
           nullable: true
+          description: Masked address of a pending email change
         createdAt:
           type: string
           format: date-time
-        totalMatches:
-          type: integer
-        totalWins:
-          type: integer
-        totalKills:
-          type: integer
-        totalDeaths:
-          type: integer
+        stats:
+          type: object
+          description: Missing values default to 0 (Elo and peak Elo to 1000, level to 1)
+          properties:
+            totalMatches:
+              type: integer
+            totalWins:
+              type: integer
+            totalKills:
+              type: integer
+            totalDeaths:
+              type: integer
+            totalBombs:
+              type: integer
+            totalPowerups:
+              type: integer
+            totalPlaytime:
+              type: integer
+            winStreak:
+              type: integer
+            bestWinStreak:
+              type: integer
+            eloRating:
+              type: integer
+            peakElo:
+              type: integer
+            totalXp:
+              type: integer
+            level:
+              type: integer
+        isProfilePublic:
+          type: boolean
+        acceptFriendRequests:
+          type: boolean
 
     # ---- Lobby ----
     RoomListItem:
@@ -4763,55 +6619,9 @@ components:
         status:
           type: string
           enum: [waiting, playing]
-
-    MatchConfig:
-      type: object
-      properties:
-        gameMode:
-          $ref: '#/components/schemas/GameMode'
-        maxPlayers:
-          type: integer
-          minimum: 2
-          maximum: 8
-        mapWidth:
-          type: integer
-        mapHeight:
-          type: integer
-        mapSeed:
-          type: integer
-        roundTime:
-          type: integer
-        teams:
-          type: integer
-        wallDensity:
-          type: number
-        enabledPowerUps:
-          type: array
-          items:
-            $ref: '#/components/schemas/PowerUpType'
-        powerUpDropRate:
-          type: number
-        botCount:
-          type: integer
-        botDifficulty:
-          $ref: '#/components/schemas/BotDifficulty'
-        botTeams:
-          type: array
-          items:
-            type: integer
-            nullable: true
-        friendlyFire:
-          type: boolean
-        hazardTiles:
-          type: boolean
-        enableMapEvents:
-          type: boolean
-        reinforcedWalls:
-          type: boolean
-        recordGame:
-          type: boolean
-        botAiId:
+        customMapName:
           type: string
+          description: Present only when the room plays a custom map
 
     # ---- Campaign ----
     CampaignWorld:
@@ -4831,8 +6641,10 @@ components:
           type: boolean
         levelCount:
           type: integer
+          description: Published levels for players; all levels in the admin list
         completedCount:
           type: integer
+          description: Levels the current user completed (player list only)
 
     CampaignWorldWithLevels:
       allOf:
@@ -4877,18 +6689,27 @@ components:
           $ref: '#/components/schemas/LevelProgress'
 
     CampaignLevel:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: integer
+            worldId:
+              type: integer
+            sortOrder:
+              type: integer
+            isPublished:
+              type: boolean
+        - $ref: '#/components/schemas/CampaignLevelContent'
+
+    CampaignLevelContent:
       type: object
+      description: A level's content, i.e. everything but its database fields (id, worldId, sortOrder, isPublished)
       properties:
-        id:
-          type: integer
-        worldId:
-          type: integer
         name:
           type: string
         description:
           type: string
-        sortOrder:
-          type: integer
         mapWidth:
           type: integer
         mapHeight:
@@ -4919,19 +6740,22 @@ components:
         winCondition:
           $ref: '#/components/schemas/CampaignWinCondition'
         winConditionConfig:
-          type: object
           nullable: true
+          allOf:
+            - $ref: '#/components/schemas/WinConditionConfig'
         lives:
           type: integer
         timeLimit:
           type: integer
         parTime:
           type: integer
+          description: Seconds; 0 means no par time
         carryOverPowerups:
           type: boolean
         startingPowerups:
-          type: object
           nullable: true
+          allOf:
+            - $ref: '#/components/schemas/StartingPowerUps'
         availablePowerupTypes:
           type: array
           items:
@@ -4954,8 +6778,54 @@ components:
                 type: integer
               type:
                 type: string
-        isPublished:
+        puzzleConfig:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/PuzzleConfig'
+
+    WinConditionConfig:
+      type: object
+      properties:
+        exitPosition:
+          $ref: '#/components/schemas/Position'
+        goalPosition:
+          $ref: '#/components/schemas/Position'
+        surviveTimeTicks:
+          type: integer
+        killTarget:
+          type: integer
+
+    StartingPowerUps:
+      type: object
+      properties:
+        bombUp:
+          type: integer
+        fireUp:
+          type: integer
+        speedUp:
+          type: integer
+        shield:
           type: boolean
+        kick:
+          type: boolean
+        pierceBomb:
+          type: boolean
+        remoteBomb:
+          type: boolean
+        lineBomb:
+          type: boolean
+        bombThrow:
+          type: boolean
+
+    PuzzleConfig:
+      type: object
+      properties:
+        switchVariants:
+          type: object
+          description: Switch variant by "x,y" position; switches not listed are toggles
+          additionalProperties:
+            type: string
+            enum: [toggle, pressure, oneshot]
 
     CampaignWinCondition:
       type: string
@@ -4986,8 +6856,9 @@ components:
           type: integer
           nullable: true
         carriedPowerups:
-          type: object
           nullable: true
+          allOf:
+            - $ref: '#/components/schemas/StartingPowerUps'
         totalLevelsCompleted:
           type: integer
         totalStars:
@@ -5049,6 +6920,7 @@ components:
 
     EnemyTypeConfig:
       type: object
+      required: [speed, movementPattern, canPassWalls, canPassBombs, canBomb, hp, contactDamage, sprite, dropChance, dropTable, isBoss, sizeMultiplier]
       properties:
         speed:
           type: number
@@ -5091,9 +6963,17 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BossPhaseConfig'
+        enemyAiId:
+          type: string
+          format: uuid
+          description: Custom enemy AI to drive this enemy
+        difficulty:
+          type: string
+          enum: [easy, normal, hard]
 
     EnemyBombConfig:
       type: object
+      required: [fireRange, cooldownTicks, trigger]
       properties:
         fireRange:
           type: integer
@@ -5113,6 +6993,7 @@ components:
 
     EnemySpriteConfig:
       type: object
+      required: [bodyShape, primaryColor, secondaryColor, eyeStyle, hasTeeth, hasHorns]
       properties:
         bodyShape:
           type: string
@@ -5130,17 +7011,23 @@ components:
           type: boolean
         hasTail:
           type: boolean
+          default: false
         hasAura:
           type: boolean
+          default: false
         hasCrown:
           type: boolean
+          default: false
         hasScar:
           type: boolean
+          default: false
         hasWings:
           type: boolean
+          default: false
         accessory:
           type: string
           enum: [none, bow_tie, monocle, bandana]
+          default: none
 
     BossPhaseConfig:
       type: object
@@ -5152,6 +7039,7 @@ components:
           maximum: 1
         speedMultiplier:
           type: number
+          minimum: 0.01
         movementPattern:
           type: string
           enum: [random_walk, chase_player, patrol_path, wall_follow, stationary]
@@ -5163,6 +7051,7 @@ components:
           type: array
           items:
             type: object
+            required: [enemyTypeId, count]
             properties:
               enemyTypeId:
                 type: integer
@@ -5182,14 +7071,17 @@ components:
         description:
           type: string
           maxLength: 2000
+          default: ''
         config:
           $ref: '#/components/schemas/EnemyTypeConfig'
 
     LevelInput:
       type: object
+      description: Every field is optional; on update only the fields sent change.
       properties:
         worldId:
           type: integer
+          description: Needed on create (or as the `worldId` query parameter); ignored on update
         name:
           type: string
           minLength: 1
@@ -5233,7 +7125,7 @@ components:
         winCondition:
           $ref: '#/components/schemas/CampaignWinCondition'
         winConditionConfig:
-          type: object
+          $ref: '#/components/schemas/WinConditionConfig'
         lives:
           type: integer
           minimum: 1
@@ -5249,7 +7141,7 @@ components:
         carryOverPowerups:
           type: boolean
         startingPowerups:
-          type: object
+          $ref: '#/components/schemas/StartingPowerUps'
         availablePowerupTypes:
           type: array
           items:
@@ -5266,6 +7158,7 @@ components:
           type: array
           items:
             type: object
+            required: [x, y, type]
             properties:
               x:
                 type: integer
@@ -5273,40 +7166,24 @@ components:
                 type: integer
               type:
                 type: string
+        puzzleConfig:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/PuzzleConfig'
         isPublished:
           type: boolean
 
     LevelExportData:
-      type: object
-      properties:
-        _format:
-          type: string
-          enum: [blast-arena-level]
-        _version:
-          type: integer
-          enum: [1]
-        name:
-          type: string
-        description:
-          type: string
-        mapWidth:
-          type: integer
-        mapHeight:
-          type: integer
-        tiles:
-          type: array
-          items:
-            type: array
-            items:
+      allOf:
+        - type: object
+          properties:
+            _format:
               type: string
-        playerSpawns:
-          type: array
-          items:
-            $ref: '#/components/schemas/Position'
-        enemyPlacements:
-          type: array
-          items:
-            $ref: '#/components/schemas/EnemyPlacement'
+              enum: [blast-arena-level]
+            _version:
+              type: integer
+              enum: [1]
+        - $ref: '#/components/schemas/CampaignLevelContent'
 
     LevelBundleExportData:
       type: object
@@ -5316,22 +7193,31 @@ components:
           enum: [blast-arena-level-bundle]
         _version:
           type: integer
-          enum: [1]
+          enum: [2]
         level:
-          type: object
+          $ref: '#/components/schemas/CampaignLevelContent'
         enemyTypes:
           type: array
+          description: The enemy types the level's placements reference
           items:
-            type: object
-            properties:
-              originalId:
-                type: integer
-              name:
-                type: string
-              description:
-                type: string
-              config:
-                $ref: '#/components/schemas/EnemyTypeConfig'
+            $ref: '#/components/schemas/BundledEnemyType'
+
+    BundledEnemyType:
+      type: object
+      properties:
+        originalId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        config:
+          $ref: '#/components/schemas/EnemyTypeConfig'
+        enemyAiSource:
+          type: string
+          description: TypeScript source of the custom enemy AI in `config.enemyAiId`, when it can be read
+        enemyAiName:
+          type: string
 
     EnemyTypeExportData:
       type: object
@@ -5341,13 +7227,18 @@ components:
           enum: [blast-arena-enemy-type]
         _version:
           type: integer
-          enum: [1]
+          enum: [2]
         name:
           type: string
         description:
           type: string
         config:
           $ref: '#/components/schemas/EnemyTypeConfig'
+        enemyAiSource:
+          type: string
+          description: TypeScript source of the custom enemy AI in `config.enemyAiId`, when it can be read
+        enemyAiName:
+          type: string
 
     ImportConflict:
       type: object
@@ -5386,7 +7277,7 @@ components:
         mapWidth:
           type: integer
           minimum: 11
-          maximum: 61
+          maximum: 51
         wallDensity:
           type: number
           minimum: 0
@@ -5418,22 +7309,64 @@ components:
           maxLength: 36
 
     SimulationDefaults:
-      allOf:
-        - $ref: '#/components/schemas/GameDefaults'
-        - type: object
-          properties:
-            totalGames:
-              type: integer
-              minimum: 1
-              maximum: 1000
-            speed:
-              type: string
-              enum: [fast, realtime]
-            logVerbosity:
-              type: string
-              enum: [normal, detailed, full]
-            recordReplays:
-              type: boolean
+      type: object
+      description: Like GameDefaults, but with room for bigger maps and one more bot, plus the batch settings
+      properties:
+        gameMode:
+          $ref: '#/components/schemas/GameMode'
+        maxPlayers:
+          type: integer
+          minimum: 2
+          maximum: 8
+        roundTime:
+          type: integer
+          minimum: 30
+          maximum: 600
+        mapWidth:
+          type: integer
+          minimum: 11
+          maximum: 61
+        wallDensity:
+          type: number
+          minimum: 0
+          maximum: 1
+        powerUpDropRate:
+          type: number
+          minimum: 0
+          maximum: 1
+        botCount:
+          type: integer
+          minimum: 0
+          maximum: 8
+        botDifficulty:
+          $ref: '#/components/schemas/BotDifficulty'
+        reinforcedWalls:
+          type: boolean
+        enableMapEvents:
+          type: boolean
+        hazardTiles:
+          type: boolean
+        friendlyFire:
+          type: boolean
+        enabledPowerUps:
+          type: array
+          items:
+            $ref: '#/components/schemas/PowerUpType'
+        totalGames:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        speed:
+          type: string
+          enum: [fast, realtime]
+        logVerbosity:
+          type: string
+          enum: [normal, detailed, full]
+        recordReplays:
+          type: boolean
+        botAiId:
+          type: string
+          maxLength: 36
 
     EmailSettings:
       type: object
@@ -5454,43 +7387,105 @@ components:
           description: Masked in GET responses
         fromEmail:
           type: string
-          format: email
           maxLength: 255
+          description: An email address, or an empty string
         fromName:
           type: string
           maxLength: 100
 
+    OpenWorldSettings:
+      type: object
+      description: Open world settings. GET returns every field; PUT accepts any subset.
+      properties:
+        enabled:
+          type: boolean
+        guestAccess:
+          type: boolean
+        maxPlayers:
+          type: integer
+          minimum: 2
+          maximum: 50
+        roundTime:
+          type: integer
+          minimum: 30
+          maximum: 3600
+          description: Round length in seconds
+        mapWidth:
+          type: integer
+          minimum: 9
+          maximum: 101
+          description: Must be an odd number
+        mapHeight:
+          type: integer
+          minimum: 9
+          maximum: 101
+          description: Must be an odd number
+        wallDensity:
+          type: number
+          minimum: 0
+          maximum: 0.9
+        respawnDelay:
+          type: integer
+          minimum: 0
+          maximum: 60
+          description: Respawn delay in seconds
+        afkTimeoutSeconds:
+          type: integer
+          minimum: 0
+          maximum: 3600
+          description: Inactivity kick timeout in seconds (0 disables it)
+
     # ---- Admin ----
     AdminUserListItem:
       type: object
+      description: A raw database row, so the keys are snake_case and booleans arrive as 0 or 1
       properties:
         id:
           type: integer
         username:
           type: string
-        email:
+        email_hint:
           type: string
         role:
           $ref: '#/components/schemas/UserRole'
-        emailVerified:
-          type: boolean
-        isDeactivated:
-          type: boolean
-        deactivatedAt:
+        email_verified:
+          $ref: '#/components/schemas/DbBoolean'
+        totp_enabled:
+          $ref: '#/components/schemas/DbBoolean'
+        is_deactivated:
+          $ref: '#/components/schemas/DbBoolean'
+        deactivated_at:
           type: string
           format: date-time
           nullable: true
-        lastLogin:
+        last_login:
           type: string
           format: date-time
           nullable: true
-        createdAt:
+        created_at:
           type: string
           format: date-time
-        totalMatches:
+        total_matches:
           type: integer
-        totalWins:
+        total_wins:
           type: integer
+
+    AccountCleanupRequest:
+      type: object
+      description: Filter for bulk account cleanup. Only accounts with the `user` role are ever matched.
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [unverified, inactive, deactivated]
+          description: |
+            `unverified`: email not verified and account created more than `days` days ago.
+            `inactive`: last login more than `days` days ago (or never logged in and created more than `days` days ago).
+            `deactivated`: deactivated accounts; `days` is ignored.
+        days:
+          type: integer
+          minimum: 1
+          description: Required for `unverified` and `inactive`
 
     AdminStats:
       type: object
@@ -5508,23 +7503,25 @@ components:
 
     AdminAction:
       type: object
+      description: A raw database row, so the keys are snake_case
       properties:
         id:
           type: integer
-        adminId:
+        admin_id:
           type: integer
-        adminUsername:
+        admin_username:
           type: string
         action:
           type: string
-        targetType:
+        target_type:
           type: string
-        targetId:
+        target_id:
           type: integer
+          description: 0 for bulk or system-wide actions
         details:
           type: string
           nullable: true
-        createdAt:
+        created_at:
           type: string
           format: date-time
 
@@ -5537,69 +7534,63 @@ components:
           type: string
         host:
           type: string
-        players:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: integer
-              username:
-                type: string
-              isBot:
-                type: boolean
-        gameMode:
-          type: string
-        status:
-          type: string
+          description: Host's username
+        playerCount:
+          type: integer
         maxPlayers:
           type: integer
-        createdAt:
+        gameMode:
+          $ref: '#/components/schemas/GameMode'
+        status:
           type: string
-          format: date-time
+          enum: [waiting, playing]
 
     AnnouncementBanner:
       type: object
       nullable: true
+      description: A raw database row, so the keys are snake_case; null when no banner is active
       properties:
         id:
           type: integer
         message:
           type: string
-        adminUsername:
+        admin_username:
           type: string
-        createdAt:
+        created_at:
           type: string
           format: date-time
 
     # ---- Matches ----
     MatchHistoryItem:
       type: object
+      description: A raw database row, so the keys are snake_case
       properties:
         id:
           type: integer
-        roomCode:
+        room_code:
           type: string
-        gameMode:
+        game_mode:
           type: string
-        playerCount:
-          type: integer
         status:
           type: string
+          enum: [waiting, countdown, playing, finished, aborted]
         duration:
           type: integer
           nullable: true
-        winnerUsername:
-          type: string
-          nullable: true
-        startedAt:
+          description: Seconds
+        started_at:
           type: string
           format: date-time
           nullable: true
-        finishedAt:
+        finished_at:
           type: string
           format: date-time
           nullable: true
+        winner_username:
+          type: string
+          nullable: true
+        player_count:
+          type: integer
 
     MatchDetail:
       type: object
@@ -5634,8 +7625,17 @@ components:
           type: string
           format: date-time
           nullable: true
+        hasReplay:
+          type: boolean
+        allPlayers:
+          type: array
+          nullable: true
+          description: Placements from the replay, bots included; null without a replay
+          items:
+            $ref: '#/components/schemas/ReplayPlacement'
         players:
           type: array
+          description: Human players only, by placement
           items:
             $ref: '#/components/schemas/MatchPlayerDetail'
 
@@ -5692,8 +7692,12 @@ components:
       properties:
         version:
           type: integer
+          enum: [1]
         matchId:
           type: integer
+        sessionId:
+          type: string
+          description: Campaign replays only
         roomCode:
           type: string
         gameMode:
@@ -5721,6 +7725,24 @@ components:
               type: string
             botCount:
               type: integer
+        gameOver:
+          type: object
+          properties:
+            winnerId:
+              type: integer
+              nullable: true
+            winnerTeam:
+              type: integer
+              nullable: true
+            reason:
+              type: string
+            placements:
+              type: array
+              items:
+                $ref: '#/components/schemas/ReplayPlacement'
+        map:
+          type: object
+          description: The generated map (tiles, dimensions, spawn points)
         totalTicks:
           type: integer
         tickRate:
@@ -5735,6 +7757,30 @@ components:
           items:
             type: object
             description: Replay log entry
+        campaign:
+          type: object
+          description: Campaign replays only (level, world, enemy types, lives, win condition)
+
+    ReplayPlacement:
+      type: object
+      properties:
+        userId:
+          type: integer
+        username:
+          type: string
+        isBot:
+          type: boolean
+        placement:
+          type: integer
+        kills:
+          type: integer
+        selfKills:
+          type: integer
+        team:
+          type: integer
+          nullable: true
+        alive:
+          type: boolean
 
     # ---- Simulations ----
     SimulationConfig:
@@ -5927,6 +7973,31 @@ components:
           type: integer
           description: File size in bytes
 
+    EnemyAIEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        filename:
+          type: string
+        isActive:
+          type: boolean
+        uploadedBy:
+          type: string
+          nullable: true
+        uploadedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+        fileSize:
+          type: integer
+          description: File size in bytes
+
     # ---- Enums (new) ----
     ChatMode:
       type: string
@@ -5989,9 +8060,35 @@ components:
             username:
               type: string
         cosmetics:
+          $ref: '#/components/schemas/PlayerCosmeticData'
+
+    PlayerCosmeticData:
+      type: object
+      description: Rendering data for a player's equipped, active cosmetics. Empty slots are omitted, and where nothing is equipped a public profile omits the whole object while a local co-op session sends an empty one.
+      properties:
+        colorHex:
+          type: integer
+          description: Player colour as a 24-bit RGB number
+        eyeStyle:
+          type: string
+        trailConfig:
           type: object
-          description: Player cosmetic data for rendering
-          additionalProperties: true
+          properties:
+            particleKey:
+              type: string
+            tint:
+              type: integer
+            frequency:
+              type: number
+        bombSkinConfig:
+          type: object
+          properties:
+            baseColor:
+              type: integer
+            fuseColor:
+              type: integer
+            label:
+              type: string
 
     # ---- User (new) ----
     PrivacySettings:
@@ -6083,21 +8180,29 @@ components:
 
     RankTier:
       type: object
+      required: [name, minElo, maxElo, color]
       properties:
         name:
           type: string
+          minLength: 1
+          maxLength: 50
         minElo:
           type: integer
         maxElo:
           type: integer
+          description: Must not be below minElo
         color:
           type: string
+          pattern: '^#[0-9a-fA-F]{3,8}$'
 
     RankConfig:
       type: object
+      required: [tiers, subTiersEnabled]
       properties:
         tiers:
           type: array
+          minItems: 1
+          description: Must tile the Elo range without gaps or overlaps (each minElo is the previous tier's maxElo + 1)
           items:
             $ref: '#/components/schemas/RankTier'
         subTiersEnabled:
@@ -6179,10 +8284,7 @@ components:
         equippedCosmetics:
           $ref: '#/components/schemas/EquippedCosmetics'
         cosmeticData:
-          type: object
-          nullable: true
-          description: Resolved cosmetic rendering data
-          additionalProperties: true
+          $ref: '#/components/schemas/PlayerCosmeticData'
 
     UserRankInfo:
       type: object
@@ -6230,6 +8332,7 @@ components:
 
     FriendRequest:
       type: object
+      description: "`id` and `fromUserId` are both the other user's ID. In `outgoing` requests, `fromUserId` and `fromUsername` are the recipient."
       properties:
         id:
           type: integer
@@ -6458,6 +8561,13 @@ components:
           type: string
         playCount:
           type: integer
+        avgRating:
+          type: number
+          nullable: true
+          description: Average star rating, null if unrated. `/maps/mine` does not load ratings, so it is always null there.
+        ratingCount:
+          type: integer
+          description: Number of ratings (always 0 in `/maps/mine`)
 
     CustomMapInput:
       type: object
@@ -6502,6 +8612,34 @@ components:
         isPublished:
           type: boolean
           default: false
+
+    # ---- Challenges ----
+    MapChallengeSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        customMapId:
+          type: integer
+        mapName:
+          type: string
+        mapCreator:
+          type: string
+          description: Username of the map's creator
+        gameMode:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        isActive:
+          type: boolean
 
     # ---- Campaign Replays ----
     CampaignReplayListItem:
@@ -6568,6 +8706,39 @@ components:
         rewardId:
           type: integer
           nullable: true
+        sortOrder:
+          type: integer
+
+    AchievementUpdateInput:
+      type: object
+      description: Every field is optional; only the fields sent change
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+        icon:
+          type: string
+          maxLength: 10
+        category:
+          type: string
+          maxLength: 50
+        conditionType:
+          $ref: '#/components/schemas/AchievementConditionType'
+        conditionConfig:
+          type: object
+          additionalProperties: true
+        rewardType:
+          $ref: '#/components/schemas/AchievementRewardType'
+        rewardId:
+          type: integer
+          nullable: true
+        isActive:
+          type: boolean
         sortOrder:
           type: integer
 
@@ -6684,6 +8855,32 @@ components:
           type: object
           nullable: true
           additionalProperties: true
+        sortOrder:
+          type: integer
+
+    CosmeticUpdateInput:
+      type: object
+      description: Every field is optional; only the fields sent change
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        type:
+          $ref: '#/components/schemas/CosmeticType'
+        config:
+          type: object
+          additionalProperties: true
+        rarity:
+          $ref: '#/components/schemas/CosmeticRarity'
+        unlockType:
+          $ref: '#/components/schemas/CosmeticUnlockType'
+        unlockRequirement:
+          type: object
+          nullable: true
+          additionalProperties: true
+        isActive:
+          type: boolean
         sortOrder:
           type: integer
 

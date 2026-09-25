@@ -47,7 +47,7 @@ docker compose -p blast-arena-dev -f docker-compose.yml -f docker-compose.dev.ym
 - Redis room mutations use atomic inline Lua scripts in `services/lobby.ts` (`JOIN_ROOM_LUA`, `LEAVE_ROOM_LUA`, `SET_READY_LUA`, `SET_TEAM_LUA`, `START_ROOM_LUA`). `ROOM_TTL_SECONDS = 3600`
 - All game constants in `shared/src/constants/`
 - Bot players use negative IDs (-(i+1)) to avoid DB conflicts; skipped in DB writes
-- Socket.io listeners use one-shot pattern for `game:start` to prevent leaks across scene transitions
+- LobbyScene's `game:start` listeners are one-shot (no leaks across scene transitions) and only accept a state that includes the user — staff spectating a room receive it too. GameScene keeps one for the match's lifetime (removed in `shutdown()`) to take the server's resync after a reconnect
 - Singleplayer: 1 human + 1+ bots is enough to start a game
 - Friendly fire config: when OFF, same-team explosions don't damage teammates (self-damage still applies)
 - Map dimensions should be odd numbers for proper indestructible wall grid pattern
@@ -55,16 +55,18 @@ docker compose -p blast-arena-dev -f docker-compose.yml -f docker-compose.dev.ym
 - All modals use `trapFocus()` from `utils/html.ts`. Game overlays (pause/leave) disable Phaser keyboard captures while open so keys reach DOM buttons
 
 ## Frontend Architecture
-- **Themes**: 11 palettes in `frontend/src/themes/definitions.ts`. `ThemeManager` reads localStorage → admin default → 'inferno'. `[data-theme]` on `<html>`. Inline `<script>` in `<head>` prevents flash
+- **Themes**: 11 palettes in `frontend/src/themes/definitions.ts`. `ThemeManager` reads localStorage → admin default → 'inferno'. `[data-theme]` on `<html>`. Inline `<script>` in `<head>` prevents a flash for a stored choice (the admin default is fetched after boot); admin default-theme changes arrive live via `admin:settingsChanged` (applied in LobbyScene)
 - **CSS**: All styles in `frontend/src/styles.css`, imported by `main.ts` so Vite emits a hashed, cacheable `/assets/*.css` (nginx serves `index.html` with `no-store`, so inline CSS was re-downloaded on every navigation). Only two things stay inline in `frontend/index.html`: the `@font-face` block, and the theme `<script>` that sets `[data-theme]` before first paint — its sha256 is pinned in the CSP, so editing it means regenerating that hash in `docker/nginx/security-headers.conf`. Always use CSS variables (e.g. `var(--primary)` not hardcoded hex). Typography: Chakra Petch (headings) + DM Sans (body). Fonts self-hosted woff2 — no external CDN
 - **Sidebar & Views**: `.app-layout` with collapsible sidebar + `.main-content`. `ILobbyView` with `render()`/`destroy()`. All lobby views render in `.main-body`. Views with own sub-header hide `.main-header`
 - **UI conventions**: Unified CSS classes: `.panel-header`/`.panel-content`, `.tab-bar`/`.tab-item`, `.data-table`, `.form-grid`/`.form-group`/`.input`/`.select`, `.toggle-switch`, `.setting-row`, `.option-chip`, `.mini-stat`, `.modal-header`/`.modal-body`/`.modal-footer`, `.btn`/`.btn-primary`/`.btn-secondary`/`.btn-ghost`/`.btn-sm`
-- **Gamepad UI nav**: `UIGamepadNavigator` spatial navigation — new interactive elements need `.sidebar-nav-item`, `.room-card`, or `.messages-conv-item` classes
+- **Gamepad UI nav**: `UIGamepadNavigator` spatial navigation over a context stack. The lobby context (`LobbyUI.updateGamepadContext`) lists what is reachable: `.sidebar-nav-item`, and inside `.main-body` inputs, buttons, `.btn`, `.room-card`, `.tab-item`, `.messages-conv-item`, `.log-row`, campaign cards, help links — a new interactive element must match that list (or extend it). `createModal()` pushes and pops its own context
 - **Rendering**: All sprites procedurally generated in `BootScene.generateTextures()` — no external image assets. `activeMoveAnim` Set on PlayerSprite prevents tween stacking. Power-up icons are procedural Canvas2D (`powerUpIcons.ts`) — no emoji `fillText`
 - **Audio**: Web Audio API procedural SFX via `AudioManager` singleton + `SoundGenerator`. No external audio files. Phaser runs with `noAudio: true`. Lazy `AudioContext` init on first user gesture (browser autoplay policy). `ensureResumed()` gates all sound playback
 - **HUD**: DOM-based overlay in HUDScene.ts. Minimap keeps its own copy of the grid, seeded in `create()` from GameScene's live grid (`liveTiles`, falling back to the `initialGameState` registry) and updated via `tileDiffs` — GameScene emits `stateUpdate` before HUDScene registers its listener. The HUD follows GameScene's `localId` (open-world ids are per join). Kill feed shows cause icons via `KillCause` type
 - **Phaser lifecycle**: `shutdown()` must be registered via `this.events.once('shutdown', this.shutdown, this)` — Phaser does NOT auto-call. Phaser reuses scene instances — constructor runs once, `create()` runs on every scene start. ALL session-specific properties MUST be reset at top of `create()`
 - **Real-time lobby**: Room list auto-updates via `room:list` socket broadcast on every room mutation
+- **Scene hand-off**: scenes pass state through `this.registry`: `initialGameState` (every game start); `openWorldMode` + `openWorldPlayerId` (open world — the id is per join and cleared when the world is left); `campaignMode`, `campaignCoopMode`, `localCoopMode`, `localCoopConfig`, `localCoopP2Identity`, `buddyMode`, `buddyConfig`, `campaignTheme`, `campaignEnemyTypes` (a campaign run — `clearCampaignRun()` drops them together); `replayMode`/`replayData`; `simulationSpectate`; `adminSpectate`; `gameOverData`; `currentRoom`, `openCampaign`, `returnToAdmin` (where LobbyScene lands). Shared services live there too: `socketClient`, `authManager`, `notifications`
+- **Reconnect**: `SocketClient.onReconnect()` fires after every reconnect (not the first connect). The server keeps no socket rooms across one, so each scene re-joins what it shows (see docs/socket-events.md, Reconnection)
 
 ## Campaign System
 Campaign with hand-crafted levels, enemies, and bosses. Solo, online co-op (2 players via party), and local co-op. 9 world themes with per-theme color palettes and themed tile textures.
@@ -94,7 +96,7 @@ Weekly featured community maps with competitive leaderboards. Only one active ch
 Friendships (reciprocal, DB-backed), presence (Redis, 120s TTL), parties (Redis, Lua atomic join, leader-follows), DMs (DB, friends only), 12 emotes with radial wheel. All social chat features admin-configurable via `ChatMode`. Each socket joins `user:{userId}` room on connect.
 
 ## Admin Panel
-Full-screen panel for admin/moderator roles. `staffMiddleware` and `adminOnlyMiddleware` for route protection. All actions audit-logged. `admin_actions.target_id` is `INT NOT NULL` — use `0` for bulk operations. Features: session revocation, account cleanup, TOTP reset, registration toggle. See [docs/admin-and-systems.md](docs/admin-and-systems.md)
+Lobby view (sidebar → Admin) for admin/moderator roles. `staffMiddleware` and `adminOnlyMiddleware` for route protection. All actions audit-logged. `admin_actions.target_id` is `INT NOT NULL` — use `0` for bulk operations. Features: session revocation, account cleanup, TOTP reset, registration toggle. See [docs/admin-and-systems.md](docs/admin-and-systems.md)
 
 ## AI Systems
 - **Bot AI**: Source scan + esbuild bundle at upload time, then execution. **Untrusted** (admin-uploaded) AIs run in an `isolated-vm` isolate per instance with a memory cap and a hard invoke timeout (`IsolatedAIRunner`); only trusted seeded AIs are loaded in-process via `vm.runInContext()` with a 5s timeout, and that context is given no host objects and has code generation disabled. Crash recovery falls back to built-in. Team-aware. Bot decisions are seeded per bot from the map seed, so matches with bots replay deterministically. See [docs/bot-ai-guide.md](docs/bot-ai-guide.md)
@@ -180,6 +182,7 @@ Full-stack i18n via **i18next**. `t('namespace:section.key')` with `{{variable}}
 - Forward: `backend/src/db/migrations/*.sql`, numbered `NNN_description.sql`
 - Rollback: `backend/src/db/migrations/down/*.down.sql`
 - Runner: `runMigrations()` (auto on startup), `rollbackMigration(steps)`, `getAppliedMigrations()`
+- MariaDB DDL auto-commits: a migration that fails halfway keeps the statements before the failure while `_migrations` does not record it. Write up and down scripts so they can run again — `IF [NOT] EXISTS`, and data changes that are safe to repeat
 
 ## Testing
 ```bash

@@ -118,7 +118,7 @@ Admin-configurable achievement system with four condition types: cumulative stat
 | AI | Admin | Upload/manage custom bot AI and enemy AI implementations |
 | Campaign | Admin | Worlds, levels (visual editor), enemy types, JSON export/import |
 | Announcements | Staff | Toast broadcasts, persistent banners |
-| Seasons | Admin | Season CRUD, activate/end (hard/soft reset), rank tier config with color pickers |
+| Seasons | Admin | Season CRUD, activate, end the active season (hard/soft Elo reset), rank tier config with color pickers |
 | Achievements | Admin | Achievement CRUD (4 condition types), cosmetic CRUD (4 types), reward linking, JSON export/import |
 | Challenges | Admin | Map challenge CRUD, activate/deactivate, global toggle, published map selection |
 
@@ -214,7 +214,7 @@ Persistent bomb arena that serves as the default landing experience. Players aut
 
 ## Internationalization
 
-Full i18n support via [i18next](https://www.i18next.com/). All UI strings are extracted into JSON locale files — no hardcoded text in source code.
+Full i18n support via [i18next](https://www.i18next.com/). UI strings live in JSON locale files, with every key present in all 12 languages (enforced by `tests/shared/localeParity.test.ts`).
 
 | Language   | Code | Status |
 |------------|------|--------|
@@ -232,14 +232,14 @@ Full i18n support via [i18next](https://www.i18next.com/). All UI strings are ex
 | Danish     | `da` | Complete |
 
 - **Language selection**: Flag dropdown on login screen + Settings > Preferences dropdown. Auto-detects browser language on first visit
-- **12 namespaces** organize translations: shared (`common`, `game`), frontend-only (`ui`, `auth`, `hud`, `admin`, `campaign`, `help`, `editor`, `errors`), backend-only (`server`, `email`)
+- **11 namespaces** organize translations: shared (`common`, `game`), frontend-only (`ui`, `auth`, `admin`, `campaign`, `help`, `editor`, `errors`), backend-only (`server`, `email`)
 - **Email i18n**: All transactional emails (verification, password reset, email change, warnings, test) sent in the user's preferred language
 - **Adding a new language**: Create translated JSON files in `frontend/src/i18n/locales/{code}/`, `shared/src/i18n/locales/{code}/`, and `backend/src/i18n/locales/{code}/`, then register the language code in the i18n config files
 - **RTL ready**: Document direction attribute set dynamically for RTL languages
 
 ## SEO & Web Standards
 
-- Meta tags: description, keywords, Open Graph, Twitter Card for social media previews
+- Meta tags: description, keywords, Open Graph and Twitter Card (title and description; no preview image yet)
 - JSON-LD structured data (`VideoGame` schema) for rich search results
 - Self-hosted fonts (Chakra Petch + DM Sans) as woff2 in `frontend/public/fonts/`, critical fonts preloaded
 - SVG favicon, web app manifest (PWA-ready), robots.txt, sitemap.xml
@@ -247,7 +247,7 @@ Full i18n support via [i18next](https://www.i18next.com/). All UI strings are ex
 - Full security header suite: CSP (with Trusted Types, script hashes, frame-ancestors, upgrade-insecure-requests), HSTS, COOP, X-Frame-Options, Permissions-Policy — all self-hosted, no external domains
 - Nginx rate limiting: API (30r/s), Socket.io (10r/s), auth (5r/s) — defense-in-depth with Express middleware
 - Socket event validation: Zod schemas for room/admin events, bounds-checked game input, per-socket rate limiting on all lobby and admin actions
-- Modal focus trapping for WCAG 2.1 AA accessibility, keyboard-navigable interactive lists
+- Modals trap focus and close on Escape; lists, cards and dialogs are reachable by keyboard and gamepad
 
 ## Tech Stack
 
@@ -276,9 +276,10 @@ blast-arena/
 │       ├── services/        # Auth, user, admin, lobby, email, replay, settings, friends, party, presence, messages, elo, season, leaderboard, achievements, cosmetics, buddy, custom-maps
 │       └── middleware/       # Auth, rate limiting, staff checks
 ├── frontend/
-│   ├── index.html           # HTML + full CSS design system (11 themes)
+│   ├── index.html           # HTML shell, @font-face and the theme bootstrap script
 │   ├── public/              # Static assets (favicon, fonts, robots.txt, sitemap, manifest)
 │   └── src/
+│       ├── styles.css       # Full CSS design system (11 themes)
 │       ├── scenes/          # Phaser scenes (Boot, Menu, Lobby, Game, HUD, GameOver)
 │       ├── ui/              # DOM-based UI (Auth, Lobby, Room, Campaign, Admin, Views)
 │       ├── game/            # Client renderers, effects, replay, gamepad
@@ -291,12 +292,12 @@ blast-arena/
 ## Testing & Linting
 
 ```bash
-npm test                    # Run all test suites (2412 tests)
+npm test                    # Run all test suites (3466 tests)
 npm run lint                # ESLint across all workspaces
 npm run format:check        # Prettier format check
 ```
 
-2412 tests across 78 suites: game logic (607), services (864), routes (547), handlers (62), middleware (55), simulation (69), utilities (166), frontend (42). See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
+3466 tests in 147 files: 3231 backend and shared tests in 115 Jest suites (game logic, services, routes, socket handlers, middleware, database, simulation, utilities) and 235 frontend tests in 32 Vitest files. See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
 
 ## Documentation
 

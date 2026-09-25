@@ -409,43 +409,64 @@ These are the key timing and gameplay constants from `shared/src/constants/game.
 
 ## Utility Functions
 
-These are available from `@blast-arena/shared` and useful for AI decision-making:
+The engine has these helpers in `@blast-arena/shared`, but an uploaded AI **cannot import them**: the upload bundler rejects every import that is still there after compilation, and only type imports are erased (see [What You Can Import](#what-you-can-import)). Copy the ones you need into your file:
 
 ### getExplosionCells
 
 Calculate which cells a bomb explosion would affect:
 
 ```typescript
-import { getExplosionCells } from '@blast-arena/shared';
+import type { Position, TileType } from '@blast-arena/shared';
 
-const cells = getExplosionCells(
-  bombX, // Origin X
-  bombY, // Origin Y
-  fireRange, // Blast radius
-  map.width, // Map width
-  map.height, // Map height
-  map.tiles, // 2D tile array
-  pierce, // Whether explosion passes through destructible walls
-);
-// Returns: { x: number, y: number }[]
+function getExplosionCells(
+  originX: number,
+  originY: number,
+  range: number, // blast radius (fire range)
+  mapWidth: number,
+  mapHeight: number,
+  tiles: TileType[][],
+  pierce = false, // pierce bombs pass through destructible walls
+): Position[] {
+  const cells: Position[] = [{ x: originX, y: originY }];
+  const dirs = [
+    { dx: 0, dy: -1 },
+    { dx: 0, dy: 1 },
+    { dx: -1, dy: 0 },
+    { dx: 1, dy: 0 },
+  ];
+  for (const { dx, dy } of dirs) {
+    for (let i = 1; i <= range; i++) {
+      const nx = originX + dx * i;
+      const ny = originY + dy * i;
+      if (nx < 0 || nx >= mapWidth || ny < 0 || ny >= mapHeight) break;
+      const tile = tiles[ny][nx];
+      if (tile === 'wall') break;
+      cells.push({ x: nx, y: ny });
+      if ((tile === 'destructible' || tile === 'destructible_cracked') && !pierce) break;
+    }
+  }
+  return cells;
+}
 ```
 
-The explosion expands in 4 cardinal directions up to `range` tiles. It always includes the origin. Stops at indestructible walls. Normal bombs stop at destructible walls; pierce bombs pass through them (but still destroy them).
+The explosion expands in 4 cardinal directions up to `range` tiles. It always includes the origin. Stops at indestructible walls. Normal bombs stop at destructible walls; pierce bombs pass through them (but still destroy them). (The engine's version also handles the wrapping open-world map, where bots do not play.)
 
 ### manhattanDistance
 
 ```typescript
-import { manhattanDistance } from '@blast-arena/shared';
+function manhattanDistance(a: Position, b: Position): number {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
 
-const dist = manhattanDistance({ x: 1, y: 2 }, { x: 4, y: 6 }); // Returns 7
+manhattanDistance({ x: 1, y: 2 }, { x: 4, y: 6 }); // 7
 ```
 
 ### isInBounds
 
 ```typescript
-import { isInBounds } from '@blast-arena/shared';
-
-const valid = isInBounds(x, y, map.width, map.height); // Returns boolean
+function isInBounds(x: number, y: number, width: number, height: number): boolean {
+  return x >= 0 && x < width && y >= 0 && y < height;
+}
 ```
 
 ---
@@ -543,21 +564,21 @@ When you upload a `.ts` file via the admin panel, the server runs this pipeline:
 
 Maximum **500KB** source file.
 
-### 2. Dangerous Import Scan
+### 2. Import Scan
 
-The following Node.js modules are **forbidden** (both `require()` and `import` syntax):
+Imports of Node.js built-in modules are **forbidden**, in `require()`, `import`, and `node:` form — among them `fs`, `child_process`, `net`, `http`, `https`, `http2`, `dgram`, `cluster`, `worker_threads`, `vm`, `os`, `dns`, `tls`, `process`, `module` and `crypto` (the full list is `DANGEROUS_MODULES` in `backend/src/services/botai-compiler.ts`).
 
-`fs`, `child_process`, `net`, `http`, `https`, `dgram`, `cluster`, `worker_threads`, `vm`, `os`, `dns`, `tls`, `readline`
+### 3. Pattern Scan
 
-This is defense-in-depth — only admins can upload, but these modules have no legitimate use in a bot AI.
+The source may not contain: `process.` / `process[`, `globalThis`, `__proto__`, `Object.defineProperty`, `Object.setPrototypeOf`, `Reflect.`, `new Proxy(`, `.constructor`, a `'constructor'` string, or `.prototype`. The scan matches text, so it also rejects these in comments and strings.
 
-### 3. TypeScript Compilation
+### 4. TypeScript Compilation
 
-The server uses esbuild to transpile your TypeScript to JavaScript. Any syntax errors or type errors that esbuild catches will be reported back.
+The server bundles your file with esbuild. Syntax errors are reported back, and **any import that survives compilation is rejected** — only imports used purely as types are erased.
 
-### 4. Structure Validation
+### 5. Structure Validation
 
-The compiled code is loaded and checked:
+The compiled code is loaded in an `isolated-vm` isolate (the same sandbox it runs in) and checked:
 
 - Must export a class (default export or named export)
 - The class prototype must have a `generateInput` method
@@ -567,15 +588,7 @@ If any step fails, you get the error details in the upload modal.
 
 ### What You Can Import
 
-You **can** import from:
-
-- `@blast-arena/shared` — Types, constants, utility functions
-
-You **cannot** import from:
-
-- Node.js built-in modules (blocked list above)
-- External npm packages (not available at runtime)
-- Other project files (your AI runs in isolation)
+Only types. `import type { PlayerInput, Direction } from '@blast-arena/shared'` (or a normal import used only in type positions) is erased at compile time and is fine. Anything used at runtime — helper functions, constants, npm packages, Node built-ins, other project files — must be written into your own file: the AI runs in an isolated sandbox with no module system.
 
 In practice, most AI logic is self-contained. Use the types from `@blast-arena/shared` for type safety, and implement your algorithms inline.
 
@@ -613,10 +626,35 @@ Your AI has no access to the filesystem, network, or other system resources. It 
 Here's a functional bot AI with danger avoidance, enemy hunting, power-up collection, and bomb placement:
 
 ```typescript
-import { PlayerInput, Direction, Position, TileType, getExplosionCells } from '@blast-arena/shared';
-import { Player } from './Player';
-import { GameStateManager } from './GameState';
-import { GameLogger } from '../utils/gameLogger';
+import type { PlayerInput, Direction, Position, TileType } from '@blast-arena/shared';
+import type { Player } from './Player';
+import type { GameStateManager } from './GameState';
+import type { GameLogger } from '../utils/gameLogger';
+
+// Runtime helpers cannot be imported into an uploaded AI; this is the engine's getExplosionCells.
+function getExplosionCells(
+  originX: number,
+  originY: number,
+  range: number,
+  mapWidth: number,
+  mapHeight: number,
+  tiles: TileType[][],
+  pierce = false,
+): Position[] {
+  const cells: Position[] = [{ x: originX, y: originY }];
+  for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+    for (let i = 1; i <= range; i++) {
+      const nx = originX + dx * i;
+      const ny = originY + dy * i;
+      if (nx < 0 || nx >= mapWidth || ny < 0 || ny >= mapHeight) break;
+      const tile = tiles[ny][nx];
+      if (tile === 'wall') break;
+      cells.push({ x: nx, y: ny });
+      if ((tile === 'destructible' || tile === 'destructible_cracked') && !pierce) break;
+    }
+  }
+  return cells;
+}
 
 const DIRECTIONS: Direction[] = ['up', 'down', 'left', 'right'];
 const DIR_DELTA: Record<Direction, { dx: number; dy: number }> = {

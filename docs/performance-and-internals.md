@@ -32,11 +32,10 @@ Bot AI runs full `generateInput()` every other tick (even ticks only); odd ticks
 
 - `getAlivePlayers()` result cached within `processTick()` (guarded by `_processingTick` flag); invalidated via `invalidateAliveCache()` after every death/respawn — eliminates 7+ redundant `Array.from().filter()` per tick
 - Bomb slide collision uses pre-built `Set<string>` for bomb and player positions — O(1) lookups instead of O(n) inner loops. Sets only built when `hasSlidingBombs` is true (~5% of ticks)
-- Shared position data built once per tick and passed to all `processPlayerInput()` calls: `sharedBombPositions` (array), `sharedPlayerPositions` (array with id/buddyOwnerId), `bombPosSet` (Set for O(1) bomb-at checks), `alivePlayerPosSet` (Set for O(1) player-at checks in line bomb)
+- Shared position data built once per tick and passed to all `processPlayerInput()` calls as one `TickOccupancy`: `bombPositions` + `bombPosSet` (O(1) bomb-at checks), `playerPositions` + `playerEntryById` (live entries of alive, unfrozen players), `alivePlayerPos` (every alive player, for keeping line bombs off occupied tiles)
 - `hasBombAt()` / `hasAlivePlayerAt()` eliminated — replaced by Set lookups in `processPlayerInput()`. bombPosSet updated inline when new bombs are placed
 - Chain reaction bomb lookup uses `Set<string>` of explosion cells — O(1) `has()` instead of O(cells) `Array.some()`
 - KOTH hill controlling player cached during scoring step, reused in `toState()`
-- Conditional tile snapshot: `map.tiles` deep-copy only when other bombs exist beyond those detonating (chain reactions possible)
 
 ## Serialization
 
@@ -60,10 +59,10 @@ Bot AI runs full `generateInput()` every other tick (even ticks only); odd ticks
 ## Database & Backend
 
 - Admin dashboard stats consolidated into single SQL query with subselects (3 queries -> 1)
-- Match history uses pre-aggregated JOIN for player count instead of correlated subquery per row
+- Match history reads each match's player count with a correlated `COUNT(*)` on `match_players` (one indexed lookup per row on the page)
 - `friendships(user_id, status)` composite index (migration 022) — covers all friend list, count, and status queries
 - Connection pool `queueLimit: 100` prevents unbounded memory growth under sustained DB pressure
-- `ReplayRecorder.recordTick()` takes tile diffs from the tick state (full-grid rescan only for callers without diffs); countdown ticks are not recorded
+- `ReplayRecorder.recordTick()` takes tile diffs from the tick state (full-grid rescan only for callers without diffs); countdown ticks are not recorded, but `observe()` still takes the cosmetics they carry
 - `listReplays()` uses async `fs.promises.readdir()` + `Promise.all(stat())` — unblocks event loop for servers with many replays
 - Presence updates batched via `setPresenceBatch()` Redis pipeline — 1 round-trip instead of N on game/campaign start
 - Socket room handlers (leave, ready, start, restart, setTeam, setBotTeam, rematch:vote, disconnect) use `socket.data.activeRoomCode` instead of `getPlayerRoom()` Redis lookup

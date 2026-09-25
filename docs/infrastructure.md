@@ -4,7 +4,7 @@
 
 ### CORS & CSP
 - CORS restricted to `APP_URL` origin for both Express and Socket.io (not `origin: true`)
-- Content-Security-Policy header in nginx: `default-src 'self'`, inline styles allowed, WebSocket connections. All fonts self-hosted (no external CDN)
+- Content-Security-Policy header in nginx: `default-src 'self'`, scripts from `'self'` plus the pinned hash of the inline theme script, inline styles allowed, `connect-src 'self'` (covers the same-origin Socket.io WebSocket). All fonts self-hosted (no external CDN)
 - **Trusted Types enabled**: `require-trusted-types-for 'script'` + `trusted-types dompurify`. See XSS Prevention below
 
 ### XSS Prevention
@@ -30,7 +30,7 @@
 - JWT access tokens in-memory only, refresh token in httpOnly sameSite:strict cookie with secure flag derived from APP_URL
 - Password hashing: bcrypt with 12 salt rounds
 - Refresh token rotation with reuse detection
-- JWT_SECRET minimum 16 chars enforced via Zod config validation
+- JWT_SECRET minimum 32 chars enforced via Zod config validation
 
 ### Database Security
 - All queries use parameterized statements via mysql2 (SQL injection prevention)
@@ -41,7 +41,7 @@
 - Deactivated users blocked from login and token refresh
 - Self-protection: admins cannot deactivate/delete themselves
 - Admin announcement endpoints (toast/banner) rate-limited to 10 req/min
-- `admin:settingsChanged` broadcasts scoped to `role:staff` room (not all sockets)
+- `admin:settingsChanged`: settings that change what every user sees (party/lobby/DM/emote/spectator chat modes, the spectator-actions toggle, default theme) go to all sockets; admin-only settings (registration, open world, XP multiplier, game defaults, email) go to the `role:staff` room only
 
 ### Email Security
 - Emails never stored in plaintext — HMAC-SHA256 with `EMAIL_PEPPER` env var (min 32 chars)
@@ -52,16 +52,17 @@
 
 ### Email Verification Enforcement
 - Socket.io middleware queries DB for `email_verified` and rejects unverified users (`EMAIL_NOT_VERIFIED`)
-- REST endpoints protected by `emailVerifiedMiddleware` (DB check, applied after `authMiddleware`)
+- REST endpoints protected by `emailVerifiedMiddleware` (applied after `authMiddleware`): it trusts the access token's `emailVerified` claim and queries the DB only for tokens signed before the claim existed
 - Exceptions: `GET /user/profile`, `PUT /user/language`, all auth routes
 
 ### Email Enumeration Prevention
-- Registration with an existing email returns generic 400 (not 409) and sends a warning email to the existing account owner
+- Registration answers with the same 200 whether or not the email is already registered (no session is issued either way) and sends a warning email to the existing account owner
 - Email change with a taken address silently succeeds (no DB update) and sends a warning
 - Username conflicts remain explicit (usernames are public)
 
 ### Nginx Rate Limiting
 - `limit_req_zone` for API (30r/s), Socket.io (10r/s), auth (5r/s) — defense-in-depth alongside Express middleware
+- Express `rateLimiter()` (per route, Redis with an in-memory fallback) counts per client IP and matched route pattern, so every id on a route such as `/admin/replays/:matchId` shares one budget
 - **These are per-IP only because of the `real_ip` block at the top of `docker/nginx/nginx.conf`.** The container publishes `127.0.0.1:8280` and sits behind Traefik on the host, so without it `$remote_addr` is the Docker bridge gateway for every visitor and all three zones become one shared bucket — roughly three simultaneous page loads exhausted the Socket.io burst site-wide, while an abusive client was indistinguishable from legitimate traffic. It also fed the gateway address onward as `X-Real-IP`/`X-Forwarded-For`, so Express's `trust proxy` resolved `req.ip` to the gateway too. (audit NGINX-REALIP-1)
 - **Deployment contract — this is load-bearing, not incidental.** Trusting `X-Forwarded-For` is only safe because Traefik declares no `forwardedHeaders.trustedIPs`, so it treats every client as untrusted and *replaces* inbound `X-Forwarded-*` rather than passing them through. `real_ip_recursive` is deliberately `off`, so nginx takes the **last** entry in the chain — the peer Traefik itself observed — which keeps forged entries to the left harmless even if Traefik were later reconfigured to append. Replacing the host proxy with one that forwards a client-supplied `X-Forwarded-For` verbatim would make every rate limit spoofable, including the 5r/s auth limiter.
 - The subnet is intentionally *not* pinned in `docker-compose.yml`; `set_real_ip_from` covers `172.16.0.0/12` so a recreated Docker network cannot silently stop the recovery. If the trust range ever stops matching, the limiter degrades to the old single-bucket behaviour — strict, never spoofable.
@@ -101,8 +102,8 @@
 ### Stale Room Cleanup
 - `room:create` and `room:join` handlers check for existing room membership and clean up before creating/joining — prevents zombie games
 
-### Bot-Only Game Termination
-After all disconnect grace periods resolve, if no human players remain alive, game ends with `finishReason = 'All players disconnected'` and match status saved as `'aborted'`.
+### Bot-Only Matches
+When no human is left playing (each has left, died without a respawn, or stayed disconnected past the grace period — a dead human in a respawn mode still counts as playing), the bots play on at 5× tick rate (`BOT_ONLY_TICK_RATE`) and the room is hidden from the lobby. A match is saved as `'aborted'` (no Elo, XP or achievements) only when every human departed — an explicit leave or an expired disconnect grace — before it ended.
 
 `GameState.killPlayer()` handles disconnect-timeout deaths with proper placement tracking, kill logging, and tickEvents emission.
 
@@ -127,7 +128,8 @@ All data persists in `./data/` via bind mounts:
 - `./data/replays:/app/replays`
 - `./data/simulations:/app/simulations`
 - `./data/ai:/app/ai`
-- MariaDB and Redis data volumes
+- `./data/enemy-ai:/app/enemy-ai`
+- `./data/db` (MariaDB) and `./data/redis` (Redis)
 
 ### Other
 - Nginx serves `no-cache` headers for `index.html` to prevent stale frontend after deploys
