@@ -11,7 +11,7 @@ A lobby view (sidebar → Admin, shown to admin and moderator roles). Tabs a mod
 | Dashboard | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings: recordings toggle, registration toggle, party chat mode, email/SMTP config, game defaults, simulation defaults |
 | Users | Admin + Mod | Search and paginated table for both roles. Every change is admin only: role change, deactivate/reactivate, delete (type-to-confirm), create user, password reset, 2FA reset, session revocation, bulk cleanup of unverified/inactive/deactivated accounts. Role changes, deactivation and session revocation ask for confirmation |
 | Matches | Admin + Mod | Paginated history, per-player stats modal. Admin delete per row / delete all (cleans up replay files) |
-| Rooms | Admin + Mod | Active rooms, updated live by the `room:list` broadcast (60s safety refresh). Spectate opens a spectator view of the match; send message (any room, waiting or running), kick player, force close (admin only) |
+| Rooms | Admin + Mod | Active rooms, updated live by the `room:list` broadcast (60s safety refresh). Spectate opens a spectator view of the match (Escape or gamepad Start goes back to the Rooms tab); send message (any room, waiting or running), kick player, force close (admin only) |
 | Logs | Admin | Audit trail of all admin actions with action type filter |
 | Simulations | Admin | Batch bot-only game simulations (see below) |
 | AI | Admin | Upload/manage custom bot AI implementations (see below) |
@@ -99,7 +99,8 @@ Admin-only batch simulation runner for bot-only games — no human players, no D
 ### Live Spectating
 - Real-time mode auto-launches GameScene in spectator mode with click-to-follow and mouse drag panning
 - Fast mode streams state at ~20fps via capped interval
-- GameScene handles `sim:state` events for rendering, `sim:gameTransition` for between-game restarts, `sim:completed` for returning to lobby
+- GameScene handles `sim:state` events for rendering, `sim:gameTransition` for between-game restarts, `sim:completed` for returning to the batch in the Simulations tab
+- Escape (or gamepad Start) stops watching at any time and reopens the batch. Both exits send `sim:unspectate`, so the server stops streaming the batch to that socket
 
 ### Queue System
 When a batch is already running, new batches are queued (max 10) and auto-start when current finishes. Cancelling advances the queue. Queued entries show position in UI with "Remove" button. Admin sockets auto-join `sim:admin` room for queue-started batch broadcasts.

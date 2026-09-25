@@ -1,6 +1,6 @@
 # Testing
 
-BlastArena has **3466 tests** across 147 test files covering the full stack: game logic, backend services, API routes, socket handlers, middleware, database migrations, utilities, shared code, config guards, and frontend.
+BlastArena has **3500 tests** across 152 test files covering the full stack: game logic, backend services, API routes, socket handlers, middleware, database migrations, utilities, shared code, config guards, and frontend.
 
 | Stack | Framework | Suites | Tests |
 |-------|-----------|--------|-------|
@@ -50,11 +50,11 @@ tests/
 └── shared/              4 files — locale parity, map validation, puzzle helpers, validation (run by backend Jest)
 
 frontend/tests/
-├── game/                6 files — entity/tile/minimap renderers, replay log index, settings, client fixes
+├── game/                8 files — entity/tile/minimap renderers, sprite interpolation, noise buffer, replay log index, settings, client fixes
 ├── network/             4 files — ApiClient, auth refresh, SocketClient connect/reconnect
-├── scenes/              2 files — open-world map resize, scene listener lifecycle
+├── scenes/              3 files — open-world map resize, scene listener lifecycle, replay/spectator exits
 ├── shared/              1 file  — grid utilities
-├── ui/                 10 files — lobby views/panels, HUD player list, admin tabs, auth/co-op modals, party state, i18n
+├── ui/                 12 files — lobby views/panels, HUD player list, admin tabs + response contracts, admin return, auth/co-op modals, party state, i18n
 ├── utils/               9 files — HTML escaping/sanitising, Trusted Types, focus trap, colors, tile textures, wrap ghosts
 └── helpers/             2 files — shared fakes, not tests: fakeScene.ts (Phaser scene stand-in), htmlLiterals.ts (HTML literal corpus)
 ```
@@ -191,14 +191,14 @@ Socket.io event handler tests — handlers tested with mock socket/io objects an
 | `middleware/validation.test.ts` | 8 | Zod validation of body/query/params, parsed output replaces the input (extra fields stripped), field-level error details, non-Zod errors forwarded |
 | `middleware/bodyParserErrors.test.ts` | 6 | Real Express stack: malformed JSON → 400 INVALID_JSON (body not reflected), corrupt gzip → 4xx, oversized → 413, unsupported charset → 415 |
 
-### Database (3 files, 120 tests)
+### Database (3 files, 123 tests)
 
 Migration tooling — the SQL statement splitter and the migration files themselves, checked without a database.
 
 | File | Tests | Coverage |
 |------|-------|----------|
-| `db/sqlStatementParser.test.ts` | 111 | parseSqlStatements: comments (`--`, `#`, block, version-gated), quoting and escapes, statement splitting; plus one parse check per repository migration file (up and down) |
-| `db/migrationParity.test.ts` | 8 | Every up migration has a down file and vice versa, numbering unique and gap-free from 001, no empty files, up/down symmetry for 030 (re-applicable after rollback), 040 and 041 |
+| `db/sqlStatementParser.test.ts` | 113 | parseSqlStatements: comments (`--`, `#`, block, version-gated), quoting and escapes, statement splitting; plus one parse check per repository migration file (up and down) |
+| `db/migrationParity.test.ts` | 9 | Every up migration has a down file and vice versa, numbering unique and gap-free from 001, no empty files, up/down symmetry for 030 (re-applicable after rollback), 040 and 041; 046 drops only the index 035 added, which 008's composite index covers |
 | `db/migrationRunner.test.ts` | 1 | rollbackMigration refuses to roll back the irreversible email migration without force |
 
 ### Simulation (2 files, 85 tests)
@@ -230,7 +230,7 @@ Backend utilities, config guards (nginx, Compose, Node version) and the shared-p
 | `utils/totpKeyValidation.test.ts` | 7 | isValidTotpKey requires exactly 64 hex chars; TOTP secret encryption round-trips, rejects invalid keys, cannot decrypt with another key |
 | `utils/nodeVersion.test.ts` | 5 | Same Node major across Docker stages, package.json engines, .nvmrc and the AI bundle target |
 
-### Frontend (32 files, 235 tests)
+### Frontend (37 files, 266 tests)
 
 All frontend tests run on Vitest + happy-dom. Paths are relative to `frontend/`.
 
@@ -238,28 +238,32 @@ All frontend tests run on Vitest + happy-dom. Paths are relative to `frontend/`.
 |------|-------|----------|
 | `tests/utils/colors.test.ts` | 18 | toCssHex (number/string → #rrggbb, malformed or out-of-range → null), safeCssColor strict-hex fallback |
 | `tests/utils/html.test.ts` | 13 | escapeHtml, escapeAttr — XSS prevention |
+| `tests/utils/trapFocus.test.ts` | 13 | Arrow-key focus movement (text fields and radios keep their arrows), Tab wrap, cleanup; createModal gamepad context push/pop, Back closes, confirmModal result; focus returns to the opener on close (never taken from an element outside the modal) |
 | `tests/ui/hudPlayerList.test.ts` | 12 | HUD player list: keyed DOM reuse (no writes when unchanged), alive-first order, click-to-spectate only while dead, team headers, live KOTH reorder + crown, username escaping, bot/buddy tags, reset() |
 | `tests/utils/wrapGhosts.test.ts` | 12 | wrapGhostOffsets/wrapGhostPositions: ghost copies only near the seams (edges, corners, margin), at most 3 copies, degenerate and oversized worlds |
 | `tests/shared/grid.test.ts` | 11 | manhattanDistance, getExplosionCells (range, walls, bounds, first destructible stops the blast, pierce, cracked walls) |
 | `tests/utils/tileTexture.test.ts` | 11 | themePrefix, getTileTexture (themed/unthemed keys, classic = no theme, floor variation, unknown-tile fallback), conveyor helpers |
 | `tests/game/gameClientFixes.test.ts` | 10 | PowerUpRenderer kills its float tween, LocalCoopInput releases keys on blur, GamepadManager.suppressHeldButtons, ReplayPlayer.seekToTick by game tick, campaign run helpers (P2 socket token, guest P2) |
-| `tests/utils/trapFocus.test.ts` | 10 | Arrow-key focus movement (text fields and radios keep their arrows), Tab wrap, cleanup; createModal gamepad context push/pop, Back closes, confirmModal result |
 | `tests/game/replayLogIndex.test.ts` | 9 | lowerBound/upperBound, findTickRange (range + scroll anchor, agrees with a linear scan), stable sortByTick |
 | `tests/utils/wrapGhostTileSpans.test.ts` | 9 | Ghost tile spans for the wrapping map: only past a seam (never the canonical copy), corner copies, clamped to grid and screen, stable layout key |
 | `tests/network/apiClient.test.ts` | 8 | ApiError code/status + validation details, 401 handling (guest not logged out, one retry after refresh, logout when refresh fails, wrong-password 401 not retried), authenticated download |
 | `tests/utils/reconcileChildren.test.ts` | 8 | Keyed DOM reorder without recreating nodes: append, no-op, removal, adoption, node state preserved, arbitrary permutations |
 | `tests/network/socketClientConnect.test.ts` | 8 | connect/connectAsGuest open exactly one socket while one is in flight, replace stale sockets, no token → no connect, disconnect then connect opens a fresh socket |
+| `tests/ui/lobbyNavigation.test.ts` | 8 | No /user/rank request for guests, navigation token discards superseded views, destroyed views stop writing to `.main-body` (ChallengeView, OpenWorldView), each view renders into its own root (late renders and container listeners go with it) |
+| `tests/ui/adminTabContracts.test.ts` | 8 | Dashboard, Users, Rooms, Matches, Announcements, Achievements/cosmetics, Campaign and Simulations tabs render fixtures shaped like their backend handlers' responses, with no error |
 | `tests/ui/adminTabs.test.ts` | 7 | ChallengesTab ({ maps } shape, load error, aria-checked revert on failed save), SeasonsTab paging + unsaved tier edits, LogsTab single listener, AITab authenticated download |
 | `tests/ui/partyState.test.ts` | 7 | PartyBar fetches the current party on build and after reconnect, PartyView follows the bar (create/leave sync both ways), no disband toast for the leaver |
 | `tests/game/Settings.test.ts` | 7 | getSettings defaults/merge/invalid-JSON or array fallback/caching, saveSettings persists and updates the cache |
 | `tests/ui/authResetMode.test.ts` | 6 | Password-reset form: token + password posted with skipAuthRetry, Enter submits, local validation, rejected/missing token offers a new link |
 | `tests/ui/i18nPlurals.test.ts` | 6 | Plural keys with real i18next (en/de, Polish few/many), 61x61 map size gone, AuthUI translates server error codes (message fallback), form links are buttons |
-| `tests/ui/lobbyNavigation.test.ts` | 6 | No /user/rank request for guests, navigation token discards superseded views, destroyed views stop writing to `.main-body` (ChallengeView, OpenWorldView) |
 | `tests/game/minimapTerrain.test.ts` | 6 | minimapTileColor fallback, MinimapTerrain paints once then repaints only changed cells (applyDiffs/sync), no grid aliasing, ragged grids tolerated |
+| `tests/game/spriteInterpolation.test.ts` | 6 | Enemies move per rendered frame at a frame-rate-independent speed, HP bar follows and redraws only on HP change; enemies and players jump (not slide) when the target moves further than a step, never while walking fast; short way over the open-world seam |
+| `tests/scenes/replayAndSpectatorExits.test.ts` | 6 | Closing a replay reopens its admin tab/view, leaving a spectated simulation sends sim:unspectate and reopens the batch, replay deaths (with cause) feed the HUD kill feed, a seek clears it, listeners removed on shutdown |
 | `tests/utils/sanitizerFidelity.test.ts` | 6 | setHtml builds the same DOM as the innerHTML it replaced for every HTML literal in `src/` (table fragments, CSS custom properties), still strips what it should |
 | `tests/network/socketClientReconnect.test.ts` | 6 | Handshake sends the current access token, refreshes an expired one and reconnects (not after a failed refresh), onReconnect fires only after the first connect |
 | `tests/game/tileMapApplyDiffs.test.ts` | 6 | TileMapRenderer.applyTileDiffs swaps only listed cells, ignores no-op/out-of-grid diffs, matches updateTiles(), idempotent, consistent with a later full sync |
 | `tests/ui/viewListenerLifecycle.test.ts` | 6 | MapsView/MessagesView/FriendsView/embedded LeaderboardUI keep one handler across re-renders and none after destroy; in-app confirm modals for delete/block |
+| `tests/ui/adminReturn.test.ts` | 5 | Matches/Campaign/Simulations tabs reopen the page, replay list or batch a replay came from (once); Watch replay closes its modal and pops its gamepad context; AdminUI hands the view to the tab |
 | `tests/utils/trustedTypesEnforcement.test.ts` | 5 | Under enforced Trusted Types: raw assignment throws, setHtml/insertHtml insert every HTML literal without touching a sink, HUD player list renders, escapeHtml still works |
 | `tests/ui/localCoopTotp.test.ts` | 4 | LocalCoopModal 2FA: code step after the challenge, wrong code/expired challenge handling, 6-digit check before any request, one gamepad context |
 | `tests/scenes/sceneListenerLifecycle.test.ts` | 4 | AST scan of `src/scenes`: no blanket socketClient.off(event), every socket subscription unsubscribed, shutdown registered explicitly |
@@ -268,6 +272,7 @@ All frontend tests run on Vitest + happy-dom. Paths are relative to `frontend/`.
 | `tests/ui/lobbyPanels.test.ts` | 3 | Panel handlers registered once across room↔lobby cycles, one toast per party invite, idempotent destroyPanels() |
 | `tests/ui/profileAddFriend.test.ts` | 3 | ProfileView Add Friend over the socket (success, retry after failure), hostile rank colour/achievement icon kept out of the markup |
 | `tests/scenes/openWorldMapResize.test.ts` | 2 | A new open-world round with a different map size rebuilds the tile renderer and wrap sizes; the same size keeps the renderer |
+| `tests/game/soundNoise.test.ts` | 1 | Noise bursts share one cached buffer and each plays a random slice as long as the burst |
 
 ## Mocking Patterns
 

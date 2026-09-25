@@ -38,7 +38,7 @@ Match replays are pruned after each save — by age (`REPLAY_MAX_AGE_DAYS`, defa
 ## Frontend Playback
 
 ### ReplayPlayer
-Manages playback: play/pause, speed (0.5x/1x/2x/4x), seek to any frame. Uses Phaser-synced time accumulator (`tick(deltaMs)`) instead of `setInterval` to prevent drift/fast-forward; frame bounds-checked before access.
+Manages playback: play/pause, speed (0.5x/1x/2x/4x), seek to any frame. Uses Phaser-synced time accumulator (`tick(deltaMs)`) instead of `setInterval` to prevent drift/fast-forward; frame bounds-checked before access. A seek calls `onSeek` before it emits the new frame.
 
 ### ReplayControls
 Video-player-like bottom bar with:
@@ -59,6 +59,7 @@ Collapsible right-side panel (collapsed by default) showing game events synced t
 - Detects `registry.get('replayMode')` and uses ReplayPlayer instead of socket events
 - Replay auto-plays on open; clicking game canvas toggles play/pause
 - EffectSystem has `triggerExplosion()`/`triggerPlayerDied()` public methods for replay mode (bypasses socket listeners)
+- Kill feed: recorded deaths (`events.playerDied`, with their `cause`) are re-emitted as the Phaser event `replayPlayerDied`, which HUDScene feeds into the kill feed — the socket carries nothing during a replay. A seek emits `replaySeek`, which clears the feed. The viewer gets no "you were eliminated" banner, even in a match they played
 
 ### Tile State Reconstruction
 Initial tiles stored once, diffs applied forward. Seeking backward rebuilds from initial tiles.
@@ -67,6 +68,7 @@ Initial tiles stored once, diffs applied forward. Seeking backward rebuilds from
 - Matches tab -> click match -> "Watch Replay" button (shows all players including bots via `allPlayers` from `getReplayPlacements()`)
 - Simulations tab -> batch detail -> per-game "Replay" button
 - Campaign tab -> replays list -> "Watch"
+- All three go through `startReplay()` (`ui/admin/replayLauncher.ts`). Closing the replay reopens the admin panel where it was started: the same Matches page, the Campaign replay list page, the simulation batch
 - Viewers stay spectators throughout, even when they played in the recorded match
 
 ## Docker

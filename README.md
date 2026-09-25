@@ -292,12 +292,12 @@ blast-arena/
 ## Testing & Linting
 
 ```bash
-npm test                    # Run all test suites (3466 tests)
+npm test                    # Run all test suites (3500 tests)
 npm run lint                # ESLint across all workspaces
 npm run format:check        # Prettier format check
 ```
 
-3466 tests in 147 files: 3231 backend and shared tests in 115 Jest suites (game logic, services, routes, socket handlers, middleware, database, simulation, utilities) and 235 frontend tests in 32 Vitest files. See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
+3500 tests in 152 files: 3234 backend and shared tests in 115 Jest suites (game logic, services, routes, socket handlers, middleware, database, simulation, utilities) and 266 frontend tests in 37 Vitest files. See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
 
 ## Documentation
 

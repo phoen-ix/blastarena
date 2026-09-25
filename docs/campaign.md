@@ -84,7 +84,7 @@ Added to `TileType` union, `CollisionSystem.isWalkable()`, `TileMap.getTileTextu
 
 `EnemyTextureGenerator.ts` renders 6 body shapes (blob, spiky, ghost, robot, bug, skull) x 4 eye styles (round, angry, sleepy, crazy) x 4 directions. Features: teeth, horns. Canvas2D preview for admin editor.
 
-`EnemySprite.ts` — campaign enemy sprites with directional textures, HP bars, position lerp (0.45), death animation (red tint, scale down, fade), ghost translucency.
+`EnemySprite.ts` — campaign enemy sprites with directional textures, HP bars, per-frame position interpolation (`frame(delta)`, the players' 0.45-per-tick speed at any frame rate; a jump of more than 3 tiles is drawn as one), death animation (red tint, scale down, fade), ghost translucency.
 
 ## Level Editor
 

@@ -55,6 +55,8 @@ Bot AI runs full `generateInput()` every other tick (even ticks only); odd ticks
 - Shield graphic drawn at origin with `setPosition()` for positioning
 - Dust particle emitter pooled per player — one persistent emitter repositioned and reused
 - ReplayLogPanel uses `DocumentFragment` for batch DOM insertion
+- Players and enemies are interpolated once per rendered frame (`frame(delta)`, speed independent of frame rate: `1 - 0.55^(delta / 50ms)` of the remaining distance), not once per 20 Hz state. Enemy HP bars are drawn at their origin, moved with the sprite, and redrawn only when the HP changes
+- SoundGenerator fills one 1 s white-noise buffer once; each burst plays a random slice of it (`start(when, offset, duration)`) instead of allocating and filling a fresh buffer per explosion
 
 ## Database & Backend
 
