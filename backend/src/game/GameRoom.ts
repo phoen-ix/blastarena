@@ -129,7 +129,8 @@ export class GameRoom {
       room.config.botCount || 0,
       room.config.maxPlayers - room.players.length,
     );
-    const botNames = ['Bomber Bot', 'Blast Bot', 'Kaboom', 'TNT', 'Dynamite', 'Sparky'];
+    // One name per possible bot (max 7), so no two bots in a match share a name.
+    const botNames = ['Bomber Bot', 'Blast Bot', 'Kaboom', 'TNT', 'Dynamite', 'Sparky', 'Fuse'];
     const botTeams = room.config.botTeams || [];
     for (let i = 0; i < botCount; i++) {
       const botId = -(i + 1); // Negative IDs for bots
@@ -362,10 +363,13 @@ export class GameRoom {
   /** Speed up simulation when only bots remain alive and hide room from lobby */
   private checkBotOnlySpeedup(): void {
     if (!this.gameLoop.isRunning()) return;
-    const hasAliveHuman = Array.from(this.gameState.players.values()).some(
-      (p) => p.alive && !p.isBot,
+    // In respawn modes a dead human is only waiting to come back: counting them as gone sped the
+    // match up 5x and deleted the lobby room while they were still playing.
+    const respawns = GAME_MODES[this.room.config.gameMode]?.hasRespawn ?? false;
+    const hasActiveHuman = Array.from(this.gameState.players.values()).some(
+      (p) => !p.isBot && !this.departedHumans.has(p.id) && (p.alive || respawns),
     );
-    if (!hasAliveHuman) {
+    if (!hasActiveHuman) {
       if (this.gameLoop.getTickRate() !== BOT_ONLY_TICK_RATE) {
         logger.info({ code: this.code }, 'Only bots remain, speeding up simulation');
         this.gameLoop.setTickRate(BOT_ONLY_TICK_RATE);
@@ -617,6 +621,8 @@ export class GameRoom {
             xpForNextLevel: getXpToNextLevel(newLevel),
             xpProgress: newTotalXp - getXpForLevel(newLevel),
           });
+          // best_win_streak comes before win_streak: MariaDB evaluates SET left to right using
+          // already-updated values, so the old order read the incremented streak and stored best + 1.
           return conn.execute(
             `UPDATE user_stats SET
               total_matches = total_matches + 1,
@@ -626,8 +632,8 @@ export class GameRoom {
               total_bombs = total_bombs + ?,
               total_powerups = total_powerups + ?,
               total_playtime = total_playtime + ?,
-              win_streak = IF(?, win_streak + 1, 0),
               best_win_streak = GREATEST(best_win_streak, IF(?, win_streak + 1, 0)),
+              win_streak = IF(?, win_streak + 1, 0),
               total_xp = ?,
               level = ?
             WHERE user_id = ?`,

@@ -15,7 +15,7 @@ import {
   DEATHMATCH_KILL_TARGET,
   KOTH_ZONE_SIZE,
   KOTH_SCORE_TARGET,
-  KOTH_POINTS_PER_TICK,
+  KOTH_POINTS_PER_SECOND,
 } from '@blast-arena/shared';
 
 // Default small map config for most tests
@@ -1293,7 +1293,8 @@ describe('GameStateManager', () => {
       const hy = kothGs.hillZone!.y;
       placePlayer(p1, hx, hy);
 
-      kothGs.processTick();
+      // Points accrue per second of sole control
+      advanceTicks(kothGs, TICK_RATE);
 
       expect(kothGs.kothScores.get(1)).toBeGreaterThan(0);
     });
@@ -1858,11 +1859,13 @@ describe('GameStateManager', () => {
       const hy = kothGs.hillZone!.y;
       placePlayer(p1, hx, hy);
 
-      // Advance a few ticks
-      advanceTicks(kothGs, 5);
-
-      const score = kothGs.kothScores.get(1) || 0;
-      expect(score).toBe(5 * KOTH_POINTS_PER_TICK);
+      // Points accrue per second of sole control, not per tick
+      advanceTicks(kothGs, TICK_RATE - 1);
+      expect(kothGs.kothScores.get(1) ?? 0).toBe(KOTH_POINTS_PER_SECOND - 1);
+      advanceTicks(kothGs, 1);
+      expect(kothGs.kothScores.get(1)).toBe(KOTH_POINTS_PER_SECOND);
+      advanceTicks(kothGs, 2 * TICK_RATE);
+      expect(kothGs.kothScores.get(1)).toBe(3 * KOTH_POINTS_PER_SECOND);
     });
 
     it('should not score KOTH when two players contest the hill', () => {
@@ -2246,7 +2249,11 @@ describe('GameStateManager', () => {
       const hx = kothGs.hillZone!.x;
       const hy = kothGs.hillZone!.y;
       placePlayer(p1, hx, hy);
-      kothGs.kothScores.set(1, KOTH_SCORE_TARGET - 1);
+      // One tick of control short of the target
+      (kothGs as unknown as { kothControlTicks: Map<number, number> }).kothControlTicks.set(
+        1,
+        (KOTH_SCORE_TARGET / KOTH_POINTS_PER_SECOND) * TICK_RATE - 1,
+      );
 
       kothGs.processTick();
 

@@ -9,18 +9,34 @@ import {
 } from '@blast-arena/shared';
 
 describe('BattleRoyaleZone', () => {
-  it('should set initial radius to max(width, height)', () => {
-    const zone1 = new BattleRoyaleZone(15, 11);
-    const state1 = zone1.toState();
-    expect(state1.currentRadius).toBe(15);
+  it('should start at the half-diagonal, just covering every tile', () => {
+    expect(new BattleRoyaleZone(15, 11).toState().currentRadius).toBe(
+      Math.ceil(Math.hypot(15, 11) / 2),
+    );
+    expect(new BattleRoyaleZone(9, 13).toState().currentRadius).toBe(
+      Math.ceil(Math.hypot(9, 13) / 2),
+    );
+    expect(new BattleRoyaleZone(39, 31).toState().currentRadius).toBe(25);
+  });
 
-    const zone2 = new BattleRoyaleZone(9, 13);
-    const state2 = zone2.toState();
-    expect(state2.currentRadius).toBe(13);
+  it('should reach the minimum radius before the round ends', () => {
+    for (const [w, h, round] of [
+      [39, 31, 300],
+      [51, 51, 600],
+      [15, 11, 30],
+    ]) {
+      const zone = new BattleRoyaleZone(w, h, round);
+      for (let tick = 1; tick <= round * TICK_RATE; tick++) zone.tick(tick);
+      expect(zone.toState().targetRadius).toBe(BR_ZONE_MIN_RADIUS);
+    }
+  });
 
-    const zone3 = new BattleRoyaleZone(11, 11);
-    const state3 = zone3.toState();
-    expect(state3.currentRadius).toBe(11);
+  it('should touch the playable corners early in a default round', () => {
+    // 39x31 / 300 s: the farthest interior tile is ~22.8 from the centre.
+    const zone = new BattleRoyaleZone(39, 31, 300);
+    let tick = 0;
+    while (zone.toState().currentRadius > 22.8 && tick < 300 * TICK_RATE) zone.tick(++tick);
+    expect(tick / TICK_RATE).toBeLessThan(90);
   });
 
   it('should set center at floor(width/2), floor(height/2)', () => {
@@ -38,7 +54,7 @@ describe('BattleRoyaleZone', () => {
 
   it('should report positions within radius as inside zone', () => {
     const zone = new BattleRoyaleZone(15, 11);
-    // All map corners should be within the initial radius of max(15,11) = 15
+    // All map corners are within the initial (half-diagonal) radius
     expect(zone.isInsideZone(0, 0)).toBe(true);
     expect(zone.isInsideZone(14, 0)).toBe(true);
     expect(zone.isInsideZone(0, 10)).toBe(true);
@@ -178,8 +194,7 @@ describe('BattleRoyaleZone', () => {
 
     expect(state.centerX).toBe(Math.floor(51 / 2));
     expect(state.centerY).toBe(Math.floor(11 / 2));
-    // Initial radius should be max(51, 11) = 51
-    expect(state.currentRadius).toBe(51);
+    expect(state.currentRadius).toBe(Math.ceil(Math.hypot(51, 11) / 2));
     expect(zone.isInsideZone(state.centerX, state.centerY)).toBe(true);
   });
 
@@ -189,8 +204,7 @@ describe('BattleRoyaleZone', () => {
 
     expect(state.centerX).toBe(Math.floor(11 / 2));
     expect(state.centerY).toBe(Math.floor(51 / 2));
-    // Initial radius should be max(11, 51) = 51
-    expect(state.currentRadius).toBe(51);
+    expect(state.currentRadius).toBe(Math.ceil(Math.hypot(11, 51) / 2));
     expect(zone.isInsideZone(state.centerX, state.centerY)).toBe(true);
   });
 

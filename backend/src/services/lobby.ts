@@ -24,6 +24,40 @@ function generateRoomCode(): string {
   return uuidv4().substring(0, 6).toUpperCase();
 }
 
+/** MatchConfig fields that hold arrays. */
+const CONFIG_ARRAY_FIELDS = [
+  'enabledPowerUps',
+  'botTeams',
+  'selectedHazardTiles',
+  'selectedMapEvents',
+  'selectedPuzzleTiles',
+] as const;
+
+/**
+ * Parse a room read back from Redis.
+ *
+ * Every Lua script round-trips the room through cjson, which encodes an empty Lua table as `{}`. An
+ * empty array in the config therefore came back as an object — `enabledPowerUps: []` (host disabled
+ * every power-up) reached the game as `{}`, and the first power-up rain or spectator drop threw on
+ * every tick until the loop's circuit breaker ended the match. Arrays are restored here, so no
+ * consumer ever sees `{}`.
+ */
+export function parseRoom(json: string): Room {
+  const room = JSON.parse(json) as Room;
+  const config = room.config as unknown as Record<string, unknown>;
+  for (const field of CONFIG_ARRAY_FIELDS) {
+    const value = config[field];
+    if (value != null && !Array.isArray(value)) {
+      config[field] = typeof value === 'object' ? Object.values(value) : [];
+    }
+  }
+  if (!Array.isArray(room.players)) {
+    room.players =
+      room.players && typeof room.players === 'object' ? Object.values(room.players) : [];
+  }
+  return room;
+}
+
 export async function createRoom(
   host: PublicUser,
   name: string,
@@ -54,7 +88,7 @@ export async function getRoom(code: string): Promise<Room | null> {
   const redis = getRedis();
   const data = await redis.get(`room:${code}`);
   if (!data) return null;
-  return JSON.parse(data);
+  return parseRoom(data);
 }
 
 export async function listRooms(): Promise<RoomListItem[]> {
@@ -76,7 +110,7 @@ export async function listRooms(): Promise<RoomListItem[]> {
       stale.push(codes[i]);
       continue;
     }
-    const room: Room = JSON.parse(data);
+    const room = parseRoom(data);
     if (room.status === 'waiting' || room.status === 'playing') {
       rooms.push({
         code: room.code,
@@ -163,7 +197,7 @@ export async function joinRoom(code: string, user: PublicUser): Promise<Room> {
     throw new AppError('Join failed', 500);
   }
 
-  return JSON.parse(result);
+  return parseRoom(result);
 }
 
 // Lua script for atomic leave: removes player, transfers host if needed, deletes empty rooms
@@ -347,7 +381,7 @@ export async function leaveRoom(code: string, userId: number): Promise<Room | nu
   if (result === 'ERR:NOT_FOUND') return null;
   if (result === 'DELETED') return null;
 
-  return JSON.parse(result);
+  return parseRoom(result);
 }
 
 export async function setPlayerReady(code: string, userId: number, ready: boolean): Promise<Room> {
@@ -364,7 +398,7 @@ export async function setPlayerReady(code: string, userId: number, ready: boolea
   if (result === 'ERR:NOT_FOUND') throw new AppError('Room not found', 404, 'NOT_FOUND');
   if (result === 'ERR:NOT_IN_ROOM') throw new AppError('Not in this room', 400, 'NOT_IN_ROOM');
 
-  return JSON.parse(result);
+  return parseRoom(result);
 }
 
 export async function setPlayerTeamAsHost(
@@ -390,7 +424,7 @@ export async function setPlayerTeamAsHost(
   if (result === 'ERR:NOT_IN_ROOM')
     throw new AppError('Player not in this room', 400, 'NOT_IN_ROOM');
 
-  return JSON.parse(result);
+  return parseRoom(result);
 }
 
 export async function setBotTeamAsHost(
@@ -416,7 +450,7 @@ export async function setBotTeamAsHost(
   if (result === 'ERR:INVALID_BOT_INDEX')
     throw new AppError('Invalid bot index', 400, 'INVALID_BOT_INDEX');
 
-  return JSON.parse(result);
+  return parseRoom(result);
 }
 
 export async function updateRoom(code: string, room: Room): Promise<void> {
@@ -436,7 +470,7 @@ export async function startRoom(code: string): Promise<Room | null> {
 
   if (result.startsWith('ERR:')) return null;
 
-  return JSON.parse(result);
+  return parseRoom(result);
 }
 
 // Atomically set a room's status, preserving all other fields. The previous JS read-modify-write

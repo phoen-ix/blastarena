@@ -37,7 +37,7 @@ import {
   DEATHMATCH_KILL_TARGET,
   KOTH_ZONE_SIZE,
   KOTH_SCORE_TARGET,
-  KOTH_POINTS_PER_TICK,
+  KOTH_POINTS_PER_SECOND,
   KOTH_HILL_MOVE_INTERVAL,
   KOTH_HILL_MOVE_WARNING,
   OPENWORLD_RESPAWN_TICKS,
@@ -177,6 +177,8 @@ export class GameStateManager {
   public hillZone: { x: number; y: number; width: number; height: number } | null = null;
   public pendingHillZone: { x: number; y: number; width: number; height: number } | null = null;
   public kothScores: Map<number, number> = new Map();
+  /** Ticks of sole hill control per player; kothScores is derived from it. */
+  private kothControlTicks: Map<number, number> = new Map();
   private nextHillMoveTick: number = 0;
 
   private rng: SeededRandom;
@@ -350,7 +352,12 @@ export class GameStateManager {
     this.rng = new SeededRandom(this.map.seed + 1);
     this.gameMode = gameMode;
     this.roundTime = roundTime;
-    this.enabledPowerUps = enabledPowerUps ?? ['bomb_up', 'fire_up', 'speed_up', 'shield', 'kick'];
+    this.enabledPowerUps =
+      enabledPowerUps == null
+        ? ['bomb_up', 'fire_up', 'speed_up', 'shield', 'kick']
+        : Array.isArray(enabledPowerUps)
+          ? enabledPowerUps
+          : [];
     this.powerUpDropRate = powerUpDropRate;
     this.friendlyFire = friendlyFire;
     this.botDifficulty = botDifficulty;
@@ -427,7 +434,7 @@ export class GameStateManager {
     const worldHeight = this.map.height;
 
     if (hasZone) {
-      this.zone = new BattleRoyaleZone(worldWidth, worldHeight);
+      this.zone = new BattleRoyaleZone(worldWidth, worldHeight, roundTime);
     }
 
     // KOTH: initialize hill zone
@@ -483,6 +490,7 @@ export class GameStateManager {
     this.spectatorEnergy.delete(id);
     this.spectatorCooldowns.delete(id);
     this.kothScores.delete(id);
+    this.kothControlTicks.delete(id);
     this._alivePlayersCache = null;
   }
 
@@ -933,9 +941,12 @@ export class GameStateManager {
       }
     }
 
-    // 6.3 Hazard tile processing
-    if (this.hazardTileTypes.length > 0 && this.finishTick === null) {
-      this.processHazardTiles();
+    // 6.3 Hazard tile processing. Freeze-wave ice slides even when the ice hazard itself is off.
+    if (this.finishTick === null) {
+      if (this.hazardTileTypes.length > 0) this.processHazardTiles();
+      if (this.frozenTiles.size > 0 && !this.hazardTileTypes.includes('ice')) {
+        this.processIceSliding();
+      }
     }
 
     // 6.4 Puzzle tile processing (switches, gates, crumbling floors)
@@ -982,10 +993,14 @@ export class GameStateManager {
       if (playersInZone.length === 1) {
         const controllerId = playersInZone[0].id;
         this._hillControllingPlayerId = controllerId;
-        const current = this.kothScores.get(controllerId) || 0;
-        this.kothScores.set(controllerId, current + KOTH_POINTS_PER_TICK);
+        // Points per second of sole control (2/s → 50 s to win), not per tick: at 2 points per
+        // tick a hold of 2.5 s ended the round, long before the hill ever moved.
+        const controlTicks = (this.kothControlTicks.get(controllerId) ?? 0) + 1;
+        this.kothControlTicks.set(controllerId, controlTicks);
+        const score = Math.floor((controlTicks * KOTH_POINTS_PER_SECOND) / TICK_RATE);
+        this.kothScores.set(controllerId, score);
 
-        if (current + KOTH_POINTS_PER_TICK >= KOTH_SCORE_TARGET) {
+        if (score >= KOTH_SCORE_TARGET) {
           this.winnerId = controllerId;
           playersInZone[0].placement = 1;
           this.finishTick = this.tick;
@@ -1049,8 +1064,8 @@ export class GameStateManager {
       ) {
         // Find 3x3 areas with at least 1 destructible wall
         const candidates: Position[] = [];
-        for (let y = 1; y < this.map.height - 4; y++) {
-          for (let x = 1; x < this.map.width - 4; x++) {
+        for (let y = 1; y <= this.map.height - 4; y++) {
+          for (let x = 1; x <= this.map.width - 4; x++) {
             let hasDestructible = false;
             for (let dy = 0; dy < 3 && !hasDestructible; dy++) {
               for (let dx = 0; dx < 3 && !hasDestructible; dx++) {
@@ -1126,7 +1141,12 @@ export class GameStateManager {
         }
         this.nextUfoTick = this.tick + Math.floor((35 + this.rng.next() * 15) * TICK_RATE);
       }
+    }
 
+    // Pending impacts run whether or not dynamic map events are enabled: a spectator Game Master
+    // meteor queues the same 'meteor' event, and in rooms with map events off (the common setup)
+    // it was never processed — the energy was spent and nothing landed.
+    if (this.finishTick === null) {
       // Revert freeze wave tiles when duration expires
       if (this.frozenTiles.size > 0 && this.tick >= this.frozenTilesRevertTick) {
         for (const [key, originalType] of this.frozenTiles) {
@@ -1134,29 +1154,14 @@ export class GameStateManager {
           this.setTileTracked(parseInt(xStr), parseInt(yStr), originalType);
         }
         this.frozenTiles.clear();
+        if (!this.hazardTileTypes.includes('ice')) this.iceSliding.clear();
       }
 
       // Process pending meteor impacts
       for (let i = this.mapEvents.length - 1; i >= 0; i--) {
         const event = this.mapEvents[i];
         if (event.type === 'meteor' && event.position && this.tick >= event.tick) {
-          // Create explosion at meteor position
-          const cells = getExplosionCells(
-            event.position.x,
-            event.position.y,
-            2,
-            this.map.width,
-            this.map.height,
-            this.map.tiles,
-            false,
-            this.map.wrapping ?? false,
-          );
-          const explosion = new Explosion(cells, -999); // System-owned
-          this.explosions.set(explosion.id, explosion);
-          // Destroy walls
-          for (const cell of cells) {
-            this.destroyTileTracked(cell.x, cell.y);
-          }
+          this.detonateMeteor(event.position);
           this.mapEvents.splice(i, 1);
           this._mapEventsDirty = true;
         }
@@ -1337,54 +1342,22 @@ export class GameStateManager {
       }
     }
 
+    // Players who died in the same tick share a placement. Each death used to take `alive + 1` at
+    // the moment it was processed, so two players caught by one blast placed differently purely by
+    // join order (and got different Elo/XP for it).
+    if (this.tickEvents.playerDied.length > 1) {
+      const sharedPlacement = this.getAlivePlayers().length + 1;
+      for (const death of this.tickEvents.playerDied) {
+        const player = this.players.get(death.playerId);
+        if (player && !player.alive) player.placement = sharedPlacement;
+      }
+    }
+
     // 8. Time limit check (campaign handles its own timer; open world manages rounds externally)
     if (this.finishTick === null && this.gameMode !== 'campaign' && !this.isOpenWorld) {
       const timeElapsed = this.tick / TICK_RATE;
       if (timeElapsed >= this.roundTime && this.status === 'playing') {
-        // Decide the result on kills when the clock runs out.
-        //
-        // This used to record a winner only when exactly one player was still alive. With two or
-        // more survivors — the common outcome of a timed round — nobody was given a placement and
-        // winnerId/winnerTeam stayed null, so every player was written to match_players as a
-        // loser and handed to Elo as `placement ?? 999`. Teams mode never consulted winnerTeam
-        // here at all. (audit TIMEUP-WINNER-1)
-        const alive = this.getAlivePlayers();
-        if (alive.length === 1) {
-          this.winnerId = alive[0].id;
-          alive[0].placement = 1;
-          this.finishReason = `Time's up — ${alive[0].username} survives!`;
-        } else if (alive.length > 1) {
-          // Survivors outrank everyone already eliminated (who took their placement on death),
-          // and rank among themselves by kills.
-          const ranked = [...alive].sort((a, b) => b.kills - a.kills);
-          ranked.forEach((p, i) => {
-            p.placement = i + 1;
-          });
-
-          if (this.gameMode === 'teams') {
-            const killsByTeam = new Map<number, number>();
-            for (const p of alive) {
-              if (p.team === null) continue;
-              killsByTeam.set(p.team, (killsByTeam.get(p.team) ?? 0) + p.kills);
-            }
-            const teams = [...killsByTeam.entries()].sort((a, b) => b[1] - a[1]);
-            // A tie stays a draw rather than inventing a winner.
-            if (teams.length > 0 && (teams.length === 1 || teams[0][1] > teams[1][1])) {
-              this.winnerTeam = teams[0][0];
-              const teamName = teams[0][0] === 0 ? 'Red' : 'Blue';
-              this.finishReason = `Time's up — Team ${teamName} leads on kills!`;
-            } else {
-              this.finishReason = "Time's up — draw!";
-            }
-          } else if (ranked[0].kills > ranked[1].kills) {
-            this.winnerId = ranked[0].id;
-            this.finishReason = `Time's up — ${ranked[0].username} leads on kills!`;
-          } else {
-            this.finishReason = "Time's up — draw!";
-          }
-        } else {
-          this.finishReason = "Time's up!";
-        }
+        this.resolveTimeUp();
         this.finishTick = this.tick;
       }
     }
@@ -1395,7 +1368,7 @@ export class GameStateManager {
     }
 
     // Track previous player positions for hazard entry detection (ice, dark_rift)
-    if (this.hazardTileTypes.length > 0) {
+    if (this.hazardTileTypes.length > 0 || this.frozenTiles.size > 0) {
       for (const player of this.players.values()) {
         this.prevPlayerPositions.set(player.id, `${player.position.x},${player.position.y}`);
       }
@@ -1760,7 +1733,15 @@ export class GameStateManager {
     for (const action of this.spectatorActionBuffer) {
       switch (action.type) {
         case 'place_wall':
-          this.applySpectatorWall(action.position);
+          // Validated when requested, applied a tick later: a player (or bomb) may have moved onto
+          // the tile in between, and the wall would have entombed them. Refund instead.
+          if (!this.applySpectatorWall(action.position)) {
+            const energy = this.spectatorEnergy.get(action.playerId) ?? 0;
+            this.spectatorEnergy.set(
+              action.playerId,
+              Math.min(SPECTATOR_MAX_ENERGY, energy + SPECTATOR_WALL_COST),
+            );
+          }
           break;
         case 'trigger_meteor':
           this.applySpectatorMeteor(action.position);
@@ -1803,9 +1784,17 @@ export class GameStateManager {
     }
   }
 
-  private applySpectatorWall(position: Position): void {
+  /** Place a temporary wall; false (nothing placed) if the tile is no longer free. */
+  private applySpectatorWall(position: Position): boolean {
     const { x, y } = position;
     const originalType = this.map.tiles[y][x] as TileType;
+    if (originalType !== 'empty' && originalType !== 'spawn') return false;
+    for (const p of this.players.values()) {
+      if (p.alive && p.position.x === x && p.position.y === y) return false;
+    }
+    for (const b of this.bombs.values()) {
+      if (b.position.x === x && b.position.y === y) return false;
+    }
     this.setTileTracked(x, y, 'destructible');
     this.temporaryWalls.set(`${x},${y}`, {
       revertTick: this.tick + SPECTATOR_WALL_DURATION_TICKS,
@@ -1817,6 +1806,7 @@ export class GameStateManager {
       tick: this.tick,
     });
     this._mapEventsDirty = true;
+    return true;
   }
 
   private applySpectatorMeteor(position: Position): void {
@@ -2421,6 +2411,48 @@ export class GameStateManager {
   }
 
   /**
+   * Meteor impact (map event or spectator action). Same blast rules as a bomb: fire does not linger
+   * on the walls it destroys, and bombs caught in the blast chain. It used to leave fire on the
+   * destroyed-wall cells and ignore bombs entirely.
+   */
+  private detonateMeteor(position: Position): void {
+    const cells = getExplosionCells(
+      position.x,
+      position.y,
+      2,
+      this.map.width,
+      this.map.height,
+      this.map.tiles,
+      false,
+      this.map.wrapping ?? false,
+    );
+    const damageCells = cells.filter((c) => {
+      const tile = this.map.tiles[c.y][c.x];
+      return tile !== 'destructible' && tile !== 'destructible_cracked';
+    });
+    const explosion = new Explosion(damageCells, -999); // System-owned
+    this.explosions.set(explosion.id, explosion);
+    this.tickEvents.explosions.push({ cells: [...damageCells], ownerId: -999 });
+
+    const cellSet = new Set(cells.map((c) => `${c.x},${c.y}`));
+    const chained: Bomb[] = [];
+    for (const bomb of this.bombs.values()) {
+      if (cellSet.has(`${bomb.position.x},${bomb.position.y}`)) chained.push(bomb);
+    }
+    for (const cell of cells) {
+      this.destroyTileTracked(cell.x, cell.y);
+    }
+    if (chained.length > 0) {
+      const tileSnapshot = this.beginTileSnapshot();
+      try {
+        for (const bomb of chained) this.detonateBomb(bomb, tileSnapshot);
+      } finally {
+        this._activeSnapshot = null;
+      }
+    }
+  }
+
+  /**
    * Pick a random enabled power-up, or null when none are enabled. (audit POWERUP-EMPTY-ARRAY-1)
    *
    * Weighted by POWERUP_DEFINITIONS[].weight, not uniform: this used to index the enabled array
@@ -2542,6 +2574,75 @@ export class GameStateManager {
           this.finishReason = 'Draw — no survivors!';
         }
       }
+    }
+  }
+
+  /**
+   * Decide the result when the clock runs out.
+   *
+   * Deathmatch and KOTH rank every player — by kills, or by hill score — rather than only whoever is
+   * alive at the buzzer: a deathmatch kill leader waiting out a respawn used to be ranked below
+   * everyone still standing, and KOTH ignored the hill entirely. Teams compare every member's kills,
+   * not just the survivors'. Elimination modes keep ranking survivors (by kills) above everyone
+   * already eliminated, who took their placement when they died.
+   */
+  private resolveTimeUp(): void {
+    if (this.gameMode === 'deathmatch' || this.gameMode === 'king_of_the_hill') {
+      const isKoth = this.gameMode === 'king_of_the_hill';
+      const score = (p: Player): number => (isKoth ? (this.kothScores.get(p.id) ?? 0) : p.kills);
+      const all = [...this.players.values()];
+      // Standard competition ranking: equal scores share a placement.
+      for (const p of all) p.placement = 1 + all.filter((o) => score(o) > score(p)).length;
+      const ranked = [...all].sort((a, b) => score(b) - score(a));
+      if (ranked.length > 0 && (ranked.length === 1 || score(ranked[0]) > score(ranked[1]))) {
+        this.winnerId = ranked[0].id;
+        this.finishReason = isKoth
+          ? `Time's up — ${ranked[0].username} leads on hill points!`
+          : `Time's up — ${ranked[0].username} leads on kills!`;
+      } else {
+        this.finishReason = ranked.length > 0 ? "Time's up — draw!" : "Time's up!";
+      }
+      return;
+    }
+
+    const alive = this.getAlivePlayers();
+    if (alive.length === 1) {
+      this.winnerId = alive[0].id;
+      alive[0].placement = 1;
+      this.finishReason = `Time's up — ${alive[0].username} survives!`;
+      return;
+    }
+    if (alive.length === 0) {
+      this.finishReason = "Time's up!";
+      return;
+    }
+
+    // Survivors outrank everyone already eliminated and rank among themselves by kills.
+    const ranked = [...alive].sort((a, b) => b.kills - a.kills);
+    ranked.forEach((p, i) => {
+      p.placement = i + 1;
+    });
+
+    if (this.gameMode === 'teams') {
+      const killsByTeam = new Map<number, number>();
+      for (const p of this.players.values()) {
+        if (p.team === null) continue;
+        killsByTeam.set(p.team, (killsByTeam.get(p.team) ?? 0) + p.kills);
+      }
+      const teams = [...killsByTeam.entries()].sort((a, b) => b[1] - a[1]);
+      // A tie stays a draw rather than inventing a winner.
+      if (teams.length > 0 && (teams.length === 1 || teams[0][1] > teams[1][1])) {
+        this.winnerTeam = teams[0][0];
+        const teamName = teams[0][0] === 0 ? 'Red' : 'Blue';
+        this.finishReason = `Time's up — Team ${teamName} leads on kills!`;
+      } else {
+        this.finishReason = "Time's up — draw!";
+      }
+    } else if (ranked[0].kills > ranked[1].kills) {
+      this.winnerId = ranked[0].id;
+      this.finishReason = `Time's up — ${ranked[0].username} leads on kills!`;
+    } else {
+      this.finishReason = "Time's up — draw!";
     }
   }
 

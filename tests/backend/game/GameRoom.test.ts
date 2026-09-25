@@ -484,6 +484,8 @@ describe('GameRoom', () => {
         expect(q).toContain('total_matches = total_matches + 1');
         expect(q).toContain('total_xp = ?');
         expect(q).toContain('level = ?');
+        // MariaDB evaluates SET left to right: best_win_streak must read the pre-increment streak.
+        expect(q.indexOf('best_win_streak =')).toBeLessThan(q.indexOf(' win_streak = IF'));
       }
       expect(mockExecute.mock.calls.some((c) => (c[0] as string).includes('user_stats'))).toBe(
         false,
@@ -531,6 +533,33 @@ describe('GameRoom', () => {
       mockUpdateRoomStatus.mockRejectedValueOnce(new Error('redis down'));
 
       await expect(finishGame(gameRoom)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('bots-only speed-up in respawn modes', () => {
+    it('does not speed up while a human is only waiting to respawn', async () => {
+      mockGameLoopIsRunning.mockReturnValue(true);
+      const gr = new GameRoom(
+        mockIo,
+        createMockRoom({ gameMode: 'deathmatch', botCount: 1 }) as any,
+      );
+      await gr.start();
+      const internals = gr as unknown as { gameState: GameStateManager };
+      internals.gameState.players.get(2)!.alive = false; // respawning, not gone
+      gr.handlePlayerLeave(1);
+      expect(mockGameLoopSetTickRate).not.toHaveBeenCalled();
+    });
+
+    it('still speeds up once every human has left', async () => {
+      mockGameLoopIsRunning.mockReturnValue(true);
+      const gr = new GameRoom(
+        mockIo,
+        createMockRoom({ gameMode: 'deathmatch', botCount: 1 }) as any,
+      );
+      await gr.start();
+      gr.handlePlayerLeave(1);
+      gr.handlePlayerLeave(2);
+      expect(mockGameLoopSetTickRate).toHaveBeenCalled();
     });
   });
 });
