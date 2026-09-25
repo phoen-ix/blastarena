@@ -32,6 +32,7 @@ export class SpectatorChat {
   private toggleBtn: HTMLElement | null = null;
   private chatHandler: ((data: SpectatorChatMessage) => void) | null = null;
   private settingsHandler: ((data: { key: string; value?: unknown }) => void) | null = null;
+  private destroyed = false;
 
   constructor(socketClient: SocketClient, userRole: string) {
     this.socketClient = socketClient;
@@ -46,6 +47,9 @@ export class SpectatorChat {
     } catch {
       // Default to 'everyone'
     }
+    // Destroyed while loading (the player respawned): mounting now would leave an orphaned panel
+    // and listeners for the rest of the match.
+    if (this.destroyed) return;
 
     this.container = document.createElement('div');
     this.container.id = 'spectator-chat';
@@ -58,6 +62,7 @@ export class SpectatorChat {
   }
 
   destroy(): void {
+    this.destroyed = true;
     if (this.chatHandler) {
       this.socketClient.off('game:spectatorChat', this.chatHandler);
       this.chatHandler = null;

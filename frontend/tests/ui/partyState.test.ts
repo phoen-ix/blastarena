@@ -45,6 +45,13 @@ function fakeSocket(acks: Record<string, (...args: unknown[]) => unknown> = {}) 
         (handlers.get(event) ?? []).filter((h) => h !== handler),
       );
     }),
+    reconnectListeners: new Set<() => void>(),
+    onReconnect(listener: () => void) {
+      socket.reconnectListeners.add(listener);
+    },
+    offReconnect(listener: () => void) {
+      socket.reconnectListeners.delete(listener);
+    },
     fire(event: string, ...args: unknown[]) {
       for (const h of handlers.get(event) ?? []) h(...args);
     },
@@ -124,6 +131,21 @@ describe('PartyBar', () => {
     expect(bar.getParty()).toBeNull();
     expect(host.querySelector<HTMLElement>('.party-bar')!.style.display).toBe('none');
     bar.destroy();
+  });
+
+  it('asks again after a reconnect, and stops listening once destroyed', () => {
+    let current: typeof party | null = party;
+    const socket = fakeSocket({ 'party:sync': () => ({ success: true, party: current }) });
+    const { bar } = makeBar(socket);
+    expect(bar.getParty()).toEqual(party);
+
+    // The server left the party for this user's last socket while the connection was down
+    current = null;
+    for (const listener of socket.reconnectListeners) listener();
+    expect(bar.getParty()).toBeNull();
+
+    bar.destroy();
+    expect(socket.reconnectListeners.size).toBe(0);
   });
 });
 

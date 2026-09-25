@@ -22,7 +22,7 @@ Full-screen panel accessible from lobby header (Admin button visible for admin a
 
 - `staffMiddleware` (admin+moderator) and `adminOnlyMiddleware` (admin only) for route protection
 - `backend/src/game/registry.ts` — singleton for RoomManager/IO access from admin service
-- Admin socket events: `admin:kick`, `admin:closeRoom`, `admin:spectate`, `admin:roomMessage`, `admin:toast`, `admin:banner`, `admin:kicked`
+- Admin socket events: `admin:kick`, `admin:closeRoom`, `admin:spectate`, `admin:unspectate`, `admin:roomMessage`, `admin:toast`, `admin:banner`, `admin:kicked`
 - All admin actions logged to `admin_actions` table for audit. `target_id` is `INT NOT NULL` — use `0` for bulk operations without a specific target
 - Deactivated users blocked from login and token refresh
 - Self-protection: admins cannot deactivate/delete themselves

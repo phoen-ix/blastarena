@@ -18,6 +18,7 @@ export class AuthManager {
   private _isGuest: boolean = false;
   private _loggingOut: boolean = false;
   private pendingTotpToken: string | null = null;
+  private refreshing: Promise<boolean> | null = null;
 
   constructor() {
     ApiClient.setAuthManager(this);
@@ -127,7 +128,27 @@ export class AuthManager {
     this.setAuth(response);
   }
 
-  async refresh(): Promise<boolean> {
+  /**
+   * Rotate the refresh cookie for a new access token. One refresh at a time — within this tab via
+   * the shared promise, across tabs via a Web Lock: two requests presenting the same cookie look
+   * like token reuse to the server, which then revokes every session of the account (two tabs
+   * refreshing together after the machine woke up logged the user out everywhere).
+   */
+  refresh(): Promise<boolean> {
+    if (this.refreshing) return this.refreshing;
+    const pending = this.lockedRefresh().finally(() => {
+      this.refreshing = null;
+    });
+    this.refreshing = pending;
+    return pending;
+  }
+
+  private async lockedRefresh(): Promise<boolean> {
+    if (typeof navigator === 'undefined' || !navigator.locks) return this.doRefresh();
+    return await navigator.locks.request('blast-arena-auth-refresh', () => this.doRefresh());
+  }
+
+  private async doRefresh(): Promise<boolean> {
     try {
       const response = await fetch(`${API_URL}/auth/refresh`, {
         method: 'POST',

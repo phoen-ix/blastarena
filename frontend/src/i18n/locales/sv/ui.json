@@ -693,6 +693,7 @@
     "gameOver": "Spelet är slut"
   },
   "connection": {
-    "reconnecting": "Återansluter till servern..."
+    "reconnecting": "Återansluter till servern...",
+    "sessionLost": "Anslutningen bröts och du är tillbaka i lobbyn."
   }
 }

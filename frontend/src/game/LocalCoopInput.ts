@@ -157,6 +157,7 @@ export class LocalCoopInput {
 
   private keyDownHandler: (e: KeyboardEvent) => void;
   private keyUpHandler: (e: KeyboardEvent) => void;
+  private blurHandler: () => void;
 
   // `_scene` is unused: input is read from window key events and the GamepadManager, not the
   // scene. Kept in the signature for the GameScene call site. (audit G4)
@@ -178,8 +179,12 @@ export class LocalCoopInput {
         this.keysDown.delete(e.code);
       }
     };
+    // A key held while the window loses focus never gets its keyup, and the player kept walking
+    // until it was pressed again.
+    this.blurHandler = () => this.keysDown.clear();
     window.addEventListener('keydown', this.keyDownHandler);
     window.addEventListener('keyup', this.keyUpHandler);
+    window.addEventListener('blur', this.blurHandler);
   }
 
   pollP1(): LocalPlayerInput {
@@ -273,6 +278,7 @@ export class LocalCoopInput {
   destroy(): void {
     window.removeEventListener('keydown', this.keyDownHandler);
     window.removeEventListener('keyup', this.keyUpHandler);
+    window.removeEventListener('blur', this.blurHandler);
     this.keysDown.clear();
     this.p1PrevBomb = false;
     this.p1PrevDetonate = false;

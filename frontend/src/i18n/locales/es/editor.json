@@ -51,7 +51,7 @@
     "levelSettings": "Configuración del Nivel",
     "width": "Ancho",
     "height": "Alto",
-    "dimensionHint": "Números impares, 7-51",
+    "dimensionHint": "Números impares, {{min}}-51",
     "name": "Nombre",
     "description": "Descripción",
     "lives": "Vidas",

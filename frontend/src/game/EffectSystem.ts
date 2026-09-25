@@ -69,6 +69,11 @@ export class EffectSystem {
     this.socketClient.on('game:powerupCollected', this.powerupCollectedHandler);
   }
 
+  /** An open-world re-join can hand a guest a new id. */
+  setLocalPlayerId(id: number): void {
+    this.localPlayerId = id;
+  }
+
   setLocalPlayerAlive(alive: boolean): void {
     this.localPlayerAlive = alive;
   }

@@ -51,7 +51,7 @@
     "levelSettings": "Leveleinstellungen",
     "width": "Breite",
     "height": "Höhe",
-    "dimensionHint": "Ungerade Zahlen, 7-51",
+    "dimensionHint": "Ungerade Zahlen, {{min}}-51",
     "name": "Name",
     "description": "Beschreibung",
     "lives": "Leben",

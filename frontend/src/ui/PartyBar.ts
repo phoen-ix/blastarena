@@ -40,6 +40,9 @@ export class PartyBar {
   private partyInviteHandler!: ServerToClientEvents['party:invite'];
   private roomInviteHandler!: ServerToClientEvents['invite:room'];
   private settingsChangedHandler!: ServerToClientEvents['admin:settingsChanged'];
+  // A dropped connection can take the party with it (the server leaves it for a user's last
+  // socket), so the bar asks again after every reconnect.
+  private reconnectHandler = () => this.syncParty();
 
   constructor(
     socketClient: SocketClient,
@@ -55,6 +58,7 @@ export class PartyBar {
     this.container.className = 'party-bar';
     this.container.style.display = 'none';
     this.setupSocketListeners();
+    this.socketClient.onReconnect(this.reconnectHandler);
     this.loadChatMode();
     this.syncParty();
   }
@@ -105,6 +109,7 @@ export class PartyBar {
     this.socketClient.off('party:invite', this.partyInviteHandler);
     this.socketClient.off('invite:room', this.roomInviteHandler);
     this.socketClient.off('admin:settingsChanged', this.settingsChangedHandler);
+    this.socketClient.offReconnect(this.reconnectHandler);
     this.chatContainer?.remove();
     this.container.remove();
     this.partyListeners.clear();

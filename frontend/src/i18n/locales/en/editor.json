@@ -51,7 +51,7 @@
     "levelSettings": "Level Settings",
     "width": "Width",
     "height": "Height",
-    "dimensionHint": "Odd numbers, 7-51",
+    "dimensionHint": "Odd numbers, {{min}}-51",
     "name": "Name",
     "description": "Description",
     "lives": "Lives",

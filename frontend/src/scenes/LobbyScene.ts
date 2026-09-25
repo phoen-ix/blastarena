@@ -23,6 +23,7 @@ export class LobbyScene extends Phaser.Scene {
   private adminKickedHandler: ((data: { reason: string }) => void) | null = null;
   private partyJoinRoomHandler: ((data: { roomCode: string }) => void) | null = null;
   private campaignCoopStartHandler: ((data: CoopStartData) => void) | null = null;
+  private reconnectHandler: (() => void) | null = null;
 
   constructor() {
     super({ key: 'LobbyScene' });
@@ -38,6 +39,7 @@ export class LobbyScene extends Phaser.Scene {
     // This is replaced by onJoinRoom()'s handler during normal flow.
     if (!this.gameStartHandler) {
       this.gameStartHandler = (state) => {
+        if (!this.isOwnMatch(state)) return;
         if (this.gameStartHandler) {
           this.socketClient.off('game:start', this.gameStartHandler);
           this.gameStartHandler = null;
@@ -179,10 +181,33 @@ export class LobbyScene extends Phaser.Scene {
     };
     this.socketClient.on('campaign:coopStart', this.campaignCoopStartHandler);
 
+    // The server keeps no socket rooms across a reconnect, and it takes a disconnected player
+    // out of a waiting room. Without this the room view stayed up for a room we had left, and
+    // the lobby stopped receiving room-list updates.
+    this.reconnectHandler = () => {
+      if (this.roomUI) {
+        this.notifications.error(t('ui:connection.sessionLost'));
+        this.registry.remove('currentRoom');
+        this.showLobby();
+      } else {
+        this.socketClient.emit('lobby:subscribe');
+      }
+    };
+    this.socketClient.onReconnect(this.reconnectHandler);
+
     // Background
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
     this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a2e);
+  }
+
+  /**
+   * `game:start` goes to everyone in the socket room, which includes staff spectating it from the
+   * admin panel — only a match this user plays in may take over the lobby.
+   */
+  private isOwnMatch(state: GameState): boolean {
+    const userId = this.authManager.getUser()?.id;
+    return userId !== undefined && state.players.some((p) => p.id === userId);
   }
 
   private showLobby(initialView?: string, viewOptions?: Record<string, unknown>): void {
@@ -203,6 +228,10 @@ export class LobbyScene extends Phaser.Scene {
 
   private onJoinRoom(room: Room): void {
     this.lobbyUI?.hide();
+    // Following the party leader can land here while a room view is already up; a second one
+    // stacked on top and the first kept its socket listeners.
+    this.roomUI?.hide();
+    this.roomUI = null;
 
     // Store room data
     this.registry.set('currentRoom', room);
@@ -220,6 +249,7 @@ export class LobbyScene extends Phaser.Scene {
 
     // Listen for game start (one-shot: removes itself after firing)
     this.gameStartHandler = (state) => {
+      if (!this.isOwnMatch(state)) return;
       // Remove this listener immediately so it doesn't leak to next game
       if (this.gameStartHandler) {
         this.socketClient.off('game:start', this.gameStartHandler);
@@ -270,6 +300,10 @@ export class LobbyScene extends Phaser.Scene {
     if (this.campaignCoopStartHandler) {
       this.socketClient.off('campaign:coopStart', this.campaignCoopStartHandler);
       this.campaignCoopStartHandler = null;
+    }
+    if (this.reconnectHandler) {
+      this.socketClient.offReconnect(this.reconnectHandler);
+      this.reconnectHandler = null;
     }
     this.lobbyUI?.hide(); // destroys the PartyBar/LobbyChatPanel pair as well (audit C1)
     this.roomUI?.hide();

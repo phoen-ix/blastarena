@@ -24,6 +24,7 @@ import { ApiClient } from '../network/ApiClient';
 import { generateThemedTileTextures, generateHazardTileTextures } from '../utils/campaignThemes';
 import { getTileTexture, isConveyorTile, conveyorAnimKey } from '../utils/tileTextures';
 import { setHtml } from '../utils/html';
+import { invalidateMapPreview } from '../utils/mapPreviewCache';
 
 type EditorTool =
   | 'empty'
@@ -943,6 +944,9 @@ export class LevelEditorScene extends Phaser.Scene {
 
   /** Store a special tile as covered by the destructible wall at this position */
   private setCoveredTile(x: number, y: number, type: TileType): void {
+    // Custom maps have no covered tiles: the wall replaces the tile, exactly as saving does. The
+    // editor used to keep it under the wall, and the saved map silently lost it.
+    if (this.editorMode === 'custom_map') return;
     const key = `${x},${y}`;
     // Remove existing overlay sprite
     this.coveredTileSprites.get(key)?.destroy();
@@ -1185,12 +1189,17 @@ export class LevelEditorScene extends Phaser.Scene {
     cam.centerOn(worldW / 2, worldH / 2);
   }
 
+  /** Smallest side the server accepts: campaign levels allow 7, custom maps need 9. */
+  private get minMapSize(): number {
+    return this.editorMode === 'custom_map' ? 9 : 7;
+  }
+
   private resizeMap(newWidth: number, newHeight: number): void {
     // Enforce odd numbers
     if (newWidth % 2 === 0) newWidth++;
     if (newHeight % 2 === 0) newHeight++;
-    newWidth = Phaser.Math.Clamp(newWidth, 7, 51);
-    newHeight = Phaser.Math.Clamp(newHeight, 7, 51);
+    newWidth = Phaser.Math.Clamp(newWidth, this.minMapSize, 51);
+    newHeight = Phaser.Math.Clamp(newHeight, this.minMapSize, 51);
 
     if (newWidth === this.mapWidth && newHeight === this.mapHeight) return;
 
@@ -1630,7 +1639,7 @@ export class LevelEditorScene extends Phaser.Scene {
     wCol.appendChild(wLabel);
     this.widthInput = document.createElement('input');
     this.widthInput.type = 'number';
-    this.widthInput.min = '7';
+    this.widthInput.min = String(this.minMapSize);
     this.widthInput.max = '51';
     this.widthInput.step = '2';
     this.widthInput.value = String(this.mapWidth);
@@ -1649,7 +1658,7 @@ export class LevelEditorScene extends Phaser.Scene {
     hCol.appendChild(hLabel);
     this.heightInput = document.createElement('input');
     this.heightInput.type = 'number';
-    this.heightInput.min = '7';
+    this.heightInput.min = String(this.minMapSize);
     this.heightInput.max = '51';
     this.heightInput.step = '2';
     this.heightInput.value = String(this.mapHeight);
@@ -1662,7 +1671,7 @@ export class LevelEditorScene extends Phaser.Scene {
     section.appendChild(dimRow);
 
     const dimHint = document.createElement('div');
-    dimHint.textContent = t('editor:settings.dimensionHint');
+    dimHint.textContent = t('editor:settings.dimensionHint', { min: this.minMapSize });
     dimHint.style.cssText = 'font-size:9px;color:var(--text-dim);margin-top:1px;margin-bottom:2px;';
     section.appendChild(dimHint);
 
@@ -1881,6 +1890,7 @@ export class LevelEditorScene extends Phaser.Scene {
     try {
       if (this.customMapId) {
         await ApiClient.put(`/maps/${this.customMapId}`, mapData);
+        invalidateMapPreview('map', this.customMapId);
       } else {
         const resp = await ApiClient.post<{ id: number }>('/maps', mapData);
         this.customMapId = resp.id;
@@ -1946,6 +1956,7 @@ export class LevelEditorScene extends Phaser.Scene {
     try {
       if (this.levelId) {
         await apiClient.put(`/admin/campaign/levels/${this.levelId}`, levelData);
+        invalidateMapPreview('campaign', this.levelId);
       } else {
         // No level yet: create it in the world the editor was opened for. This used to fall
         // through to the "saved" toast and clear the dirty flag without saving anything.

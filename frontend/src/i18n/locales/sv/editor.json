@@ -51,7 +51,7 @@
     "levelSettings": "Baninställningar",
     "width": "Bredd",
     "height": "Höjd",
-    "dimensionHint": "Udda tal, 7-51",
+    "dimensionHint": "Udda tal, {{min}}-51",
     "name": "Namn",
     "description": "Beskrivning",
     "lives": "Liv",

@@ -1,10 +1,11 @@
 import { ApiClient } from '../../network/ApiClient';
 import { SocketClient } from '../../network/SocketClient';
 import { NotificationUI } from '../NotificationUI';
-import { RoomListItem, UserRole, gameModeName } from '@blast-arena/shared';
+import { GameState, RoomListItem, UserRole, gameModeName } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
+import { game } from '../../main';
 
 export class RoomsTab {
   private container: HTMLElement | null = null;
@@ -130,8 +131,9 @@ export class RoomsTab {
 
     if (action === 'spectate') {
       this.socketClient.emit('admin:spectate', { roomCode: code }, (res) => {
-        if (res.success) {
+        if (res.success && res.state) {
           this.notifications.success(t('admin:rooms.spectatingRoom', { code }));
+          this.openSpectatorView(code, res.state);
         } else {
           this.notifications.error(res.error || t('admin:rooms.failedToSpectate'));
         }
@@ -144,6 +146,27 @@ export class RoomsTab {
       this.showCloseConfirmation(code);
     }
   };
+
+  /**
+   * Watch the match. Spectating used to join the socket to the room and stop there: nothing was
+   * shown, and the admin's lobby took the room's 20 Hz state for the rest of the session.
+   * GameScene sends admin:unspectate when the view closes.
+   */
+  private openSpectatorView(code: string, state: GameState): void {
+    const lobbyScene = game.scene.getScene('LobbyScene');
+    if (!lobbyScene || !this.container) {
+      this.socketClient.emit('admin:unspectate', { roomCode: code });
+      return;
+    }
+    game.registry.set('initialGameState', state);
+    game.registry.set('adminSpectate', { roomCode: code });
+    const uiOverlay = document.getElementById('ui-overlay');
+    if (uiOverlay) {
+      while (uiOverlay.firstChild) uiOverlay.removeChild(uiOverlay.firstChild);
+    }
+    lobbyScene.scene.start('GameScene');
+    lobbyScene.scene.launch('HUDScene');
+  }
 
   private showMessageModal(code: string): void {
     const { overlay, content, close } = createModal({

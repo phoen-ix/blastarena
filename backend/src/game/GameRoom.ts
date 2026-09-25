@@ -436,6 +436,9 @@ export class GameRoom {
           ? { ...state, map: { ...state.map, tiles: this.gameState.map.tiles } }
           : state;
       this.replayRecorder.recordTick(replayState, events);
+    } else if (this.replayRecorder) {
+      // Countdown ticks carry each player's cosmetics once; the recorder keeps them for the frames.
+      this.replayRecorder.observe(state);
     }
   }
 

@@ -51,7 +51,7 @@
     "levelSettings": "Levelinstellingen",
     "width": "Breedte",
     "height": "Hoogte",
-    "dimensionHint": "Oneven getallen, 7-51",
+    "dimensionHint": "Oneven getallen, {{min}}-51",
     "name": "Naam",
     "description": "Beschrijving",
     "lives": "Levens",

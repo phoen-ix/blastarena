@@ -17,7 +17,7 @@ import { LocalCoopP2Identity } from '../game/LocalCoopInput';
 import { t } from '../i18n';
 import { audioManager } from '../game/AudioManager';
 import { AuthManager } from '../network/AuthManager';
-import { enterCoopLevel } from './coopStart';
+import { enterCoopLevel, clearCampaignRun, localP2StartData } from './coopStart';
 
 const DEADZONE = 0.3;
 
@@ -138,11 +138,20 @@ export class GameOverScene extends Phaser.Scene {
     };
     socketClient.on('campaign:coopStart', coopStartHandler);
 
+    // Match results: the server takes a disconnected player out of the finished room, so after a
+    // reconnect there is no rematch left to wait for.
+    const reconnectHandler = () => {
+      this.registry.remove('currentRoom');
+      this.scene.start('LobbyScene');
+    };
+    if (!data?.campaignResult) socketClient.onReconnect(reconnectHandler);
+
     // `once`, matching every other scene: Phaser's Systems.shutdown() only clears the transition
     // events, so a scene `shutdown` listener registered with `on` survives and accumulates one
     // more closure — holding the old socketClient and six stale handler refs — per finished match.
     // (audit SCENE-SHUTDOWN-ONCE-1)
     this.events.once('shutdown', () => {
+      socketClient.offReconnect(reconnectHandler);
       socketClient.off('room:state', roomStateHandler);
       socketClient.off('game:eloUpdate', eloHandler);
       socketClient.off('game:xpUpdate', xpHandler);
@@ -491,11 +500,7 @@ export class GameOverScene extends Phaser.Scene {
     backBtn.on('pointerover', () => backBtn.setColor(colors.primaryHoverHex));
     backBtn.on('pointerout', () => backBtn.setColor(colors.primaryHex));
     backBtn.on('pointerdown', () => {
-      this.registry.remove('campaignMode');
-      this.registry.remove('campaignCoopMode');
-      this.registry.remove('localCoopMode');
-      this.registry.remove('localCoopConfig');
-      this.registry.remove('campaignTheme');
+      clearCampaignRun(this.registry);
       this.registry.set('openCampaign', true);
       this.scene.start('LobbyScene');
     });
@@ -578,7 +583,7 @@ export class GameOverScene extends Phaser.Scene {
 
     // Fetch enemy types, then emit campaign:start and transition directly to GameScene
     ApiClient.get<{ enemyTypes: EnemyTypeEntry[] }>('/campaign/enemy-types')
-      .then((enemyTypesResp) => {
+      .then(async (enemyTypesResp) => {
         const gameStartHandler = (data: {
           state: CampaignGameState;
           level: CampaignLevelSummary;
@@ -608,7 +613,7 @@ export class GameOverScene extends Phaser.Scene {
           levelId: number;
           coopMode?: boolean;
           localCoopMode?: boolean;
-          localP2?: { userId?: number; username: string; guestColor?: number };
+          localP2?: { userId?: number; username: string; guestColor?: number; token?: string };
           buddyMode?: boolean;
         } = { levelId };
         if (isBuddyMode) {
@@ -617,35 +622,21 @@ export class GameOverScene extends Phaser.Scene {
           startData.coopMode = true;
         } else if (isLocalCoopMode) {
           startData.localCoopMode = true;
-          const p2Id = this.registry.get('localCoopP2Identity') as LocalCoopP2Identity | undefined;
-          if (p2Id?.mode === 'loggedIn' && p2Id.loggedInUserId) {
-            startData.localP2 = {
-              userId: p2Id.loggedInUserId,
-              username: p2Id.loggedInUsername || 'Player 2',
-            };
-          } else {
-            startData.localP2 = {
-              username: p2Id?.guestName || 'Player 2',
-              guestColor: p2Id?.guestColor,
-            };
-          }
+          startData.localP2 = await localP2StartData(
+            this.registry.get('localCoopP2Identity') as LocalCoopP2Identity | undefined,
+          );
         }
 
         socketClient.emit('campaign:start', startData, (response) => {
           if (response && response.error) {
             socketClient.off('campaign:gameStart', gameStartHandler);
-            this.registry.remove('campaignMode');
-            this.registry.remove('campaignCoopMode');
-            this.registry.remove('localCoopMode');
-            this.registry.remove('campaignTheme');
+            clearCampaignRun(this.registry);
             this.scene.start('LobbyScene');
           }
         });
       })
       .catch(() => {
-        this.registry.remove('campaignMode');
-        this.registry.remove('campaignCoopMode');
-        this.registry.remove('localCoopMode');
+        clearCampaignRun(this.registry);
         this.scene.start('LobbyScene');
       });
   }

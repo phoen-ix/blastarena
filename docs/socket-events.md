@@ -39,6 +39,14 @@ On connect, the server checks if the user was in an active game room (via Redis)
 3. `handlePlayerReconnect()` cancels the 10-second disconnect grace period
 4. Full game state is sent via `game:start` so the client can resume rendering
 
+The server keeps no socket rooms across a reconnect, so the client re-establishes them
+(`SocketClient.onReconnect`). Each handshake sends the current access token (refreshed when the
+server answers `Invalid token`). After a reconnect a match waits up to 5 s for that `game:start` and
+otherwise returns to the lobby; the open world re-joins (a guest comes back under a new id); a
+campaign run returns to the campaign menu, since the server ended or left it; the lobby
+re-subscribes and the party bar re-syncs, and a waiting room is left behind (the server removed the
+player on disconnect).
+
 ### Disconnect Cleanup
 
 On disconnect, the server:
@@ -93,8 +101,9 @@ On disconnect, the server:
 |-------|---------|-------------|------|
 | `admin:kick` | `{ roomCode: string, userId: number, reason?: string }` + callback | Kick a player from a room. The target is killed immediately (no reconnect grace) and receives `admin:kicked` | admin, moderator |
 | `admin:closeRoom` | `{ roomCode: string }` + callback | Force-close a room. All players receive `admin:kicked`, room is deleted | admin only |
-| `admin:spectate` | `{ roomCode: string }` + callback | Join a room as a spectator. `roomCode` must match `/^[A-Z0-9]{6}$/`. Admin socket joins `room:{roomCode}` to receive game state. 3/s (adminRoom) | admin, moderator |
-| `admin:roomMessage` | `{ roomCode: string, message: string }` | Send a system message to a room. Requires admin to have joined the room (spectating). Max 500 chars. 3/s (adminRoom) | admin, moderator |
+| `admin:spectate` | `{ roomCode: string }` + callback | Watch a running match. `roomCode` must match `/^[A-Z0-9]{6}$/`. The admin socket joins `room:{roomCode}`, and the callback carries the current `state`; the admin panel opens a spectator view with it. 3/s (adminRoom) | admin, moderator |
+| `admin:unspectate` | `{ roomCode: string }` | Leave a spectated room (sent when the spectator view closes). Never removes a player from their own room. 3/s (adminRoom) | admin, moderator |
+| `admin:roomMessage` | `{ roomCode: string, message: string }` + callback | Send a system message to any existing room, waiting or running; the callback reports success or the error. Max 500 chars. 3/s (adminRoom) | admin, moderator |
 
 ### Simulation Events
 
@@ -317,7 +326,7 @@ All open world events are scoped to the `openworld` room, which a socket enters 
 | inviteLimiter | `party:invite`, `invite:room` | 3/s | Invite spam prevention |
 | partyActionLimiter | `party:create`, `party:acceptInvite`, `party:leave`, `party:kick`, `invite:acceptRoom` | 5/s | Each costs a Redis Lua call or a `fetchSockets()` |
 | lobbySubscribeLimiter | `lobby:subscribe`, `lobby:unsubscribe` | 5/s | Room join/leave churn |
-| adminRoomLimiter | `admin:spectate`, `admin:roomMessage` | 3/s | Room joins and room-wide broadcasts |
+| adminRoomLimiter | `admin:spectate`, `admin:unspectate`, `admin:roomMessage` | 3/s | Room joins and room-wide broadcasts |
 | lobbyChatLimiter | `lobby:chat` | 3/s | Lobby chat throttle |
 | dmChatLimiter | `dm:send` | 5/s | DM throttle |
 | spectatorChatLimiter | `game:spectatorChat` | 3/s | Spectator chat throttle (per-socket instance) |

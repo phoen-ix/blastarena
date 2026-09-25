@@ -693,6 +693,7 @@
     "gameOver": "Game over"
   },
   "connection": {
-    "reconnecting": "Reconnecting to server..."
+    "reconnecting": "Reconnecting to server...",
+    "sessionLost": "The connection was lost and you are back in the lobby."
   }
 }

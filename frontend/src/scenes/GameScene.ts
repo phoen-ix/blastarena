@@ -12,6 +12,7 @@ import {
   OpenWorldScoreEntry,
   EnemyTypeEntry,
   Position,
+  TileType,
   TILE_SIZE,
   TICK_MS,
 } from '@blast-arena/shared';
@@ -47,10 +48,13 @@ import {
 } from '../game/LocalCoopInput';
 import { ApiClient } from '../network/ApiClient';
 import { EmoteId, EMOTES, CampaignLevelSummary } from '@blast-arena/shared';
-import type { ServerToClientEvents } from '@blast-arena/shared';
+import type { ServerToClientEvents, ChatMode } from '@blast-arena/shared';
 import { audioManager } from '../game/AudioManager';
 import { getSettings } from '../game/Settings';
-import { enterCoopLevel } from './coopStart';
+import { enterCoopLevel, clearCampaignRun, localP2StartData } from './coopStart';
+
+/** After a reconnect, how long a match waits for the server to re-send its state. */
+const RESYNC_TIMEOUT_MS = 5000;
 
 export class GameScene extends Phaser.Scene {
   /** ScaleManager resize handler; removed in shutdown(). (audit SCENE-RESIZE-LEAK-1) */
@@ -84,6 +88,7 @@ export class GameScene extends Phaser.Scene {
   private pendingGamepadAction: 'bomb' | 'detonate' | 'throw' | null = null;
   private lastInputSeq: number = 0;
   private lastInputTime: number = 0;
+  private lastP2InputTime: number = 0;
 
   // Game state
   private lastGameState: GameState | null = null;
@@ -151,8 +156,23 @@ export class GameScene extends Phaser.Scene {
   private gameOverHandler: ServerToClientEvents['game:over'] | null = null;
   private gameEmoteHandler: ServerToClientEvents['game:emote'] | null = null;
   private openWorldStateHandler: ServerToClientEvents['openworld:state'] | null = null;
+  private gameStartHandler: ServerToClientEvents['game:start'] | null = null;
+  private adminKickedHandler: ServerToClientEvents['admin:kicked'] | null = null;
+  private reconnectHandler: (() => void) | null = null;
+  /** Runs after a reconnect until the server re-sends our match (see onSocketReconnect). */
+  private resyncTimer: Phaser.Time.TimerEvent | null = null;
+  /** Replays and simulation spectating: the viewer never takes part, even in a match they played. */
+  private spectatorOnly: boolean = false;
 
   // Emotes
+  /**
+   * Emotes exist in room matches only — the server drops them in the open world and the campaign
+   * — and follow the admin's emote mode. Both used to be ignored, offering keys and a wheel that
+   * did nothing.
+   */
+  private emotesAllowed: boolean = false;
+  /** Guards the async emote-mode lookup against a scene that restarted meanwhile. */
+  private emoteModeRequest: number = 0;
   private emoteRenderer: EmoteBubbleRenderer | null = null;
   private emoteWheel: EmoteWheel | null = null;
   private emoteKeyHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -164,6 +184,16 @@ export class GameScene extends Phaser.Scene {
   /** Whether this scene runs the persistent open-world arena (read by HUDScene). */
   get isOpenWorld(): boolean {
     return this.openWorldMode;
+  }
+
+  /** The player this client controls (HUDScene follows it). */
+  get localId(): number {
+    return this.localPlayerId;
+  }
+
+  /** The current grid with every tile diff applied (seeds the HUD minimap). */
+  get liveTiles(): TileType[][] | null {
+    return this.storedTiles;
   }
 
   /**
@@ -296,10 +326,20 @@ export class GameScene extends Phaser.Scene {
     // Detect open world mode
     this.openWorldMode = !!this.registry.get('openWorldMode');
     this.registry.remove('openWorldMode');
-    const openWorldPlayerId = this.registry.get('openWorldPlayerId') as number | undefined;
+    // The open-world join assigns the player id (guests get a negative one). Every other mode plays
+    // as the account: the key outlived its session, and a later match or local co-op run followed
+    // the stale id with its camera, HUD and P2 controls.
+    const openWorldPlayerId = this.openWorldMode
+      ? (this.registry.get('openWorldPlayerId') as number | undefined)
+      : undefined;
+    if (!this.openWorldMode) this.registry.remove('openWorldPlayerId');
 
-    // Set local player ID — open world guests get server-assigned negative IDs
     this.localPlayerId = openWorldPlayerId ?? this.authManager.getUser()?.id ?? 0;
+    const adminSpectate = this.registry.get('adminSpectate') as { roomCode: string } | undefined;
+    this.spectatorOnly =
+      !!this.registry.get('replayMode') ||
+      !!this.registry.get('simulationSpectate') ||
+      !!adminSpectate;
 
     // Reset state
     this.paused = false;
@@ -315,6 +355,7 @@ export class GameScene extends Phaser.Scene {
     this.storedTiles = null;
     this.lastInputSeq = 0;
     this.lastInputTime = 0;
+    this.lastP2InputTime = 0;
     this._emotePositions.clear();
     this.cosmeticsById = new Map();
     this.explosionCellsById.clear();
@@ -432,8 +473,10 @@ export class GameScene extends Phaser.Scene {
 
     // Emote keys 1-6 quick emotes + backtick for emote wheel
     this.emoteWheel = new EmoteWheel();
+    this.emotesAllowed = false;
+    this.emoteModeRequest++;
     this.emoteKeyHandler = (e: KeyboardEvent) => {
-      if (this.localPlayerDead) return;
+      if (!this.emotesAllowed || this.localPlayerDead) return;
       if (this.lastGameState?.status !== 'playing') return;
 
       // Backtick toggles emote wheel
@@ -557,7 +600,7 @@ export class GameScene extends Phaser.Scene {
       this.replayControls.mount();
 
       this.replayLogPanel = new ReplayLogPanel(replayData.log, (tick: number) => {
-        this.replayPlayer?.seekTo(tick);
+        this.replayPlayer?.seekToTick(tick);
         this.replayControls?.update();
       });
       this.replayLogPanel.mount();
@@ -787,16 +830,7 @@ export class GameScene extends Phaser.Scene {
       this.socketClient.on('openworld:roundEnd', this.openWorldRoundEndHandler);
 
       this.openWorldRoundStartHandler = (data) => {
-        // New round — update stored tiles and camera
-        if (data.state.map?.tiles) {
-          this.storedTiles = data.state.map.tiles.map(
-            (row: import('@blast-arena/shared').TileType[]) => [...row],
-          );
-          this.tileMap?.updateTiles(data.state.map.tiles);
-          this.mapEventRenderer?.setMapSize(data.state.map.width, data.state.map.height);
-          this.applyCameraBounds(data.state.map.width, data.state.map.height);
-        }
-        this.updateState(data.state);
+        this.applyOpenWorldState(data.state);
         this.events.emit('openWorldRoundStart', data);
       };
       this.socketClient.on('openworld:roundStart', this.openWorldRoundStartHandler);
@@ -814,27 +848,7 @@ export class GameScene extends Phaser.Scene {
       };
       this.socketClient.on('openworld:scoreUpdate', this.openWorldScoreHandler);
 
-      // Handle AFK kick — return to lobby (or back to the landing if this is a background arena
-      // rendered behind the menu, so an idle guest on the landing isn't dropped into the lobby).
-      this.openWorldAfkKickHandler = () => {
-        if (this.registry.get('openWorldBackground')) {
-          this.registry.remove('openWorldBackground');
-          this.scene.stop('HUDScene');
-          this.scene.stop(); // stop self; MenuScene stays up over the (now empty) canvas
-          return;
-        }
-        if (this.registry.get('authOverlayOpen')) {
-          // Guest is typing in the auth form over the game — don't start LobbyScene
-          // (it wipes #ui-overlay and would destroy the form). Just stop the scenes;
-          // AuthUI's close/success callbacks route back to MenuScene.
-          this.scene.stop('HUDScene');
-          this.scene.stop();
-          return;
-        }
-        this.registry.remove('currentRoom');
-        this.scene.stop('HUDScene');
-        this.scene.start('LobbyScene');
-      };
+      this.openWorldAfkKickHandler = () => this.leaveOpenWorld();
       this.socketClient.on('openworld:afkKick', this.openWorldAfkKickHandler);
 
       // Escape key to toggle leave menu
@@ -855,12 +869,39 @@ export class GameScene extends Phaser.Scene {
       };
       this.socketClient.on('game:state', this.gameStateHandler);
 
+      // Staff watching from the admin panel: spectator camera, and back to the panel at the end
+      if (adminSpectate) this.localPlayerDead = true;
+
       this.gameOverHandler = (data) => {
+        if (adminSpectate) {
+          this.leaveAdminSpectate();
+          return;
+        }
         this.registry.set('gameOverData', data);
         this.scene.stop('HUDScene');
         this.scene.start('GameOverScene');
       };
       this.socketClient.on('game:over', this.gameOverHandler);
+
+      // After a reconnect within its grace period the server puts us back into the match and
+      // re-sends its full state, which also restores the tile diffs missed meanwhile.
+      this.gameStartHandler = (state) => {
+        this.resyncTimer?.remove();
+        this.resyncTimer = null;
+        this.updateState(state);
+      };
+      this.socketClient.on('game:start', this.gameStartHandler);
+
+      // Kicked by staff, or the room was closed: the server has already taken us out of the match
+      // and stopped sending it, so only LobbyScene listening left the match frozen.
+      this.adminKickedHandler = (data) => {
+        this.registry.get('notifications')?.error(data.reason || t('ui:rooms.kicked'));
+        if (adminSpectate) this.leaveAdminSpectate();
+        else this.leaveMatch();
+      };
+      this.socketClient.on('admin:kicked', this.adminKickedHandler);
+
+      if (!this.spectatorOnly) void this.loadEmoteMode();
 
       // Escape key to toggle leave game menu (multiplayer)
       if (!this.registry.get('replayMode') && !this.registry.get('simulationSpectate')) {
@@ -876,6 +917,11 @@ export class GameScene extends Phaser.Scene {
         };
         window.addEventListener('keydown', this.pauseKeyHandler);
       }
+    }
+
+    if (!replayMode) {
+      this.reconnectHandler = () => this.onSocketReconnect();
+      this.socketClient.onReconnect(this.reconnectHandler);
     }
 
     // Camera setup
@@ -1032,7 +1078,7 @@ export class GameScene extends Phaser.Scene {
         const cam = this.cameras.main;
         this.freeCamX = cam.scrollX + cam.width / 2;
         this.freeCamY = cam.scrollY + cam.height / 2;
-      } else if (this.localPlayerDead && me && me.alive) {
+      } else if (this.localPlayerDead && me && me.alive && !this.spectatorOnly) {
         // Player respawned (campaign, deathmatch, open world) — exit spectator mode
         this.localPlayerDead = false;
         this.spectateTargetId = null;
@@ -1472,7 +1518,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Y button = emote wheel toggle (only when alive and playing)
-    if (menu.emoteWheel && !this.localPlayerDead && this.lastGameState?.status === 'playing') {
+    if (
+      menu.emoteWheel &&
+      this.emotesAllowed &&
+      !this.localPlayerDead &&
+      this.lastGameState?.status === 'playing'
+    ) {
       if (this.emoteWheel!.isVisible()) {
         this.emoteWheel!.hide();
       } else {
@@ -1515,28 +1566,36 @@ export class GameScene extends Phaser.Scene {
 
     // Don't send inputs during countdown or pause
     if (this.lastGameState?.status !== 'playing') return;
-    if (this.paused) return;
+    if (this.paused || this.emoteWheel?.isVisible()) {
+      // A/B drive the menu or the wheel here; still held once it closes, they must not become a
+      // bomb or a detonation.
+      this.gamepadManager?.suppressHeldButtons();
+      if (this.paused) return;
+    }
 
     // Local co-op: route both P1 and P2 through LocalCoopInput (configurable presets)
     if (this.localCoopMode && this.localCoopInput) {
+      // Each player at most once per tick. P2 was only held back by P1's input, so a P2 moving on
+      // their own sent every frame and the server's per-socket limit dropped both players' inputs.
       const now = Date.now();
-      if (now - this.lastInputTime < TICK_MS) return;
-
-      const p1 = this.localCoopInput.pollP1();
-      if (p1.direction || p1.action) {
-        this.lastInputTime = now;
-        this.lastInputSeq++;
-        this.socketClient.emit('campaign:input', {
-          seq: this.lastInputSeq,
-          direction: p1.direction,
-          action: p1.action,
-          tick: this.lastGameState?.tick || 0,
-        });
+      if (now - this.lastInputTime >= TICK_MS) {
+        const p1 = this.localCoopInput.pollP1();
+        if (p1.direction || p1.action) {
+          this.lastInputTime = now;
+          this.lastInputSeq++;
+          this.socketClient.emit('campaign:input', {
+            seq: this.lastInputSeq,
+            direction: p1.direction,
+            action: p1.action,
+            tick: this.lastGameState?.tick || 0,
+          });
+        }
       }
 
-      if (this.localP2Id) {
+      if (this.localP2Id && now - this.lastP2InputTime >= TICK_MS) {
         const p2 = this.localCoopInput.pollP2();
         if (p2.direction || p2.action) {
+          this.lastP2InputTime = now;
           this.lastInputSeq++;
           this.socketClient.emit('campaign:input', {
             seq: this.lastInputSeq,
@@ -1803,14 +1862,16 @@ export class GameScene extends Phaser.Scene {
     overlay.querySelector('#leave-confirm')!.addEventListener('click', () => {
       this.paused = false;
       this.hidePauseOverlay();
+      if (this.registry.get('adminSpectate')) {
+        this.leaveAdminSpectate();
+        return;
+      }
       if (this.openWorldMode) {
         this.socketClient.emit('openworld:leave');
       } else {
         this.socketClient.emit('room:leave');
       }
-      this.registry.remove('currentRoom');
-      this.scene.stop('HUDScene');
-      this.scene.start('LobbyScene');
+      this.leaveMatch();
     });
     overlay.querySelector('#leave-cancel')!.addEventListener('click', () => {
       this.hideLeaveOverlay();
@@ -1878,19 +1939,8 @@ export class GameScene extends Phaser.Scene {
       this.restartCampaignLevel(levelId);
     });
     overlay.querySelector('#pause-exit')!.addEventListener('click', () => {
-      this.paused = false;
-      this.hidePauseOverlay();
       this.socketClient.emit('campaign:quit');
-      this.registry.remove('campaignMode');
-      this.registry.remove('campaignCoopMode');
-      this.registry.remove('localCoopMode');
-      this.registry.remove('localCoopConfig');
-      this.registry.remove('buddyMode');
-      this.registry.remove('buddyConfig');
-      this.registry.remove('campaignTheme');
-      this.registry.set('openCampaign', true);
-      this.scene.stop('HUDScene');
-      this.scene.start('LobbyScene');
+      this.exitCampaign();
     });
 
     // Disable Phaser keyboard captures so keys reach DOM buttons
@@ -1928,13 +1978,185 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Emotes follow the admin's emote mode, which the server enforces per role. */
+  private async loadEmoteMode(): Promise<void> {
+    const request = this.emoteModeRequest;
+    let mode: ChatMode = 'everyone';
+    try {
+      mode = (await ApiClient.get<{ mode: ChatMode }>('/admin/settings/emote_mode')).mode;
+    } catch {
+      // Keep the default; the server still has the final say
+    }
+    if (request !== this.emoteModeRequest) return;
+    const role = this.authManager.getUser()?.role;
+    this.emotesAllowed =
+      mode !== 'disabled' &&
+      (mode !== 'admin_only' || role === 'admin') &&
+      (mode !== 'staff' || role === 'admin' || role === 'moderator');
+  }
+
+  /** Close the admin spectator view (shutdown() tells the server) and return to the Rooms tab. */
+  private leaveAdminSpectate(): void {
+    this.registry.set('returnToAdmin', 'rooms');
+    this.scene.stop('HUDScene');
+    this.scene.start('LobbyScene');
+  }
+
+  /** Back to the lobby from a match or the open world. */
+  private leaveMatch(): void {
+    this.registry.remove('currentRoom');
+    this.scene.stop('HUDScene');
+    this.scene.start('LobbyScene');
+  }
+
+  /** Back to the campaign menu, dropping every registry key that describes the current run. */
+  private exitCampaign(): void {
+    this.paused = false;
+    this.hidePauseOverlay();
+    clearCampaignRun(this.registry);
+    this.registry.set('openCampaign', true);
+    this.scene.stop('HUDScene');
+    this.scene.start('LobbyScene');
+  }
+
+  /**
+   * Out of the open world (AFK kick, or a re-join that failed): back to the lobby, or to the
+   * landing when this is the background arena behind the menu, so an idle guest there isn't
+   * dropped into the lobby.
+   */
+  private leaveOpenWorld(): void {
+    if (this.registry.get('openWorldBackground')) {
+      this.registry.remove('openWorldBackground');
+      this.scene.stop('HUDScene');
+      this.scene.stop(); // stop self; MenuScene stays up over the (now empty) canvas
+      return;
+    }
+    if (this.registry.get('authOverlayOpen')) {
+      // Guest is typing in the auth form over the game — don't start LobbyScene
+      // (it wipes #ui-overlay and would destroy the form). Just stop the scenes;
+      // AuthUI's close/success callbacks route back to MenuScene.
+      this.scene.stop('HUDScene');
+      this.scene.stop();
+      return;
+    }
+    this.leaveMatch();
+  }
+
+  /**
+   * The socket came back after a drop. The server keeps no room membership across a reconnect,
+   * so each mode re-establishes what this scene shows; before, the view just froze.
+   */
+  private onSocketReconnect(): void {
+    const adminSpectate = this.registry.get('adminSpectate') as { roomCode: string } | undefined;
+    if (adminSpectate) {
+      this.socketClient.emit('admin:spectate', { roomCode: adminSpectate.roomCode }, (res) => {
+        if (res.success && res.state) this.updateState(res.state);
+        else this.leaveAdminSpectate();
+      });
+      return;
+    }
+    const simSpectate = this.registry.get('simulationSpectate') as { batchId: string } | undefined;
+    if (simSpectate) {
+      this.socketClient.emit('sim:spectate', { batchId: simSpectate.batchId }, (res) => {
+        if (!res?.success) this.simCompletedHandler?.();
+      });
+      return;
+    }
+    if (this.openWorldMode) {
+      this.rejoinOpenWorld();
+      return;
+    }
+    if (this.campaignMode) {
+      // The server ended a solo run when the socket dropped, and took us out of a co-op one.
+      this.registry.get('notifications')?.error(t('ui:connection.sessionLost'));
+      this.exitCampaign();
+      return;
+    }
+    // A match: within its grace period the server puts us back and re-sends game:start.
+    this.resyncTimer?.remove();
+    this.resyncTimer = this.time.delayedCall(RESYNC_TIMEOUT_MS, () => {
+      this.resyncTimer = null;
+      this.registry.get('notifications')?.error(t('ui:connection.sessionLost'));
+      this.leaveMatch();
+    });
+  }
+
+  /** Join the open world again after a reconnect. A guest comes back under a new id. */
+  private rejoinOpenWorld(): void {
+    const guestName = this.authManager.isGuest ? this.authManager.getUser()?.username : undefined;
+    this.socketClient.emit('openworld:join', guestName ? { username: guestName } : {}, (res) => {
+      if (!this.openWorldMode || !this.sys.isActive()) return; // left in the meantime
+      if (!res?.success || !res.state) {
+        this.leaveOpenWorld();
+        return;
+      }
+      if (res.isGuest && res.playerId !== undefined && res.username) {
+        this.authManager.setGuestIdentity(res.playerId, res.username);
+      }
+      if (res.playerId !== undefined && res.playerId !== this.localPlayerId) {
+        this.localPlayerId = res.playerId;
+        this.registry.set('openWorldPlayerId', res.playerId);
+        this.effectSystem?.setLocalPlayerId(res.playerId);
+        this.events.emit('localPlayerChanged', res.playerId);
+      }
+      if (res.info) {
+        this.registry.set('openWorldInfo', res.info);
+        this.events.emit('openWorldInfo', res.info);
+      }
+      this.applyOpenWorldState(res.state);
+    });
+  }
+
+  /**
+   * A complete open-world state: a new round, or a re-join. Rounds can come with a different map
+   * size (admin setting); reusing the renderer indexed the new grid with the old dimensions, and a
+   * smaller map threw inside the socket handler and froze every client.
+   */
+  private applyOpenWorldState(state: GameState): void {
+    const map = state.map;
+    if (map?.tiles?.length) {
+      if (this.tileMap?.matches(map.width, map.height)) {
+        this.tileMap.updateTiles(map.tiles);
+      } else {
+        this.rebuildForMapSize(map);
+      }
+      this.storedTiles = map.tiles.map((row) => [...row]);
+      this.mapEventRenderer?.setMapSize(map.width, map.height);
+      this.applyCameraBounds(map.width, map.height);
+    }
+    this.updateState(state);
+  }
+
+  /** New tile renderer and wrap sizes for a map of another size. */
+  private rebuildForMapSize(map: GameState['map']): void {
+    this.tileMap?.destroy();
+    this.tileMap = new TileMapRenderer(
+      this,
+      map.tiles,
+      map.width,
+      map.height,
+      this.registry.get('campaignTheme') as string | undefined,
+      map.wrapping ?? false,
+    );
+    const wrapSize = map.wrapping ? { w: map.width * TILE_SIZE, h: map.height * TILE_SIZE } : null;
+    if (this.playerRenderer) this.playerRenderer.wrappingWorldSize = wrapSize;
+    if (this.bombRenderer) this.bombRenderer.wrappingWorldSize = wrapSize;
+    if (this.explosionRenderer) this.explosionRenderer.wrappingWorldSize = wrapSize;
+    if (this.powerUpRenderer) this.powerUpRenderer.wrappingWorldSize = wrapSize && { ...wrapSize };
+    if (this.effectSystem) {
+      this.effectSystem.wrappingMapSize = map.wrapping
+        ? { width: map.width, height: map.height }
+        : null;
+    }
+  }
+
   private restartCampaignLevel(levelId: number): void {
     const isCoopMode = !!this.registry.get('campaignCoopMode');
     const isLocalCoopMode = !!this.registry.get('localCoopMode');
     const isBuddyMode = !!this.registry.get('buddyMode');
 
     ApiClient.get<{ enemyTypes: EnemyTypeEntry[] }>('/campaign/enemy-types')
-      .then((enemyTypesResp) => {
+      .then(async (enemyTypesResp) => {
         const gameStartHandler = (data: {
           state: CampaignGameState;
           level: CampaignLevelSummary;
@@ -1962,7 +2184,7 @@ export class GameScene extends Phaser.Scene {
           levelId: number;
           coopMode?: boolean;
           localCoopMode?: boolean;
-          localP2?: { userId?: number; username: string; guestColor?: number };
+          localP2?: { userId?: number; username: string; guestColor?: number; token?: string };
           buddyMode?: boolean;
         } = { levelId };
         if (isBuddyMode) {
@@ -1971,42 +2193,19 @@ export class GameScene extends Phaser.Scene {
           startData.coopMode = true;
         } else if (isLocalCoopMode) {
           startData.localCoopMode = true;
-          const p2Id = this.registry.get('localCoopP2Identity') as LocalCoopP2Identity | undefined;
-          if (p2Id?.mode === 'loggedIn' && p2Id.loggedInUserId) {
-            startData.localP2 = {
-              userId: p2Id.loggedInUserId,
-              username: p2Id.loggedInUsername || 'Player 2',
-            };
-          } else {
-            startData.localP2 = {
-              username: p2Id?.guestName || 'Player 2',
-              guestColor: p2Id?.guestColor,
-            };
-          }
+          startData.localP2 = await localP2StartData(
+            this.registry.get('localCoopP2Identity') as LocalCoopP2Identity | undefined,
+          );
         }
 
         this.socketClient.emit('campaign:start', startData, (response) => {
           if (response && response.error) {
             this.socketClient.off('campaign:gameStart', gameStartHandler);
-            this.registry.remove('campaignMode');
-            this.registry.remove('campaignCoopMode');
-            this.registry.remove('localCoopMode');
-            this.registry.remove('campaignTheme');
-            this.registry.set('openCampaign', true);
-            this.scene.stop('HUDScene');
-            this.scene.start('LobbyScene');
+            this.exitCampaign();
           }
         });
       })
-      .catch(() => {
-        this.registry.remove('campaignMode');
-        this.registry.remove('campaignCoopMode');
-        this.registry.remove('localCoopMode');
-        this.registry.remove('campaignTheme');
-        this.registry.set('openCampaign', true);
-        this.scene.stop('HUDScene');
-        this.scene.start('LobbyScene');
-      });
+      .catch(() => this.exitCampaign());
   }
 
   /**
@@ -2034,6 +2233,20 @@ export class GameScene extends Phaser.Scene {
       this.socketClient.off('openworld:state', this.openWorldStateHandler);
       this.openWorldStateHandler = null;
     }
+    if (this.gameStartHandler) {
+      this.socketClient.off('game:start', this.gameStartHandler);
+      this.gameStartHandler = null;
+    }
+    if (this.adminKickedHandler) {
+      this.socketClient.off('admin:kicked', this.adminKickedHandler);
+      this.adminKickedHandler = null;
+    }
+    if (this.reconnectHandler) {
+      this.socketClient.offReconnect(this.reconnectHandler);
+      this.reconnectHandler = null;
+    }
+    this.resyncTimer?.remove();
+    this.resyncTimer = null;
   }
 
   /** Remove only this scene's campaign and bomb-throw listeners. (audit SOCKET-OFF-REF-1) */
@@ -2143,6 +2356,15 @@ export class GameScene extends Phaser.Scene {
     this.campaignCoopMode = false;
     this.localCoopMode = false;
     this.buddyMode = false;
+    this.spectatorOnly = false;
+    // However the spectator view ended, stop the room's state stream to this socket
+    const adminSpectate = this.registry.get('adminSpectate') as { roomCode: string } | undefined;
+    if (adminSpectate) {
+      this.socketClient.emit('admin:unspectate', { roomCode: adminSpectate.roomCode });
+      this.registry.remove('adminSpectate');
+    }
+    // The open-world player id belongs to that session only (logout/login, a later match)
+    if (this.openWorldMode) this.registry.remove('openWorldPlayerId');
     this.openWorldMode = false;
     // Cached scoreboard snapshot must not seed a later session's HUD
     this.registry.remove('openWorldInfo');

@@ -66,3 +66,8 @@ export async function getCustomMapTiles(mapId: number): Promise<MapTileData> {
   }
   return pending;
 }
+
+/** Drop a cached preview after its map or level was saved, so pickers show the new layout. */
+export function invalidateMapPreview(kind: 'campaign' | 'map', id: number): void {
+  (kind === 'campaign' ? campaignCache : customMapCache).delete(id);
+}

@@ -51,7 +51,7 @@
     "levelSettings": "Bolum Ayarlari",
     "width": "Genislik",
     "height": "Yukseklik",
-    "dimensionHint": "Tek sayilar, 7-51",
+    "dimensionHint": "Tek sayilar, {{min}}-51",
     "name": "Ad",
     "description": "Aciklama",
     "lives": "Can",

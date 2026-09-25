@@ -49,6 +49,8 @@ function countingSocket() {
         (live.get(event) ?? []).filter((h) => h !== handler),
       );
     }),
+    onReconnect: vi.fn(),
+    offReconnect: vi.fn(),
     fire(event: string, ...args: unknown[]) {
       for (const h of live.get(event) ?? []) h(...args);
     },

@@ -51,7 +51,7 @@
     "levelSettings": "Impostazioni livello",
     "width": "Larghezza",
     "height": "Altezza",
-    "dimensionHint": "Numeri dispari, 7-51",
+    "dimensionHint": "Numeri dispari, {{min}}-51",
     "name": "Nome",
     "description": "Descrizione",
     "lives": "Vite",

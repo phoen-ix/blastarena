@@ -21,7 +21,9 @@ interface ActionDef {
 
 const ACTIONS: ActionDef[] = [
   { type: 'place_wall', cost: SPECTATOR_WALL_COST, hotkey: 'Q', icon: '&#x25A3;' },
-  { type: 'trigger_meteor', cost: SPECTATOR_METEOR_COST, hotkey: 'W', icon: '&#x2604;' },
+  // Not W: W pans the spectator camera, so panning up also armed a meteor that the next
+  // click-drag dropped.
+  { type: 'trigger_meteor', cost: SPECTATOR_METEOR_COST, hotkey: 'F', icon: '&#x2604;' },
   { type: 'drop_powerup', cost: SPECTATOR_POWERUP_COST, hotkey: 'E', icon: '&#x2605;' },
   { type: 'speed_zone', cost: SPECTATOR_SPEED_ZONE_COST, hotkey: 'R', icon: '&#x21C4;' },
 ];
@@ -152,9 +154,11 @@ export class SpectatorActionBar {
     // Keyboard shortcuts
     this.keyHandler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // A held key repeats, and each repeat toggled the selection on and off again
+      if (e.repeat) return;
       const key = e.key.toUpperCase();
       if (key === 'Q') this.selectAction('place_wall');
-      else if (key === 'W') this.selectAction('trigger_meteor');
+      else if (key === 'F') this.selectAction('trigger_meteor');
       else if (key === 'E') this.selectAction('drop_powerup');
       else if (key === 'R') this.selectAction('speed_zone');
       else if (key === 'ESCAPE') this.cancelSelection();

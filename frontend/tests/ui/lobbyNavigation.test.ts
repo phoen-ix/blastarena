@@ -71,7 +71,14 @@ vi.mock('../../src/ui/views/MapsView', () => ({ MapsView: fakeView('maps') }));
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 function fakeSocket() {
-  return { emit: vi.fn(), on: vi.fn(), off: vi.fn(), getSocket: vi.fn(() => null) };
+  return {
+    emit: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
+    onReconnect: vi.fn(),
+    offReconnect: vi.fn(),
+    getSocket: vi.fn(() => null),
+  };
 }
 
 const notifications = { success: vi.fn(), error: vi.fn(), info: vi.fn() };

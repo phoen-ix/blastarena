@@ -51,7 +51,8 @@ type SocketRateLimiter = ReturnType<typeof createSocketRateLimiter>;
 export function createRateLimiters() {
   // Per-socket limiters
   const inputLimiter = createSocketRateLimiter(30); // game:input — 30/sec (game is 20 tps)
-  const campaignInputLimiter = createSocketRateLimiter(30); // campaign:input — 30/sec
+  // campaign:input — local co-op and buddy runs send for two players over one socket, 20/sec each
+  const campaignInputLimiter = createSocketRateLimiter(50);
   const openWorldInputLimiter = createSocketRateLimiter(30); // openworld:input — 30/sec
   const createLimiter = createSocketRateLimiter(2); // room:create — 2/sec
   const joinLimiter = createSocketRateLimiter(5); // room:join — 5/sec

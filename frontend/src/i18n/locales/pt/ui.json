@@ -693,6 +693,7 @@
     "gameOver": "Fim de jogo"
   },
   "connection": {
-    "reconnecting": "A restabelecer ligação ao servidor..."
+    "reconnecting": "A restabelecer ligação ao servidor...",
+    "sessionLost": "A ligação foi perdida e voltaste ao lobby."
   }
 }

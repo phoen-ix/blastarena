@@ -345,4 +345,31 @@ describe('ReplayRecorder with trimmed tick states', () => {
     const frames = (recorder as unknown as { frames: { tileDiffs?: unknown[] }[] }).frames;
     expect(frames[0].tileDiffs).toEqual([{ x: 5, y: 5, type: 'ice' }]);
   });
+
+  it('keeps cosmetics that were only sent during the unrecorded countdown', () => {
+    const gs = makeState();
+    gs.addPlayer(1, 'a');
+    // Built before the room loads cosmetics, as GameRoom does
+    const recorder = new ReplayRecorder('ROOM', 'ffa', gs.toState());
+    gs.players.get(1)!.cosmetics = { colorHex: 0x3366ff } as unknown as NonNullable<
+      ReturnType<typeof gs.players.get>
+    >['cosmetics'];
+    const events = { explosions: [], playerDied: [], powerupCollected: [], bombThrown: [] };
+
+    gs.status = 'countdown';
+    const countdown = gs.toTickState();
+    expect(countdown.players[0].cosmetics).toEqual({ colorHex: 0x3366ff });
+    recorder.observe(countdown);
+
+    gs.status = 'playing';
+    gs.processTick();
+    const playing = gs.toTickState();
+    expect(playing.players[0].cosmetics).toBeUndefined();
+    recorder.recordTick({ ...playing, map: { ...playing.map, tiles: gs.map.tiles } }, events);
+
+    const frames = (recorder as unknown as { frames: { players: { cosmetics?: unknown }[] }[] })
+      .frames;
+    expect(frames).toHaveLength(1);
+    expect(frames[0].players[0].cosmetics).toEqual({ colorHex: 0x3366ff });
+  });
 });

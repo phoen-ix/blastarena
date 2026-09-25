@@ -192,6 +192,16 @@ export class ReplayRecorder {
     if (data.exitOpen !== undefined) lastFrame.exitOpen = data.exitOpen;
   }
 
+  /**
+   * Take in a broadcast that is not recorded (the countdown) for its once-only data. A player's
+   * cosmetics travel only on their first tick, which is a countdown tick, and the recorder is
+   * built before the room loads cosmetics — so no frame of a match replay carried them.
+   */
+  observe(state: GameState): void {
+    this.hydratePlayers(state.players);
+    this.hydrateExplosions(state.explosions);
+  }
+
   recordTick(state: GameState, tickEvents: TickEvents): void {
     this.currentTick = state.tick;
 

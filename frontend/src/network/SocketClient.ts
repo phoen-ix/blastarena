@@ -14,13 +14,18 @@ type ServerEventName = keyof ServerToClientEvents;
 /** Union of all client-to-server event names */
 type ClientEventName = keyof ClientToServerEvents;
 
+/** How long a healthy backend with no socket reconnect is tolerated before reloading the page. */
+const RELOAD_AFTER_MS = 20_000;
+
 export class SocketClient {
   private socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
   private authManager: AuthManager;
   private overlay: HTMLElement | null = null;
   private knownBuildId: string | null = null;
   private healthPollTimer: ReturnType<typeof setInterval> | null = null;
-  private localeHandler: (() => void) | null = null;
+  /** Set after the first successful connect of the current socket. */
+  private connectedOnce = false;
+  private reconnectListeners = new Set<() => void>();
 
   constructor(authManager: AuthManager) {
     this.authManager = authManager;
@@ -37,8 +42,11 @@ export class SocketClient {
     if (!token) return;
 
     this.discardStaleSocket();
+    this.connectedOnce = false;
     this.socket = io(SOCKET_URL, {
-      auth: { token, locale: i18n.language },
+      // Evaluated on every (re)connect: the current access token and language, not the ones from
+      // login time (a reconnect after the 15-minute token lifetime was always refused).
+      auth: (cb) => cb({ token: this.authManager.getAccessToken(), locale: i18n.language }),
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
@@ -49,18 +57,8 @@ export class SocketClient {
       console.log('Socket connected');
       this.hideOverlay();
       this.checkBuild();
+      this.notifyConnected();
     });
-
-    // Keep socket auth locale in sync with language changes
-    if (this.localeHandler) {
-      window.removeEventListener('language-changed', this.localeHandler);
-    }
-    this.localeHandler = () => {
-      if (this.socket) {
-        (this.socket.auth as Record<string, string>).locale = i18n.language;
-      }
-    };
-    window.addEventListener('language-changed', this.localeHandler);
 
     this.socket.on('disconnect', (reason) => {
       console.log('Socket disconnected:', reason);
@@ -70,15 +68,42 @@ export class SocketClient {
       }
     });
 
-    this.socket.on('connect_error', (error) => {
+    const socket = this.socket;
+    socket.on('connect_error', (error) => {
       console.error('Socket connection error:', error.message);
       if (error.message === 'EMAIL_NOT_VERIFIED') {
         // Don't show reconnecting overlay — the VerificationUI handles this
         this.socket?.disconnect();
         return;
       }
+      // Expired access token. socket.io does not retry a handshake the server refused, so refresh
+      // the token and connect again by hand; `auth` above sends the new one.
+      if (error.message === 'Invalid token') {
+        void this.authManager.refresh().then((ok) => {
+          if (ok && this.socket === socket && !socket.active) socket.connect();
+        });
+      }
       this.showOverlay();
     });
+  }
+
+  /**
+   * Called after every reconnect (not the first connect). The server keeps no room memberships
+   * across a reconnect, so scenes re-join whatever they were showing.
+   */
+  onReconnect(listener: () => void): void {
+    this.reconnectListeners.add(listener);
+  }
+
+  offReconnect(listener: () => void): void {
+    this.reconnectListeners.delete(listener);
+  }
+
+  private notifyConnected(): void {
+    if (this.connectedOnce) {
+      for (const listener of [...this.reconnectListeners]) listener();
+    }
+    this.connectedOnce = true;
   }
 
   /** Connect as guest (no auth token — for open world) */
@@ -86,8 +111,9 @@ export class SocketClient {
     if (this.socket?.active) return; // connecting or connected (audit C8)
 
     this.discardStaleSocket();
+    this.connectedOnce = false;
     this.socket = io(SOCKET_URL, {
-      auth: { guest: true, locale: i18n.language },
+      auth: (cb) => cb({ guest: true, locale: i18n.language }),
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
@@ -97,6 +123,7 @@ export class SocketClient {
     this.socket.on('connect', () => {
       console.log('Socket connected (guest)');
       this.hideOverlay();
+      this.notifyConnected();
     });
 
     this.socket.on('disconnect', (reason) => {
@@ -125,10 +152,6 @@ export class SocketClient {
   }
 
   disconnect(): void {
-    if (this.localeHandler) {
-      window.removeEventListener('language-changed', this.localeHandler);
-      this.localeHandler = null;
-    }
     this.socket?.disconnect();
     this.socket = null;
     this.hideOverlay();
@@ -198,12 +221,18 @@ export class SocketClient {
 
   private startHealthPoll(): void {
     if (this.healthPollTimer) return;
+    const overlaySince = Date.now();
     this.healthPollTimer = setInterval(async () => {
       try {
         const res = await fetch(`${API_URL}/health`, { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
-        if (data.buildId && data.status === 'ok') {
+        // socket.io reconnects on its own and the scenes re-join (onReconnect). Reload only for a
+        // new deploy, or when the backend has been healthy for a while and the socket still has
+        // not come back. Reloading on the first healthy poll turned every 3 s blip into a reload.
+        const redeployed = !!this.knownBuildId && data.buildId !== this.knownBuildId;
+        const stuck = Date.now() - overlaySince >= RELOAD_AFTER_MS;
+        if (data.buildId && data.status === 'ok' && (redeployed || stuck)) {
           // Verify the page itself loads (not nginx 502.html) before reloading
           const pageRes = await fetch(window.location.href, { cache: 'no-store' });
           if (!pageRes.ok) return;

@@ -342,13 +342,7 @@
     [data-theme="sand"] .hud-ow-roundend,
     [data-theme="frost"] .hud-ow-roundend,
     [data-theme="blossom"] .hud-ow-roundend,
-    [data-theme="dune"] .hud-ow-roundend,
-    [data-theme="daylight"] .hud-admin-banner,
-    [data-theme="sakura"] .hud-admin-banner,
-    [data-theme="sand"] .hud-admin-banner,
-    [data-theme="frost"] .hud-admin-banner,
-    [data-theme="blossom"] .hud-admin-banner,
-    [data-theme="dune"] .hud-admin-banner { background: rgba(255, 255, 255, 0.88) !important; color: var(--text) !important; }
+    [data-theme="dune"] .hud-ow-roundend { background: rgba(255, 255, 255, 0.88) !important; color: var(--text) !important; }
     [data-theme="daylight"] .hud-ow-row.self,
     [data-theme="sakura"] .hud-ow-row.self,
     [data-theme="sand"] .hud-ow-row.self,

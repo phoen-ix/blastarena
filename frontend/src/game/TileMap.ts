@@ -48,6 +48,11 @@ export class TileMapRenderer {
     }
   }
 
+  /** Whether this renderer was built for a grid of this size. */
+  matches(width: number, height: number): boolean {
+    return this.width === width && this.height === height;
+  }
+
   private createTiles(tiles: TileType[][]): void {
     this.tileSprites = [];
     this.previousTiles = [];
@@ -227,7 +232,10 @@ export class TileMapRenderer {
 
       if (settings.animations) {
         const oldSprite = this.tileSprites[y][x];
-        // Animate destruction: scale down and fade out, then replace
+        // Animate destruction: scale down and fade out, then replace. The fading sprite goes one
+        // depth above the tiles: the replacement is added later at the same depth and used to
+        // cover it, so the animation never showed.
+        oldSprite.setDepth(1);
         this.scene.tweens.add({
           targets: oldSprite,
           alpha: 0,
@@ -262,6 +270,7 @@ export class TileMapRenderer {
       const newTexture = getTileTexture(newType, x, y, this.theme);
       if (settings.animations) {
         const oldSprite = this.tileSprites[y][x];
+        oldSprite.setDepth(1); // above the replacement, see the destruction case
         this.scene.tweens.add({
           targets: oldSprite,
           alpha: 0,
@@ -316,6 +325,7 @@ export class TileMapRenderer {
       const newTexture = getTileTexture(newType, x, y, this.theme);
       if (settings.animations) {
         const oldSprite = this.tileSprites[y][x];
+        oldSprite.setDepth(1); // above the replacement, see the destruction case
         this.scene.tweens.add({
           targets: oldSprite,
           alpha: 0,

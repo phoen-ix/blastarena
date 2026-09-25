@@ -744,9 +744,12 @@ export class MapEventRenderer {
     const px = position.x * TILE_SIZE + TILE_SIZE / 2;
     const py = position.y * TILE_SIZE + TILE_SIZE / 2;
 
+    // Drawn around the object's origin and moved into place: the tween scales the Graphics about
+    // (0, 0), so a circle drawn at (px, py) slid away from its tile as it grew.
     const gfx = this.scene.add.graphics();
     gfx.fillStyle(color, 0.6);
-    gfx.fillCircle(px, py, TILE_SIZE * 0.6);
+    gfx.fillCircle(0, 0, TILE_SIZE * 0.6);
+    gfx.setPosition(px, py);
     gfx.setDepth(120);
     this.flashes.set(key, gfx);
 

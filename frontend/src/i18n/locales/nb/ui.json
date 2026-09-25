@@ -693,6 +693,7 @@
     "gameOver": "Spillet er over"
   },
   "connection": {
-    "reconnecting": "Kobler til serveren på nytt..."
+    "reconnecting": "Kobler til serveren på nytt...",
+    "sessionLost": "Tilkoblingen ble brutt, og du er tilbake i lobbyen."
   }
 }

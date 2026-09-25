@@ -111,6 +111,28 @@ export class ReplayPlayer {
     this.emitCurrentFrame();
   }
 
+  /**
+   * Seek to the last frame at or before a game tick. Log entries carry ticks, and frames are not
+   * one per tick from 0 (nothing is recorded during the countdown), so seeking to a log entry's
+   * tick as a frame index landed on the wrong moment.
+   */
+  seekToTick(tick: number): void {
+    const frames = this.replayData.frames;
+    let lo = 0;
+    let hi = frames.length - 1;
+    let found = 0;
+    while (lo <= hi) {
+      const mid = (lo + hi) >>> 1;
+      if (frames[mid].tick <= tick) {
+        found = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    this.seekTo(found);
+  }
+
   stepForward(): void {
     if (this.currentFrame < this.getTotalFrames() - 1) {
       this.seekTo(this.currentFrame + 1);

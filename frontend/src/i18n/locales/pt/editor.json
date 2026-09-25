@@ -51,7 +51,7 @@
     "levelSettings": "Configurações da Fase",
     "width": "Largura",
     "height": "Altura",
-    "dimensionHint": "Números ímpares, 7-51",
+    "dimensionHint": "Números ímpares, {{min}}-51",
     "name": "Nome",
     "description": "Descrição",
     "lives": "Vidas",

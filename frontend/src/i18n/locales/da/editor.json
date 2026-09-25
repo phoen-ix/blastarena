@@ -51,7 +51,7 @@
     "levelSettings": "Baneindstillinger",
     "width": "Bredde",
     "height": "Højde",
-    "dimensionHint": "Ulige tal, 7-51",
+    "dimensionHint": "Ulige tal, {{min}}-51",
     "name": "Navn",
     "description": "Beskrivelse",
     "lives": "Liv",

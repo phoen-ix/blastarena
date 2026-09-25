@@ -51,7 +51,7 @@
     "levelSettings": "Nivåinnstillinger",
     "width": "Bredde",
     "height": "Høyde",
-    "dimensionHint": "Oddetall, 7–51",
+    "dimensionHint": "Oddetall, {{min}}–51",
     "name": "Navn",
     "description": "Beskrivelse",
     "lives": "Liv",

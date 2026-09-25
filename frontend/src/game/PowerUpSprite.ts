@@ -19,9 +19,12 @@ export class PowerUpRenderer {
     for (const p of powerUps) this._activeIds.add(p.id);
     const activeIds = this._activeIds;
 
-    // Remove sprites for power-ups that no longer exist
+    // Remove sprites for power-ups that no longer exist. The float tween repeats forever and
+    // Phaser keeps running it on a destroyed sprite, so it is killed first — otherwise every
+    // power-up ever shown left a live tween (and its sprite) behind.
     for (const [id, sprite] of this.sprites) {
       if (!activeIds.has(id)) {
+        this.scene.tweens.killTweensOf(sprite);
         sprite.destroy();
         this.sprites.delete(id);
         const ghosts = this.ghostSprites.get(id);
@@ -102,6 +105,7 @@ export class PowerUpRenderer {
 
   destroy(): void {
     for (const [, sprite] of this.sprites) {
+      this.scene.tweens.killTweensOf(sprite);
       sprite.destroy();
     }
     this.sprites.clear();

@@ -51,7 +51,7 @@
     "levelSettings": "Ustawienia poziomu",
     "width": "Szerokość",
     "height": "Wysokość",
-    "dimensionHint": "Liczby nieparzyste, 7-51",
+    "dimensionHint": "Liczby nieparzyste, {{min}}-51",
     "name": "Nazwa",
     "description": "Opis",
     "lives": "Życia",

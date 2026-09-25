@@ -693,6 +693,7 @@
     "gameOver": "Oyun bitti"
   },
   "connection": {
-    "reconnecting": "Sunucuya yeniden bağlanılıyor..."
+    "reconnecting": "Sunucuya yeniden bağlanılıyor...",
+    "sessionLost": "Bağlantı koptu ve lobiye geri döndün."
   }
 }

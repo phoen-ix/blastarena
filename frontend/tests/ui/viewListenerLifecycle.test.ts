@@ -51,6 +51,8 @@ function fakeSocket() {
         (handlers.get(event) ?? []).filter((h) => h !== handler),
       );
     }),
+    onReconnect: vi.fn(),
+    offReconnect: vi.fn(),
     fire(event: string, ...args: unknown[]) {
       for (const h of handlers.get(event) ?? []) h(...args);
     },

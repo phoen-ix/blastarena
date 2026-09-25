@@ -693,6 +693,7 @@
     "gameOver": "Spiel vorbei"
   },
   "connection": {
-    "reconnecting": "Verbindung zum Server wird wiederhergestellt..."
+    "reconnecting": "Verbindung zum Server wird wiederhergestellt...",
+    "sessionLost": "Die Verbindung wurde unterbrochen, du bist zurück in der Lobby."
   }
 }

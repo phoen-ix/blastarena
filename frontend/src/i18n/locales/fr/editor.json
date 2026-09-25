@@ -51,7 +51,7 @@
     "levelSettings": "Paramètres du niveau",
     "width": "Largeur",
     "height": "Hauteur",
-    "dimensionHint": "Nombres impairs, 7-51",
+    "dimensionHint": "Nombres impairs, {{min}}-51",
     "name": "Nom",
     "description": "Description",
     "lives": "Vies",

@@ -693,6 +693,7 @@
     "gameOver": "Spel afgelopen"
   },
   "connection": {
-    "reconnecting": "Opnieuw verbinden met server..."
+    "reconnecting": "Opnieuw verbinden met server...",
+    "sessionLost": "De verbinding is verbroken en je bent terug in de lobby."
   }
 }

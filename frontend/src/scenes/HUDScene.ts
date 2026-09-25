@@ -39,6 +39,9 @@ export class HUDScene extends Phaser.Scene {
   private lastSpecBannerShown: boolean | null = null;
   private localPlayerDead: boolean = false;
   private localPlayerId!: number;
+  /** Replays and simulation spectating: the viewer never takes part, even in a match they played. */
+  private spectatorOnly: boolean = false;
+  private localPlayerChangedHandler: ((id: number) => void) | null = null;
   private boundClickHandler: ((e: MouseEvent) => void) | null = null;
   private socketClient: SocketClient | null = null;
   private playerDiedHandler:
@@ -161,14 +164,17 @@ export class HUDScene extends Phaser.Scene {
     this.events.once('shutdown', this.shutdown, this);
 
     const authManager = this.registry.get('authManager') as AuthManager;
-    const openWorldPlayerId = this.registry.get('openWorldPlayerId') as number | undefined;
-    this.localPlayerId = openWorldPlayerId ?? authManager.getUser()?.id ?? 0;
+    // GameScene owns the local player id: the open world assigns one per join, and the registry
+    // key it comes from used to be read here in every mode, long after that session ended.
+    const gameSceneRef = this.scene.get('GameScene') as GameScene | null;
+    this.localPlayerId = gameSceneRef?.localId ?? authManager.getUser()?.id ?? 0;
     this.localPlayerDead = false;
 
     // Force spectator mode for simulation/replay viewers
     const simSpectate = this.registry.get('simulationSpectate');
     const replayMode = this.registry.get('replayMode');
-    if (simSpectate || replayMode) {
+    this.spectatorOnly = !!(simSpectate || replayMode || this.registry.get('adminSpectate'));
+    if (this.spectatorOnly) {
       this.localPlayerDead = true;
     }
 
@@ -263,7 +269,6 @@ export class HUDScene extends Phaser.Scene {
 
     // Open-world guests keep a compact login/register bar docked bottom-center, so the
     // play area stays clear but authentication remains one click away.
-    const gameSceneRef = this.scene.get('GameScene') as GameScene | null;
     if (gameSceneRef?.isOpenWorld && authManager.isGuest) {
       this.mountAuthBar();
     }
@@ -318,10 +323,20 @@ export class HUDScene extends Phaser.Scene {
     };
     gameScene.events.on('stateUpdate', this.stateUpdateHandler);
 
-    // Seed minimap tiles from initial state — GameScene emits stateUpdate during
-    // its create() before HUDScene registers its listener, so we miss the full tiles
-    if (this.minimapEnabled && initialState?.map?.tiles?.length) {
-      this.minimapSeedTiles = initialState.map.tiles;
+    // A guest re-joining the open world after a reconnect comes back under a new id
+    this.localPlayerChangedHandler = (id: number) => {
+      this.localPlayerId = id;
+      this.renderOpenWorldBoard();
+    };
+    gameScene.events.on('localPlayerChanged', this.localPlayerChangedHandler);
+
+    // Seed the minimap: GameScene emits stateUpdate during its create(), before this listener
+    // exists. From its live grid rather than the registry's initial state — the landing's
+    // background arena mounts this HUD long after joining, and open-world rounds replace the map,
+    // so the initial grid drew walls that were long gone.
+    const seedTiles = gameSceneRef?.liveTiles ?? initialState?.map?.tiles;
+    if (this.minimapEnabled && seedTiles?.length) {
+      this.minimapSeedTiles = seedTiles;
     }
 
     // Campaign mode: add lives/enemy counter, hide player list and kill feed
@@ -383,23 +398,19 @@ export class HUDScene extends Phaser.Scene {
    */
   private showAdminBanner(message: string, from: string): void {
     this.hideAdminBanner();
+    // Styled by the themed .hud-admin-banner rules in styles.css. It used to carry an inline dark
+    // background that overrode them, leaving the text unreadable in the light themes.
     const banner = document.createElement('div');
     banner.className = 'hud-admin-banner';
     banner.setAttribute('role', 'status');
-    banner.style.cssText =
-      'position:fixed;top:72px;left:50%;transform:translateX(-50%);max-width:min(640px,90vw);' +
-      'display:flex;align-items:flex-start;gap:12px;padding:10px 14px;' +
-      'background:rgba(20,16,40,0.92);border:1px solid var(--primary);border-radius:8px;' +
-      'color:var(--text);font-family:"DM Sans",sans-serif;font-size:14px;z-index:120;' +
-      'box-shadow:0 4px 20px rgba(0,0,0,0.5);';
     setHtml(
       banner,
       `
-      <div style="flex:1;min-width:0;">
-        <div style="font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--primary);margin-bottom:2px;">${escapeHtml(t('ui:hud.adminMessageFrom', { from }))}</div>
-        <div style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(message)}</div>
+      <div class="hud-admin-banner-body">
+        <div class="hud-admin-banner-from">${escapeHtml(t('ui:hud.adminMessageFrom', { from }))}</div>
+        <div class="hud-admin-banner-text">${escapeHtml(message)}</div>
       </div>
-      <button type="button" class="btn btn-ghost btn-sm hud-admin-banner-close" aria-label="${escapeHtml(t('common:actions.close'))}" style="flex-shrink:0;padding:2px 8px;line-height:1;">✕</button>
+      <button type="button" class="hud-admin-banner-close" aria-label="${escapeHtml(t('common:actions.close'))}">✕</button>
     `,
     );
     banner
@@ -538,9 +549,11 @@ export class HUDScene extends Phaser.Scene {
     const me = state.players.find((p) => p.id === this.localPlayerId);
     if (!this.localPlayerDead && me && !me.alive) {
       this.localPlayerDead = true;
-      // Mount spectator chat when player dies (not campaign/replay/sim)
+      // Mount spectator chat when player dies (not campaign/replay/sim). Nor the open world:
+      // spectator chat is a room feature and the server drops it there.
       if (
         !this.campaignMode &&
+        !this.openWorldMode &&
         !this.spectatorChatMounted &&
         !this.registry.get('replayMode') &&
         !this.registry.get('simulationSpectate')
@@ -557,7 +570,7 @@ export class HUDScene extends Phaser.Scene {
       ) {
         this.mountSpectatorActionBar();
       }
-    } else if (this.localPlayerDead && me && me.alive) {
+    } else if (this.localPlayerDead && me && me.alive && !this.spectatorOnly) {
       // Player respawned (campaign, deathmatch, open world)
       this.localPlayerDead = false;
       // Unmount spectator UI on respawn
@@ -1280,6 +1293,10 @@ export class HUDScene extends Phaser.Scene {
       const gameScene = this.scene.get('GameScene');
       gameScene?.events.off('stateUpdate', this.stateUpdateHandler);
       this.stateUpdateHandler = null;
+    }
+    if (this.localPlayerChangedHandler) {
+      this.scene.get('GameScene')?.events.off('localPlayerChanged', this.localPlayerChangedHandler);
+      this.localPlayerChangedHandler = null;
     }
     if (this.playerDiedHandler && this.socketClient) {
       this.socketClient.off('game:playerDied', this.playerDiedHandler);

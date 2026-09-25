@@ -693,6 +693,7 @@
     "gameOver": "Spillet er slut"
   },
   "connection": {
-    "reconnecting": "Genopretter forbindelse til serveren..."
+    "reconnecting": "Genopretter forbindelse til serveren...",
+    "sessionLost": "Forbindelsen blev afbrudt, og du er sendt tilbage til lobbyen."
   }
 }

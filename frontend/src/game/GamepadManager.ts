@@ -156,6 +156,22 @@ export class GamepadManager {
     return this.getPad() !== null;
   }
 
+  /**
+   * Treat the action buttons as already held, so a press only counts after a release. Called while
+   * the pause menu or emote wheel owns A/B: the button that confirms or closes them was still down
+   * on the next gameplay poll and became a bomb or a detonation.
+   */
+  suppressHeldButtons(): void {
+    this.prevBombButton = true;
+    this.prevDetonateButton = true;
+    this.prevThrowButton = true;
+    for (let i = 0; i < 4; i++) {
+      this.prevIndexedBomb.set(`pad${i}`, true);
+      this.prevIndexedDetonate.set(`pad${i}`, true);
+      this.prevIndexedThrow.set(`pad${i}`, true);
+    }
+  }
+
   private readDirection(
     pad: Phaser.Input.Gamepad.Gamepad,
   ): 'up' | 'down' | 'left' | 'right' | null {
