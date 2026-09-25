@@ -20,6 +20,28 @@ type LoadedEnemy = { kind: 'class'; ctor: EnemyAIConstructor } | { kind: 'isolat
 
 const ENEMY_AI_BASE_DIR = path.join(process.cwd(), 'enemy-ai');
 
+function hasDecide(value: unknown): value is EnemyAIConstructor {
+  return (
+    typeof value === 'function' &&
+    typeof (value as { prototype?: { decide?: unknown } }).prototype?.decide === 'function'
+  );
+}
+
+/**
+ * The AI class a module exports: the module itself (`module.exports = HunterAI`, which is how every
+ * built-in source ends, so the sandbox hands back the class, not an object holding it), its default
+ * export, or any exported class — the order IsolatedAIRunner uses. Looking only at `default` and
+ * the module's properties rejected every built-in, so none loaded and campaign enemies fell back
+ * to the basic movement patterns.
+ */
+function findAIClass(mod: unknown): EnemyAIConstructor | undefined {
+  if (hasDecide(mod)) return mod;
+  if (mod === null || (typeof mod !== 'object' && typeof mod !== 'function')) return undefined;
+  const exported = mod as Record<string, unknown>;
+  if (hasDecide(exported.default)) return exported.default;
+  return Object.values(exported).find(hasDecide);
+}
+
 export class EnemyAIRegistry {
   private loaded: Map<string, LoadedEnemy> = new Map();
 
@@ -82,21 +104,7 @@ export class EnemyAIRegistry {
 
   /** A built-in AI, from code compiled from the repository source — runs in-process. */
   loadBuiltin(id: string, compiledCode: string): void {
-    const mod = loadBotAIInSandbox(compiledCode);
-    let AIClass: EnemyAIConstructor | undefined;
-    if (typeof mod.default === 'function' && mod.default.prototype?.decide) {
-      AIClass = mod.default as EnemyAIConstructor;
-    } else {
-      for (const val of Object.values(mod)) {
-        if (
-          typeof val === 'function' &&
-          (val as { prototype: Record<string, unknown> }).prototype?.decide
-        ) {
-          AIClass = val as EnemyAIConstructor;
-          break;
-        }
-      }
-    }
+    const AIClass = findAIClass(loadBotAIInSandbox(compiledCode));
     if (!AIClass) {
       throw new Error('No class with decide() found in built-in enemy AI');
     }

@@ -1,6 +1,6 @@
 # Testing
 
-BlastArena has **3501 tests** across 152 test files covering the full stack: game logic, backend services, API routes, socket handlers, middleware, database migrations, utilities, shared code, config guards, and frontend.
+BlastArena has **3508 tests** across 153 test files covering the full stack: game logic, backend services, API routes, socket handlers, middleware, database migrations, utilities, shared code, config guards, and frontend.
 
 | Stack | Framework | Suites | Tests |
 |-------|-----------|--------|-------|
@@ -39,7 +39,7 @@ cd frontend && npx vitest                                     # Frontend watch m
 tests/
 ├── backend/
 │   ├── game/           27 files — core game logic, engine/campaign regressions, bot determinism, open world
-│   ├── services/       40 files — business logic layer, AI sandbox/isolates, AI guide examples, TOTP, Lua/pagination source scans
+│   ├── services/       41 files — business logic layer, AI sandbox/isolates, built-in enemy AIs, AI guide examples, TOTP, Lua/pagination source scans
 │   ├── routes/         15 files — API endpoint handlers, admin validation, route mounting, JSON 404 + headers
 │   ├── handlers/        6 files — Socket.io event handlers, socket.ts AST guards
 │   ├── middleware/      7 files — auth, validation, rate limiting, errors, body parsing, email, locale
@@ -97,7 +97,7 @@ Core game mechanics — most of these drive the server-authoritative game state 
 | `game/MapEventPrune.test.ts` | 4 | Map events expire with dynamic events on or off, in-window events kept, list stays bounded over long matches |
 | `game/ChainSnapshot.test.ts` | 3 | Chained detonations use the pre-detonation tile snapshot (a first blast cannot widen the second), incl. a 3-bomb line batch and with unexpired bombs left |
 
-### Services (40 files, 1010 tests)
+### Services (41 files, 1017 tests)
 
 Business logic layer — DB/Redis-backed services are tested with mocked database and Redis; the AI compiler, sandbox and isolate suites run the real compilers and isolates. The `lua-interpolation` and `pagination-total-order` suites scan the service sources instead, and `aiGuideExamples` compiles the code samples in the AI guides.
 
@@ -136,6 +136,7 @@ Business logic layer — DB/Redis-backed services are tested with mocked databas
 | `services/buddy.test.ts` | 8 | getBuddySettings defaults, saveBuddySettings UPSERT with partial merge |
 | `services/presence.test.ts` | 8 | Set with TTL, get (corrupt data → null), getBatch via MGET (skipped for empty input), remove |
 | `services/challenges.test.ts` | 7 | Admin challenges: unknown ids → 404 with nothing changed (activate/update/delete/deactivate), activate switches the others off, update applies a new map and checks a partial date change against the stored end, missing/unpublished map → 400 |
+| `services/enemyaiBuiltins.test.ts` | 7 | Every built-in enemy AI source through the real compiler and sandbox, loaded by the registry (`module.exports = Class` shape) and deciding at each difficulty |
 | `services/achievements-progress.test.ts` | 6 | getAchievementProgress: one GROUP BY query for mode-specific stats, one for campaign totals, aggregates skipped when unneeded or already unlocked, bounded query count |
 | `services/ServiceAuditFixes.test.ts` | 6 | canUserPlayMap (owner, published, unpublished, missing), refresh-token reaping as two indexed deletes |
 | `services/auth-refresh-reaper.test.ts` | 5 | cleanupExpiredRefreshTokens: two indexed deletes (no OR), chunked loop until a short chunk, missing affectedRows → 0, driver errors propagate |

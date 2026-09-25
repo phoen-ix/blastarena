@@ -87,6 +87,10 @@ export interface CompileResult {
   errors: string[];
 }
 
+/**
+ * Runs compiled CommonJS in a fresh context and returns its `module.exports` — an object of
+ * exports, or the class itself when the code assigns `module.exports = SomeClass`.
+ */
 export function loadBotAIInSandbox(code: string): Record<string, unknown> {
   const frozenConsole = Object.freeze({
     log: () => {},
