@@ -83,6 +83,11 @@ services:
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
       APP_URL: ${APP_URL:-http://localhost:8080}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      GAME_LOG_IDLE_WINDOW_TICKS: ${GAME_LOG_IDLE_WINDOW_TICKS:-60}
+      GAME_LOG_MAX_AGE_DAYS: ${GAME_LOG_MAX_AGE_DAYS:-365}
+      GAME_LOG_MAX_TOTAL_MB: ${GAME_LOG_MAX_TOTAL_MB:-20480}
+      REPLAY_MAX_AGE_DAYS: ${REPLAY_MAX_AGE_DAYS:-365}
+      REPLAY_MAX_TOTAL_MB: ${REPLAY_MAX_TOTAL_MB:-10240}
     depends_on:
       db:
         condition: service_healthy

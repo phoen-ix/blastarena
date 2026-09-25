@@ -60,6 +60,14 @@ const configSchema = z.object({
   APP_URL: z.string().default('http://localhost:8080'),
   LOG_LEVEL: z.string().default('info'),
 
+  // Game-log and replay retention. Read by utils/gameLogger and utils/replayRecorder; validated
+  // here so a typo fails startup instead of turning into NaN (which disabled pruning).
+  GAME_LOG_IDLE_WINDOW_TICKS: z.coerce.number().int().positive().default(60),
+  GAME_LOG_MAX_AGE_DAYS: z.coerce.number().positive().default(365),
+  GAME_LOG_MAX_TOTAL_MB: z.coerce.number().positive().default(20480),
+  REPLAY_MAX_AGE_DAYS: z.coerce.number().positive().default(365),
+  REPLAY_MAX_TOTAL_MB: z.coerce.number().positive().default(10240),
+
   // GAME_TICK_RATE, MAX_ROOMS, MAX_PLAYERS_PER_ROOM, BOMB_TIMER_SECONDS, POWERUP_DROP_CHANCE and
   // RATE_LIMIT_LOGIN/REGISTER/API used to be declared here, in docker-compose.yml and in
   // .env.example, and were read by nothing: the tick rate, room/player caps and bomb timings are

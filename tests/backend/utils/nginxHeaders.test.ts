@@ -165,4 +165,11 @@ describe('security-headers include files', () => {
       expect(devHeaders).toContain(`add_header ${header}`);
     }
   });
+
+  it('production: proxy locations stop the probe regex from matching API paths', () => {
+    const conf = fs.readFileSync(path.join(__dirname, '../../../docker/nginx/nginx.conf'), 'utf-8');
+    for (const prefix of ['/api/auth/', '/api/', '/socket.io/']) {
+      expect(conf).toContain(`location ^~ ${prefix} {`);
+    }
+  });
 });
