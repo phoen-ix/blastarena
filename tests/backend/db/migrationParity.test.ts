@@ -106,6 +106,36 @@ describe('migration files', () => {
     );
   });
 
+  // MariaDB commits DDL on its own, so the runner's per-migration transaction cannot cover an
+  // ALTER: a run that stops after one leaves it applied while _migrations does not record the
+  // migration, and every start after that fails on it ("Duplicate column name"). From 042 on
+  // (001-041 predate the rule) schema changes are guarded, so the migration can just run again.
+  it('from 042 on, every schema change can run again (IF [NOT] EXISTS), up and down', () => {
+    const UNGUARDED = [
+      /\bADD COLUMN (?!IF NOT EXISTS)/i,
+      /\bADD (?:UNIQUE )?(?:INDEX|KEY) (?!IF NOT EXISTS)/i,
+      /\bCREATE (?:UNIQUE )?INDEX (?!IF NOT EXISTS)/i,
+      /\bCREATE TABLE (?!IF NOT EXISTS)/i,
+      /\bDROP (?:COLUMN|INDEX|KEY|TABLE) (?!IF EXISTS)/i,
+    ];
+    const files = [
+      ...ups.filter((f) => parseInt(f, 10) >= 42).map((f) => path.join(MIGRATIONS_DIR, f)),
+      ...downs.filter((f) => parseInt(f, 10) >= 42).map((f) => path.join(DOWN_DIR, f)),
+    ];
+    expect(files.length).toBeGreaterThanOrEqual(10);
+
+    const unguarded: string[] = [];
+    for (const file of files) {
+      // One space between tokens, so a lookahead cannot be dodged by extra whitespace
+      const sql = fs.readFileSync(file, 'utf-8').replace(/--.*$/gm, '').replace(/\s+/g, ' ');
+      for (const pattern of UNGUARDED) {
+        const m = pattern.exec(sql);
+        if (m) unguarded.push(`${path.basename(file)}: ${sql.slice(m.index, m.index + 60)}`);
+      }
+    }
+    expect(unguarded).toEqual([]);
+  });
+
   it('041 drops login_attempts and its down recreates the 001 definition verbatim', () => {
     const up = fs.readFileSync(path.join(MIGRATIONS_DIR, '041_drop_login_attempts.sql'), 'utf-8');
     expect(up).toMatch(/DROP TABLE IF EXISTS login_attempts;/);

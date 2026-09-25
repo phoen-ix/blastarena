@@ -1,1 +1,1 @@
-ALTER TABLE users DROP COLUMN totp_last_step;
+ALTER TABLE users DROP COLUMN IF EXISTS totp_last_step;

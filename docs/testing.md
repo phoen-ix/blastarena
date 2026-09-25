@@ -1,6 +1,6 @@
 # Testing
 
-BlastArena has **3500 tests** across 152 test files covering the full stack: game logic, backend services, API routes, socket handlers, middleware, database migrations, utilities, shared code, config guards, and frontend.
+BlastArena has **3501 tests** across 152 test files covering the full stack: game logic, backend services, API routes, socket handlers, middleware, database migrations, utilities, shared code, config guards, and frontend.
 
 | Stack | Framework | Suites | Tests |
 |-------|-----------|--------|-------|
@@ -191,14 +191,14 @@ Socket.io event handler tests — handlers tested with mock socket/io objects an
 | `middleware/validation.test.ts` | 8 | Zod validation of body/query/params, parsed output replaces the input (extra fields stripped), field-level error details, non-Zod errors forwarded |
 | `middleware/bodyParserErrors.test.ts` | 6 | Real Express stack: malformed JSON → 400 INVALID_JSON (body not reflected), corrupt gzip → 4xx, oversized → 413, unsupported charset → 415 |
 
-### Database (3 files, 123 tests)
+### Database (3 files, 124 tests)
 
 Migration tooling — the SQL statement splitter and the migration files themselves, checked without a database.
 
 | File | Tests | Coverage |
 |------|-------|----------|
 | `db/sqlStatementParser.test.ts` | 113 | parseSqlStatements: comments (`--`, `#`, block, version-gated), quoting and escapes, statement splitting; plus one parse check per repository migration file (up and down) |
-| `db/migrationParity.test.ts` | 9 | Every up migration has a down file and vice versa, numbering unique and gap-free from 001, no empty files, up/down symmetry for 030 (re-applicable after rollback), 040 and 041; 046 drops only the index 035 added, which 008's composite index covers |
+| `db/migrationParity.test.ts` | 10 | Every up migration has a down file and vice versa, numbering unique and gap-free from 001, no empty files, up/down symmetry for 030 (re-applicable after rollback), 040 and 041; 046 drops only the index 035 added, which 008's composite index covers; from 042 on every schema change, up and down, is guarded with `IF [NOT] EXISTS` so an interrupted migration can run again |
 | `db/migrationRunner.test.ts` | 1 | rollbackMigration refuses to roll back the irreversible email migration without force |
 
 ### Simulation (2 files, 85 tests)
