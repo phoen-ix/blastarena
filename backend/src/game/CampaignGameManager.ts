@@ -89,11 +89,12 @@ export class CampaignGameManager {
     // Remove from playerSessions lookup
     this.playerSessions.delete(userId);
 
-    // Kill the player in-game
-    const player = game.getPlayer(userId);
-    if (player && player.alive) {
-      player.die();
-    }
+    // Take the player out of the level. Killing them (the old behaviour) cost the partner a shared
+    // life, respawned the departed player as an idle body, and left exit/goal levels waiting for it
+    // to lock in forever.
+    game.removePlayer(userId);
+    // A partner who quit from the pause menu must not leave the other player frozen.
+    if (game.isPaused()) game.resume();
 
     logger.info({ sessionId, userId }, 'Player removed from campaign session');
 
@@ -104,10 +105,11 @@ export class CampaignGameManager {
     }
   }
 
+  /** Idempotent: pausing an already-paused session succeeds, so either co-op player gets the menu. */
   pauseSession(sessionId: string): boolean {
     const game = this.sessions.get(sessionId);
-    if (!game || game.isFinished() || game.isPaused()) return false;
-    game.pause();
+    if (!game || game.isFinished()) return false;
+    if (!game.isPaused()) game.pause();
     return true;
   }
 

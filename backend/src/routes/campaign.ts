@@ -689,6 +689,18 @@ router.post(
       if (!levelData || !levelData.name || !levelData.tiles) {
         return res.status(400).json({ error: 'Invalid level data' });
       }
+      // Same bounds as creating a level (map size, lives, times, …); unknown export fields pass
+      // through. Imports used to skip validation entirely, so a level could carry any map size.
+      const checked = levelSchema.passthrough().safeParse(levelData);
+      if (!checked.success) {
+        return res.status(400).json({
+          error: 'Invalid level data',
+          details: checked.error.errors.map((e) => ({
+            field: e.path.join('.'),
+            message: e.message,
+          })),
+        });
+      }
 
       // Collect enemy type IDs referenced in placements
       const referencedIds = [

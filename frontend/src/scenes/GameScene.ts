@@ -50,6 +50,7 @@ import { EmoteId, EMOTES, CampaignLevelSummary } from '@blast-arena/shared';
 import type { ServerToClientEvents } from '@blast-arena/shared';
 import { audioManager } from '../game/AudioManager';
 import { getSettings } from '../game/Settings';
+import { enterCoopLevel } from './coopStart';
 
 export class GameScene extends Phaser.Scene {
   /** ScaleManager resize handler; removed in shutdown(). (audit SCENE-RESIZE-LEAK-1) */
@@ -135,6 +136,8 @@ export class GameScene extends Phaser.Scene {
   private campaignGameOverHandler: ServerToClientEvents['campaign:gameOver'] | null = null;
   private campaignLockedInHandler: ServerToClientEvents['campaign:playerLockedIn'] | null = null;
   private campaignPartnerLeftHandler: ServerToClientEvents['campaign:partnerLeft'] | null = null;
+  private campaignPauseStateHandler: ServerToClientEvents['campaign:pauseState'] | null = null;
+  private campaignCoopStartHandler: ServerToClientEvents['campaign:coopStart'] | null = null;
   // Campaign feedback events the server always emitted but nothing rendered. (audit G7)
   private campaignEnemyDiedHandler: ServerToClientEvents['campaign:enemyDied'] | null = null;
   private campaignExitOpenedHandler: ServerToClientEvents['campaign:exitOpened'] | null = null;
@@ -734,6 +737,27 @@ export class GameScene extends Phaser.Scene {
           }
         };
         this.socketClient.on('campaign:partnerLeft', this.campaignPartnerLeftHandler);
+
+        // The partner paused or resumed the shared level: mirror it, so neither player is left
+        // with a frozen level and no menu.
+        this.campaignPauseStateHandler = (data) => {
+          if (data.paused && !this.paused) {
+            this.paused = true;
+            this.showPauseOverlay();
+          } else if (!data.paused && this.paused && this.pauseOverlay) {
+            this.paused = false;
+            this.hidePauseOverlay();
+          }
+        };
+        this.socketClient.on('campaign:pauseState', this.campaignPauseStateHandler);
+
+        // The leader restarted the level: follow them into the new session
+        this.campaignCoopStartHandler = (data) => {
+          this.paused = false;
+          this.hidePauseOverlay();
+          enterCoopLevel(this, data);
+        };
+        this.socketClient.on('campaign:coopStart', this.campaignCoopStartHandler);
       }
 
       // Escape key to toggle pause menu
@@ -1820,6 +1844,12 @@ export class GameScene extends Phaser.Scene {
 
   private showPauseOverlay(): void {
     this.hidePauseOverlay();
+    // Only the session owner (always the first player) can restart an online co-op level; the
+    // server rejects anyone else after they have already quit the session.
+    const onlineCoopPartner =
+      this.campaignCoopMode &&
+      !this.localCoopMode &&
+      this.lastGameState?.players[0]?.id !== this.localPlayerId;
     const overlay = document.createElement('div');
     overlay.className = 'pause-overlay';
     setHtml(
@@ -1828,7 +1858,7 @@ export class GameScene extends Phaser.Scene {
       <div class="pause-menu">
         <h2 class="pause-title">${t('ui:game.pausedTitle')}</h2>
         <button class="btn btn-primary pause-btn" id="pause-continue">${t('ui:game.pauseContinue')}</button>
-        <button class="btn btn-secondary pause-btn" id="pause-restart">${t('ui:game.pauseRestartLevel')}</button>
+        ${onlineCoopPartner ? '' : `<button class="btn btn-secondary pause-btn" id="pause-restart">${t('ui:game.pauseRestartLevel')}</button>`}
         <button class="btn btn-ghost pause-btn" id="pause-exit">${t('ui:game.pauseExitLevel')}</button>
       </div>
     `,
@@ -1839,7 +1869,7 @@ export class GameScene extends Phaser.Scene {
     overlay.querySelector('#pause-continue')!.addEventListener('click', () => {
       this.resumeCampaign();
     });
-    overlay.querySelector('#pause-restart')!.addEventListener('click', () => {
+    overlay.querySelector('#pause-restart')?.addEventListener('click', () => {
       const levelId = this.lastCampaignState?.levelId;
       if (!levelId) return;
       this.paused = false;
@@ -2027,6 +2057,14 @@ export class GameScene extends Phaser.Scene {
     if (this.campaignPartnerLeftHandler) {
       this.socketClient.off('campaign:partnerLeft', this.campaignPartnerLeftHandler);
       this.campaignPartnerLeftHandler = null;
+    }
+    if (this.campaignPauseStateHandler) {
+      this.socketClient.off('campaign:pauseState', this.campaignPauseStateHandler);
+      this.campaignPauseStateHandler = null;
+    }
+    if (this.campaignCoopStartHandler) {
+      this.socketClient.off('campaign:coopStart', this.campaignCoopStartHandler);
+      this.campaignCoopStartHandler = null;
     }
     if (this.campaignEnemyDiedHandler) {
       this.socketClient.off('campaign:enemyDied', this.campaignEnemyDiedHandler);

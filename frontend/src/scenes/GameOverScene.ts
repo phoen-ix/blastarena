@@ -9,6 +9,7 @@ import {
   CampaignGameState,
   CampaignLevelSummary,
   EnemyTypeEntry,
+  CoopStartData,
   ServerToClientEvents,
 } from '@blast-arena/shared';
 import { themeManager } from '../themes/ThemeManager';
@@ -16,6 +17,7 @@ import { LocalCoopP2Identity } from '../game/LocalCoopInput';
 import { t } from '../i18n';
 import { audioManager } from '../game/AudioManager';
 import { AuthManager } from '../network/AuthManager';
+import { enterCoopLevel } from './coopStart';
 
 const DEADZONE = 0.3;
 
@@ -129,6 +131,13 @@ export class GameOverScene extends Phaser.Scene {
     };
     socketClient.on('rematch:triggered', rematchTriggeredHandler);
 
+    // Co-op partner: the leader picked Next Level / Retry from their results screen
+    const coopStartHandler = (coopData: CoopStartData) => {
+      socketClient.off('campaign:coopStart', coopStartHandler);
+      enterCoopLevel(this, coopData);
+    };
+    socketClient.on('campaign:coopStart', coopStartHandler);
+
     // `once`, matching every other scene: Phaser's Systems.shutdown() only clears the transition
     // events, so a scene `shutdown` listener registered with `on` survives and accumulates one
     // more closure — holding the old socketClient and six stale handler refs — per finished match.
@@ -140,6 +149,7 @@ export class GameOverScene extends Phaser.Scene {
       socketClient.off('achievement:unlocked', achievementHandler);
       socketClient.off('rematch:update', rematchUpdateHandler);
       socketClient.off('rematch:triggered', rematchTriggeredHandler);
+      socketClient.off('campaign:coopStart', coopStartHandler);
     });
 
     const colors = themeManager.getCanvasColors();

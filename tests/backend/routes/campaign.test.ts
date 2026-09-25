@@ -1467,6 +1467,21 @@ describe('POST /admin/campaign/levels/import', () => {
     expect(res._json).toEqual({ id: 21 });
   });
 
+  it('rejects an imported level outside the create bounds', async () => {
+    const req = mockReq({
+      user: { userId: 1 },
+      body: {
+        worldId: 1,
+        level: { name: 'Huge', tiles: [['empty']], mapWidth: 100000, enemyPlacements: [] },
+      },
+    });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+
+    expect(res._status).toBe(400);
+    expect(mockCreateLevel).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when level data is missing name', async () => {
     const req = mockReq({
       user: { userId: 1 },

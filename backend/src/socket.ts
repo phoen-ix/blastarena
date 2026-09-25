@@ -83,6 +83,7 @@ const spectatorActionLimiter = createSocketRateLimiter(2);
 // Module-scoped like its siblings. It used to be created inside the connection handler, so every
 // socket owned a private Map that nothing ever pruned. (audit E10)
 const campaignStartLimiter = createSocketRateLimiter(1);
+const campaignPauseLimiter = createSocketRateLimiter(2);
 // lobby:subscribe/unsubscribe, admin:spectate and admin:roomMessage had no limiter at all — each
 // is a cheap call, but socket.join/leave and a room-wide broadcast are not free at 1000/s. (audit B16)
 const lobbySubscribeLimiter = createSocketRateLimiter(5);
@@ -1428,7 +1429,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
               // updateCarriedPowerups had no call sites at all, so campaign_user_state's
               // carried_powerups was always null and the carry-over never happened.
               // (audit CARRYOVER-1)
-              if (socket.data.userId > 0) {
+              if (socket.data.userId > 0 && !game.hasDeparted(socket.data.userId)) {
                 try {
                   await progressService.updateCarriedPowerups(socket.data.userId, carried);
                 } catch (err) {
@@ -1446,7 +1447,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
               // player's count. (audit A13)
               const starsByUser = new Map<number, number>();
               for (const uid of userIds) {
-                if (uid > 0) {
+                if (uid > 0 && !game.hasDeparted(uid)) {
                   starsByUser.set(
                     uid,
                     await progressService.recordCompletion(
@@ -1481,7 +1482,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
               // Evaluate campaign achievements for all real players
               for (const uid of userIds) {
-                if (uid <= 0) continue;
+                if (uid <= 0 || game.hasDeparted(uid)) continue;
                 try {
                   const userState = await progressService.getUserState(uid);
                   const totalStars = userState.totalStars;
@@ -1561,17 +1562,19 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           worldTheme,
         );
 
+        // EnemyTypeEntry[] (id + config): the replay metadata and the co-op partner's textures are
+        // both keyed by enemy type id.
+        const enemyTypeEntries = Array.from(enemyTypes.entries()).map(([id, config]) => ({
+          id,
+          name: '',
+          description: '',
+          config,
+          isBoss: config.isBoss,
+          createdAt: '',
+        }));
+
         // Enable replay recording if recordings are enabled
         if (await settingsService.isRecordingEnabled()) {
-          // Build EnemyTypeEntry[] from the Map for replay metadata
-          const enemyTypeEntries = Array.from(enemyTypes.entries()).map(([id, config]) => ({
-            id,
-            name: '',
-            description: '',
-            config,
-            isBoss: config.isBoss,
-            createdAt: '',
-          }));
           game.enableReplayRecording({
             levelId: level.id,
             levelName: level.name,
@@ -1687,11 +1690,12 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
         // Send coopStart to partner (online co-op only)
         if (partnerSocket) {
-          const enemyTypeConfigs = Array.from(enemyTypes.values());
+          // Entries, not bare configs: the partner's texture generator is keyed by type id and
+          // threw on configs without one.
           partnerSocket.emit('campaign:coopStart', {
             state: initialState.state,
             level: levelSummary,
-            enemyTypes: enemyTypeConfigs,
+            enemyTypes: enemyTypeEntries,
           });
         }
 
@@ -1726,20 +1730,31 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       getCampaignGameManager().handleInput(sessionId, userId, input);
     });
 
-    // Campaign: pause (either player can pause for both)
+    // Campaign: pause (either player can pause for both). Both players are told, so a co-op
+    // partner gets the pause menu instead of a silently frozen level.
     socket.on('campaign:pause', (callback) => {
+      if (!campaignPauseLimiter.isAllowed(socket.id)) return callback({ success: false });
       const sessionId = socket.data.activeCampaignSession;
       if (!sessionId) return callback({ success: false });
-      const ok = getCampaignGameManager().pauseSession(sessionId);
+      const manager = getCampaignGameManager();
+      const ok = manager.pauseSession(sessionId);
       callback({ success: ok });
+      const game = manager.getSession(sessionId);
+      if (ok && game)
+        io.to(`campaign:${game.userIds[0]}`).emit('campaign:pauseState', { paused: true });
     });
 
     // Campaign: resume (either player can resume)
     socket.on('campaign:resume', (callback) => {
+      if (!campaignPauseLimiter.isAllowed(socket.id)) return callback({ success: false });
       const sessionId = socket.data.activeCampaignSession;
       if (!sessionId) return callback({ success: false });
-      const ok = getCampaignGameManager().resumeSession(sessionId);
+      const manager = getCampaignGameManager();
+      const ok = manager.resumeSession(sessionId);
       callback({ success: ok });
+      const game = manager.getSession(sessionId);
+      if (ok && game)
+        io.to(`campaign:${game.userIds[0]}`).emit('campaign:pauseState', { paused: false });
     });
 
     // Campaign: quit
@@ -1751,10 +1766,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       const game = campaignManager.getSession(sessionId);
 
       if (game && game.coopMode) {
-        // Co-op: remove this player, notify partner
+        // Co-op: remove this player, notify partner (removal also resumes a paused level)
         campaignManager.removePlayer(sessionId, socket.data.userId);
         const campaignRoom = `campaign:${game.userIds[0]}`;
         socket.to(campaignRoom).emit('campaign:partnerLeft', { reason: 'quit' });
+        socket.to(campaignRoom).emit('campaign:pauseState', { paused: false });
         socket.leave(campaignRoom);
       } else {
         campaignManager.endSession(sessionId);
@@ -1860,6 +1876,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         spectatorActionLimiter.remove(socket.id);
         guestRejectLogLimiter.remove(socket.id);
         campaignStartLimiter.remove(socket.id); // audit E10
+        campaignPauseLimiter.remove(socket.id);
         lobbySubscribeLimiter.remove(socket.id); // audit B16
         adminRoomLimiter.remove(socket.id); // audit B16
         // Capture before clearing: the room-cleanup block further down reads this, and clearing it
@@ -1912,6 +1929,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
             campaignManager.removePlayer(socket.data.activeCampaignSession, socket.data.userId);
             const campaignRoom = `campaign:${game.userIds[0]}`;
             io.to(campaignRoom).emit('campaign:partnerLeft', { reason: 'disconnected' });
+            io.to(campaignRoom).emit('campaign:pauseState', { paused: false });
           } else {
             campaignManager.endSession(socket.data.activeCampaignSession);
           }

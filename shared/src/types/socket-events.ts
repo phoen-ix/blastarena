@@ -282,6 +282,8 @@ export interface ServerToClientEvents {
   }) => void;
   'campaign:gameOver': (data: { levelId: number; reason: string }) => void;
   'campaign:partnerLeft': (data: { reason: string }) => void;
+  /** Either co-op player paused/resumed the shared level. */
+  'campaign:pauseState': (data: { paused: boolean }) => void;
 
   // Friends
   'friend:update': (data: {

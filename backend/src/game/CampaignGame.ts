@@ -163,6 +163,16 @@ export class CampaignGame {
   // Sequential lock-in: players frozen on exit/goal tile
   private lockedInPlayers: Set<number> = new Set();
 
+  /** Co-op players who left mid-level (removed from the game state). */
+  private departedPlayers: Set<number> = new Set();
+
+  /** Explosion ids that already damaged each enemy — see firstHit(). */
+  private enemyExplosionHits: Map<number, Set<string>> = new Map();
+
+  /** Spike activations so far; an enemy takes spike damage once per activation. */
+  private spikeActivation = 0;
+  private enemySpikeActivation: Map<number, number> = new Map();
+
   // Hidden power-ups: revealed when the wall at that position is destroyed
   private hiddenPowerups: Map<string, PowerUpType> = new Map();
 
@@ -598,6 +608,19 @@ export class CampaignGame {
       return;
     }
 
+    // The level's own time limit. GameState skips its time check for campaign, so a timed
+    // kill-all/exit/goal level used to run past 0:00 forever. survive_time completes instead (see
+    // checkWinCondition); a win already in its grace period is not failed.
+    if (
+      this.level.timeLimit > 0 &&
+      this.level.winCondition !== 'survive_time' &&
+      this.completionTick === null &&
+      tick / TICK_RATE >= this.level.timeLimit
+    ) {
+      this.gameOverInternal("Time's up!");
+      return;
+    }
+
     // Apply speed modifiers for players on slowing tiles.
     // Only boost cooldown on the tick the player actually moved,
     // not every tick — otherwise the player gets permanently stuck.
@@ -630,7 +653,10 @@ export class CampaignGame {
     for (const explosion of this.gameState.explosions.values()) {
       for (const enemy of this.enemies.values()) {
         if (!enemy.alive) continue;
-        if (explosion.containsCell(enemy.position.x, enemy.position.y)) {
+        if (
+          explosion.containsCell(enemy.position.x, enemy.position.y) &&
+          this.firstHit(enemy, explosion.id)
+        ) {
           const died = enemy.takeDamage(1);
           if (died) {
             this.onEnemyDied(enemy);
@@ -744,7 +770,10 @@ export class CampaignGame {
     for (const explosion of this.gameState.explosions.values()) {
       for (const enemy of this.enemies.values()) {
         if (!enemy.alive) continue;
-        if (explosion.containsCell(enemy.position.x, enemy.position.y)) {
+        if (
+          explosion.containsCell(enemy.position.x, enemy.position.y) &&
+          this.firstHit(enemy, explosion.id)
+        ) {
           const died = enemy.takeDamage(1);
           if (died) {
             this.onEnemyDied(enemy);
@@ -855,6 +884,38 @@ export class CampaignGame {
 
     // 11. Update enemy positions for next tick's bomb slide collision checks
     this.updateEnemyPositions();
+  }
+
+  /**
+   * True the first time `explosionId` hits this enemy. An explosion lasts 10 ticks and enemies are
+   * checked before and after moving, so without this one blast dealt up to ~20 damage and enemy HP
+   * meant "ticks in fire" — the seeded 2 HP bomber died to a single bomb.
+   */
+  private firstHit(enemy: Enemy, explosionId: string): boolean {
+    let hits = this.enemyExplosionHits.get(enemy.id);
+    if (!hits) {
+      hits = new Set();
+      this.enemyExplosionHits.set(enemy.id, hits);
+    }
+    if (hits.has(explosionId)) return false;
+    hits.add(explosionId);
+    return true;
+  }
+
+  /** A co-op player who quit or disconnected: gone from the level, not respawned, not waited for. */
+  removePlayer(userId: number): void {
+    if (this.departedPlayers.has(userId)) return;
+    this.departedPlayers.add(userId);
+    this.respawnTicks.delete(userId);
+    this.lockedInPlayers.delete(userId);
+    this.quicksandTimers.delete(userId);
+    this.iceSliding.delete(userId);
+    this.prevPlayerPositions.delete(userId);
+    this.gameState.removePlayer(userId);
+  }
+
+  hasDeparted(userId: number): boolean {
+    return this.departedPlayers.has(userId);
   }
 
   private updateEnemyPositions(): void {
@@ -1405,6 +1466,7 @@ export class CampaignGame {
     // Transition from safe to lethal
     const justActivated = prevPhase < SPIKE_SAFE_TICKS && this.spikePhase >= SPIKE_SAFE_TICKS;
     if (justActivated) {
+      this.spikeActivation++;
       for (const pos of this.spikePositions) {
         this.gameState.setTileTracked(pos.x, pos.y, 'spikes_active');
       }
@@ -1440,7 +1502,11 @@ export class CampaignGame {
       for (const enemy of this.enemies.values()) {
         if (!enemy.alive || enemy.typeConfig.canPassWalls) continue;
         const tile = this.gameState.collisionSystem.getTileAt(enemy.position.x, enemy.position.y);
-        if (tile === 'spikes_active') {
+        if (
+          tile === 'spikes_active' &&
+          this.enemySpikeActivation.get(enemy.id) !== this.spikeActivation
+        ) {
+          this.enemySpikeActivation.set(enemy.id, this.spikeActivation);
           const died = enemy.takeDamage(1);
           if (died) this.onEnemyDied(enemy);
         }

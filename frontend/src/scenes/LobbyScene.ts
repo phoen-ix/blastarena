@@ -8,6 +8,7 @@ import { GameState, Room, CoopStartData } from '@blast-arena/shared';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { t } from '../i18n';
 import { setHtml } from '../utils/html';
+import { enterCoopLevel } from './coopStart';
 
 export class LobbyScene extends Phaser.Scene {
   private authManager!: AuthManager;
@@ -172,18 +173,9 @@ export class LobbyScene extends Phaser.Scene {
         }
       }
 
-      // Set registry flags for GameScene
-      const registry = this.registry;
-      registry.set('campaignMode', true);
-      registry.set('campaignCoopMode', true);
-      registry.set('initialGameState', data.state.gameState);
-      registry.set('campaignEnemyTypes', data.enemyTypes || []);
-
-      // Transition to GameScene + HUDScene
       this.lobbyUI?.hide();
       this.roomUI?.hide();
-      this.scene.start('GameScene');
-      this.scene.launch('HUDScene');
+      enterCoopLevel(this, data);
     };
     this.socketClient.on('campaign:coopStart', this.campaignCoopStartHandler);
 

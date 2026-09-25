@@ -245,7 +245,7 @@ export interface ImportConflict {
 export interface CoopStartData {
   state: CampaignGameState;
   level: CampaignLevelSummary;
-  enemyTypes: EnemyTypeConfig[];
+  enemyTypes: EnemyTypeEntry[];
 }
 
 // --- Buddy Mode ---
