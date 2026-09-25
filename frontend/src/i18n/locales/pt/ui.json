@@ -32,7 +32,9 @@
     "joined": "Entrou na sala: {{name}}",
     "joinFailed": "Falha ao entrar na sala",
     "loadFailed": "Falha ao carregar salas: {{error}}",
-    "kicked": "Você foi expulso"
+    "kicked": "Você foi expulso",
+    "statusWaiting": "Aguardando",
+    "statusPlaying": "Em jogo"
   },
   "maps": {
     "title": "Meus Mapas",
@@ -306,7 +308,7 @@
     "noParty": "Você não está em um grupo.",
     "noPartyTitle": "Nenhum Grupo Ativo",
     "noPartyDescription": "Crie um grupo para jogar com amigos antes de entrar em uma sala.",
-    "noPartyTip": "Dica: Convide amigos pela página de Amigos após criar um grupo.",
+    "noPartyTip": "Dica: Depois de criar um grupo, convide amigos com \"+ Convidar Amigo\" nesta página.",
     "chatHeader": "Chat do Grupo",
     "chatPlaceholder": "Digite uma mensagem...",
     "chatDisabled": "O chat está desativado no momento",
@@ -326,7 +328,7 @@
     "disbanded": "Grupo desfeito",
     "created": "Grupo criado",
     "createFailed": "Falha ao criar grupo",
-    "useFriendsPanel": "Use o painel de Amigos para convidar jogadores",
+    "usePartyPage": "Convide amigos pela página de Grupo",
     "invitedToParty": "<strong>{{username}}</strong> convidou você para o grupo",
     "invitedToRoom": "<strong>{{username}}</strong> convidou você para uma sala",
     "accept": "Aceitar",
@@ -387,7 +389,8 @@
     "date": "Date",
     "win": "WIN",
     "prev": "Prev",
-    "next": "Next"
+    "next": "Next",
+    "modeSummary": "{{winRate}}% de vitórias · {{kd}} K/D"
   },
   "createRoom": {
     "title": "Criar Sala",
@@ -433,8 +436,8 @@
     "powerUps": "Power-Ups",
     "botCount": "Quantidade de Bots",
     "none": "Nenhum",
-    "nBots": "{{count}} Bot",
-    "nBots_plural": "{{count}} Bots",
+    "nBots_one": "{{count}} Bot",
+    "nBots_other": "{{count}} Bots",
     "newMap": "+ Novo Mapa",
     "randomGenerated": "Aleatório (Gerado)",
     "communityMaps": "Mapas da Comunidade",
@@ -444,14 +447,14 @@
     "mapSpawnHint": "Este mapa tem {{count}} pontos de início (máximo {{count}} jogadores)",
     "mapDimensions": "Mapa {{width}}x{{height}}",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} pontos de início)",
+    "mapBy": "por {{username}}",
     "loadingPreview": "Carregando pré-visualização...",
     "recordGame": "Gravar Jogo",
     "mapSizes": {
       "21": "21×21 (Pequeno)",
       "31": "31×31 (Normal)",
       "39": "39×39 (Grande)",
-      "51": "51×51 (Enorme)",
-      "61": "61×61 (Massivo)"
+      "51": "51×51 (Enorme)"
     },
     "wallDensities": {
       "low30": "Baixa (30%)",
@@ -548,6 +551,7 @@
     "back": "← Voltar",
     "inviteFriend": "Convidar Amigo",
     "inviteInfo": "Use o painel de Amigos (lobby) para convidar amigos para esta sala",
+    "noFriendsToInvite": "Nenhum amigo online para convidar",
     "roomCode": "Código da Sala:",
     "playersCount": "Jogadores ({{current}}/{{max}})",
     "needPlayers": "Precisa de Jogadores ou Bots",

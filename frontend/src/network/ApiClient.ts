@@ -2,6 +2,40 @@ import { API_URL } from '../config';
 import { AuthManager } from './AuthManager';
 import { i18n } from '../i18n';
 
+/**
+ * A failed API request. Carries the server's machine-readable `code` (e.g. INVALID_CREDENTIALS)
+ * and the HTTP status, so callers can translate the error instead of showing the English text.
+ * A plain Error dropped both, and AuthUI.translateError never matched anything.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+/** Build an ApiError from a non-2xx response, keeping field-level validation details. */
+async function toApiError(response: Response): Promise<ApiError> {
+  const body = await response.json().catch(() => ({ error: 'Request failed' }));
+  let message: string = body.error || `HTTP ${response.status}`;
+  if (body.details?.length) {
+    const fieldErrors = body.details
+      .map((d: { field: string; message: string }) => `${d.field}: ${d.message}`)
+      .join(', ');
+    message += ` (${fieldErrors})`;
+  }
+  return new ApiError(
+    message,
+    response.status,
+    typeof body.code === 'string' ? body.code : undefined,
+  );
+}
+
 class ApiClientClass {
   private authManager: AuthManager | null = null;
   private refreshPromise: Promise<boolean> | null = null;
@@ -26,16 +60,18 @@ class ApiClientClass {
   }
 
   /**
-   * Core fetch wrapper with auth retry. Used by all request methods.
+   * Send with the access token, and on a 401 refresh once and retry. Returns the final response,
+   * successful or not; the callers decide how to read it.
    */
-  private async fetchWithAuth<T>(
+  private async send(
     path: string,
     init: RequestInit,
     headers: Record<string, string>,
     skipAuthRetry: boolean,
-  ): Promise<T> {
-    if (this.authManager?.getAccessToken()) {
-      headers['Authorization'] = `Bearer ${this.authManager.getAccessToken()}`;
+  ): Promise<Response> {
+    const carriedToken = this.authManager?.getAccessToken() ?? null;
+    if (carriedToken) {
+      headers['Authorization'] = `Bearer ${carriedToken}`;
     }
 
     const response = await fetch(`${API_URL}${path}`, {
@@ -48,35 +84,36 @@ class ApiClientClass {
       const refreshed = await this.refreshToken();
       if (refreshed) {
         headers['Authorization'] = `Bearer ${this.authManager.getAccessToken()}`;
-        const retryResponse = await fetch(`${API_URL}${path}`, {
+        return fetch(`${API_URL}${path}`, {
           ...init,
           headers,
           credentials: 'include',
         });
-
-        if (!retryResponse.ok) {
-          const error = await retryResponse.json().catch(() => ({ error: 'Request failed' }));
-          throw new Error(error.error || 'Request failed');
-        }
-        return retryResponse.json();
       }
 
-      this.authManager.logout();
-      throw new Error('Session expired');
-    }
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Request failed' }));
-      let message = error.error || `HTTP ${response.status}`;
-      if (error.details?.length) {
-        const fieldErrors = error.details
-          .map((d: { field: string; message: string }) => `${d.field}: ${d.message}`)
-          .join(', ');
-        message += ` (${fieldErrors})`;
+      // Only a request that carried a token had a session that could expire. A guest (or anyone
+      // before login) has none, and logging out here threw open-world guests out of the lobby
+      // on the first auth-only request.
+      if (carriedToken) {
+        this.authManager.logout();
+        throw new ApiError('Session expired', 401, 'TOKEN_EXPIRED');
       }
-      throw new Error(message);
     }
 
+    return response;
+  }
+
+  /**
+   * Core fetch wrapper with auth retry. Used by all request methods.
+   */
+  private async fetchWithAuth<T>(
+    path: string,
+    init: RequestInit,
+    headers: Record<string, string>,
+    skipAuthRetry: boolean,
+  ): Promise<T> {
+    const response = await this.send(path, init, headers, skipAuthRetry);
+    if (!response.ok) throw await toApiError(response);
     return response.json();
   }
 
@@ -95,6 +132,16 @@ class ApiClientClass {
 
   async get<T>(path: string): Promise<T> {
     return this.request<T>(path);
+  }
+
+  /**
+   * GET a non-JSON body (a file download) with the same auth and refresh handling as get().
+   * A bare fetch() sent no Authorization header, so every admin download came back 401.
+   */
+  async download(path: string): Promise<Response> {
+    const response = await this.send(path, {}, { 'X-Language': i18n.language || 'en' }, false);
+    if (!response.ok) throw await toApiError(response);
+    return response;
   }
 
   async post<T>(path: string, body?: unknown, skipAuthRetry = false): Promise<T> {

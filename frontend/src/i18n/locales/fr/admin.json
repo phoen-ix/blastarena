@@ -93,6 +93,14 @@
     "deleteSuccess": "Utilisateur supprimé définitivement",
     "revokeSessions": "Révoquer les sessions",
     "revokeSessionsSuccess": "Sessions utilisateur révoquées",
+    "confirm": {
+      "roleTitle": "Changer le rôle",
+      "roleMessage": "Changer le rôle de {{username}} en {{role}} ?",
+      "deactivateTitle": "Désactiver l'utilisateur",
+      "deactivateMessage": "Désactiver {{username}} ? L'utilisateur est déconnecté et ne peut plus se connecter avant d'être réactivé.",
+      "revokeTitle": "Révoquer les sessions",
+      "revokeMessage": "Révoquer toutes les sessions de {{username}} ? L'utilisateur est déconnecté sur tous ses appareils."
+    },
     "cleanup": {
       "button": "Account Cleanup",
       "title": "Account Cleanup",
@@ -175,6 +183,14 @@
     "replayEmptyOrCorrupted": "Les données du replay sont vides ou corrompues",
     "failedToLoadReplay": "Échec du chargement du replay",
     "statusAbandoned": "abandonnée",
+    "statusLive": "en cours",
+    "statuses": {
+      "waiting": "en attente",
+      "countdown": "compte à rebours",
+      "playing": "en cours",
+      "finished": "terminée",
+      "aborted": "annulée"
+    },
     "durationSeconds": "{{duration}}s"
   },
   "logs": {
@@ -289,6 +305,7 @@
     "cancelBtn": "Annuler",
     "sendBtn": "Envoyer",
     "messageSent": "Message envoyé",
+    "messageFailed": "Échec de l'envoi du message",
     "kickPlayerTitle": "Expulser un joueur du salon {{code}}",
     "playerUserIdLabel": "ID du joueur",
     "enterUserIdPlaceholder": "Entrez l'ID utilisateur",
@@ -600,7 +617,23 @@
     "revokeAllSuccess": "Toutes les sessions révoquées",
     "spectatorActionsDesc": "Les joueurs éliminés peuvent dépenser de l'énergie en murs, météores, bonus et zones de vitesse (chaque salle peut encore le désactiver par partie)",
     "spectatorActionsToggled": "Maître du jeu spectateur {{status}}",
-    "spectatorActionsGlobal": "Maître du jeu spectateur (global)"
+    "spectatorActionsGlobal": "Maître du jeu spectateur (global)",
+    "openWorld": {
+      "title": "Monde ouvert",
+      "enabled": "Activé",
+      "guestAccess": "Accès invité",
+      "maxPlayers": "Joueurs max",
+      "roundTime": "Durée de manche (s)",
+      "mapWidth": "Largeur de la carte",
+      "mapHeight": "Hauteur de la carte",
+      "wallDensity": "Densité des murs",
+      "respawnDelay": "Délai de réapparition (s)",
+      "afkTimeout": "Délai d'inactivité (s)",
+      "afkTimeoutHint": "0 = désactivé",
+      "save": "Enregistrer les paramètres du monde ouvert",
+      "saved": "Paramètres du monde ouvert enregistrés",
+      "saveFailed": "Échec de l'enregistrement des paramètres du monde ouvert"
+    }
   },
   "seasons": {
     "sectionTitle": "Gestion des saisons",
@@ -656,6 +689,12 @@
       "seasonEnded": "Saison terminée (réinitialisation {{resetMode}})",
       "seasonDeleted": "Saison supprimée",
       "rankConfigSaved": "Configuration des rangs enregistrée"
+    },
+    "confirm": {
+      "activateTitle": "Activer la saison",
+      "activateMessage": "Activer « {{name}} » ? Toute autre saison active sera désactivée.",
+      "deleteTitle": "Supprimer la saison",
+      "deleteMessage": "Supprimer « {{name}} » ? Cette action est irréversible."
     }
   },
   "campaign": {
@@ -883,6 +922,8 @@
       "watchBtn": "Regarder",
       "deleteBtn": "Supprimer",
       "replayDeleted": "Replay de campagne supprimé",
+      "deleteConfirmTitle": "Supprimer le replay",
+      "deleteConfirm": "Supprimer ce replay ? Cette action est irréversible.",
       "loadingReplay": "Chargement du replay de campagne...",
       "replayEmptyOrCorrupted": "Les données du replay sont vides ou corrompues",
       "loadFailed": "Échec du chargement du replay de campagne",
@@ -1041,6 +1082,7 @@
     "globalToggle": "Système de défis",
     "enabled": "Défis activés",
     "toggleSaved": "Paramètre de défi enregistré",
+    "toggleLoadFailed": "Impossible de charger le réglage des défis",
     "title": "Défis de carte",
     "titleLabel": "Titre",
     "description": "Description",
@@ -1060,6 +1102,11 @@
     "activate": "Activer",
     "deactivate": "Désactiver",
     "deleteBtn": "Supprimer",
-    "none": "Pas encore de défis"
+    "none": "Pas encore de défis",
+    "statusActive": "Actif",
+    "statusInactive": "Inactif",
+    "unknownCreator": "Inconnu",
+    "deleteConfirmTitle": "Supprimer le défi",
+    "deleteConfirm": "Supprimer le défi « {{title}} » ? Cette action est irréversible."
   }
 }

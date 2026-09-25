@@ -93,6 +93,14 @@
     "deleteSuccess": "Användare permanent borttagen",
     "revokeSessions": "Återkalla sessioner",
     "revokeSessionsSuccess": "Användarsessioner återkallade",
+    "confirm": {
+      "roleTitle": "Ändra roll",
+      "roleMessage": "Ändra rollen för {{username}} till {{role}}?",
+      "deactivateTitle": "Inaktivera användare",
+      "deactivateMessage": "Inaktivera {{username}}? Användaren loggas ut och kan inte logga in förrän kontot aktiveras igen.",
+      "revokeTitle": "Återkalla sessioner",
+      "revokeMessage": "Återkalla alla sessioner för {{username}}? Användaren loggas ut på alla enheter."
+    },
     "cleanup": {
       "button": "Account Cleanup",
       "title": "Account Cleanup",
@@ -175,6 +183,14 @@
     "replayEmptyOrCorrupted": "Reprisdata är tom eller korrupt",
     "failedToLoadReplay": "Kunde inte ladda repris",
     "statusAbandoned": "övergiven",
+    "statusLive": "pågår",
+    "statuses": {
+      "waiting": "väntar",
+      "countdown": "nedräkning",
+      "playing": "pågår",
+      "finished": "avslutad",
+      "aborted": "avbruten"
+    },
     "durationSeconds": "{{duration}}s"
   },
   "logs": {
@@ -289,6 +305,7 @@
     "cancelBtn": "Avbryt",
     "sendBtn": "Skicka",
     "messageSent": "Meddelande skickat",
+    "messageFailed": "Kunde inte skicka meddelandet",
     "kickPlayerTitle": "Sparka spelare från rum {{code}}",
     "playerUserIdLabel": "Spelarens användar-ID",
     "enterUserIdPlaceholder": "Ange användar-ID",
@@ -600,7 +617,23 @@
     "revokeAllSuccess": "Alla sessioner återkallade",
     "spectatorActionsDesc": "Låt utslagna spelare spendera energi på väggar, meteorer, power-ups och hastighetszoner (rum kan fortfarande stänga av det per match)",
     "spectatorActionsToggled": "Åskådar-spelledare {{status}}",
-    "spectatorActionsGlobal": "Åskådar-spelledare (globalt)"
+    "spectatorActionsGlobal": "Åskådar-spelledare (globalt)",
+    "openWorld": {
+      "title": "Öppen värld",
+      "enabled": "Aktiverad",
+      "guestAccess": "Gäståtkomst",
+      "maxPlayers": "Max spelare",
+      "roundTime": "Rundtid (s)",
+      "mapWidth": "Kartbredd",
+      "mapHeight": "Karthöjd",
+      "wallDensity": "Väggtäthet",
+      "respawnDelay": "Återupplivningsfördröjning (s)",
+      "afkTimeout": "AFK-tidsgräns (s)",
+      "afkTimeoutHint": "0 = inaktiverad",
+      "save": "Spara inställningar för öppen värld",
+      "saved": "Inställningar för öppen värld sparade",
+      "saveFailed": "Kunde inte spara inställningar för öppen värld"
+    }
   },
   "seasons": {
     "sectionTitle": "Säsongshantering",
@@ -656,6 +689,12 @@
       "seasonEnded": "Säsong avslutad ({{resetMode}} återställning)",
       "seasonDeleted": "Säsong borttagen",
       "rankConfigSaved": "Rangkonfiguration sparad"
+    },
+    "confirm": {
+      "activateTitle": "Aktivera säsong",
+      "activateMessage": "Aktivera ”{{name}}”? Alla andra aktiva säsonger inaktiveras.",
+      "deleteTitle": "Ta bort säsong",
+      "deleteMessage": "Ta bort ”{{name}}”? Det går inte att ångra."
     }
   },
   "campaign": {
@@ -883,6 +922,8 @@
       "watchBtn": "Titta",
       "deleteBtn": "Ta bort",
       "replayDeleted": "Kampanjrepris borttagen",
+      "deleteConfirmTitle": "Ta bort repris",
+      "deleteConfirm": "Ta bort den här reprisen? Det går inte att ångra.",
       "loadingReplay": "Laddar kampanjrepris...",
       "replayEmptyOrCorrupted": "Reprisdata är tom eller korrupt",
       "loadFailed": "Kunde inte ladda kampanjrepris",
@@ -1041,6 +1082,7 @@
     "globalToggle": "Utmaningssystem",
     "enabled": "Utmaningar aktiverade",
     "toggleSaved": "Utmaningsinställning sparad",
+    "toggleLoadFailed": "Kunde inte läsa in inställningen för utmaningar",
     "title": "Kartutmaningar",
     "titleLabel": "Titel",
     "description": "Beskrivning",
@@ -1060,6 +1102,11 @@
     "activate": "Aktivera",
     "deactivate": "Inaktivera",
     "deleteBtn": "Ta bort",
-    "none": "Inga utmaningar ännu"
+    "none": "Inga utmaningar ännu",
+    "statusActive": "Aktiv",
+    "statusInactive": "Inaktiv",
+    "unknownCreator": "Okänd",
+    "deleteConfirmTitle": "Ta bort utmaning",
+    "deleteConfirm": "Ta bort utmaningen ”{{title}}”? Det går inte att ångra."
   }
 }

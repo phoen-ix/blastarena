@@ -103,6 +103,14 @@
     "deleteSuccess": "User deleted permanently",
     "revokeSessions": "Revoke Sessions",
     "revokeSessionsSuccess": "User sessions revoked",
+    "confirm": {
+      "roleTitle": "Change Role",
+      "roleMessage": "Change the role of {{username}} to {{role}}?",
+      "deactivateTitle": "Deactivate User",
+      "deactivateMessage": "Deactivate {{username}}? They are logged out and cannot sign in until reactivated.",
+      "revokeTitle": "Revoke Sessions",
+      "revokeMessage": "Revoke all sessions of {{username}}? They are logged out on every device."
+    },
     "cleanup": {
       "button": "Account Cleanup",
       "title": "Account Cleanup",
@@ -175,6 +183,14 @@
     "replayEmptyOrCorrupted": "Replay data is empty or corrupted",
     "failedToLoadReplay": "Failed to load replay",
     "statusAbandoned": "abandoned",
+    "statusLive": "live",
+    "statuses": {
+      "waiting": "waiting",
+      "countdown": "countdown",
+      "playing": "playing",
+      "finished": "finished",
+      "aborted": "aborted"
+    },
     "durationSeconds": "{{duration}}s"
   },
   "logs": {
@@ -289,6 +305,7 @@
     "cancelBtn": "Cancel",
     "sendBtn": "Send",
     "messageSent": "Message sent",
+    "messageFailed": "Failed to send message",
     "kickPlayerTitle": "Kick Player from Room {{code}}",
     "playerUserIdLabel": "Player User ID",
     "enterUserIdPlaceholder": "Enter user ID",
@@ -600,7 +617,23 @@
     "revokeAllSuccess": "All sessions revoked",
     "spectatorActionsDesc": "Let eliminated players spend energy on walls, meteors, power-ups and speed zones (rooms can still disable it per match)",
     "spectatorActionsToggled": "Spectator Game Master {{status}}",
-    "spectatorActionsGlobal": "Spectator Game Master (global)"
+    "spectatorActionsGlobal": "Spectator Game Master (global)",
+    "openWorld": {
+      "title": "Open World",
+      "enabled": "Enabled",
+      "guestAccess": "Guest Access",
+      "maxPlayers": "Max Players",
+      "roundTime": "Round Time (s)",
+      "mapWidth": "Map Width",
+      "mapHeight": "Map Height",
+      "wallDensity": "Wall Density",
+      "respawnDelay": "Respawn Delay (s)",
+      "afkTimeout": "AFK Timeout (s)",
+      "afkTimeoutHint": "0 = disabled",
+      "save": "Save Open World Settings",
+      "saved": "Open World settings saved",
+      "saveFailed": "Failed to save Open World settings"
+    }
   },
   "seasons": {
     "sectionTitle": "Season Management",
@@ -656,6 +689,12 @@
       "seasonEnded": "Season ended ({{resetMode}} reset)",
       "seasonDeleted": "Season deleted",
       "rankConfigSaved": "Rank configuration saved"
+    },
+    "confirm": {
+      "activateTitle": "Activate Season",
+      "activateMessage": "Activate \"{{name}}\"? Any other active season is deactivated.",
+      "deleteTitle": "Delete Season",
+      "deleteMessage": "Delete \"{{name}}\"? This cannot be undone."
     }
   },
   "campaign": {
@@ -883,6 +922,8 @@
       "watchBtn": "Watch",
       "deleteBtn": "Delete",
       "replayDeleted": "Campaign replay deleted",
+      "deleteConfirmTitle": "Delete Replay",
+      "deleteConfirm": "Delete this replay? This cannot be undone.",
       "loadingReplay": "Loading campaign replay...",
       "replayEmptyOrCorrupted": "Replay data is empty or corrupted",
       "loadFailed": "Failed to load campaign replay",
@@ -1041,6 +1082,7 @@
     "globalToggle": "Challenge System",
     "enabled": "Challenges Enabled",
     "toggleSaved": "Challenge setting saved",
+    "toggleLoadFailed": "Could not load the challenge setting",
     "title": "Map Challenges",
     "titleLabel": "Title",
     "description": "Description",
@@ -1060,6 +1102,11 @@
     "activate": "Activate",
     "deactivate": "Deactivate",
     "deleteBtn": "Delete",
-    "none": "No challenges yet"
+    "none": "No challenges yet",
+    "statusActive": "Active",
+    "statusInactive": "Inactive",
+    "unknownCreator": "Unknown",
+    "deleteConfirmTitle": "Delete Challenge",
+    "deleteConfirm": "Delete the challenge \"{{title}}\"? This cannot be undone."
   }
 }

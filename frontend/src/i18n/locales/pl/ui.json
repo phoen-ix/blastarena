@@ -32,7 +32,9 @@
     "joined": "Dołączono do pokoju: {{name}}",
     "joinFailed": "Nie udało się dołączyć do pokoju",
     "loadFailed": "Nie udało się załadować pokoi: {{error}}",
-    "kicked": "Zostałeś wyrzucony"
+    "kicked": "Zostałeś wyrzucony",
+    "statusWaiting": "Oczekuje",
+    "statusPlaying": "W grze"
   },
   "maps": {
     "title": "Moje mapy",
@@ -302,11 +304,13 @@
     "leader": "Lider",
     "member": "Członek",
     "memberCount_one": "{{count}} członek",
+    "memberCount_few": "{{count}} członkowie",
+    "memberCount_many": "{{count}} członków",
     "memberCount_other": "{{count}} członków",
     "noParty": "Nie jesteś w żadnej drużynie.",
     "noPartyTitle": "Brak aktywnej drużyny",
     "noPartyDescription": "Utwórz drużynę, aby grać ze znajomymi przed dołączeniem do pokoju.",
-    "noPartyTip": "Wskazówka: Po utworzeniu drużyny zaproś znajomych ze strony Znajomi.",
+    "noPartyTip": "Wskazówka: Po utworzeniu drużyny zaproś znajomych przyciskiem „+ Zaproś znajomego” na tej stronie.",
     "chatHeader": "Czat drużynowy",
     "chatPlaceholder": "Napisz wiadomość...",
     "chatDisabled": "Czat jest obecnie wyłączony",
@@ -326,7 +330,7 @@
     "disbanded": "Drużyna rozwiązana",
     "created": "Drużyna utworzona",
     "createFailed": "Nie udało się utworzyć drużyny",
-    "useFriendsPanel": "Użyj panelu Znajomi, aby zaprosić graczy",
+    "usePartyPage": "Zaproś znajomych na stronie Drużyna",
     "invitedToParty": "<strong>{{username}}</strong> zaprosił(a) cię do swojej drużyny",
     "invitedToRoom": "<strong>{{username}}</strong> zaprosił(a) cię do pokoju",
     "accept": "Akceptuj",
@@ -387,7 +391,8 @@
     "date": "Date",
     "win": "WIN",
     "prev": "Prev",
-    "next": "Next"
+    "next": "Next",
+    "modeSummary": "{{winRate}}% wygranych · {{kd}} K/D"
   },
   "createRoom": {
     "title": "Utwórz pokój",
@@ -433,8 +438,10 @@
     "powerUps": "Bonusy",
     "botCount": "Liczba botów",
     "none": "Brak",
-    "nBots": "{{count}} Bot",
-    "nBots_plural": "{{count}} Botów",
+    "nBots_one": "{{count}} Bot",
+    "nBots_few": "{{count}} Boty",
+    "nBots_many": "{{count}} Botów",
+    "nBots_other": "{{count}} Botów",
     "newMap": "+ Nowa mapa",
     "randomGenerated": "Losowa (generowana)",
     "communityMaps": "Mapy społeczności",
@@ -444,14 +451,14 @@
     "mapSpawnHint": "Ta mapa ma {{count}} punktów startu (maks. {{count}} graczy)",
     "mapDimensions": "Mapa {{width}}x{{height}}",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} punktów startu)",
+    "mapBy": "autor: {{username}}",
     "loadingPreview": "Ładowanie podglądu...",
     "recordGame": "Nagraj grę",
     "mapSizes": {
       "21": "21×21 (Mały)",
       "31": "31×31 (Normalny)",
       "39": "39×39 (Duży)",
-      "51": "51×51 (Ogromny)",
-      "61": "61×61 (Masywny)"
+      "51": "51×51 (Ogromny)"
     },
     "wallDensities": {
       "low30": "Niska (30%)",
@@ -548,6 +555,7 @@
     "back": "← Wstecz",
     "inviteFriend": "Zaproś znajomego",
     "inviteInfo": "Użyj panelu Znajomi (lobby), aby zaprosić znajomych do tego pokoju",
+    "noFriendsToInvite": "Brak znajomych online do zaproszenia",
     "roomCode": "Kod pokoju:",
     "playersCount": "Gracze ({{current}}/{{max}})",
     "needPlayers": "Potrzeba graczy lub botów",

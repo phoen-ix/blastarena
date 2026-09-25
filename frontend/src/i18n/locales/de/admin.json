@@ -93,6 +93,14 @@
     "deleteSuccess": "Benutzer endgültig gelöscht",
     "revokeSessions": "Sitzungen widerrufen",
     "revokeSessionsSuccess": "Benutzersitzungen widerrufen",
+    "confirm": {
+      "roleTitle": "Rolle ändern",
+      "roleMessage": "Die Rolle von {{username}} auf {{role}} ändern?",
+      "deactivateTitle": "Benutzer deaktivieren",
+      "deactivateMessage": "{{username}} deaktivieren? Der Benutzer wird abgemeldet und kann sich bis zur Reaktivierung nicht anmelden.",
+      "revokeTitle": "Sitzungen widerrufen",
+      "revokeMessage": "Alle Sitzungen von {{username}} widerrufen? Der Benutzer wird auf allen Geräten abgemeldet."
+    },
     "cleanup": {
       "button": "Account Cleanup",
       "title": "Account Cleanup",
@@ -175,6 +183,14 @@
     "replayEmptyOrCorrupted": "Replay-Daten sind leer oder beschädigt",
     "failedToLoadReplay": "Replay konnte nicht geladen werden",
     "statusAbandoned": "Abgebrochen",
+    "statusLive": "Läuft",
+    "statuses": {
+      "waiting": "Wartet",
+      "countdown": "Countdown",
+      "playing": "Läuft",
+      "finished": "Beendet",
+      "aborted": "Annulliert"
+    },
     "durationSeconds": "{{duration}}s"
   },
   "logs": {
@@ -289,6 +305,7 @@
     "cancelBtn": "Abbrechen",
     "sendBtn": "Senden",
     "messageSent": "Nachricht gesendet",
+    "messageFailed": "Nachricht konnte nicht gesendet werden",
     "kickPlayerTitle": "Spieler aus Raum {{code}} kicken",
     "playerUserIdLabel": "Spieler-ID",
     "enterUserIdPlaceholder": "Benutzer-ID eingeben",
@@ -600,7 +617,23 @@
     "revokeAllSuccess": "Alle Sitzungen widerrufen",
     "spectatorActionsDesc": "Ausgeschiedene Spieler dürfen Energie für Wände, Meteoriten, Power-ups und Tempozonen ausgeben (Räume können es pro Match weiterhin deaktivieren)",
     "spectatorActionsToggled": "Zuschauer-Spielleiter {{status}}",
-    "spectatorActionsGlobal": "Zuschauer-Spielleiter (global)"
+    "spectatorActionsGlobal": "Zuschauer-Spielleiter (global)",
+    "openWorld": {
+      "title": "Offene Welt",
+      "enabled": "Aktiviert",
+      "guestAccess": "Gastzugang",
+      "maxPlayers": "Max. Spieler",
+      "roundTime": "Rundenzeit (s)",
+      "mapWidth": "Kartenbreite",
+      "mapHeight": "Kartenhöhe",
+      "wallDensity": "Wanddichte",
+      "respawnDelay": "Respawn-Verzögerung (s)",
+      "afkTimeout": "AFK-Timeout (s)",
+      "afkTimeoutHint": "0 = deaktiviert",
+      "save": "Offene-Welt-Einstellungen speichern",
+      "saved": "Offene-Welt-Einstellungen gespeichert",
+      "saveFailed": "Offene-Welt-Einstellungen konnten nicht gespeichert werden"
+    }
   },
   "seasons": {
     "sectionTitle": "Season-Verwaltung",
@@ -656,6 +689,12 @@
       "seasonEnded": "Season beendet ({{resetMode}}-Reset)",
       "seasonDeleted": "Season gelöscht",
       "rankConfigSaved": "Rang-Konfiguration gespeichert"
+    },
+    "confirm": {
+      "activateTitle": "Season aktivieren",
+      "activateMessage": "„{{name}}“ aktivieren? Jede andere aktive Season wird deaktiviert.",
+      "deleteTitle": "Season löschen",
+      "deleteMessage": "„{{name}}“ löschen? Dies kann nicht rückgängig gemacht werden."
     }
   },
   "campaign": {
@@ -883,6 +922,8 @@
       "watchBtn": "Ansehen",
       "deleteBtn": "Löschen",
       "replayDeleted": "Kampagnen-Replay gelöscht",
+      "deleteConfirmTitle": "Replay löschen",
+      "deleteConfirm": "Dieses Replay löschen? Dies kann nicht rückgängig gemacht werden.",
       "loadingReplay": "Kampagnen-Replay wird geladen...",
       "replayEmptyOrCorrupted": "Replay-Daten sind leer oder beschädigt",
       "loadFailed": "Kampagnen-Replay konnte nicht geladen werden",
@@ -1041,6 +1082,7 @@
     "globalToggle": "Herausforderungssystem",
     "enabled": "Herausforderungen aktiviert",
     "toggleSaved": "Herausforderungseinstellung gespeichert",
+    "toggleLoadFailed": "Die Einstellung für Herausforderungen konnte nicht geladen werden",
     "title": "Karten-Herausforderungen",
     "titleLabel": "Titel",
     "description": "Beschreibung",
@@ -1060,6 +1102,11 @@
     "activate": "Aktivieren",
     "deactivate": "Deaktivieren",
     "deleteBtn": "Löschen",
-    "none": "Noch keine Herausforderungen"
+    "none": "Noch keine Herausforderungen",
+    "statusActive": "Aktiv",
+    "statusInactive": "Inaktiv",
+    "unknownCreator": "Unbekannt",
+    "deleteConfirmTitle": "Herausforderung löschen",
+    "deleteConfirm": "Die Herausforderung „{{title}}“ löschen? Dies kann nicht rückgängig gemacht werden."
   }
 }

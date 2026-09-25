@@ -93,6 +93,14 @@
     "deleteSuccess": "Utente eliminato permanentemente",
     "revokeSessions": "Revoca sessioni",
     "revokeSessionsSuccess": "Sessioni utente revocate",
+    "confirm": {
+      "roleTitle": "Cambia ruolo",
+      "roleMessage": "Cambiare il ruolo di {{username}} in {{role}}?",
+      "deactivateTitle": "Disattiva utente",
+      "deactivateMessage": "Disattivare {{username}}? L'utente viene disconnesso e non potrà accedere finché non viene riattivato.",
+      "revokeTitle": "Revoca sessioni",
+      "revokeMessage": "Revocare tutte le sessioni di {{username}}? L'utente viene disconnesso su tutti i dispositivi."
+    },
     "cleanup": {
       "button": "Account Cleanup",
       "title": "Account Cleanup",
@@ -175,6 +183,14 @@
     "replayEmptyOrCorrupted": "I dati del replay sono vuoti o corrotti",
     "failedToLoadReplay": "Impossibile caricare il replay",
     "statusAbandoned": "abbandonata",
+    "statusLive": "in corso",
+    "statuses": {
+      "waiting": "in attesa",
+      "countdown": "conto alla rovescia",
+      "playing": "in corso",
+      "finished": "terminata",
+      "aborted": "annullata"
+    },
     "durationSeconds": "{{duration}}s"
   },
   "logs": {
@@ -289,6 +305,7 @@
     "cancelBtn": "Annulla",
     "sendBtn": "Invia",
     "messageSent": "Messaggio inviato",
+    "messageFailed": "Impossibile inviare il messaggio",
     "kickPlayerTitle": "Espelli giocatore dalla stanza {{code}}",
     "playerUserIdLabel": "ID utente giocatore",
     "enterUserIdPlaceholder": "Inserisci ID utente",
@@ -600,7 +617,23 @@
     "revokeAllSuccess": "Tutte le sessioni revocate",
     "spectatorActionsDesc": "Consente ai giocatori eliminati di spendere energia in muri, meteore, potenziamenti e zone di velocità (le stanze possono comunque disattivarlo per partita)",
     "spectatorActionsToggled": "Game Master spettatore {{status}}",
-    "spectatorActionsGlobal": "Game Master spettatore (globale)"
+    "spectatorActionsGlobal": "Game Master spettatore (globale)",
+    "openWorld": {
+      "title": "Mondo aperto",
+      "enabled": "Attivo",
+      "guestAccess": "Accesso ospiti",
+      "maxPlayers": "Giocatori massimi",
+      "roundTime": "Durata round (s)",
+      "mapWidth": "Larghezza mappa",
+      "mapHeight": "Altezza mappa",
+      "wallDensity": "Densità muri",
+      "respawnDelay": "Ritardo respawn (s)",
+      "afkTimeout": "Timeout AFK (s)",
+      "afkTimeoutHint": "0 = disattivato",
+      "save": "Salva impostazioni mondo aperto",
+      "saved": "Impostazioni mondo aperto salvate",
+      "saveFailed": "Impossibile salvare le impostazioni del mondo aperto"
+    }
   },
   "seasons": {
     "sectionTitle": "Gestione stagioni",
@@ -656,6 +689,12 @@
       "seasonEnded": "Stagione terminata (reset {{resetMode}})",
       "seasonDeleted": "Stagione eliminata",
       "rankConfigSaved": "Configurazione gradi salvata"
+    },
+    "confirm": {
+      "activateTitle": "Attiva stagione",
+      "activateMessage": "Attivare «{{name}}»? Ogni altra stagione attiva verrà disattivata.",
+      "deleteTitle": "Elimina stagione",
+      "deleteMessage": "Eliminare «{{name}}»? L'operazione non può essere annullata."
     }
   },
   "campaign": {
@@ -883,6 +922,8 @@
       "watchBtn": "Guarda",
       "deleteBtn": "Elimina",
       "replayDeleted": "Replay campagna eliminato",
+      "deleteConfirmTitle": "Elimina replay",
+      "deleteConfirm": "Eliminare questo replay? L'operazione non può essere annullata.",
       "loadingReplay": "Caricamento replay campagna...",
       "replayEmptyOrCorrupted": "I dati del replay sono vuoti o corrotti",
       "loadFailed": "Impossibile caricare il replay campagna",
@@ -1041,6 +1082,7 @@
     "globalToggle": "Sistema sfide",
     "enabled": "Sfide attivate",
     "toggleSaved": "Impostazione sfida salvata",
+    "toggleLoadFailed": "Impossibile caricare l'impostazione delle sfide",
     "title": "Sfide mappa",
     "titleLabel": "Titolo",
     "description": "Descrizione",
@@ -1060,6 +1102,11 @@
     "activate": "Attiva",
     "deactivate": "Disattiva",
     "deleteBtn": "Elimina",
-    "none": "Nessuna sfida ancora"
+    "none": "Nessuna sfida ancora",
+    "statusActive": "Attivo",
+    "statusInactive": "Inattivo",
+    "unknownCreator": "Sconosciuto",
+    "deleteConfirmTitle": "Elimina sfida",
+    "deleteConfirm": "Eliminare la sfida «{{title}}»? L'operazione non può essere annullata."
   }
 }

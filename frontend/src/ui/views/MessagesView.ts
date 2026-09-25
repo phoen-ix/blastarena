@@ -20,6 +20,9 @@ export class MessagesView implements ILobbyView {
   private conversations: DMConversation[] = [];
   private messages: DirectMessage[] = [];
   private initialTarget: { userId: number; username: string } | null = null;
+  // Bumped per conversation load: a slower answer for a conversation the user already left
+  // must not replace the one now open.
+  private messagesLoadSeq = 0;
 
   // Socket handlers
   private dmReceiveHandler: (message: DirectMessage) => void;
@@ -99,11 +102,16 @@ export class MessagesView implements ILobbyView {
     };
     this.container.addEventListener('click', this.clickHandler);
 
-    // Enter key in message input
+    // Enter key in message input; Enter/Space on a focused conversation opens it
     this.keydownHandler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.matches('[data-msg-input]') && e.key === 'Enter') {
         this.sendMessage();
+        return;
+      }
+      if ((e.key === 'Enter' || e.key === ' ') && target.matches('.messages-conv-item')) {
+        e.preventDefault();
+        this.openConversation(parseInt(target.dataset.convUserId!), target.dataset.convUsername!);
       }
     };
     this.container.addEventListener('keydown', this.keydownHandler);
@@ -238,6 +246,7 @@ export class MessagesView implements ILobbyView {
   }
 
   private async loadMessages(userId: number): Promise<void> {
+    const seq = ++this.messagesLoadSeq;
     try {
       const resp = await ApiClient.get<{
         messages: DirectMessage[];
@@ -245,8 +254,10 @@ export class MessagesView implements ILobbyView {
         page: number;
         limit: number;
       }>(`/messages/${userId}`);
+      if (seq !== this.messagesLoadSeq) return; // superseded by a newer conversation
       this.messages = resp.messages.reverse();
     } catch {
+      if (seq !== this.messagesLoadSeq) return;
       this.deps.notifications.error(t('ui:messages.loadFailed'));
     }
     this.renderMessages();
@@ -348,7 +359,7 @@ export class MessagesView implements ILobbyView {
             conv.lastMessage.length > 40 ? conv.lastMessage.slice(0, 40) + '...' : conv.lastMessage;
 
           return `
-          <div class="messages-conv-item ${isActive ? 'active' : ''}" data-conv-user-id="${conv.userId}" data-conv-username="${escapeAttr(conv.username)}">
+          <div class="messages-conv-item ${isActive ? 'active' : ''}" data-conv-user-id="${conv.userId}" data-conv-username="${escapeAttr(conv.username)}" role="button" tabindex="0"${isActive ? ' aria-current="true"' : ''}>
             <div class="messages-conv-item-avatar" style="background:${color};">
               ${escapeHtml(conv.username.charAt(0).toUpperCase())}
             </div>

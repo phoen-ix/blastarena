@@ -367,6 +367,7 @@ describe('Leaderboard Service', () => {
       best_win_streak: 8,
       total_xp: 0,
       level: 1,
+      total_playtime: 5400,
       ...overrides,
     });
 
@@ -397,6 +398,7 @@ describe('Leaderboard Service', () => {
         bestWinStreak: 8,
         level: 1,
         totalXp: 0,
+        totalPlaytime: 5400,
       });
       expect(result!.rankTier).toContain('Gold');
       expect(result!.rankColor).toBe('#ffd700');

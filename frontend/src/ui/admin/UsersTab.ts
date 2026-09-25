@@ -2,7 +2,7 @@ import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
 import { UserRole, getErrorMessage } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
-import { createModal } from '../../utils/modal';
+import { createModal, confirmModal } from '../../utils/modal';
 import { t } from '../../i18n';
 
 /** Row returned by GET /admin/users (snake_case DB columns, dates serialized as strings). */
@@ -132,7 +132,7 @@ export class UsersTab {
               <tr>
                 <td>${escapeHtml(u.username)}</td>
                 <td>${escapeHtml(u.email_hint)}</td>
-                <td><span class="badge badge-${u.role}">${u.role}</span></td>
+                <td><span class="badge badge-${u.role}">${this.roleLabel(u.role)}</span></td>
                 <td>${this.statusBadge(u)}</td>
                 <td>${u.totp_enabled ? `<span class="badge badge-active">${t('admin:users.twoFactorOn')}</span>` : `<span style="color:var(--text-dim);">—</span>`}</td>
                 <td>${u.total_matches}</td>
@@ -143,16 +143,16 @@ export class UsersTab {
                   ${
                     isAdmin
                       ? `
-                    <select class="admin-select" data-action="role" data-id="${u.id}">
+                    <select class="admin-select" data-action="role" data-id="${u.id}" data-current="${u.role}" data-username="${escapeAttr(u.username)}">
                       <option value="user" ${u.role === 'user' ? 'selected' : ''}>${t('admin:users.roles.user')}</option>
                       <option value="moderator" ${u.role === 'moderator' ? 'selected' : ''}>${t('admin:users.roles.moderator')}</option>
                       <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>${t('admin:users.roles.admin')}</option>
                     </select>
-                    <button class="btn-warn btn-sm" data-action="deactivate" data-id="${u.id}" data-deactivated="${u.is_deactivated}">
+                    <button class="btn-warn btn-sm" data-action="deactivate" data-id="${u.id}" data-deactivated="${u.is_deactivated}" data-username="${escapeAttr(u.username)}">
                       ${u.is_deactivated ? t('admin:users.reactivate') : t('admin:users.deactivate')}
                     </button>
                     <button class="btn-sm" style="background:var(--accent);color:var(--bg-deep);" data-action="resetpw" data-id="${u.id}" data-username="${escapeAttr(u.username)}">${t('admin:users.resetPw')}</button>
-                    <button class="btn-sm" style="background:var(--warning);color:var(--bg-deep);" data-action="revoke-sessions" data-id="${u.id}">${t('admin:users.revokeSessions')}</button>
+                    <button class="btn-sm" style="background:var(--warning);color:var(--bg-deep);" data-action="revoke-sessions" data-id="${u.id}" data-username="${escapeAttr(u.username)}">${t('admin:users.revokeSessions')}</button>
                     ${u.totp_enabled ? `<button class="btn-sm" style="background:var(--info, var(--accent));color:var(--bg-deep);" data-action="reset-totp" data-id="${u.id}" data-username="${escapeAttr(u.username)}">${t('admin:users.resetTotp')}</button>` : ''}
                     <button class="btn-danger btn-sm" data-action="delete" data-id="${u.id}" data-username="${escapeAttr(u.username)}">${t('admin:users.delete')}</button>
                   `
@@ -202,14 +202,34 @@ export class UsersTab {
 
     if (!action || !id) return;
 
+    const username = target.dataset.username || '';
     if (action === 'deactivate') {
       const isDeactivated =
         target.dataset.deactivated === '1' || target.dataset.deactivated === 'true';
+      // Deactivating logs the user out and locks the account: confirm first. Reactivating
+      // restores access and needs no confirmation.
+      if (
+        !isDeactivated &&
+        !(await confirmModal({
+          title: t('admin:users.confirm.deactivateTitle'),
+          message: t('admin:users.confirm.deactivateMessage', { username }),
+          confirmLabel: t('admin:users.deactivate'),
+          danger: true,
+        }))
+      ) {
+        return;
+      }
       await this.doDeactivate(parseInt(id), !isDeactivated);
     } else if (action === 'resetpw') {
-      this.showResetPasswordModal(parseInt(id), target.dataset.username || '');
+      this.showResetPasswordModal(parseInt(id), username);
     } else if (action === 'revoke-sessions') {
-      await this.doRevokeSessions(parseInt(id));
+      const confirmed = await confirmModal({
+        title: t('admin:users.confirm.revokeTitle'),
+        message: t('admin:users.confirm.revokeMessage', { username }),
+        confirmLabel: t('admin:users.revokeSessions'),
+        danger: true,
+      });
+      if (confirmed) await this.doRevokeSessions(parseInt(id));
     } else if (action === 'reset-totp') {
       this.showResetTotpModal(parseInt(id), target.dataset.username || '');
     } else if (action === 'delete') {
@@ -220,9 +240,26 @@ export class UsersTab {
   private handleChange = async (e: Event) => {
     const target = e.target as HTMLSelectElement;
     if (target.dataset.action === 'role' && target.dataset.id) {
-      await this.doRoleChange(parseInt(target.dataset.id), target.value as UserRole);
+      const previous = target.dataset.current as UserRole | undefined;
+      const role = target.value as UserRole;
+      // A role change used to apply on the first click of the dropdown, with no way back.
+      const confirmed = await confirmModal({
+        title: t('admin:users.confirm.roleTitle'),
+        message: t('admin:users.confirm.roleMessage', {
+          username: target.dataset.username ?? '',
+          role: t(`admin:users.roles.${role}`, { defaultValue: role }),
+        }),
+        confirmLabel: t('common:actions.confirm'),
+      });
+      const changed = confirmed && (await this.doRoleChange(parseInt(target.dataset.id), role));
+      // Cancelled or refused: the select must show the role the user still has.
+      if (!changed && previous) target.value = previous;
     }
   };
+
+  private roleLabel(role: string): string {
+    return escapeHtml(t(`admin:users.roles.${role}`, { defaultValue: role }));
+  }
 
   private showDeleteModal(userId: number, username: string): void {
     const { overlay, content, close } = createModal({
@@ -532,14 +569,20 @@ export class UsersTab {
     renderModal();
   }
 
-  private async doRoleChange(userId: number, role: UserRole): Promise<void> {
+  private async doRoleChange(userId: number, role: UserRole): Promise<boolean> {
     try {
       await ApiClient.put(`/admin/users/${userId}/role`, { role });
-      this.notifications.success(t('admin:users.roleChangeSuccess', { role }));
-      await this.loadUsers();
     } catch (err: unknown) {
       this.notifications.error(getErrorMessage(err));
+      return false;
     }
+    this.notifications.success(
+      t('admin:users.roleChangeSuccess', {
+        role: t(`admin:users.roles.${role}`, { defaultValue: role }),
+      }),
+    );
+    await this.loadUsers();
+    return true;
   }
 
   private async doDeactivate(userId: number, deactivated: boolean): Promise<void> {

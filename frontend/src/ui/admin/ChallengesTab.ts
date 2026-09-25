@@ -1,8 +1,23 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
-import { MapChallengeSummary, CustomMapSummary, getErrorMessage } from '@blast-arena/shared';
+import {
+  MapChallengeSummary,
+  CustomMapSummary,
+  getErrorMessage,
+  gameModeName,
+} from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
+import { confirmModal } from '../../utils/modal';
 import { t } from '../../i18n';
+
+const CHALLENGE_MODES = [
+  'ffa',
+  'teams',
+  'battle_royale',
+  'sudden_death',
+  'deathmatch',
+  'king_of_the_hill',
+];
 
 export class ChallengesTab {
   private container: HTMLElement;
@@ -10,7 +25,12 @@ export class ChallengesTab {
   private challenges: MapChallengeSummary[] = [];
   private publishedMaps: CustomMapSummary[] = [];
   private showCreateForm = false;
-  private challengesEnabled = true;
+  // null = unknown (the setting failed to load). It used to default to true, showing "enabled"
+  // for a system that may well be switched off.
+  private challengesEnabled: boolean | null = null;
+  // Bumped by destroy(): a load that finishes after a tab switch must not render into the
+  // shared tab content, which by then belongs to the next tab.
+  private renderGen = 0;
 
   constructor(notifications: NotificationUI) {
     this.container = document.createElement('div');
@@ -18,25 +38,35 @@ export class ChallengesTab {
   }
 
   async render(parent: HTMLElement): Promise<void> {
+    const gen = ++this.renderGen;
     this.container = parent;
     await this.loadData();
+    if (gen !== this.renderGen) return;
     this.renderContent();
   }
 
   private async loadData(): Promise<void> {
-    try {
-      const [challengeRes, mapsRes, enabledRes] = await Promise.all([
-        ApiClient.get<{ challenges: MapChallengeSummary[]; total: number }>('/admin/challenges'),
-        ApiClient.get<CustomMapSummary[]>('/maps/published'),
-        ApiClient.get<{ enabled: boolean }>('/admin/settings/challenges_enabled').catch(() => ({
-          enabled: true,
-        })),
-      ]);
-      this.challenges = challengeRes.challenges;
-      this.publishedMaps = mapsRes;
-      this.challengesEnabled = enabledRes.enabled;
-    } catch (err: unknown) {
-      this.notifications.error(getErrorMessage(err));
+    const [challengeRes, mapsRes, enabledRes] = await Promise.allSettled([
+      ApiClient.get<{ challenges: MapChallengeSummary[]; total: number }>('/admin/challenges'),
+      // Answers { maps }, not a bare array — the array cast made Create crash on .map().
+      ApiClient.get<{ maps: CustomMapSummary[] }>('/maps/published'),
+      ApiClient.get<{ enabled: boolean }>('/admin/settings/challenges_enabled'),
+    ]);
+    if (challengeRes.status === 'fulfilled') {
+      this.challenges = challengeRes.value.challenges ?? [];
+    } else {
+      this.notifications.error(getErrorMessage(challengeRes.reason));
+    }
+    if (mapsRes.status === 'fulfilled') {
+      this.publishedMaps = mapsRes.value.maps ?? [];
+    } else {
+      this.notifications.error(getErrorMessage(mapsRes.reason));
+    }
+    if (enabledRes.status === 'fulfilled') {
+      this.challengesEnabled = enabledRes.value.enabled;
+    } else {
+      this.challengesEnabled = null;
+      this.notifications.error(t('admin:challenges.toggleLoadFailed'));
     }
   }
 
@@ -53,14 +83,18 @@ export class ChallengesTab {
         <h3>${t('admin:challenges.globalToggle')}</h3>
       </div>
       <div class="admin-card-body">
-        <div class="setting-row">
+        ${
+          this.challengesEnabled === null
+            ? `<p class="text-danger">${t('admin:challenges.toggleLoadFailed')}</p>`
+            : `<div class="setting-row">
           <span>${t('admin:challenges.enabled')}</span>
           <label class="toggle-switch">
             <input type="checkbox" id="challenges-enabled-toggle" ${this.challengesEnabled ? 'checked' : ''}
               role="switch" aria-checked="${this.challengesEnabled}">
             <span class="toggle-slider"></span>
           </label>
-        </div>
+        </div>`
+        }
       </div>`,
     );
     this.container.appendChild(toggleSection);
@@ -68,12 +102,16 @@ export class ChallengesTab {
     toggleSection
       .querySelector('#challenges-enabled-toggle')
       ?.addEventListener('change', async (e) => {
-        const enabled = (e.target as HTMLInputElement).checked;
+        const toggle = e.target as HTMLInputElement;
+        const enabled = toggle.checked;
+        toggle.setAttribute('aria-checked', String(enabled));
         try {
           await ApiClient.put('/admin/settings/challenges_enabled', { enabled });
           this.challengesEnabled = enabled;
           this.notifications.success(t('admin:challenges.toggleSaved'));
         } catch (err: unknown) {
+          toggle.checked = !enabled;
+          toggle.setAttribute('aria-checked', String(!enabled));
           this.notifications.error(getErrorMessage(err));
         }
       });
@@ -149,6 +187,14 @@ export class ChallengesTab {
           await ApiClient.post(`/admin/challenges/${id}/deactivate`, {});
           this.notifications.success(t('admin:challenges.deactivated'));
         } else if (action === 'delete') {
+          const challenge = this.challenges.find((c) => c.id === id);
+          const confirmed = await confirmModal({
+            title: t('admin:challenges.deleteConfirmTitle'),
+            message: t('admin:challenges.deleteConfirm', { title: challenge?.title ?? `#${id}` }),
+            confirmLabel: t('admin:challenges.deleteBtn'),
+            danger: true,
+          });
+          if (!confirmed) return;
           await ApiClient.delete(`/admin/challenges/${id}`);
           this.notifications.success(t('admin:challenges.deleted'));
         }
@@ -177,18 +223,15 @@ export class ChallengesTab {
         <div class="form-group">
           <label for="ch-map">${t('admin:challenges.map')}</label>
           <select class="select" id="ch-map" required>
-            ${this.publishedMaps.map((m) => `<option value="${m.id}">${escapeHtml(m.name)} (${escapeHtml(m.creatorUsername ?? 'Unknown')})</option>`).join('')}
+            ${this.publishedMaps.map((m) => `<option value="${m.id}">${escapeHtml(m.name)} (${escapeHtml(m.creatorUsername ?? t('admin:challenges.unknownCreator'))})</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
           <label for="ch-mode">${t('admin:challenges.gameMode')}</label>
           <select class="select" id="ch-mode">
-            <option value="ffa">FFA</option>
-            <option value="teams">Teams</option>
-            <option value="battle_royale">Battle Royale</option>
-            <option value="sudden_death">Sudden Death</option>
-            <option value="deathmatch">Deathmatch</option>
-            <option value="king_of_the_hill">King of the Hill</option>
+            ${CHALLENGE_MODES.map(
+              (mode) => `<option value="${mode}">${escapeHtml(t(gameModeName(mode)))}</option>`,
+            ).join('')}
           </select>
         </div>
         <div class="form-group">
@@ -227,8 +270,8 @@ export class ChallengesTab {
               <td>${c.startDate} — ${c.endDate}</td>
               <td>${
                 c.isActive
-                  ? '<span style="color:var(--success);">Active</span>'
-                  : '<span style="color:var(--text-muted);">Inactive</span>'
+                  ? `<span style="color:var(--success);">${t('admin:challenges.statusActive')}</span>`
+                  : `<span style="color:var(--text-muted);">${t('admin:challenges.statusInactive')}</span>`
               }</td>
               <td style="display:flex; gap:0.25rem;">
                 ${
@@ -246,6 +289,7 @@ export class ChallengesTab {
   }
 
   destroy(): void {
+    this.renderGen++;
     setHtml(this.container, '');
   }
 }

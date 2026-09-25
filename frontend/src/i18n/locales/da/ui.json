@@ -32,7 +32,9 @@
     "joined": "Tilsluttet rum: {{name}}",
     "joinFailed": "Kunne ikke tilslutte rum",
     "loadFailed": "Kunne ikke indlæse rum: {{error}}",
-    "kicked": "Du er blevet smidt ud"
+    "kicked": "Du er blevet smidt ud",
+    "statusWaiting": "Venter",
+    "statusPlaying": "I gang"
   },
   "maps": {
     "title": "Mine kort",
@@ -306,7 +308,7 @@
     "noParty": "Du er ikke i en gruppe.",
     "noPartyTitle": "Ingen aktiv gruppe",
     "noPartyDescription": "Opret en gruppe for at slå dig sammen med venner før I tilslutter et rum.",
-    "noPartyTip": "Tip: Invitér venner fra Venner-siden efter oprettelse af en gruppe.",
+    "noPartyTip": "Tip: Når du har oprettet en gruppe, inviterer du venner med »+ Invitér ven« på denne side.",
     "chatHeader": "Gruppechat",
     "chatPlaceholder": "Skriv en besked...",
     "chatDisabled": "Chat er i øjeblikket deaktiveret",
@@ -326,7 +328,7 @@
     "disbanded": "Gruppe opløst",
     "created": "Gruppe oprettet",
     "createFailed": "Kunne ikke oprette gruppe",
-    "useFriendsPanel": "Brug Venner-panelet til at invitere spillere",
+    "usePartyPage": "Invitér venner fra Gruppe-siden",
     "invitedToParty": "<strong>{{username}}</strong> inviterede dig til deres gruppe",
     "invitedToRoom": "<strong>{{username}}</strong> inviterede dig til et rum",
     "accept": "Acceptér",
@@ -387,7 +389,8 @@
     "date": "Date",
     "win": "WIN",
     "prev": "Prev",
-    "next": "Next"
+    "next": "Next",
+    "modeSummary": "{{winRate}} % sejre · {{kd}} K/D"
   },
   "createRoom": {
     "title": "Opret rum",
@@ -433,8 +436,8 @@
     "powerUps": "Power-ups",
     "botCount": "Antal bots",
     "none": "Ingen",
-    "nBots": "{{count}} bot",
-    "nBots_plural": "{{count}} bots",
+    "nBots_one": "{{count}} bot",
+    "nBots_other": "{{count}} bots",
     "newMap": "+ Nyt kort",
     "randomGenerated": "Tilfældigt (genereret)",
     "communityMaps": "Fællesskabskort",
@@ -444,14 +447,14 @@
     "mapSpawnHint": "Dette kort har {{count}} startpunkter ({{count}} spillere maks)",
     "mapDimensions": "{{width}}x{{height}} kort",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} startpunkter)",
+    "mapBy": "af {{username}}",
     "loadingPreview": "Indlæser forhåndsvisning...",
     "recordGame": "Optag spil",
     "mapSizes": {
       "21": "21×21 (Lille)",
       "31": "31×31 (Normal)",
       "39": "39×39 (Stor)",
-      "51": "51×51 (Kæmpe)",
-      "61": "61×61 (Massiv)"
+      "51": "51×51 (Kæmpe)"
     },
     "wallDensities": {
       "low30": "Lav (30%)",
@@ -548,6 +551,7 @@
     "back": "← Tilbage",
     "inviteFriend": "Invitér ven",
     "inviteInfo": "Brug Venner-panelet (lobby) til at invitere venner til dette rum",
+    "noFriendsToInvite": "Ingen venner online at invitere",
     "roomCode": "Rumkode:",
     "playersCount": "Spillere ({{current}}/{{max}})",
     "needPlayers": "Brug for spillere eller bots",

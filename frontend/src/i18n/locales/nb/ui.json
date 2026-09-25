@@ -32,7 +32,9 @@
     "joined": "Ble med i rom: {{name}}",
     "joinFailed": "Kunne ikke bli med i rommet",
     "loadFailed": "Kunne ikke laste rom: {{error}}",
-    "kicked": "Du har blitt sparket ut"
+    "kicked": "Du har blitt sparket ut",
+    "statusWaiting": "Venter",
+    "statusPlaying": "Pågår"
   },
   "maps": {
     "title": "Mine kart",
@@ -306,7 +308,7 @@
     "noParty": "Du er ikke i en gruppe.",
     "noPartyTitle": "Ingen aktiv gruppe",
     "noPartyDescription": "Opprett en gruppe for å slå deg sammen med venner før du blir med i et rom.",
-    "noPartyTip": "Tips: Inviter venner fra Venner-siden etter at du har opprettet en gruppe.",
+    "noPartyTip": "Tips: Når du har opprettet en gruppe, inviterer du venner med «+ Inviter venn» på denne siden.",
     "chatHeader": "Gruppechat",
     "chatPlaceholder": "Skriv en melding...",
     "chatDisabled": "Chat er for tiden deaktivert",
@@ -326,7 +328,7 @@
     "disbanded": "Gruppe oppløst",
     "created": "Gruppe opprettet",
     "createFailed": "Kunne ikke opprette gruppe",
-    "useFriendsPanel": "Bruk Venner-panelet for å invitere spillere",
+    "usePartyPage": "Inviter venner fra Gruppe-siden",
     "invitedToParty": "<strong>{{username}}</strong> inviterte deg til gruppen sin",
     "invitedToRoom": "<strong>{{username}}</strong> inviterte deg til et rom",
     "accept": "Godta",
@@ -387,7 +389,8 @@
     "date": "Date",
     "win": "WIN",
     "prev": "Prev",
-    "next": "Next"
+    "next": "Next",
+    "modeSummary": "{{winRate}} % seiere · {{kd}} K/D"
   },
   "createRoom": {
     "title": "Opprett rom",
@@ -433,8 +436,8 @@
     "powerUps": "Oppgraderinger",
     "botCount": "Antall roboter",
     "none": "Ingen",
-    "nBots": "{{count}} robot",
-    "nBots_plural": "{{count}} roboter",
+    "nBots_one": "{{count}} robot",
+    "nBots_other": "{{count}} roboter",
     "newMap": "+ Nytt kart",
     "randomGenerated": "Tilfeldig (generert)",
     "communityMaps": "Fellesskapskart",
@@ -444,14 +447,14 @@
     "mapSpawnHint": "Dette kartet har {{count}} startpunkter (maks {{count}} spillere)",
     "mapDimensions": "{{width}}x{{height}} kart",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} startpunkter)",
+    "mapBy": "av {{username}}",
     "loadingPreview": "Laster forhåndsvisning...",
     "recordGame": "Ta opp spill",
     "mapSizes": {
       "21": "21×21 (Liten)",
       "31": "31×31 (Normal)",
       "39": "39×39 (Stor)",
-      "51": "51×51 (Enorm)",
-      "61": "61×61 (Massiv)"
+      "51": "51×51 (Enorm)"
     },
     "wallDensities": {
       "low30": "Lav (30%)",
@@ -548,6 +551,7 @@
     "back": "← Tilbake",
     "inviteFriend": "Inviter venn",
     "inviteInfo": "Bruk Venner-panelet (lobbyen) for å invitere venner til dette rommet",
+    "noFriendsToInvite": "Ingen venner pålogget å invitere",
     "roomCode": "Romkode:",
     "playersCount": "Spillere ({{current}}/{{max}})",
     "needPlayers": "Trenger spillere eller roboter",

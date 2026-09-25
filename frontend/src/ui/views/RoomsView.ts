@@ -1,6 +1,6 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
-import { RoomListItem, Room, getErrorMessage } from '@blast-arena/shared';
+import { RoomListItem, Room, getErrorMessage, gameModeName } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
@@ -22,6 +22,8 @@ export class RoomsView implements ILobbyView {
   private container: HTMLElement | null = null;
   private onJoinRoom: (room: Room) => void;
   private cachedRooms: RoomListItem[] | null = null;
+  // A double click sent two room:join requests; the second answer could open a second room UI.
+  private joining = false;
 
   constructor(deps: ViewDeps, onJoinRoom: (room: Room) => void) {
     this.deps = deps;
@@ -113,11 +115,11 @@ export class RoomsView implements ILobbyView {
         <h3>${escapeHtml(room.name)}</h3>
         <div class="room-info">
           <span>${t('ui:rooms.players', { current: room.playerCount, max: room.maxPlayers })}</span>
-          <span class="room-mode">${room.gameMode.replace('_', ' ').toUpperCase()}</span>
+          <span class="room-mode">${escapeHtml(t(gameModeName(room.gameMode), { defaultValue: room.gameMode }))}</span>
         </div>
         <div class="room-info" style="margin-top:6px;">
           <span>${t('ui:rooms.host', { name: escapeHtml(room.host) })}</span>
-          <span style="color:${room.status === 'playing' ? 'var(--warning)' : 'var(--success)'};">${room.status}</span>
+          <span style="color:${room.status === 'playing' ? 'var(--warning)' : 'var(--success)'};">${room.status === 'playing' ? t('ui:rooms.statusPlaying') : t('ui:rooms.statusWaiting')}</span>
         </div>
       </div>
     `,
@@ -127,10 +129,13 @@ export class RoomsView implements ILobbyView {
   }
 
   private async joinRoom(code: string): Promise<void> {
+    if (this.joining) return;
+    this.joining = true;
     this.deps.socketClient.emit(
       'room:join',
       { code },
       (response: { success: boolean; room?: Room; error?: string }) => {
+        this.joining = false;
         if (response.success && response.room) {
           this.deps.notifications.success(t('ui:rooms.joined', { name: response.room.name }));
           this.onJoinRoom(response.room);

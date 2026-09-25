@@ -44,8 +44,11 @@ class ThemeManager {
     try {
       const resp = await ApiClient.get<{ theme: string }>('/admin/settings/default_theme');
       if (resp.theme && this.isValidTheme(resp.theme)) {
+        const changed = resp.theme !== this.currentTheme;
         this.currentTheme = resp.theme as ThemeId;
         this.applyTheme(this.currentTheme);
+        // Listeners (canvas colours, the settings picker) otherwise kept the built-in default.
+        if (changed) this.notifyListeners();
         return;
       }
     } catch {

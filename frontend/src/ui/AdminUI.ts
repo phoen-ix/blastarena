@@ -261,7 +261,7 @@ export class AdminUI {
 
     this.contentEl = this.container.querySelector('#admin-tab-content');
     await this.renderActiveTab();
-    this.pushGamepadContext();
+    // No context of its own when embedded: the lobby's covers .main-body, sidebar and Back.
   }
 
   destroy(): void {
@@ -271,6 +271,9 @@ export class AdminUI {
   }
 
   private pushGamepadContext(): void {
+    // Embedded, a context of its own (pushed again on every tab switch) sat on top of the lobby's
+    // with no sidebar and a Back that did nothing — the pad user was stuck in the admin panel.
+    if (this.isEmbedded) return;
     const gpNav = UIGamepadNavigator.getInstance();
     gpNav.popContext('admin');
 

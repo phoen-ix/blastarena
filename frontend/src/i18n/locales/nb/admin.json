@@ -93,6 +93,14 @@
     "deleteSuccess": "Bruker slettet permanent",
     "revokeSessions": "Opphev økter",
     "revokeSessionsSuccess": "Brukerøkter opphevet",
+    "confirm": {
+      "roleTitle": "Endre rolle",
+      "roleMessage": "Endre rollen til {{username}} til {{role}}?",
+      "deactivateTitle": "Deaktiver bruker",
+      "deactivateMessage": "Deaktivere {{username}}? Brukeren logges ut og kan ikke logge inn før kontoen aktiveres igjen.",
+      "revokeTitle": "Opphev økter",
+      "revokeMessage": "Oppheve alle økter for {{username}}? Brukeren logges ut på alle enheter."
+    },
     "cleanup": {
       "button": "Account Cleanup",
       "title": "Account Cleanup",
@@ -175,6 +183,14 @@
     "replayEmptyOrCorrupted": "Reprisedata er tom eller korrupt",
     "failedToLoadReplay": "Kunne ikke laste reprise",
     "statusAbandoned": "forlatt",
+    "statusLive": "pågår",
+    "statuses": {
+      "waiting": "venter",
+      "countdown": "nedtelling",
+      "playing": "pågår",
+      "finished": "ferdig",
+      "aborted": "avbrutt"
+    },
     "durationSeconds": "{{duration}}s"
   },
   "logs": {
@@ -289,6 +305,7 @@
     "cancelBtn": "Avbryt",
     "sendBtn": "Send",
     "messageSent": "Melding sendt",
+    "messageFailed": "Kunne ikke sende meldingen",
     "kickPlayerTitle": "Spark spiller fra rom {{code}}",
     "playerUserIdLabel": "Spiller bruker-ID",
     "enterUserIdPlaceholder": "Skriv inn bruker-ID",
@@ -600,7 +617,23 @@
     "revokeAllSuccess": "Alle økter opphevet",
     "spectatorActionsDesc": "La utslåtte spillere bruke energi på vegger, meteorer, power-ups og fartssoner (rom kan fortsatt slå det av per kamp)",
     "spectatorActionsToggled": "Tilskuer-spilleder {{status}}",
-    "spectatorActionsGlobal": "Tilskuer-spilleder (globalt)"
+    "spectatorActionsGlobal": "Tilskuer-spilleder (globalt)",
+    "openWorld": {
+      "title": "Åpen verden",
+      "enabled": "Aktivert",
+      "guestAccess": "Gjestetilgang",
+      "maxPlayers": "Maks spillere",
+      "roundTime": "Rundetid (s)",
+      "mapWidth": "Kartbredde",
+      "mapHeight": "Karthøyde",
+      "wallDensity": "Veggtetthet",
+      "respawnDelay": "Gjenopplivingsforsinkelse (s)",
+      "afkTimeout": "AFK-tidsavbrudd (s)",
+      "afkTimeoutHint": "0 = deaktivert",
+      "save": "Lagre innstillinger for åpen verden",
+      "saved": "Innstillinger for åpen verden lagret",
+      "saveFailed": "Kunne ikke lagre innstillinger for åpen verden"
+    }
   },
   "seasons": {
     "sectionTitle": "Sesongadministrasjon",
@@ -656,6 +689,12 @@
       "seasonEnded": "Sesong avsluttet ({{resetMode}} tilbakestilling)",
       "seasonDeleted": "Sesong slettet",
       "rankConfigSaved": "Rangkonfigurasjon lagret"
+    },
+    "confirm": {
+      "activateTitle": "Aktiver sesong",
+      "activateMessage": "Aktivere «{{name}}»? Alle andre aktive sesonger deaktiveres.",
+      "deleteTitle": "Slett sesong",
+      "deleteMessage": "Slette «{{name}}»? Dette kan ikke angres."
     }
   },
   "campaign": {
@@ -883,6 +922,8 @@
       "watchBtn": "Se",
       "deleteBtn": "Slett",
       "replayDeleted": "Kampanjereprise slettet",
+      "deleteConfirmTitle": "Slett reprise",
+      "deleteConfirm": "Slette denne reprisen? Dette kan ikke angres.",
       "loadingReplay": "Laster kampanjereprise...",
       "replayEmptyOrCorrupted": "Reprisedata er tom eller korrupt",
       "loadFailed": "Kunne ikke laste kampanjereprise",
@@ -1041,6 +1082,7 @@
     "globalToggle": "Utfordringssystem",
     "enabled": "Utfordringer aktivert",
     "toggleSaved": "Utfordringsinnstilling lagret",
+    "toggleLoadFailed": "Kunne ikke laste inn innstillingen for utfordringer",
     "title": "Kartutfordringer",
     "titleLabel": "Tittel",
     "description": "Beskrivelse",
@@ -1060,6 +1102,11 @@
     "activate": "Aktiver",
     "deactivate": "Deaktiver",
     "deleteBtn": "Slett",
-    "none": "Ingen utfordringer ennå"
+    "none": "Ingen utfordringer ennå",
+    "statusActive": "Aktiv",
+    "statusInactive": "Inaktiv",
+    "unknownCreator": "Ukjent",
+    "deleteConfirmTitle": "Slett utfordring",
+    "deleteConfirm": "Slette utfordringen «{{title}}»? Dette kan ikke angres."
   }
 }

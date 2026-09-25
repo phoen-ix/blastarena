@@ -89,6 +89,9 @@ export class HelpUI {
   private displayGithub = false;
   private displayImprint = false;
   private isEmbedded = false;
+  // Embedded, `container` is the lobby's shared .main-body; a render still awaiting its settings
+  // after destroy() wrote the help page over whatever view came next.
+  private destroyed = false;
   private onLanguageChanged = () => this.render();
 
   constructor(authManager: AuthManager, onClose: () => void, initialTab?: string) {
@@ -723,8 +726,10 @@ export class HelpUI {
 
   async renderEmbedded(container: HTMLElement): Promise<void> {
     this.isEmbedded = true;
+    this.destroyed = false;
     this.container = container;
     await this.loadFooterSettings();
+    if (this.destroyed) return;
 
     const rightLinks: string[] = [];
     if (this.displayGithub) {
@@ -770,7 +775,7 @@ export class HelpUI {
 
     this.contentEl = this.container.querySelector('#help-tab-content');
     await this.renderActiveTab();
-    this.pushGamepadContext();
+    // No context of its own when embedded: the lobby's covers .main-body, sidebar and Back.
   }
 
   private async loadFooterSettings(): Promise<void> {
@@ -813,10 +818,14 @@ export class HelpUI {
   }
 
   destroy(): void {
+    this.destroyed = true;
     UIGamepadNavigator.getInstance().popContext('help-ui');
   }
 
   private pushGamepadContext(): void {
+    // Embedded, a context of its own (pushed again on every tab switch) sat on top of the lobby's
+    // with no sidebar and a Back that did nothing — the pad user was stuck in Help.
+    if (this.isEmbedded) return;
     UIGamepadNavigator.getInstance().popContext('help-ui');
     UIGamepadNavigator.getInstance().pushContext({
       id: 'help-ui',

@@ -3,7 +3,6 @@ import { NotificationUI } from '../NotificationUI';
 import { BotAIEntry, EnemyAIEntry, getErrorMessage } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
-import { API_URL } from '../../config';
 import { t } from '../../i18n';
 
 export class AITab {
@@ -162,10 +161,10 @@ export class AITab {
       btn.addEventListener('click', async () => {
         const id = (btn as HTMLElement).dataset.id!;
         try {
-          const response = await fetch(`${API_URL}/admin/ai/${id}/download`, {
-            credentials: 'include',
+          // ApiClient.download sends the Bearer token; the bare fetch had none and always got 401.
+          const response = await ApiClient.download(`/admin/ai/${id}/download`).catch(() => {
+            throw new Error(t('admin:ai.downloadFailed'));
           });
-          if (!response.ok) throw new Error(t('admin:ai.downloadFailed'));
           const blob = await response.blob();
           const disposition = response.headers.get('Content-Disposition');
           const filenameMatch = disposition?.match(/filename="(.+)"/);
@@ -258,10 +257,9 @@ export class AITab {
       btn.addEventListener('click', async () => {
         const id = (btn as HTMLElement).dataset.id!;
         try {
-          const response = await fetch(`${API_URL}/admin/enemy-ai/${id}/download`, {
-            credentials: 'include',
+          const response = await ApiClient.download(`/admin/enemy-ai/${id}/download`).catch(() => {
+            throw new Error(t('admin:ai.downloadFailed'));
           });
-          if (!response.ok) throw new Error(t('admin:ai.downloadFailed'));
           const blob = await response.blob();
           const disposition = response.headers.get('Content-Disposition');
           const filenameMatch = disposition?.match(/filename="(.+)"/);

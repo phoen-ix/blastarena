@@ -3,7 +3,7 @@ import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
 import { getErrorMessage } from '@blast-arena/shared';
 import { t } from '../i18n';
-import { setHtml } from '../utils/html';
+import { escapeHtml, setHtml } from '../utils/html';
 
 export class VerificationUI {
   private overlay: HTMLElement;
@@ -118,7 +118,7 @@ export class VerificationUI {
         this.resendCount = this.maxResends;
         btn.textContent = t('auth:verification.resendLimitReached');
       } else {
-        setHtml(statusEl, `<span class="text-danger">${msg}</span>`);
+        setHtml(statusEl, `<span class="text-danger">${escapeHtml(msg)}</span>`);
         btn.disabled = false;
       }
     }

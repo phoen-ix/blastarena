@@ -74,6 +74,9 @@ export class CampaignUI {
   private selectedLevelId: number | null = null;
   private worlds: CampaignWorld[] = [];
   private embedded = false;
+  // Embedded, `container` is the lobby's shared .main-body. A load that finished after destroy()
+  // appended the campaign under whatever view came next (and pushed a stale gamepad context).
+  private destroyed = false;
 
   constructor(
     socketClient: SocketClient,
@@ -118,13 +121,16 @@ export class CampaignUI {
 
   async renderEmbedded(container: HTMLElement): Promise<void> {
     this.embedded = true;
+    this.destroyed = false;
     this.container = container;
     await this.loadCampaignData();
+    if (this.destroyed) return;
     this.renderContent();
     this.pushGamepadContext();
   }
 
   destroy(): void {
+    this.destroyed = true;
     UIGamepadNavigator.getInstance().popContext('campaign');
     setHtml(this.container, '');
     this.embedded = false;
@@ -280,6 +286,12 @@ export class CampaignUI {
       gap: 10px;
     `;
     worldHeader.dataset.worldId = String(world.id);
+    // A plain div was out of the keyboard's and the lobby gamepad context's reach.
+    worldHeader.className = 'campaign-world-header';
+    worldHeader.tabIndex = 0;
+    worldHeader.setAttribute('role', 'button');
+    worldHeader.setAttribute('aria-expanded', String(isExpanded));
+    this.activateOnKey(worldHeader);
     worldHeader.addEventListener('mouseenter', () => {
       card.style.borderColor = 'var(--primary)';
     });
@@ -316,7 +328,7 @@ export class CampaignUI {
       letter-spacing: 0.5px;
       text-transform: uppercase;
       color: var(--accent);
-      background: rgba(0,212,170,0.1);
+      background: var(--accent-dim);
       padding: 3px 8px;
       border-radius: 4px;
     `;
@@ -411,6 +423,7 @@ export class CampaignUI {
         this.expandedWorldId = null;
         levelContainer.style.display = 'none';
         chevron.style.transform = 'rotate(0deg)';
+        worldHeader.setAttribute('aria-expanded', 'false');
       } else {
         // Collapse previously expanded
         const prevExpanded = this.container.querySelector('[data-expanded="true"]');
@@ -421,8 +434,12 @@ export class CampaignUI {
             'span[style*="transform"]',
           ) as HTMLElement | null;
           if (prevChevron) prevChevron.style.transform = 'rotate(0deg)';
+          prevExpanded.parentElement
+            ?.querySelector('.campaign-world-header')
+            ?.setAttribute('aria-expanded', 'false');
         }
         this.expandedWorldId = world.id;
+        worldHeader.setAttribute('aria-expanded', 'true');
         levelContainer.style.display = 'flex';
         levelContainer.setAttribute('data-expanded', 'true');
         chevron.style.transform = 'rotate(180deg)';
@@ -450,7 +467,16 @@ export class CampaignUI {
     `;
 
     card.dataset.levelId = String(level.id);
-    if (level.locked) card.dataset.locked = 'true';
+    card.className = 'campaign-level-card';
+    if (level.locked) {
+      card.dataset.locked = 'true';
+      card.setAttribute('aria-disabled', 'true');
+    } else {
+      card.tabIndex = 0;
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-pressed', String(isSelected));
+      this.activateOnKey(card);
+    }
 
     if (!level.locked) {
       card.addEventListener('mouseenter', () => {
@@ -675,6 +701,7 @@ export class CampaignUI {
     // Click to select (if not locked)
     if (!level.locked) {
       card.addEventListener('click', () => {
+        const hadFocus = document.activeElement === card;
         if (this.selectedLevelId === level.id) {
           this.selectedLevelId = null;
         } else {
@@ -685,10 +712,25 @@ export class CampaignUI {
         } else {
           this.render();
         }
+        // The re-render replaced the card; keep keyboard focus on it.
+        if (hadFocus) {
+          this.container
+            .querySelector<HTMLElement>(`.campaign-level-card[data-level-id="${level.id}"]`)
+            ?.focus();
+        }
       });
     }
 
     return card;
+  }
+
+  /** Enter/Space on a focused card acts like a click (buttons inside handle their own keys). */
+  private activateOnKey(el: HTMLElement): void {
+    el.addEventListener('keydown', (e) => {
+      if (e.target !== el || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault();
+      el.click();
+    });
   }
 
   private createStatBadge(value: string, label: string, color: string): HTMLElement {

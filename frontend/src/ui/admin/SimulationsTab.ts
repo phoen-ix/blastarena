@@ -14,6 +14,7 @@ import {
   GameMode,
   LogVerbosity,
   BotAIEntry,
+  gameModeName,
 } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
@@ -44,8 +45,9 @@ export class SimulationsTab {
   }
 
   async render(parent: HTMLElement): Promise<void> {
-    this.container = document.createElement('div');
-    parent.appendChild(this.container);
+    const container = document.createElement('div');
+    this.container = container;
+    parent.appendChild(container);
 
     // Listen for simulation socket events
     this.socketClient.on('sim:progress', this.handleProgress);
@@ -54,6 +56,9 @@ export class SimulationsTab {
     this.socketClient.on('sim:queueUpdate', this.handleQueueUpdate);
 
     await this.loadBatchList();
+    // destroy() ran during the load (a quick tab switch): starting the poll now would leak it.
+    if (this.container !== container) return;
+    if (this.refreshInterval) clearInterval(this.refreshInterval);
     this.refreshInterval = setInterval(() => {
       if (this.viewMode === 'list') this.loadBatchList();
     }, 5000);
@@ -178,7 +183,9 @@ export class SimulationsTab {
             : b.status === 'cancelled'
               ? 'text-warning'
               : 'text-danger';
-    const modeLabel = GAME_MODES[b.config.gameMode]?.name || b.config.gameMode;
+    const modeLabel = t(gameModeName(b.config.gameMode), {
+      defaultValue: GAME_MODES[b.config.gameMode]?.name || b.config.gameMode,
+    });
 
     return `
       <tr>
@@ -396,7 +403,9 @@ export class SimulationsTab {
 
     const pct =
       status.totalGames > 0 ? Math.round((status.gamesCompleted / status.totalGames) * 100) : 0;
-    const modeLabel = GAME_MODES[status.config.gameMode]?.name || status.config.gameMode;
+    const modeLabel = t(gameModeName(status.config.gameMode), {
+      defaultValue: GAME_MODES[status.config.gameMode]?.name || status.config.gameMode,
+    });
 
     // Build win distribution
     const winCounts: Record<string, number> = {};

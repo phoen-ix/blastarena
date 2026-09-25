@@ -93,6 +93,14 @@
     "deleteSuccess": "Gebruiker permanent verwijderd",
     "revokeSessions": "Sessies intrekken",
     "revokeSessionsSuccess": "Gebruikerssessies ingetrokken",
+    "confirm": {
+      "roleTitle": "Rol wijzigen",
+      "roleMessage": "De rol van {{username}} wijzigen in {{role}}?",
+      "deactivateTitle": "Gebruiker deactiveren",
+      "deactivateMessage": "{{username}} deactiveren? De gebruiker wordt uitgelogd en kan pas weer inloggen na heractivering.",
+      "revokeTitle": "Sessies intrekken",
+      "revokeMessage": "Alle sessies van {{username}} intrekken? De gebruiker wordt op alle apparaten uitgelogd."
+    },
     "cleanup": {
       "button": "Account Cleanup",
       "title": "Account Cleanup",
@@ -175,6 +183,14 @@
     "replayEmptyOrCorrupted": "Replaygegevens zijn leeg of beschadigd",
     "failedToLoadReplay": "Replay laden mislukt",
     "statusAbandoned": "verlaten",
+    "statusLive": "bezig",
+    "statuses": {
+      "waiting": "wachten",
+      "countdown": "aftellen",
+      "playing": "bezig",
+      "finished": "afgelopen",
+      "aborted": "afgebroken"
+    },
     "durationSeconds": "{{duration}}s"
   },
   "logs": {
@@ -289,6 +305,7 @@
     "cancelBtn": "Annuleren",
     "sendBtn": "Versturen",
     "messageSent": "Bericht verstuurd",
+    "messageFailed": "Bericht verzenden mislukt",
     "kickPlayerTitle": "Speler verwijderen uit kamer {{code}}",
     "playerUserIdLabel": "Speler-gebruikers-ID",
     "enterUserIdPlaceholder": "Voer gebruikers-ID in",
@@ -600,7 +617,23 @@
     "revokeAllSuccess": "Alle sessies ingetrokken",
     "spectatorActionsDesc": "Laat uitgeschakelde spelers energie besteden aan muren, meteoren, power-ups en snelheidszones (kamers kunnen het per wedstrijd nog uitschakelen)",
     "spectatorActionsToggled": "Toeschouwer-spelleider {{status}}",
-    "spectatorActionsGlobal": "Toeschouwer-spelleider (globaal)"
+    "spectatorActionsGlobal": "Toeschouwer-spelleider (globaal)",
+    "openWorld": {
+      "title": "Open wereld",
+      "enabled": "Ingeschakeld",
+      "guestAccess": "Gasttoegang",
+      "maxPlayers": "Max. spelers",
+      "roundTime": "Rondetijd (s)",
+      "mapWidth": "Kaartbreedte",
+      "mapHeight": "Kaarthoogte",
+      "wallDensity": "Muurdichtheid",
+      "respawnDelay": "Respawnvertraging (s)",
+      "afkTimeout": "AFK-time-out (s)",
+      "afkTimeoutHint": "0 = uitgeschakeld",
+      "save": "Instellingen open wereld opslaan",
+      "saved": "Instellingen open wereld opgeslagen",
+      "saveFailed": "Instellingen open wereld opslaan mislukt"
+    }
   },
   "seasons": {
     "sectionTitle": "Seizoensbeheer",
@@ -656,6 +689,12 @@
       "seasonEnded": "Seizoen beëindigd ({{resetMode}} reset)",
       "seasonDeleted": "Seizoen verwijderd",
       "rankConfigSaved": "Rangconfiguratie opgeslagen"
+    },
+    "confirm": {
+      "activateTitle": "Seizoen activeren",
+      "activateMessage": "\"{{name}}\" activeren? Elk ander actief seizoen wordt gedeactiveerd.",
+      "deleteTitle": "Seizoen verwijderen",
+      "deleteMessage": "\"{{name}}\" verwijderen? Dit kan niet ongedaan worden gemaakt."
     }
   },
   "campaign": {
@@ -883,6 +922,8 @@
       "watchBtn": "Bekijken",
       "deleteBtn": "Verwijderen",
       "replayDeleted": "Campagne-replay verwijderd",
+      "deleteConfirmTitle": "Replay verwijderen",
+      "deleteConfirm": "Deze replay verwijderen? Dit kan niet ongedaan worden gemaakt.",
       "loadingReplay": "Campagne-replay laden...",
       "replayEmptyOrCorrupted": "Replaygegevens zijn leeg of beschadigd",
       "loadFailed": "Campagne-replay laden mislukt",
@@ -1041,6 +1082,7 @@
     "globalToggle": "Uitdagingssysteem",
     "enabled": "Uitdagingen ingeschakeld",
     "toggleSaved": "Uitdagingsinstelling opgeslagen",
+    "toggleLoadFailed": "De uitdagingsinstelling kon niet worden geladen",
     "title": "Kaartuitdagingen",
     "titleLabel": "Titel",
     "description": "Beschrijving",
@@ -1060,6 +1102,11 @@
     "activate": "Activeren",
     "deactivate": "Deactiveren",
     "deleteBtn": "Verwijderen",
-    "none": "Nog geen uitdagingen"
+    "none": "Nog geen uitdagingen",
+    "statusActive": "Actief",
+    "statusInactive": "Inactief",
+    "unknownCreator": "Onbekend",
+    "deleteConfirmTitle": "Uitdaging verwijderen",
+    "deleteConfirm": "De uitdaging \"{{title}}\" verwijderen? Dit kan niet ongedaan worden gemaakt."
   }
 }

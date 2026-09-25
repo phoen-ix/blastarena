@@ -8,12 +8,13 @@ import {
   GameMode,
   BotAIEntry,
   CustomMapSummary,
+  ROOM_MAP_SIZES,
 } from '@blast-arena/shared';
 import { game } from '../../main';
 import { ensureLevelEditorScene } from '../../scenes/levelEditorLoader';
 import { renderMapPreview } from '../../utils/mapPreview';
 import { getCustomMapTiles } from '../../utils/mapPreviewCache';
-import { escapeHtml, setHtml } from '../../utils/html';
+import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
 export class CreateRoomView implements ILobbyView {
@@ -31,6 +32,8 @@ export class CreateRoomView implements ILobbyView {
   private activeAIs: BotAIEntry[] = [];
   private myMaps: CustomMapSummary[] = [];
   private publishedMaps: CustomMapSummary[] = [];
+  // A second click while room:create is in flight created a second room.
+  private submitting = false;
 
   constructor(deps: ViewDeps, onRoomCreated: (room: Room) => void, onCancel: () => void) {
     this.deps = deps;
@@ -135,11 +138,10 @@ export class CreateRoomView implements ILobbyView {
               <div class="form-group">
                 <label>${t('ui:createRoom.mapSize')}</label>
                 <select class="select" id="cr-map-size">
-                  <option value="21">${t('ui:createRoom.mapSizes.21')}</option>
-                  <option value="31" selected>${t('ui:createRoom.mapSizes.31')}</option>
-                  <option value="39">${t('ui:createRoom.mapSizes.39')}</option>
-                  <option value="51">${t('ui:createRoom.mapSizes.51')}</option>
-                  <option value="61">${t('ui:createRoom.mapSizes.61')}</option>
+                  ${ROOM_MAP_SIZES.map(
+                    (size) =>
+                      `<option value="${size}" ${size === 31 ? 'selected' : ''}>${t(`ui:createRoom.mapSizes.${size}`)}</option>`,
+                  ).join('')}
                 </select>
               </div>
               <div class="form-group">
@@ -194,7 +196,7 @@ export class CreateRoomView implements ILobbyView {
               <div class="form-group">
                 <label>${t('ui:createRoom.botAI')}</label>
                 <select class="select" id="cr-bot-ai" disabled>
-                  ${this.activeAIs.map((ai) => `<option value="${ai.id}"${ai.isBuiltin ? ' selected' : ''}>${ai.name}</option>`).join('')}
+                  ${this.activeAIs.map((ai) => `<option value="${escapeAttr(ai.id)}"${ai.isBuiltin ? ' selected' : ''}>${escapeHtml(ai.name)}</option>`).join('')}
                 </select>
               </div>
               `
@@ -333,7 +335,10 @@ export class CreateRoomView implements ILobbyView {
     setSelect('#cr-mode', d.gameMode);
     setSelect('#cr-max-players', d.maxPlayers);
     setSelect('#cr-round-time', d.roundTime);
-    setSelect('#cr-map-size', d.mapWidth);
+    // A default saved before the 61x61 option was dropped would leave the select empty (NaN size).
+    if (d.mapWidth !== undefined && (ROOM_MAP_SIZES as readonly number[]).includes(d.mapWidth)) {
+      setSelect('#cr-map-size', d.mapWidth);
+    }
     setSelect('#cr-wall-density', d.wallDensity);
     setSelect('#cr-powerup-rate', d.powerUpDropRate);
     setSelect('#cr-bots', d.botCount);
@@ -508,7 +513,7 @@ export class CreateRoomView implements ILobbyView {
   }
 
   private submitRoom(): void {
-    if (!this.container) return;
+    if (!this.container || this.submitting) return;
 
     const name = (this.container.querySelector('#cr-name') as HTMLInputElement).value.trim();
     const gameMode = (this.container.querySelector('#cr-mode') as HTMLSelectElement)
@@ -586,6 +591,9 @@ export class CreateRoomView implements ILobbyView {
       ? ((this.container.querySelector('#cr-record-game') as HTMLInputElement)?.checked ?? true)
       : false;
 
+    this.submitting = true;
+    const submitBtn = this.container.querySelector<HTMLButtonElement>('#cr-submit');
+    if (submitBtn) submitBtn.disabled = true;
     this.deps.socketClient.emit(
       'room:create',
       {
@@ -616,10 +624,12 @@ export class CreateRoomView implements ILobbyView {
         },
       },
       (response) => {
+        this.submitting = false;
         if (response.success && response.room) {
           this.deps.notifications.success(t('ui:createRoom.roomCreated'));
           this.onRoomCreated(response.room);
         } else {
+          if (submitBtn) submitBtn.disabled = false;
           this.deps.notifications.error(response.error || t('ui:createRoom.createFailed'));
         }
       },
@@ -634,18 +644,30 @@ export class CreateRoomView implements ILobbyView {
     if (this.myMaps.length > 0) {
       html += `<optgroup label="${t('ui:createRoom.myMaps')}">`;
       for (const m of this.myMaps) {
-        html += `<option value="${m.id}">${escapeHtml(m.name)} (${m.mapWidth}x${m.mapHeight}, ${m.spawnCount} spawns)</option>`;
+        html += `<option value="${m.id}">${t('ui:createRoom.mapOptionLabel', {
+          name: escapeHtml(m.name),
+          width: m.mapWidth,
+          height: m.mapHeight,
+          spawns: m.spawnCount,
+        })}</option>`;
       }
       html += '</optgroup>';
     }
     if (communityMaps.length > 0) {
       html += `<optgroup label="${t('ui:createRoom.communityMaps')}">`;
       for (const m of communityMaps) {
-        const by = m.creatorUsername ? ` by ${escapeHtml(m.creatorUsername)}` : '';
+        const by = m.creatorUsername
+          ? ` ${t('ui:createRoom.mapBy', { username: escapeHtml(m.creatorUsername) })}`
+          : '';
         const rating = m.avgRating
           ? ` ${'★'.repeat(Math.round(m.avgRating))}${'☆'.repeat(5 - Math.round(m.avgRating))}`
           : '';
-        html += `<option value="${m.id}">${escapeHtml(m.name)}${by}${rating} (${m.mapWidth}x${m.mapHeight}, ${m.spawnCount} spawns)</option>`;
+        html += `<option value="${m.id}">${t('ui:createRoom.mapOptionLabel', {
+          name: `${escapeHtml(m.name)}${by}${rating}`,
+          width: m.mapWidth,
+          height: m.mapHeight,
+          spawns: m.spawnCount,
+        })}</option>`;
       }
       html += '</optgroup>';
     }

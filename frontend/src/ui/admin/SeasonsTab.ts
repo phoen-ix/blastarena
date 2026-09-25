@@ -2,6 +2,7 @@ import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
 import { Season, RankConfig, DEFAULT_RANK_CONFIG, getErrorMessage } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
+import { confirmModal } from '../../utils/modal';
 import { t } from '../../i18n';
 
 export class SeasonsTab {
@@ -13,6 +14,9 @@ export class SeasonsTab {
     tiers: [...DEFAULT_RANK_CONFIG.tiers],
   };
   private showCreateForm = false;
+  // Bumped by destroy(): a load that finishes after a tab switch must not render into the
+  // shared tab content, which by then belongs to the next tab.
+  private renderGen = 0;
 
   constructor(notifications: NotificationUI) {
     this.container = document.createElement('div');
@@ -20,14 +24,21 @@ export class SeasonsTab {
   }
 
   async render(parent: HTMLElement): Promise<void> {
+    const gen = ++this.renderGen;
     this.container = parent;
     await Promise.all([this.loadSeasons(), this.loadRankConfig()]);
+    if (gen !== this.renderGen) return;
     this.renderContent();
   }
 
   private async loadSeasons(): Promise<void> {
     try {
-      this.seasons = await ApiClient.get<Season[]>('/admin/seasons');
+      // Paged: answers { seasons, total }. Treating it as the array left this.seasons an object,
+      // and renderSeasonsTable threw on .length/.map — the tab never rendered.
+      const res = await ApiClient.get<{ seasons: Season[]; total: number }>(
+        '/admin/seasons?limit=50',
+      );
+      this.seasons = res.seasons ?? [];
     } catch (err: unknown) {
       this.notifications.error(getErrorMessage(err));
       this.seasons = [];
@@ -180,7 +191,7 @@ export class SeasonsTab {
           ${this.seasons
             .map(
               (s) => `
-            <tr style="${s.isActive ? 'background:rgba(0,212,170,0.08);' : ''}">
+            <tr style="${s.isActive ? 'background:var(--accent-dim);' : ''}">
               <td>${escapeHtml(s.name)}</td>
               <td>${escapeHtml(this.formatDate(s.startDate))}</td>
               <td>${escapeHtml(this.formatDate(s.endDate))}</td>
@@ -232,6 +243,13 @@ export class SeasonsTab {
   }
 
   private async activateSeason(id: number): Promise<void> {
+    const season = this.seasons.find((s) => s.id === id);
+    const confirmed = await confirmModal({
+      title: t('admin:seasons.confirm.activateTitle'),
+      message: t('admin:seasons.confirm.activateMessage', { name: season?.name ?? `#${id}` }),
+      confirmLabel: t('admin:seasons.table.activate'),
+    });
+    if (!confirmed) return;
     try {
       await ApiClient.post(`/admin/seasons/${id}/activate`, {});
       this.notifications.success(t('admin:seasons.notifications.seasonActivated'));
@@ -313,6 +331,13 @@ export class SeasonsTab {
       this.notifications.error(t('admin:seasons.errors.cannotDeleteActive'));
       return;
     }
+    const confirmed = await confirmModal({
+      title: t('admin:seasons.confirm.deleteTitle'),
+      message: t('admin:seasons.confirm.deleteMessage', { name: season?.name ?? `#${id}` }),
+      confirmLabel: t('admin:seasons.table.delete'),
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await ApiClient.delete(`/admin/seasons/${id}`);
       this.notifications.success(t('admin:seasons.notifications.seasonDeleted'));
@@ -359,29 +384,8 @@ export class SeasonsTab {
     `,
     );
 
-    // Add tier
-    el.querySelector('#rank-add-tier')!.addEventListener('click', () => {
-      const lastTier = tiers[tiers.length - 1];
-      const newMin = lastTier ? lastTier.maxElo + 1 : 0;
-      this.rankConfig.tiers.push({
-        name: '',
-        minElo: newMin,
-        maxElo: newMin + 199,
-        color: '#ffffff',
-      });
-      this.renderRankTiers(el);
-    });
-
-    // Remove tier
-    el.querySelectorAll<HTMLButtonElement>('.tier-remove').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const idx = Number(btn.dataset.index);
-        this.rankConfig.tiers.splice(idx, 1);
-        this.renderRankTiers(el);
-      });
-    });
-
-    // Sync input changes into state on change
+    // Sync input changes into state. Add/remove re-render the list from state, so they sync
+    // first — otherwise every unsaved edit in the other rows was thrown away.
     const syncTiers = () => {
       const rows = el.querySelectorAll('.rank-tier-row');
       rows.forEach((row, i) => {
@@ -403,6 +407,30 @@ export class SeasonsTab {
         el.querySelector('#rank-subtiers') as HTMLInputElement
       ).checked;
     };
+
+    // Add tier
+    el.querySelector('#rank-add-tier')!.addEventListener('click', () => {
+      syncTiers();
+      const lastTier = tiers[tiers.length - 1];
+      const newMin = lastTier ? lastTier.maxElo + 1 : 0;
+      this.rankConfig.tiers.push({
+        name: '',
+        minElo: newMin,
+        maxElo: newMin + 199,
+        color: '#ffffff',
+      });
+      this.renderRankTiers(el);
+    });
+
+    // Remove tier
+    el.querySelectorAll<HTMLButtonElement>('.tier-remove').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        syncTiers();
+        const idx = Number(btn.dataset.index);
+        this.rankConfig.tiers.splice(idx, 1);
+        this.renderRankTiers(el);
+      });
+    });
 
     // Save
     el.querySelector('#rank-save')!.addEventListener('click', async () => {
@@ -443,6 +471,7 @@ export class SeasonsTab {
   }
 
   destroy(): void {
-    // No persistent listeners to clean up
+    // No persistent listeners to clean up; only an in-flight render to stop
+    this.renderGen++;
   }
 }

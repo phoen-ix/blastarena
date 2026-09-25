@@ -93,6 +93,14 @@
     "deleteSuccess": "Użytkownik trwale usunięty",
     "revokeSessions": "Unieważnij sesje",
     "revokeSessionsSuccess": "Sesje użytkownika unieważnione",
+    "confirm": {
+      "roleTitle": "Zmień rolę",
+      "roleMessage": "Zmienić rolę użytkownika {{username}} na {{role}}?",
+      "deactivateTitle": "Dezaktywuj użytkownika",
+      "deactivateMessage": "Dezaktywować {{username}}? Użytkownik zostanie wylogowany i nie zaloguje się do czasu ponownej aktywacji.",
+      "revokeTitle": "Unieważnij sesje",
+      "revokeMessage": "Unieważnić wszystkie sesje użytkownika {{username}}? Zostanie wylogowany na wszystkich urządzeniach."
+    },
     "cleanup": {
       "button": "Account Cleanup",
       "title": "Account Cleanup",
@@ -175,6 +183,14 @@
     "replayEmptyOrCorrupted": "Dane powtórki są puste lub uszkodzone",
     "failedToLoadReplay": "Nie udało się załadować powtórki",
     "statusAbandoned": "porzucony",
+    "statusLive": "w toku",
+    "statuses": {
+      "waiting": "oczekuje",
+      "countdown": "odliczanie",
+      "playing": "w toku",
+      "finished": "zakończony",
+      "aborted": "przerwany"
+    },
     "durationSeconds": "{{duration}}s"
   },
   "logs": {
@@ -289,6 +305,7 @@
     "cancelBtn": "Anuluj",
     "sendBtn": "Wyślij",
     "messageSent": "Wiadomość wysłana",
+    "messageFailed": "Nie udało się wysłać wiadomości",
     "kickPlayerTitle": "Wyrzuć gracza z pokoju {{code}}",
     "playerUserIdLabel": "ID użytkownika gracza",
     "enterUserIdPlaceholder": "Wpisz ID użytkownika",
@@ -332,6 +349,8 @@
     "achievementsBtn": "Osiągnięcia",
     "cosmeticsBtn": "Kosmetyki",
     "achievementCount": "{{count}} osiągnięcie",
+    "achievementCount_few": "{{count}} osiągnięcia",
+    "achievementCount_many": "{{count}} osiągnięć",
     "achievementCount_other": "{{count}} osiągnięć",
     "exportAll": "Eksportuj wszystko",
     "import": "Importuj",
@@ -393,6 +412,8 @@
       "subType": "Podtyp"
     },
     "cosmeticCount": "{{count}} kosmetyk",
+    "cosmeticCount_few": "{{count}} kosmetyki",
+    "cosmeticCount_many": "{{count}} kosmetyków",
     "cosmeticCount_other": "{{count}} kosmetyków",
     "importCosmetic": "Importuj",
     "createCosmetic": "Utwórz kosmetyk",
@@ -600,7 +621,23 @@
     "revokeAllSuccess": "Wszystkie sesje unieważnione",
     "spectatorActionsDesc": "Pozwala wyeliminowanym graczom wydawać energię na ściany, meteory, ulepszenia i strefy prędkości (pokoje nadal mogą to wyłączyć na mecz)",
     "spectatorActionsToggled": "Mistrz gry dla widzów: {{status}}",
-    "spectatorActionsGlobal": "Mistrz gry dla widzów (globalnie)"
+    "spectatorActionsGlobal": "Mistrz gry dla widzów (globalnie)",
+    "openWorld": {
+      "title": "Otwarty świat",
+      "enabled": "Włączony",
+      "guestAccess": "Dostęp dla gości",
+      "maxPlayers": "Maks. graczy",
+      "roundTime": "Czas rundy (s)",
+      "mapWidth": "Szerokość mapy",
+      "mapHeight": "Wysokość mapy",
+      "wallDensity": "Gęstość ścian",
+      "respawnDelay": "Opóźnienie odrodzenia (s)",
+      "afkTimeout": "Limit bezczynności (s)",
+      "afkTimeoutHint": "0 = wyłączone",
+      "save": "Zapisz ustawienia otwartego świata",
+      "saved": "Zapisano ustawienia otwartego świata",
+      "saveFailed": "Nie udało się zapisać ustawień otwartego świata"
+    }
   },
   "seasons": {
     "sectionTitle": "Zarządzanie sezonami",
@@ -656,6 +693,12 @@
       "seasonEnded": "Sezon zakończony (reset {{resetMode}})",
       "seasonDeleted": "Sezon usunięty",
       "rankConfigSaved": "Konfiguracja rang zapisana"
+    },
+    "confirm": {
+      "activateTitle": "Aktywuj sezon",
+      "activateMessage": "Aktywować „{{name}}”? Każdy inny aktywny sezon zostanie dezaktywowany.",
+      "deleteTitle": "Usuń sezon",
+      "deleteMessage": "Usunąć „{{name}}”? Tej operacji nie można cofnąć."
     }
   },
   "campaign": {
@@ -858,6 +901,8 @@
     },
     "replays": {
       "totalCount": "{{count}} powtórka kampanii",
+      "totalCount_few": "{{count}} powtórki kampanii",
+      "totalCount_many": "{{count}} powtórek kampanii",
       "totalCount_other": "{{count}} powtórek kampanii",
       "prev": "Poprz.",
       "next": "Nast.",
@@ -883,6 +928,8 @@
       "watchBtn": "Oglądaj",
       "deleteBtn": "Usuń",
       "replayDeleted": "Powtórka kampanii usunięta",
+      "deleteConfirmTitle": "Usuń powtórkę",
+      "deleteConfirm": "Usunąć tę powtórkę? Tej operacji nie można cofnąć.",
       "loadingReplay": "Ładowanie powtórki kampanii...",
       "replayEmptyOrCorrupted": "Dane powtórki są puste lub uszkodzone",
       "loadFailed": "Nie udało się załadować powtórki kampanii",
@@ -986,6 +1033,7 @@
       "cancel": "Anuluj",
       "startBatch": "Uruchom paczkę",
       "nBots": "{{count}} botów",
+      "nBots_few": "{{count}} boty",
       "modes": {
         "ffa": "Każdy na każdego",
         "teams": "Drużyny",
@@ -1041,6 +1089,7 @@
     "globalToggle": "System wyzwań",
     "enabled": "Wyzwania włączone",
     "toggleSaved": "Ustawienie wyzwania zapisane",
+    "toggleLoadFailed": "Nie udało się wczytać ustawienia wyzwań",
     "title": "Wyzwania map",
     "titleLabel": "Tytuł",
     "description": "Opis",
@@ -1060,6 +1109,11 @@
     "activate": "Aktywuj",
     "deactivate": "Dezaktywuj",
     "deleteBtn": "Usuń",
-    "none": "Brak wyzwań"
+    "none": "Brak wyzwań",
+    "statusActive": "Aktywne",
+    "statusInactive": "Nieaktywne",
+    "unknownCreator": "Nieznany",
+    "deleteConfirmTitle": "Usuń wyzwanie",
+    "deleteConfirm": "Usunąć wyzwanie „{{title}}”? Tej operacji nie można cofnąć."
   }
 }

@@ -32,7 +32,9 @@
     "joined": "Entrato nella stanza: {{name}}",
     "joinFailed": "Impossibile entrare nella stanza",
     "loadFailed": "Impossibile caricare le stanze: {{error}}",
-    "kicked": "Sei stato espulso"
+    "kicked": "Sei stato espulso",
+    "statusWaiting": "In attesa",
+    "statusPlaying": "In corso"
   },
   "maps": {
     "title": "Le mie mappe",
@@ -306,7 +308,7 @@
     "noParty": "Non sei in un gruppo.",
     "noPartyTitle": "Nessun gruppo attivo",
     "noPartyDescription": "Crea un gruppo per fare squadra con gli amici prima di entrare in una stanza.",
-    "noPartyTip": "Suggerimento: invita amici dalla pagina Amici dopo aver creato un gruppo.",
+    "noPartyTip": "Suggerimento: dopo aver creato un gruppo, invita amici con «+ Invita amico» in questa pagina.",
     "chatHeader": "Chat gruppo",
     "chatPlaceholder": "Scrivi un messaggio...",
     "chatDisabled": "La chat è attualmente disabilitata",
@@ -326,7 +328,7 @@
     "disbanded": "Gruppo sciolto",
     "created": "Gruppo creato",
     "createFailed": "Impossibile creare il gruppo",
-    "useFriendsPanel": "Usa il pannello Amici per invitare giocatori",
+    "usePartyPage": "Invita amici dalla pagina Gruppo",
     "invitedToParty": "<strong>{{username}}</strong> ti ha invitato nel suo gruppo",
     "invitedToRoom": "<strong>{{username}}</strong> ti ha invitato in una stanza",
     "accept": "Accetta",
@@ -387,7 +389,8 @@
     "date": "Date",
     "win": "WIN",
     "prev": "Prev",
-    "next": "Next"
+    "next": "Next",
+    "modeSummary": "{{winRate}}% vittorie · {{kd}} K/D"
   },
   "createRoom": {
     "title": "Crea stanza",
@@ -433,8 +436,8 @@
     "powerUps": "Potenziamenti",
     "botCount": "Numero bot",
     "none": "Nessuno",
-    "nBots": "{{count}} Bot",
-    "nBots_plural": "{{count}} Bot",
+    "nBots_one": "{{count}} Bot",
+    "nBots_other": "{{count}} Bot",
     "newMap": "+ Nuova mappa",
     "randomGenerated": "Casuale (Generata)",
     "communityMaps": "Mappe della community",
@@ -444,6 +447,7 @@
     "mapSpawnHint": "Questa mappa ha {{count}} punti di nascita (massimo {{count}} giocatori)",
     "mapDimensions": "Mappa {{width}}x{{height}}",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} nascite)",
+    "mapBy": "di {{username}}",
     "loadingPreview": "Caricamento anteprima...",
     "recordGame": "Registra partita",
     "hazardTypes": {
@@ -471,8 +475,7 @@
       "21": "21×21 (Piccola)",
       "31": "31×31 (Normale)",
       "39": "39×39 (Grande)",
-      "51": "51×51 (Enorme)",
-      "61": "61×61 (Massiccia)"
+      "51": "51×51 (Enorme)"
     },
     "wallDensities": {
       "low30": "Bassa (30%)",
@@ -548,6 +551,7 @@
     "back": "← Indietro",
     "inviteFriend": "Invita amico",
     "inviteInfo": "Usa il pannello Amici (lobby) per invitare amici in questa stanza",
+    "noFriendsToInvite": "Nessun amico online da invitare",
     "roomCode": "Codice stanza:",
     "playersCount": "Giocatori ({{current}}/{{max}})",
     "needPlayers": "Servono giocatori o bot",

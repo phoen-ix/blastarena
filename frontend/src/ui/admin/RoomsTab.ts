@@ -1,7 +1,7 @@
 import { ApiClient } from '../../network/ApiClient';
 import { SocketClient } from '../../network/SocketClient';
 import { NotificationUI } from '../NotificationUI';
-import { RoomListItem, UserRole } from '@blast-arena/shared';
+import { RoomListItem, UserRole, gameModeName } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
@@ -26,8 +26,9 @@ export class RoomsTab {
 
   async render(parent: HTMLElement): Promise<void> {
     this.abortController = new AbortController();
-    this.container = document.createElement('div');
-    parent.appendChild(this.container);
+    const container = document.createElement('div');
+    this.container = container;
+    parent.appendChild(container);
 
     this.roomListHandler = (rooms) => this.renderRooms(rooms);
     this.socketClient.on('room:list', this.roomListHandler);
@@ -37,6 +38,9 @@ export class RoomsTab {
     this.socketClient.emit('lobby:subscribe');
 
     await this.loadRooms();
+    // destroy() ran during the load (a quick tab switch): starting the poll now would leak it.
+    if (this.container !== container) return;
+    if (this.refreshInterval) clearInterval(this.refreshInterval);
     this.refreshInterval = setInterval(() => this.loadRooms(), 60000);
   }
 
@@ -95,9 +99,9 @@ export class RoomsTab {
               <tr>
                 <td style="font-family:monospace;">${escapeHtml(r.code)}</td>
                 <td>${escapeHtml(r.name)}</td>
-                <td>${escapeHtml(r.gameMode)}</td>
+                <td>${escapeHtml(t(gameModeName(r.gameMode), { defaultValue: r.gameMode }))}</td>
                 <td>${t('admin:rooms.playerCount', { current: r.playerCount, max: r.maxPlayers })}</td>
-                <td><span class="badge badge-${r.status === 'playing' ? 'admin' : 'active'}">${r.status}</span></td>
+                <td><span class="badge badge-${r.status === 'playing' ? 'admin' : 'active'}">${r.status === 'playing' ? t('ui:rooms.statusPlaying') : t('ui:rooms.statusWaiting')}</span></td>
                 <td style="display:flex;gap:4px;flex-wrap:wrap;">
                   <button class="btn btn-secondary btn-sm" data-action="spectate" data-code="${escapeAttr(r.code)}">${t('admin:rooms.spectateBtn')}</button>
                   <button class="btn btn-secondary btn-sm" data-action="message" data-code="${escapeAttr(r.code)}">${t('admin:rooms.messageBtn')}</button>
@@ -160,16 +164,26 @@ export class RoomsTab {
     );
 
     overlay.querySelector('#msg-cancel')!.addEventListener('click', close);
-    overlay.querySelector('#msg-send')!.addEventListener('click', () => {
+    const sendBtn = overlay.querySelector('#msg-send') as HTMLButtonElement;
+    sendBtn.addEventListener('click', () => {
       const input = overlay.querySelector('#room-message-input') as HTMLInputElement;
-      if (input.value.trim()) {
-        this.socketClient.emit('admin:roomMessage', {
-          roomCode: code,
-          message: input.value.trim(),
-        });
-        this.notifications.success(t('admin:rooms.messageSent'));
+      const message = input.value.trim();
+      if (!message) {
+        close();
+        return;
       }
-      close();
+      sendBtn.disabled = true;
+      // Acknowledged: the result is shown as it is. The old fire-and-forget emit always toasted
+      // "Message sent", even when the room was gone or the message was refused.
+      this.socketClient.emit('admin:roomMessage', { roomCode: code, message }, (res) => {
+        if (res.success) {
+          this.notifications.success(t('admin:rooms.messageSent'));
+          close();
+        } else {
+          sendBtn.disabled = false;
+          this.notifications.error(res.error || t('admin:rooms.messageFailed'));
+        }
+      });
     });
   }
 

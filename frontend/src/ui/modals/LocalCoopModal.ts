@@ -48,7 +48,22 @@ interface P2State {
   loginError?: string;
   loginLoading?: boolean;
   duration: number;
+  /** Set while P2's account has 2FA and the password step passed: the code step is showing. */
+  totpToken?: string;
 }
+
+/** Body of POST /api/local-coop/login and /verify-totp (success, 2FA challenge, or error). */
+interface LocalCoopAuthResponse {
+  user?: { id: number; username: string };
+  cosmetics?: PlayerCosmeticData;
+  totpRequired?: boolean;
+  totpToken?: string;
+  error?: string;
+  code?: string;
+}
+
+/** Selected-chip background. It was rgba(var(--primary-rgb)), a variable no theme defines. */
+const CHIP_SELECTED_BG = 'var(--primary-dim)';
 
 export function showLocalCoopModal(
   onStart: (config: LocalCoopConfig) => void,
@@ -72,6 +87,7 @@ export function showLocalCoopModal(
   overlay.setAttribute('aria-label', t('campaign:localCoopModal.ariaLabel'));
 
   let releaseFocusTrap: (() => void) | null = null;
+  let closed = false;
   const escHandler = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       closeModal();
@@ -79,6 +95,7 @@ export function showLocalCoopModal(
     }
   };
   function closeModal(): void {
+    closed = true;
     releaseFocusTrap?.();
     document.removeEventListener('keydown', escHandler);
     UIGamepadNavigator.getInstance().popContext('local-coop-modal');
@@ -106,38 +123,102 @@ export function showLocalCoopModal(
     };
   }
 
+  /** POST to a local-coop auth route with P1's session (the routes are P1-authenticated). */
+  async function postLocalCoop(
+    path: string,
+    body: Record<string, unknown>,
+  ): Promise<{ ok: boolean; data: LocalCoopAuthResponse }> {
+    const token = authManager.getAccessToken();
+    const resp = await fetch(`/api/local-coop/${path}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    const data: LocalCoopAuthResponse = await resp.json().catch(() => ({}));
+    return { ok: resp.ok, data };
+  }
+
+  function applyLoggedIn(data: LocalCoopAuthResponse): void {
+    p2.mode = 'loggedIn';
+    p2.loggedInUser = data.user;
+    p2.loggedInCosmetics = data.cosmetics;
+    p2.totpToken = undefined;
+    p2.loginError = undefined;
+    p2.loginLoading = false;
+  }
+
   async function tryLogin(username: string, password: string): Promise<void> {
     p2.loginLoading = true;
     p2.loginError = undefined;
     render();
 
     try {
-      const token = authManager.getAccessToken();
-      const resp = await fetch('/api/local-coop/login', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ username, password, duration: p2.duration }),
+      const { ok, data } = await postLocalCoop('login', {
+        username,
+        password,
+        duration: p2.duration,
       });
-
-      const data = await resp.json();
-      if (!resp.ok) {
+      if (closed) return;
+      if (!ok) {
         p2.loginError = data.error || t('campaign:localCoopModal.loginFailed');
         p2.loginLoading = false;
         render();
         return;
       }
 
-      p2.mode = 'loggedIn';
-      p2.loggedInUser = data.user;
-      p2.loggedInCosmetics = data.cosmetics;
-      p2.loginError = undefined;
-      p2.loginLoading = false;
+      // An account with 2FA answers with a challenge instead of the user: ask for the code.
+      if (data.totpRequired && data.totpToken) {
+        p2.totpToken = data.totpToken;
+        p2.loginLoading = false;
+        render();
+        return;
+      }
+
+      applyLoggedIn(data);
       render();
     } catch {
+      if (closed) return;
+      p2.loginError = t('campaign:localCoopModal.connectionError');
+      p2.loginLoading = false;
+      render();
+    }
+  }
+
+  async function verifyTotp(code: string): Promise<void> {
+    if (!p2.totpToken) return;
+    p2.loginLoading = true;
+    p2.loginError = undefined;
+    render();
+
+    try {
+      const { ok, data } = await postLocalCoop('verify-totp', {
+        totpToken: p2.totpToken,
+        code,
+        duration: p2.duration,
+      });
+      if (closed) return;
+      if (!ok) {
+        p2.loginLoading = false;
+        if (data.code === 'INVALID_TOKEN') {
+          // The challenge expired or was used up: start over from the password step.
+          p2.totpToken = undefined;
+          p2.loginError = t('campaign:localCoopModal.totpExpired');
+        } else if (data.code === 'INVALID_TOTP_CODE') {
+          p2.loginError = t('campaign:localCoopModal.totpInvalidCode');
+        } else {
+          p2.loginError = data.error || t('campaign:localCoopModal.loginFailed');
+        }
+        render();
+        return;
+      }
+      applyLoggedIn(data);
+      render();
+    } catch {
+      if (closed) return;
       p2.loginError = t('campaign:localCoopModal.connectionError');
       p2.loginLoading = false;
       render();
@@ -176,7 +257,7 @@ export function showLocalCoopModal(
     const closeBtn = document.createElement('button');
     closeBtn.className = 'btn btn-ghost btn-sm';
     closeBtn.textContent = '\u2715';
-    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.setAttribute('aria-label', t('common:actions.close'));
     closeBtn.style.cssText = 'font-size:18px;padding:4px 8px;';
     closeBtn.addEventListener('click', () => {
       closeModal();
@@ -272,20 +353,6 @@ export function showLocalCoopModal(
     modal.appendChild(footer);
 
     overlay.appendChild(modal);
-
-    // Gamepad context
-    UIGamepadNavigator.getInstance().pushContext({
-      id: 'local-coop-modal',
-      elements: () => [
-        ...overlay.querySelectorAll<HTMLElement>('.option-chip'),
-        ...overlay.querySelectorAll<HTMLElement>('.btn'),
-        ...overlay.querySelectorAll<HTMLElement>('input,select'),
-      ],
-      onBack: () => {
-        closeModal();
-        onCancel();
-      },
-    });
   }
 
   function createP2Section(): HTMLElement {
@@ -313,7 +380,7 @@ export function showLocalCoopModal(
       chip.style.cursor = 'pointer';
       if (p2.mode === mode) {
         chip.style.borderColor = 'var(--primary)';
-        chip.style.background = 'rgba(var(--primary-rgb, 255,107,53), 0.15)';
+        chip.style.background = CHIP_SELECTED_BG;
         chip.style.color = 'var(--primary)';
       }
       chip.textContent =
@@ -322,6 +389,7 @@ export function showLocalCoopModal(
         if (p2.mode !== mode) {
           p2.mode = mode;
           p2.loginError = undefined;
+          p2.totpToken = undefined;
           render();
         }
       });
@@ -334,6 +402,8 @@ export function showLocalCoopModal(
       section.appendChild(createGuestIdentity());
     } else if (p2.loggedInUser) {
       section.appendChild(createLoggedInDisplay());
+    } else if (p2.totpToken) {
+      section.appendChild(createTotpForm());
     } else {
       section.appendChild(createLoginForm());
     }
@@ -496,10 +566,77 @@ export function showLocalCoopModal(
     return container;
   }
 
+  /** Second login step for a P2 account with 2FA: the 6-digit code from their authenticator. */
+  function createTotpForm(): HTMLElement {
+    const container = document.createElement('div');
+    container.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+
+    const prompt = document.createElement('div');
+    prompt.style.cssText = 'font-size:13px;color:var(--text-dim);';
+    prompt.textContent = t('campaign:localCoopModal.totpPrompt');
+    container.appendChild(prompt);
+
+    const actionRow = document.createElement('div');
+    actionRow.style.cssText = 'display:flex;gap:8px;align-items:center;';
+
+    const codeInput = document.createElement('input');
+    codeInput.type = 'text';
+    codeInput.className = 'input';
+    codeInput.inputMode = 'numeric';
+    codeInput.autocomplete = 'one-time-code';
+    codeInput.maxLength = 10; // a backup code (xxxx-xxxx) works too, as on the main login
+    codeInput.placeholder = '000000';
+    codeInput.setAttribute('aria-label', t('campaign:localCoopModal.totpCodeAriaLabel'));
+    codeInput.style.cssText = 'flex:1;padding:6px 10px;font-size:14px;letter-spacing:2px;';
+
+    const verifyBtn = document.createElement('button');
+    verifyBtn.className = 'btn btn-primary btn-sm';
+    verifyBtn.textContent = p2.loginLoading
+      ? t('campaign:localCoopModal.totpVerifying')
+      : t('campaign:localCoopModal.totpVerify');
+    verifyBtn.disabled = !!p2.loginLoading;
+    verifyBtn.addEventListener('click', () => {
+      const code = codeInput.value.trim();
+      if (!/^(\d{6}|[0-9a-z]{4}-[0-9a-z]{4})$/i.test(code)) {
+        p2.loginError = t('campaign:localCoopModal.totpEnterCode');
+        render();
+        return;
+      }
+      verifyTotp(code);
+    });
+    codeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') verifyBtn.click();
+    });
+
+    const backBtn = document.createElement('button');
+    backBtn.className = 'btn btn-ghost btn-sm';
+    backBtn.textContent = t('campaign:localCoopModal.totpBack');
+    backBtn.addEventListener('click', () => {
+      p2.totpToken = undefined;
+      p2.loginError = undefined;
+      render();
+    });
+
+    actionRow.appendChild(codeInput);
+    actionRow.appendChild(verifyBtn);
+    actionRow.appendChild(backBtn);
+    container.appendChild(actionRow);
+
+    if (p2.loginError) {
+      const error = document.createElement('div');
+      error.style.cssText = 'color:var(--danger);font-size:13px;';
+      error.textContent = p2.loginError;
+      container.appendChild(error);
+    }
+
+    if (!p2.loginLoading) requestAnimationFrame(() => codeInput.focus());
+    return container;
+  }
+
   function createLoggedInDisplay(): HTMLElement {
     const container = document.createElement('div');
     container.style.cssText =
-      'display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface-2);border-radius:var(--radius);';
+      'display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-elevated);border-radius:var(--radius);';
 
     const info = document.createElement('span');
     info.style.cssText = 'font-size:14px;color:var(--text);';
@@ -534,6 +671,7 @@ export function showLocalCoopModal(
   fetch('/api/local-coop/session', { credentials: 'include' })
     .then((resp) => (resp.ok ? resp.json() : null))
     .then((data) => {
+      if (closed) return;
       if (data?.user) {
         p2.mode = 'loggedIn';
         p2.loggedInUser = data.user;
@@ -554,6 +692,21 @@ export function showLocalCoopModal(
     document.body.appendChild(overlay);
   }
   releaseFocusTrap = trapFocus(overlay);
+
+  // One context for the modal's lifetime (its element list is live). It used to be pushed on
+  // every render() but popped once on close, leaving stale 'local-coop-modal' entries behind.
+  UIGamepadNavigator.getInstance().pushContext({
+    id: 'local-coop-modal',
+    elements: () => [
+      ...overlay.querySelectorAll<HTMLElement>('.option-chip'),
+      ...overlay.querySelectorAll<HTMLElement>('.btn'),
+      ...overlay.querySelectorAll<HTMLElement>('input,select'),
+    ],
+    onBack: () => {
+      closeModal();
+      onCancel();
+    },
+  });
 }
 
 export function createControlsSection(
@@ -580,7 +733,7 @@ export function createControlsSection(
 
     if (preset === selected) {
       chip.style.borderColor = 'var(--primary)';
-      chip.style.background = 'rgba(var(--primary-rgb, 255,107,53), 0.15)';
+      chip.style.background = CHIP_SELECTED_BG;
       chip.style.color = 'var(--primary)';
     }
 
@@ -622,7 +775,7 @@ export function createCameraModeSection(
 
     if (mode === selected) {
       chip.style.borderColor = 'var(--primary)';
-      chip.style.background = 'rgba(var(--primary-rgb, 255,107,53), 0.15)';
+      chip.style.background = CHIP_SELECTED_BG;
       chip.style.color = 'var(--primary)';
     }
 

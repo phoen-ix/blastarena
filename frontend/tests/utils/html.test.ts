@@ -48,6 +48,14 @@ describe('escapeAttr', () => {
     );
   });
 
+  it('encodes & first, so an escaped-looking value is not decoded back', () => {
+    expect(escapeAttr('Fire & Ice')).toBe('Fire &amp; Ice');
+    expect(escapeAttr('a&quot;b')).toBe('a&amp;quot;b');
+    const el = document.createElement('div');
+    el.innerHTML = `<span title="${escapeAttr('a&quot;onmouseover=x')}"></span>`;
+    expect(el.querySelector('span')!.getAttribute('title')).toBe('a&quot;onmouseover=x');
+  });
+
   it('returns empty string for empty input', () => {
     expect(escapeAttr('')).toBe('');
   });

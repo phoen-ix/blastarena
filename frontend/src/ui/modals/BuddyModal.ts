@@ -47,6 +47,7 @@ export function showBuddyModal(
   overlay.setAttribute('aria-label', t('campaign:buddyModal.ariaLabel'));
 
   let releaseFocusTrap: (() => void) | null = null;
+  let closed = false;
   const escHandler = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       closeModal();
@@ -54,6 +55,7 @@ export function showBuddyModal(
     }
   };
   function closeModal(): void {
+    closed = true;
     releaseFocusTrap?.();
     document.removeEventListener('keydown', escHandler);
     UIGamepadNavigator.getInstance().popContext('buddy-modal');
@@ -67,11 +69,13 @@ export function showBuddyModal(
   // Load buddy settings from server
   ApiClient.get<BuddySettings>('/user/buddy-settings')
     .then((settings) => {
+      if (closed) return;
       buddySettings = settings;
       loading = false;
       render();
     })
     .catch(() => {
+      if (closed) return;
       loading = false;
       render();
     });
@@ -294,7 +298,7 @@ export function showBuddyModal(
     const closeBtn = document.createElement('button');
     closeBtn.className = 'btn btn-ghost btn-sm';
     closeBtn.textContent = '\u2715';
-    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.setAttribute('aria-label', t('common:actions.close'));
     closeBtn.style.cssText = 'font-size:18px;padding:4px 8px;';
     closeBtn.addEventListener('click', () => {
       closeModal();
@@ -409,20 +413,6 @@ export function showBuddyModal(
     modal.appendChild(footer);
 
     overlay.appendChild(modal);
-
-    // Gamepad context
-    UIGamepadNavigator.getInstance().pushContext({
-      id: 'buddy-modal',
-      elements: () => [
-        ...overlay.querySelectorAll<HTMLElement>('.option-chip'),
-        ...overlay.querySelectorAll<HTMLElement>('.btn'),
-        ...overlay.querySelectorAll<HTMLElement>('input,select'),
-      ],
-      onBack: () => {
-        closeModal();
-        onCancel();
-      },
-    });
   }
 
   document.addEventListener('keydown', escHandler);
@@ -435,4 +425,19 @@ export function showBuddyModal(
   }
   render();
   releaseFocusTrap = trapFocus(overlay);
+
+  // One context for the modal's lifetime (its element list is live). It used to be pushed on
+  // every render() but popped once on close, leaving stale 'buddy-modal' entries on the stack.
+  UIGamepadNavigator.getInstance().pushContext({
+    id: 'buddy-modal',
+    elements: () => [
+      ...overlay.querySelectorAll<HTMLElement>('.option-chip'),
+      ...overlay.querySelectorAll<HTMLElement>('.btn'),
+      ...overlay.querySelectorAll<HTMLElement>('input,select'),
+    ],
+    onBack: () => {
+      closeModal();
+      onCancel();
+    },
+  });
 }

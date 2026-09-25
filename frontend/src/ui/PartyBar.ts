@@ -26,6 +26,12 @@ export class PartyBar {
 
   // Invite handler for room/party invites
   private onJoinRoom: ((roomCode: string) => void) | null = null;
+  // PartyView (and anything else showing the party) follows this bar's state instead of keeping
+  // its own copy; the two used to drift apart after every create/leave.
+  private partyListeners = new Set<(party: Party | null) => void>();
+  // Set while our own party:leave is in flight: the server tells the leaver's tabs with
+  // party:disbanded, which must not toast "Party disbanded" at the user who just left.
+  private leavePending = false;
 
   // Socket handler refs (assigned in setupSocketListeners, called from the constructor)
   private partyStateHandler!: ServerToClientEvents['party:state'];
@@ -50,6 +56,17 @@ export class PartyBar {
     this.container.style.display = 'none';
     this.setupSocketListeners();
     this.loadChatMode();
+    this.syncParty();
+  }
+
+  /**
+   * A PartyBar is built with every LobbyUI and used to start at "no party" until the next party
+   * event — so after any room trip the bar was gone while the user was still in a party.
+   */
+  private syncParty(): void {
+    this.socketClient.emit('party:sync', (res) => {
+      if (res.success) this.setParty(res.party ?? null);
+    });
   }
 
   setJoinRoomCallback(cb: (roomCode: string) => void): void {
@@ -78,6 +95,7 @@ export class PartyBar {
     if (!parent.contains(this.container)) {
       parent.appendChild(this.container);
     }
+    this.render(); // re-mounted after a language change: redraw its labels
   }
 
   destroy(): void {
@@ -89,27 +107,44 @@ export class PartyBar {
     this.socketClient.off('admin:settingsChanged', this.settingsChangedHandler);
     this.chatContainer?.remove();
     this.container.remove();
+    this.partyListeners.clear();
   }
 
   getParty(): Party | null {
     return this.party;
   }
 
-  private setupSocketListeners(): void {
-    this.partyStateHandler = (party: Party) => {
-      this.party = party;
-      this.render();
+  /** Follow party changes; returns the unsubscribe function. */
+  onPartyChange(listener: (party: Party | null) => void): () => void {
+    this.partyListeners.add(listener);
+    return () => {
+      this.partyListeners.delete(listener);
     };
-    this.socketClient.on('party:state', this.partyStateHandler);
+  }
 
-    this.partyDisbandedHandler = () => {
-      this.party = null;
+  /** The single place party state changes: every create/leave/sync/server event ends here. */
+  private setParty(party: Party | null): void {
+    this.party = party;
+    if (!party) {
       this.chatMessages = [];
       this.chatOpen = false;
       this.chatContainer?.remove();
       this.chatContainer = null;
-      this.render();
-      this.notifications.info(t('ui:party.disbanded'));
+    }
+    this.render();
+    for (const listener of this.partyListeners) listener(party);
+  }
+
+  private setupSocketListeners(): void {
+    this.partyStateHandler = (party: Party) => {
+      this.setParty(party);
+    };
+    this.socketClient.on('party:state', this.partyStateHandler);
+
+    this.partyDisbandedHandler = () => {
+      const wasInParty = this.party !== null;
+      this.setParty(null);
+      if (wasInParty && !this.leavePending) this.notifications.info(t('ui:party.disbanded'));
     };
     this.socketClient.on('party:disbanded', this.partyDisbandedHandler);
 
@@ -152,11 +187,24 @@ export class PartyBar {
   createParty(): void {
     this.socketClient.emit('party:create', (response) => {
       if (response.success && response.party) {
-        this.party = response.party;
-        this.render();
+        this.setParty(response.party);
         this.notifications.success(t('ui:party.created'));
       } else {
         this.notifications.error(response.error || t('ui:party.createFailed'));
+      }
+    });
+  }
+
+  /** Leave the party (the leader leaving disbands it). */
+  leaveParty(): void {
+    if (this.leavePending) return;
+    this.leavePending = true;
+    this.socketClient.emit('party:leave', (res) => {
+      this.leavePending = false;
+      if (res.success) {
+        this.setParty(null);
+      } else if (res.error) {
+        this.notifications.error(res.error);
       }
     });
   }
@@ -197,7 +245,7 @@ export class PartyBar {
     const inviteBtn = this.container.querySelector('#party-invite-btn');
     if (inviteBtn) {
       inviteBtn.addEventListener('click', () => {
-        this.notifications.info(t('ui:party.useFriendsPanel'));
+        this.notifications.info(t('ui:party.usePartyPage'));
       });
     }
 
@@ -212,16 +260,7 @@ export class PartyBar {
     });
 
     this.container.querySelector('#party-leave-btn')!.addEventListener('click', () => {
-      this.socketClient.emit('party:leave', (res) => {
-        if (res.success) {
-          this.party = null;
-          this.chatMessages = [];
-          this.chatOpen = false;
-          this.chatContainer?.remove();
-          this.chatContainer = null;
-          this.render();
-        }
-      });
+      this.leaveParty();
     });
   }
 

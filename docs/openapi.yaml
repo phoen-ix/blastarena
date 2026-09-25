@@ -6161,6 +6161,9 @@ components:
               type: integer
             totalXp:
               type: integer
+            totalPlaytime:
+              type: integer
+              description: Seconds played in matches
         rankTier:
           type: string
         rankColor:

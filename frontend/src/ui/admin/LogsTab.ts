@@ -29,10 +29,33 @@ export class LogsTab {
   async render(parent: HTMLElement): Promise<void> {
     this.container = document.createElement('div');
     parent.appendChild(this.container);
+    // Delegated once on the element this render created. It used to be added in loadActions(),
+    // i.e. once more per page, so each pagination click fetched N pages and a row toggled N times.
+    this.container.addEventListener('click', this.handleClick);
     this.page = 1;
     this.actionFilter = '';
     await this.loadActions();
   }
+
+  private handleClick = (e: Event): void => {
+    const target = e.target as HTMLElement;
+    if (target.dataset.page) {
+      this.page = parseInt(target.dataset.page);
+      this.loadActions();
+      return;
+    }
+    const logRow = target.closest('.log-row') as HTMLElement | null;
+    if (logRow && this.container) {
+      const index = logRow.dataset.logIndex;
+      const detailRow = this.container.querySelector(
+        `[data-detail-index="${index}"]`,
+      ) as HTMLElement | null;
+      if (detailRow) {
+        const isVisible = detailRow.style.display !== 'none';
+        detailRow.style.display = isVisible ? 'none' : 'table-row';
+      }
+    }
+  };
 
   destroy(): void {
     this.container?.remove();
@@ -47,6 +70,7 @@ export class LogsTab {
       if (this.actionFilter) params.set('action', this.actionFilter);
 
       const result = await ApiClient.get<AdminActionsResponse>(`/admin/actions?${params}`);
+      if (!this.container) return; // tab closed while loading
       const totalPages = Math.ceil(result.total / result.limit);
 
       setHtml(
@@ -111,27 +135,8 @@ export class LogsTab {
         this.page = 1;
         this.loadActions();
       });
-
-      this.container.addEventListener('click', (e: Event) => {
-        const target = e.target as HTMLElement;
-        if (target.dataset.page) {
-          this.page = parseInt(target.dataset.page);
-          this.loadActions();
-          return;
-        }
-        const logRow = target.closest('.log-row') as HTMLElement | null;
-        if (logRow) {
-          const index = logRow.dataset.logIndex;
-          const detailRow = this.container!.querySelector(
-            `[data-detail-index="${index}"]`,
-          ) as HTMLElement | null;
-          if (detailRow) {
-            const isVisible = detailRow.style.display !== 'none';
-            detailRow.style.display = isVisible ? 'none' : 'table-row';
-          }
-        }
-      });
     } catch {
+      if (!this.container) return;
       setHtml(
         this.container,
         `<div style="color:var(--danger);">${t('admin:logs.failedToLoad')}</div>`,

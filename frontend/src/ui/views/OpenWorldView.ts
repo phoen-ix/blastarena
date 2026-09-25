@@ -48,6 +48,9 @@ export class OpenWorldView implements ILobbyView {
   private infoHandler: ((data: OpenWorldInfo) => void) | null = null;
   private timerInterval: ReturnType<typeof setInterval> | null = null;
   private roundTimeRemaining = 0;
+  // render() awaits the status fetch; if the view was destroyed meanwhile it used to write into
+  // the next view's .main-body and register a socket listener and a 1 s interval nothing freed.
+  private destroyed = false;
 
   constructor(deps: ViewDeps) {
     this.deps = deps;
@@ -80,6 +83,12 @@ export class OpenWorldView implements ILobbyView {
       }
     } catch {
       // Fall through to disabled state
+    }
+
+    if (this.destroyed) {
+      // An auto-join hid the whole lobby shell; don't leave it hidden for the next view.
+      if (willAutoJoin && appLayout) appLayout.style.display = '';
+      return;
     }
 
     if (!status?.enabled) {
@@ -338,6 +347,7 @@ export class OpenWorldView implements ILobbyView {
   }
 
   destroy(): void {
+    this.destroyed = true;
     this.stopTimerCountdown();
     if (this.infoHandler) {
       this.deps.socketClient.off('openworld:info', this.infoHandler);

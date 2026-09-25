@@ -1,7 +1,7 @@
 import { AuthManager } from '../network/AuthManager';
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
-import { escapeHtml, escapeAttr, trapFocus, setHtml } from '../utils/html';
+import { escapeHtml, escapeAttr, trapFocus, setHtml, toCssHex } from '../utils/html';
 import {
   getErrorMessage,
   Cosmetic,
@@ -500,14 +500,14 @@ export class SettingsUI {
 
         <p style="margin:var(--sp-2) 0;color:var(--text-dim);">${t('settings.account.twoFactor.manualEntry')}</p>
         <div style="display:flex;gap:var(--sp-2);align-items:center;margin-bottom:var(--sp-3);">
-          <code style="flex:1;padding:var(--sp-2);background:var(--bg-inset);border-radius:var(--radius);font-size:14px;letter-spacing:2px;word-break:break-all;user-select:all;">${setupData.secret}</code>
+          <code style="flex:1;padding:var(--sp-2);background:var(--bg-input);border-radius:var(--radius);font-size:14px;letter-spacing:2px;word-break:break-all;user-select:all;">${setupData.secret}</code>
           <button class="btn btn-secondary btn-sm" id="totp-copy-secret">${t('settings.account.twoFactor.copy')}</button>
         </div>
 
         <details style="margin-bottom:var(--sp-3);">
           <summary style="cursor:pointer;color:var(--text-dim);font-size:13px;">${t('settings.account.twoFactor.backupTitle')}</summary>
           <p style="margin:var(--sp-1) 0;color:var(--text-dim);font-size:13px;">${t('settings.account.twoFactor.backupDescription')}</p>
-          <pre style="padding:var(--sp-2);background:var(--bg-inset);border-radius:var(--radius);font-size:13px;user-select:all;">${setupData.backupCodes.join('\n')}</pre>
+          <pre style="padding:var(--sp-2);background:var(--bg-input);border-radius:var(--radius);font-size:13px;user-select:all;">${setupData.backupCodes.join('\n')}</pre>
         </details>
 
         <p style="margin:var(--sp-2) 0;color:var(--text-dim);">${t('settings.account.twoFactor.confirmCode')}</p>
@@ -1156,10 +1156,12 @@ export class SettingsUI {
               .map((c) => {
                 const owned = ownedIds.has(c.id);
                 const isEquipped = equippedId === c.id;
-                const preview =
-                  c.type === 'color' && c.config.hex
-                    ? `<span class="cosmetic-color-dot" style="background:${typeof c.config.hex === 'string' ? '#' + (c.config.hex as string).replace('0x', '') : '#fff'}"></span>`
-                    : '';
+                // config.hex is '#rrggbb' (admin editor) or a 0x number; prefixing '#' to the string
+                // form produced '##rrggbb', an invalid colour, so every swatch rendered blank.
+                const swatch = c.type === 'color' ? toCssHex(c.config.hex) : null;
+                const preview = swatch
+                  ? `<span class="cosmetic-color-dot" style="background:${swatch}"></span>`
+                  : '';
                 return `
                   <button class="cosmetic-item ${isEquipped ? 'equipped' : ''}" data-slot="${slot.type}" data-cosmetic-id="${c.id}"
                     ${!owned ? 'disabled' : ''}>
@@ -1230,10 +1232,8 @@ export class SettingsUI {
     let playerHex = getPlayerColorHex(0);
     if (equipped.colorId !== null) {
       const colorCosmetic = allCosmetics.find((c) => c.id === equipped.colorId);
-      if (colorCosmetic?.config.hex) {
-        const raw = colorCosmetic.config.hex as string;
-        playerHex = '#' + raw.replace('0x', '').replace('#', '');
-      }
+      const hex = toCssHex(colorCosmetic?.config.hex);
+      if (hex) playerHex = hex;
     }
 
     // Resolve eye style
@@ -1262,14 +1262,9 @@ export class SettingsUI {
     let bombFuseHex: string | undefined;
     if (equipped.bombSkinId !== null) {
       const bombCosmetic = allCosmetics.find((c) => c.id === equipped.bombSkinId);
-      if (bombCosmetic?.config.baseColor != null) {
-        const base = bombCosmetic.config.baseColor as number;
-        bombBaseHex = '#' + base.toString(16).padStart(6, '0');
-        if (bombCosmetic.config.fuseColor != null) {
-          const fuse = bombCosmetic.config.fuseColor as number;
-          bombFuseHex = '#' + fuse.toString(16).padStart(6, '0');
-        }
-      }
+      // Stored as 0x numbers or '#rrggbb' strings, like the colour cosmetics.
+      bombBaseHex = toCssHex(bombCosmetic?.config.baseColor) ?? undefined;
+      if (bombBaseHex) bombFuseHex = toCssHex(bombCosmetic?.config.fuseColor) ?? undefined;
     }
 
     // Draw bomb sprite
@@ -1289,12 +1284,7 @@ export class SettingsUI {
       if (equipped.trailId !== null) {
         const trailCosmetic = allCosmetics.find((c) => c.id === equipped.trailId);
         if (trailCosmetic) {
-          if (trailCosmetic.config.tint != null) {
-            const tint = trailCosmetic.config.tint as number;
-            trailDot.style.background = '#' + tint.toString(16).padStart(6, '0');
-          } else {
-            trailDot.style.background = 'var(--text)';
-          }
+          trailDot.style.background = toCssHex(trailCosmetic.config.tint) ?? 'var(--text)';
           trailDot.style.display = 'inline-block';
           trailLabel.textContent = trailCosmetic.name;
         }
@@ -1336,7 +1326,7 @@ export class SettingsUI {
 
     this.contentEl = this.container.querySelector('#settings-tab-content');
     await this.renderActiveTab();
-    this.pushGamepadContext();
+    // No context of its own when embedded: the lobby's covers .main-body, sidebar and Back.
   }
 
   destroy(): void {
@@ -1345,6 +1335,9 @@ export class SettingsUI {
   }
 
   private pushGamepadContext(): void {
+    // Embedded, a context of its own (pushed again on every tab switch) sat on top of the lobby's
+    // with no sidebar and a Back that did nothing — the pad user was stuck in Settings.
+    if (this.isEmbedded) return;
     const gpNav = UIGamepadNavigator.getInstance();
     gpNav.popContext('settings-ui');
     gpNav.pushContext({

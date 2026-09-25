@@ -1,9 +1,19 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
-import { ActiveChallengeInfo, ChallengeScore, TileType, GameMode, Room } from '@blast-arena/shared';
+import {
+  ActiveChallengeInfo,
+  ChallengeScore,
+  TileType,
+  GameMode,
+  Room,
+  gameModeName,
+} from '@blast-arena/shared';
 import { renderMapPreview } from '../../utils/mapPreview';
 import { escapeHtml, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
+
+/** The server caps room names at 50 characters; challenge titles may be up to 150. */
+const ROOM_NAME_MAX = 50;
 
 export class ChallengeView implements ILobbyView {
   readonly viewId = 'challenge';
@@ -12,9 +22,15 @@ export class ChallengeView implements ILobbyView {
   }
 
   private deps: ViewDeps;
+  private onJoinRoom: (room: Room) => void;
+  // render() awaits the API and then writes into the shared .main-body; once the user has moved
+  // on, that write landed on top of the next view.
+  private destroyed = false;
+  private creating = false;
 
-  constructor(deps: ViewDeps) {
+  constructor(deps: ViewDeps, onJoinRoom: (room: Room) => void) {
     this.deps = deps;
+    this.onJoinRoom = onJoinRoom;
   }
 
   async render(container: HTMLElement): Promise<void> {
@@ -27,6 +43,7 @@ export class ChallengeView implements ILobbyView {
       const res = await ApiClient.get<ActiveChallengeInfo | { challenge: null }>(
         '/challenges/active',
       );
+      if (this.destroyed) return;
       if (!res.challenge) {
         setHtml(
           container,
@@ -39,6 +56,7 @@ export class ChallengeView implements ILobbyView {
       }
       this.renderChallenge(container, res as ActiveChallengeInfo);
     } catch {
+      if (this.destroyed) return;
       setHtml(
         container,
         `<div class="panel-content" style="padding:1rem;"><p style="color:var(--danger);">${t('ui:challenge.loadError')}</p></div>`,
@@ -71,7 +89,7 @@ export class ChallengeView implements ILobbyView {
             </div>
             <div class="mini-stat" style="margin-bottom:0.25rem;">
               <span style="color:var(--text-muted);">${t('ui:challenge.mode')}:</span>
-              <span>${escapeHtml(challenge.gameMode.toUpperCase())}</span>
+              <span>${escapeHtml(t(gameModeName(challenge.gameMode), { defaultValue: challenge.gameMode }))}</span>
             </div>
             <div class="mini-stat" style="margin-bottom:0.5rem;">
               <span style="color:var(--text-muted);">${t('ui:challenge.dates')}:</span>
@@ -126,11 +144,15 @@ export class ChallengeView implements ILobbyView {
     }
 
     // Play button — creates a room with the challenge map
-    container.querySelector('#challenge-play-btn')?.addEventListener('click', () => {
+    const playBtn = container.querySelector<HTMLButtonElement>('#challenge-play-btn');
+    playBtn?.addEventListener('click', () => {
+      if (this.creating) return;
+      this.creating = true;
+      playBtn.disabled = true;
       this.deps.socketClient.emit(
         'room:create',
         {
-          name: challenge.title,
+          name: challenge.title.slice(0, ROOM_NAME_MAX).trim() || t('ui:challenge.title'),
           config: {
             gameMode: challenge.gameMode as GameMode,
             maxPlayers: 8,
@@ -141,10 +163,14 @@ export class ChallengeView implements ILobbyView {
           },
         },
         (response: { success: boolean; room?: Room; error?: string }) => {
+          this.creating = false;
           if (response.success && response.room) {
-            window.dispatchEvent(new CustomEvent('navigate-to-room', { detail: response.room }));
+            // Enter the room like RoomsView/CreateRoomView do. The old 'navigate-to-room' window
+            // event had no listener, so the user stayed here as host of a room they never saw.
+            this.onJoinRoom(response.room);
           } else {
-            this.deps.notifications.error(response.error || 'Failed to create room');
+            playBtn.disabled = false;
+            this.deps.notifications.error(response.error || t('ui:createRoom.createFailed'));
           }
         },
       );
@@ -152,6 +178,7 @@ export class ChallengeView implements ILobbyView {
   }
 
   destroy(): void {
-    // Nothing held between renders: no listeners on the shared container, no timers. (audit G4)
+    // No listeners on the shared container and no timers; only the in-flight render to stop.
+    this.destroyed = true;
   }
 }

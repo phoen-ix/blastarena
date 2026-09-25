@@ -93,6 +93,14 @@
     "deleteSuccess": "Kullanici kalici olarak silindi",
     "revokeSessions": "Oturumları iptal et",
     "revokeSessionsSuccess": "Kullanıcı oturumları iptal edildi",
+    "confirm": {
+      "roleTitle": "Rolu degistir",
+      "roleMessage": "{{username}} kullanicisinin rolu {{role}} olarak degistirilsin mi?",
+      "deactivateTitle": "Kullaniciyi devre disi birak",
+      "deactivateMessage": "{{username}} devre disi birakilsin mi? Kullanicinin oturumu kapatilir ve yeniden etkinlestirilene kadar giris yapamaz.",
+      "revokeTitle": "Oturumlari iptal et",
+      "revokeMessage": "{{username}} kullanicisinin tum oturumlari iptal edilsin mi? Tum cihazlarda oturumu kapatilir."
+    },
     "cleanup": {
       "button": "Account Cleanup",
       "title": "Account Cleanup",
@@ -175,6 +183,14 @@
     "replayEmptyOrCorrupted": "Tekrar verisi bos veya bozuk",
     "failedToLoadReplay": "Tekrar yuklenemedi",
     "statusAbandoned": "terk edilmis",
+    "statusLive": "devam ediyor",
+    "statuses": {
+      "waiting": "bekliyor",
+      "countdown": "geri sayim",
+      "playing": "oynaniyor",
+      "finished": "bitti",
+      "aborted": "iptal edildi"
+    },
     "durationSeconds": "{{duration}}sn"
   },
   "logs": {
@@ -289,6 +305,7 @@
     "cancelBtn": "Iptal",
     "sendBtn": "Gonder",
     "messageSent": "Mesaj gonderildi",
+    "messageFailed": "Mesaj gonderilemedi",
     "kickPlayerTitle": "{{code}} Odasindan Oyuncu At",
     "playerUserIdLabel": "Oyuncu Kullanici ID",
     "enterUserIdPlaceholder": "Kullanici ID girin",
@@ -600,7 +617,23 @@
     "revokeAllSuccess": "Tüm oturumlar iptal edildi",
     "spectatorActionsDesc": "Elenen oyuncuların duvar, meteor, güçlendirme ve hız bölgelerine enerji harcamasına izin verir (odalar bunu maç bazında yine de kapatabilir)",
     "spectatorActionsToggled": "İzleyici Oyun Yöneticisi {{status}}",
-    "spectatorActionsGlobal": "İzleyici Oyun Yöneticisi (genel)"
+    "spectatorActionsGlobal": "İzleyici Oyun Yöneticisi (genel)",
+    "openWorld": {
+      "title": "Acik Dunya",
+      "enabled": "Etkin",
+      "guestAccess": "Misafir Erisimi",
+      "maxPlayers": "Maks Oyuncu",
+      "roundTime": "Tur Suresi (sn)",
+      "mapWidth": "Harita Genisligi",
+      "mapHeight": "Harita Yuksekligi",
+      "wallDensity": "Duvar Yogunlugu",
+      "respawnDelay": "Yeniden Dogma Gecikmesi (sn)",
+      "afkTimeout": "AFK Zaman Asimi (sn)",
+      "afkTimeoutHint": "0 = devre disi",
+      "save": "Acik Dunya Ayarlarini Kaydet",
+      "saved": "Acik Dunya ayarlari kaydedildi",
+      "saveFailed": "Acik Dunya ayarlari kaydedilemedi"
+    }
   },
   "seasons": {
     "sectionTitle": "Sezon Yonetimi",
@@ -656,6 +689,12 @@
       "seasonEnded": "Sezon sona erdi ({{resetMode}} sifirlama)",
       "seasonDeleted": "Sezon silindi",
       "rankConfigSaved": "Derece yapilandirmasi kaydedildi"
+    },
+    "confirm": {
+      "activateTitle": "Sezonu etkinlestir",
+      "activateMessage": "\"{{name}}\" etkinlestirilsin mi? Diger aktif sezon devre disi birakilir.",
+      "deleteTitle": "Sezonu sil",
+      "deleteMessage": "\"{{name}}\" silinsin mi? Bu islem geri alinamaz."
     }
   },
   "campaign": {
@@ -883,6 +922,8 @@
       "watchBtn": "Izle",
       "deleteBtn": "Sil",
       "replayDeleted": "Kampanya tekrari silindi",
+      "deleteConfirmTitle": "Tekrari sil",
+      "deleteConfirm": "Bu tekrar silinsin mi? Bu islem geri alinamaz.",
       "loadingReplay": "Kampanya tekrari yukleniyor...",
       "replayEmptyOrCorrupted": "Tekrar verisi bos veya bozuk",
       "loadFailed": "Kampanya tekrari yuklenemedi",
@@ -1041,6 +1082,7 @@
     "globalToggle": "Meydan okuma sistemi",
     "enabled": "Meydan okumalar etkin",
     "toggleSaved": "Meydan okuma ayarı kaydedildi",
+    "toggleLoadFailed": "Meydan okuma ayari yuklenemedi",
     "title": "Harita meydan okumaları",
     "titleLabel": "Başlık",
     "description": "Açıklama",
@@ -1060,6 +1102,11 @@
     "activate": "Etkinleştir",
     "deactivate": "Devre dışı bırak",
     "deleteBtn": "Sil",
-    "none": "Henüz meydan okuma yok"
+    "none": "Henüz meydan okuma yok",
+    "statusActive": "Aktif",
+    "statusInactive": "Pasif",
+    "unknownCreator": "Bilinmiyor",
+    "deleteConfirmTitle": "Meydan okumayi sil",
+    "deleteConfirm": "\"{{title}}\" meydan okumasi silinsin mi? Bu islem geri alinamaz."
   }
 }

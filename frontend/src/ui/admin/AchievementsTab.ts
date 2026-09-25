@@ -11,6 +11,7 @@ import {
   AchievementBundleExportData,
   AchievementImportConflict,
   getErrorMessage,
+  gameModeName,
 } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
@@ -52,7 +53,16 @@ const PER_GAME_STATS = [
 
 const PER_GAME_OPERATORS = ['>=', '<=', '==', '>'];
 
-const GAME_MODES = ['ffa', 'teams', 'battle_royale', 'sudden_death', 'deathmatch', 'koth'];
+// Mode ids as matches record them. 'koth' matched no game, so a KOTH achievement could never be
+// earned; migration 043 moved stored conditions to 'king_of_the_hill'.
+const GAME_MODES = [
+  'ffa',
+  'teams',
+  'battle_royale',
+  'sudden_death',
+  'deathmatch',
+  'king_of_the_hill',
+];
 
 const MODE_SPECIFIC_STATS = ['wins', 'matches', 'kills'];
 
@@ -457,7 +467,7 @@ export class AchievementsTab {
           <div>
             <label class="field-label">${t('admin:achievements.conditionFields.gameMode')}</label>
             <select class="admin-select w-full mt-label" id="am-cond-mode">
-              ${GAME_MODES.map((m) => `<option value="${m}" ${cfg.mode === m ? 'selected' : ''}>${m}</option>`).join('')}
+              ${GAME_MODES.map((m) => `<option value="${m}" ${cfg.mode === m || (cfg.mode === 'koth' && m === 'king_of_the_hill') ? 'selected' : ''}>${escapeHtml(t(gameModeName(m)))}</option>`).join('')}
             </select>
           </div>
           <div>

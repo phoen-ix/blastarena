@@ -32,7 +32,9 @@
     "joined": "Odaya katilindi: {{name}}",
     "joinFailed": "Odaya katilma basarisiz",
     "loadFailed": "Odalar yuklenemedi: {{error}}",
-    "kicked": "Odadan atildiniz"
+    "kicked": "Odadan atildiniz",
+    "statusWaiting": "Bekliyor",
+    "statusPlaying": "Oynaniyor"
   },
   "maps": {
     "title": "Haritalarim",
@@ -306,7 +308,7 @@
     "noParty": "Bir partide degilsiniz.",
     "noPartyTitle": "Aktif Parti Yok",
     "noPartyDescription": "Bir odaya katilmadan once arkadaslarinizla takim kurmak icin parti olusturun.",
-    "noPartyTip": "Ipucu: Parti olusturduktan sonra Arkadaslar sayfasindan arkadaslarinizi davet edin.",
+    "noPartyTip": "Ipucu: Parti olusturduktan sonra bu sayfadaki \"+ Arkadas Davet Et\" ile arkadaslarinizi davet edin.",
     "chatHeader": "Parti Sohbeti",
     "chatPlaceholder": "Mesaj yazin...",
     "chatDisabled": "Sohbet su anda devre disi",
@@ -326,7 +328,7 @@
     "disbanded": "Parti dagitildi",
     "created": "Parti olusturuldu",
     "createFailed": "Parti olusturulamadi",
-    "useFriendsPanel": "Oyunculari davet etmek icin Arkadaslar panelini kullanin",
+    "usePartyPage": "Arkadaslarinizi Parti sayfasindan davet edin",
     "invitedToParty": "<strong>{{username}}</strong> sizi partisine davet etti",
     "invitedToRoom": "<strong>{{username}}</strong> sizi bir odaya davet etti",
     "accept": "Kabul Et",
@@ -387,7 +389,8 @@
     "date": "Date",
     "win": "WIN",
     "prev": "Prev",
-    "next": "Next"
+    "next": "Next",
+    "modeSummary": "%{{winRate}} galibiyet · {{kd}} K/D"
   },
   "createRoom": {
     "title": "Oda Olustur",
@@ -433,8 +436,8 @@
     "powerUps": "Guc-upler",
     "botCount": "Bot Sayisi",
     "none": "Yok",
-    "nBots": "{{count}} Bot",
-    "nBots_plural": "{{count}} Bot",
+    "nBots_one": "{{count}} Bot",
+    "nBots_other": "{{count}} Bot",
     "newMap": "+ Yeni Harita",
     "randomGenerated": "Rastgele (Uretilmis)",
     "communityMaps": "Topluluk Haritalari",
@@ -444,14 +447,14 @@
     "mapSpawnHint": "Bu haritada {{count}} dogma noktasi var (maks {{count}} oyuncu)",
     "mapDimensions": "{{width}}x{{height}} harita",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} dogma)",
+    "mapBy": "{{username}} tarafindan",
     "loadingPreview": "Önizleme yükleniyor...",
     "recordGame": "Oyunu Kaydet",
     "mapSizes": {
       "21": "21x21 (Kucuk)",
       "31": "31x31 (Normal)",
       "39": "39x39 (Buyuk)",
-      "51": "51x51 (Cok Buyuk)",
-      "61": "61x61 (Devasa)"
+      "51": "51x51 (Cok Buyuk)"
     },
     "wallDensities": {
       "low30": "Dusuk (%30)",
@@ -548,6 +551,7 @@
     "back": "← Geri",
     "inviteFriend": "Arkadas Davet Et",
     "inviteInfo": "Arkadaslarinizi bu odaya davet etmek icin Arkadaslar panelini (lobi) kullanin",
+    "noFriendsToInvite": "Davet edilecek cevrimici arkadas yok",
     "roomCode": "Oda Kodu:",
     "playersCount": "Oyuncular ({{current}}/{{max}})",
     "needPlayers": "Oyuncu veya Bot Gerekli",

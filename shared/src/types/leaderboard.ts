@@ -57,6 +57,8 @@ export interface PublicProfile {
     bestWinStreak: number;
     level: number;
     totalXp: number;
+    /** Seconds played in matches. */
+    totalPlaytime: number;
   };
   rankTier: string;
   rankColor: string;

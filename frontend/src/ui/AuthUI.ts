@@ -33,9 +33,22 @@ export class AuthUI {
     this.onClose = onClose ?? null;
     this.overlay = document.createElement('div');
     this.overlay.className = 'auth-overlay';
+    // Bound once: the overlay outlives every render, and binding this per render stacked one
+    // listener per form switch.
+    this.overlay.addEventListener('click', this.closeLangDropdownOnOutsideClick);
     this.loadPublicSettings();
     this.render();
   }
+
+  private closeLangDropdownOnOutsideClick = (e: MouseEvent): void => {
+    const toggle = this.overlay.querySelector('#auth-lang-toggle');
+    const dropdown = this.overlay.querySelector('#auth-lang-dropdown');
+    if (!toggle || !dropdown) return;
+    if (!toggle.contains(e.target as Node) && !dropdown.contains(e.target as Node)) {
+      dropdown.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+  };
 
   private async loadPublicSettings(): Promise<void> {
     try {
@@ -105,7 +118,7 @@ export class AuthUI {
       id: 'auth',
       elements: () => [
         ...this.overlay.querySelectorAll<HTMLElement>(
-          'input, .btn-primary, .auth-switch a, .auth-lang-toggle',
+          'input, .btn-primary, .auth-switch a, .auth-switch .auth-link, .auth-lang-toggle',
         ),
       ],
       onBack: () => {
@@ -177,12 +190,12 @@ export class AuthUI {
         ${
           this.registrationEnabled
             ? `<div class="auth-switch">
-          ${t('auth:login.noAccount')} <a id="switch-register">${t('auth:login.register')}</a>
+          ${t('auth:login.noAccount')} <button type="button" class="auth-link" id="switch-register">${t('auth:login.register')}</button>
         </div>`
             : ''
         }
         <div class="auth-switch">
-          <a id="switch-forgot">${t('auth:login.forgotPassword')}</a>
+          <button type="button" class="auth-link" id="switch-forgot">${t('auth:login.forgotPassword')}</button>
         </div>
         ${this.renderFooterLinks()}
       </div>
@@ -268,7 +281,7 @@ export class AuthUI {
         <div class="form-error" id="reg-error"></div>
         <button class="btn btn-primary" id="reg-btn">${t('auth:register.submit')}</button>
         <div class="auth-switch">
-          ${t('auth:register.hasAccount')} <a id="switch-login">${t('auth:register.login')}</a>
+          ${t('auth:register.hasAccount')} <button type="button" class="auth-link" id="switch-login">${t('auth:register.login')}</button>
         </div>
       </div>
     `,
@@ -301,7 +314,7 @@ export class AuthUI {
         <div class="form-error" id="forgot-error"></div>
         <button class="btn btn-primary" id="forgot-btn">${t('auth:forgotPassword.submit')}</button>
         <div class="auth-switch">
-          <a id="switch-login-back">${t('auth:forgotPassword.backToLogin')}</a>
+          <button type="button" class="auth-link" id="switch-login-back">${t('auth:forgotPassword.backToLogin')}</button>
         </div>
       </div>
     `,
@@ -368,14 +381,7 @@ export class AuthUI {
         }
       });
     });
-
-    // Close dropdown on outside click
-    this.overlay.addEventListener('click', (e) => {
-      if (!toggle.contains(e.target as Node) && !dropdown.contains(e.target as Node)) {
-        dropdown.classList.remove('open');
-        toggle.setAttribute('aria-expanded', 'false');
-      }
-    });
+    // Outside-click closing is bound once in the constructor.
   }
 
   private renderFooterLinks(): string {
@@ -440,7 +446,7 @@ export class AuthUI {
         <div class="form-error" id="totp-error"></div>
         <button class="btn btn-primary" id="totp-btn">${t('auth:totp.submit')}</button>
         <div class="auth-switch">
-          <a id="switch-login-back">${t('auth:totp.backToLogin')}</a>
+          <button type="button" class="auth-link" id="switch-login-back">${t('auth:totp.backToLogin')}</button>
         </div>
       </div>
     `,
@@ -533,15 +539,12 @@ export class AuthUI {
 
     btn.disabled = true;
     btn.textContent = t('auth:forgotPassword.submitting');
+    errorEl.textContent = '';
 
     try {
-      await (
-        await fetch('/api/auth/forgot-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
-        })
-      ).json();
+      // Through ApiClient so a 400/429 throws: the raw fetch read the body and said "sent" for
+      // any status. skipAuthRetry — there is no session here to refresh.
+      await ApiClient.post('/auth/forgot-password', { email }, true);
       this.notifications.info(t('auth:forgotPassword.success'));
       this.mode = 'login';
       this.render();
@@ -578,7 +581,7 @@ export class AuthUI {
         <button class="btn btn-primary" id="reset-btn">${t('auth:resetPassword.submit')}</button>
         <div class="auth-switch" id="reset-request-again"></div>
         <div class="auth-switch">
-          <a id="switch-login-back">${t('auth:resetPassword.backToLogin')}</a>
+          <button type="button" class="auth-link" id="switch-login-back">${t('auth:resetPassword.backToLogin')}</button>
         </div>
       </div>
     `,
@@ -601,12 +604,16 @@ export class AuthUI {
 
   /**
    * Offer the way out of a dead reset link. Rendered on demand rather than kept hidden in the
-   * markup: the gamepad navigator lists every `.auth-switch a`, and a hidden one has a zero rect.
+   * markup: the gamepad navigator lists every `.auth-switch .auth-link`, and a hidden one has a
+   * zero rect.
    */
   private showRequestNewLink(): void {
     const slot = this.overlay.querySelector('#reset-request-again');
     if (!slot || slot.querySelector('#switch-forgot')) return;
-    setHtml(slot, `<a id="switch-forgot">${t('auth:resetPassword.requestNewLink')}</a>`);
+    setHtml(
+      slot,
+      `<button type="button" class="auth-link" id="switch-forgot">${t('auth:resetPassword.requestNewLink')}</button>`,
+    );
     slot.querySelector('#switch-forgot')!.addEventListener('click', () => {
       this.mode = 'forgot';
       this.render();
@@ -666,13 +673,12 @@ export class AuthUI {
    * fall back to the raw error message.
    */
   private translateError(err: unknown): string {
-    const message = getErrorMessage(err);
-    // Try to extract error code from the error message or object
-    if (err && typeof err === 'object' && 'code' in err) {
-      const code = (err as { code: string }).code;
+    // ApiClient's ApiError carries the server's code (INVALID_CREDENTIALS, TOKEN_EXPIRED, ...).
+    const code = (err as { code?: unknown } | null)?.code;
+    if (typeof code === 'string' && code) {
       const translated = t(`errors:${code}`, { defaultValue: '' });
       if (translated) return translated;
     }
-    return message;
+    return getErrorMessage(err);
   }
 }

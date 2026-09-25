@@ -86,6 +86,7 @@ let LobbyUI: typeof import('../../src/ui/LobbyUI').LobbyUI;
 
 const authManager = {
   getUser: () => ({ id: 1, username: 'me', role: 'user' }),
+  getAccessToken: () => 'access-token',
   isGuest: false,
 } as unknown as AuthManager;
 const notifications = {

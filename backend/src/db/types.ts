@@ -317,6 +317,7 @@ export interface PublicProfileRow extends RowDataPacket {
   best_win_streak: number;
   total_xp: number;
   level: number;
+  total_playtime: number;
 }
 
 /** Cosmetic row */

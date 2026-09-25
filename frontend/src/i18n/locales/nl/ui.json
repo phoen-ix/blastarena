@@ -32,7 +32,9 @@
     "joined": "Kamer betreden: {{name}}",
     "joinFailed": "Kamer betreden mislukt",
     "loadFailed": "Kamers laden mislukt: {{error}}",
-    "kicked": "Je bent verwijderd"
+    "kicked": "Je bent verwijderd",
+    "statusWaiting": "Wachten",
+    "statusPlaying": "Bezig"
   },
   "maps": {
     "title": "Mijn kaarten",
@@ -306,7 +308,7 @@
     "noParty": "Je zit niet in een groep.",
     "noPartyTitle": "Geen actieve groep",
     "noPartyDescription": "Maak een groep aan om samen met vrienden een kamer te betreden.",
-    "noPartyTip": "Tip: Nodig vrienden uit via de Vriendenpagina nadat je een groep hebt aangemaakt.",
+    "noPartyTip": "Tip: Nodig na het aanmaken van een groep vrienden uit met \"+ Vriend uitnodigen\" op deze pagina.",
     "chatHeader": "Groepschat",
     "chatPlaceholder": "Typ een bericht...",
     "chatDisabled": "Chat is momenteel uitgeschakeld",
@@ -326,7 +328,7 @@
     "disbanded": "Groep opgeheven",
     "created": "Groep aangemaakt",
     "createFailed": "Groep aanmaken mislukt",
-    "useFriendsPanel": "Gebruik het Vriendenpaneel om spelers uit te nodigen",
+    "usePartyPage": "Nodig vrienden uit via de Groepspagina",
     "invitedToParty": "<strong>{{username}}</strong> heeft je uitgenodigd voor hun groep",
     "invitedToRoom": "<strong>{{username}}</strong> heeft je uitgenodigd voor een kamer",
     "accept": "Accepteren",
@@ -387,7 +389,8 @@
     "date": "Date",
     "win": "WIN",
     "prev": "Prev",
-    "next": "Next"
+    "next": "Next",
+    "modeSummary": "{{winRate}}% winst · {{kd}} K/D"
   },
   "createRoom": {
     "title": "Kamer aanmaken",
@@ -433,8 +436,8 @@
     "powerUps": "Power-ups",
     "botCount": "Aantal bots",
     "none": "Geen",
-    "nBots": "{{count}} bot",
-    "nBots_plural": "{{count}} bots",
+    "nBots_one": "{{count}} bot",
+    "nBots_other": "{{count}} bots",
     "newMap": "+ Nieuwe kaart",
     "randomGenerated": "Willekeurig (gegenereerd)",
     "communityMaps": "Communitykaarten",
@@ -444,14 +447,14 @@
     "mapSpawnHint": "Deze kaart heeft {{count}} spawnpunten (max. {{count}} spelers)",
     "mapDimensions": "{{width}}x{{height}} kaart",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} spawns)",
+    "mapBy": "door {{username}}",
     "loadingPreview": "Voorbeeld laden...",
     "recordGame": "Spel opnemen",
     "mapSizes": {
       "21": "21×21 (Klein)",
       "31": "31×31 (Normaal)",
       "39": "39×39 (Groot)",
-      "51": "51×51 (Enorm)",
-      "61": "61×61 (Massief)"
+      "51": "51×51 (Enorm)"
     },
     "wallDensities": {
       "low30": "Laag (30%)",
@@ -548,6 +551,7 @@
     "back": "← Terug",
     "inviteFriend": "Vriend uitnodigen",
     "inviteInfo": "Gebruik het Vriendenpaneel (lobby) om vrienden voor deze kamer uit te nodigen",
+    "noFriendsToInvite": "Geen vrienden online om uit te nodigen",
     "roomCode": "Kamercode:",
     "playersCount": "Spelers ({{current}}/{{max}})",
     "needPlayers": "Spelers of bots nodig",

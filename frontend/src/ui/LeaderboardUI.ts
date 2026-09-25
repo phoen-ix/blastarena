@@ -1,6 +1,6 @@
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
-import { escapeHtml, escapeAttr, setHtml } from '../utils/html';
+import { escapeHtml, safeCssColor, setHtml } from '../utils/html';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { t } from '../i18n';
 import {
@@ -23,7 +23,12 @@ export class LeaderboardUI {
   // Delegated profile-link handler on the embedded container (the persistent `.main-body`),
   // removed in destroy() — it used to accumulate one copy per visit. (audit C2)
   private profileClickHandler: ((e: Event) => void) | null = null;
+  private profileKeyHandler: ((e: KeyboardEvent) => void) | null = null;
   private embeddedContainer: HTMLElement | null = null;
+  private isEmbedded = false;
+  // Embedded, `container` is the lobby's shared .main-body: loads that finish after destroy()
+  // must not touch it.
+  private destroyed = false;
 
   constructor(
     notifications: NotificationUI,
@@ -52,6 +57,8 @@ export class LeaderboardUI {
   }
 
   async renderEmbedded(container: HTMLElement): Promise<void> {
+    this.isEmbedded = true;
+    this.destroyed = false;
     this.container = container;
     setHtml(
       this.container,
@@ -86,6 +93,16 @@ export class LeaderboardUI {
       }
     };
     this.container.addEventListener('click', this.profileClickHandler);
+    // Names are keyboard-focusable (tabindex) — Enter opens the profile like a click.
+    this.profileKeyHandler = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const target = (e.target as HTMLElement).closest('.lb-user-link') as HTMLElement | null;
+      if (target?.dataset.userId && this.onViewProfile) {
+        e.preventDefault();
+        this.onViewProfile(parseInt(target.dataset.userId, 10));
+      }
+    };
+    this.container.addEventListener('keydown', this.profileKeyHandler);
     this.embeddedContainer = this.container;
 
     this.currentPage = 1;
@@ -94,6 +111,7 @@ export class LeaderboardUI {
   }
 
   destroy(): void {
+    this.destroyed = true;
     this.unbindEmbeddedListeners();
     UIGamepadNavigator.getInstance().popContext('leaderboard-ui');
   }
@@ -102,8 +120,12 @@ export class LeaderboardUI {
     if (this.embeddedContainer && this.profileClickHandler) {
       this.embeddedContainer.removeEventListener('click', this.profileClickHandler);
     }
+    if (this.embeddedContainer && this.profileKeyHandler) {
+      this.embeddedContainer.removeEventListener('keydown', this.profileKeyHandler);
+    }
     this.embeddedContainer = null;
     this.profileClickHandler = null;
+    this.profileKeyHandler = null;
   }
 
   private pushGamepadContext(): void {
@@ -116,6 +138,9 @@ export class LeaderboardUI {
         ...this.container.querySelectorAll<HTMLElement>('#lb-prev, #lb-next'),
       ],
       onBack: () => {
+        // Embedded, `container` IS the lobby's `.main-body`: hide() would remove it and leave the
+        // lobby shell empty. The lobby context's own onBack handles navigation.
+        if (this.isEmbedded) return;
         this.hide();
         this.onBack();
       },
@@ -170,9 +195,11 @@ export class LeaderboardUI {
       const seasonsResp = await ApiClient.get<{ seasons: Season[]; total: number }>(
         '/leaderboard/seasons',
       );
+      if (this.destroyed) return;
       this.seasons = seasonsResp.seasons ?? [];
       this.populateSeasonSelect();
     } catch (err: unknown) {
+      if (this.destroyed) return;
       this.notifications.error(getErrorMessage(err));
     }
     await this.loadLeaderboard();
@@ -205,16 +232,20 @@ export class LeaderboardUI {
   }
 
   private async loadLeaderboard(): Promise<void> {
-    const tableContainer = this.container.querySelector('#lb-table-container')!;
+    if (this.destroyed) return;
+    const tableContainer = this.container.querySelector('#lb-table-container');
+    if (!tableContainer) return;
     setHtml(tableContainer, `<div class="lb-status">${t('ui:leaderboard.loading')}</div>`);
 
     try {
       let url = `/leaderboard?page=${this.currentPage}&limit=${PAGE_LIMIT}`;
       if (this.currentSeasonId) url += `&season_id=${this.currentSeasonId}`;
       const data = await ApiClient.get<LeaderboardResponse>(url);
+      if (this.destroyed) return;
       this.renderTable(data);
       this.renderPagination(data);
     } catch (err: unknown) {
+      if (this.destroyed) return;
       setHtml(
         tableContainer,
         `<div class="lb-status error">${escapeHtml(t('ui:leaderboard.loadFailed', { error: getErrorMessage(err) }))}</div>`,
@@ -254,13 +285,13 @@ export class LeaderboardUI {
   }
 
   private renderRow(entry: LeaderboardEntry): string {
-    const rankBadge = `<span class="lb-rank-pill" style="background:${escapeAttr(entry.rankColor)}">${escapeHtml(entry.rankTier)}</span>`;
+    const rankBadge = `<span class="lb-rank-pill" style="background:${safeCssColor(entry.rankColor, 'var(--primary)')}">${escapeHtml(entry.rankTier)}</span>`;
 
     return `
       <tr>
         <td class="lb-rank-col">${entry.rank}</td>
         <td>
-          <span class="lb-user-link" data-user-id="${entry.userId}">${escapeHtml(entry.username)}</span>
+          <span class="lb-user-link" data-user-id="${entry.userId}" role="link" tabindex="0">${escapeHtml(entry.username)}</span>
         </td>
         <td><span class="lb-level-pill">${entry.level}</span></td>
         <td class="lb-elo-col">${entry.eloRating}</td>

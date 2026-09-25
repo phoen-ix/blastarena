@@ -2,7 +2,7 @@ import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
 import { escapeHtml, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
-import { GameState, ReplayData } from '@blast-arena/shared';
+import { GameState, ReplayData, RoomListItem, gameModeName } from '@blast-arena/shared';
 import { game } from '../../main';
 import { t } from '../../i18n';
 
@@ -67,6 +67,9 @@ export class MatchesTab {
   private notifications: NotificationUI;
   private page = 1;
   private isAdmin = false;
+  // Codes of rooms with a match running right now. A playing/countdown row without finished_at
+  // is live when its room is still playing, and abandoned otherwise — all were "abandoned".
+  private liveRoomCodes = new Set<string>();
 
   constructor(notifications: NotificationUI, isAdmin = false) {
     this.notifications = notifications;
@@ -89,9 +92,12 @@ export class MatchesTab {
     if (!this.container) return;
 
     try {
-      const result = await ApiClient.get<AdminMatchListResponse>(
-        `/admin/matches?page=${this.page}&limit=20`,
-      );
+      const [result, rooms] = await Promise.all([
+        ApiClient.get<AdminMatchListResponse>(`/admin/matches?page=${this.page}&limit=20`),
+        ApiClient.get<RoomListItem[]>('/admin/rooms').catch(() => [] as RoomListItem[]),
+      ]);
+      if (!this.container) return; // tab closed while loading
+      this.liveRoomCodes = new Set(rooms.filter((r) => r.status === 'playing').map((r) => r.code));
       const totalPages = Math.ceil(result.total / result.limit);
 
       const colCount = this.isAdmin ? 9 : 8;
@@ -126,7 +132,7 @@ export class MatchesTab {
               <tr style="cursor:pointer;" data-match-id="${m.id}">
                 <td>${m.id}</td>
                 <td>${escapeHtml(m.room_code)}</td>
-                <td>${escapeHtml(m.game_mode)}</td>
+                <td>${this.modeLabel(m.game_mode)}</td>
                 <td>${m.player_count}</td>
                 <td>${m.duration ? t('admin:matches.durationSeconds', { duration: m.duration }) : '-'}</td>
                 <td>${m.winner_username ? escapeHtml(m.winner_username) : '-'}</td>
@@ -150,6 +156,7 @@ export class MatchesTab {
 
       this.container.addEventListener('click', this.handleClick);
     } catch {
+      if (!this.container) return;
       setHtml(
         this.container,
         `<div style="color:var(--danger);">${t('admin:matches.failedToLoad')}</div>`,
@@ -257,9 +264,9 @@ export class MatchesTab {
           <h2 style="margin-bottom:16px;">${t('admin:matches.detailTitle', { matchId: match.id })}</h2>
           <div style="margin-bottom:16px;">
             <div class="match-detail-row"><span class="label">${t('admin:matches.detailRoomCode')}</span><span class="value">${escapeHtml(match.roomCode)}</span></div>
-            <div class="match-detail-row"><span class="label">${t('admin:matches.detailGameMode')}</span><span class="value">${escapeHtml(match.gameMode)}</span></div>
+            <div class="match-detail-row"><span class="label">${t('admin:matches.detailGameMode')}</span><span class="value">${this.modeLabel(match.gameMode)}</span></div>
             <div class="match-detail-row"><span class="label">${t('admin:matches.detailMap')}</span><span class="value">${t('admin:matches.detailMapValue', { width: match.mapWidth, height: match.mapHeight, seed: match.mapSeed })}</span></div>
-            <div class="match-detail-row"><span class="label">${t('admin:matches.detailStatus')}</span><span class="value">${match.status}</span></div>
+            <div class="match-detail-row"><span class="label">${t('admin:matches.detailStatus')}</span><span class="value">${this.statusText(match.status)}</span></div>
             <div class="match-detail-row"><span class="label">${t('admin:matches.detailDuration')}</span><span class="value">${match.duration ? t('admin:matches.durationSeconds', { duration: match.duration }) : '-'}</span></div>
             <div class="match-detail-row"><span class="label">${t('admin:matches.detailStarted')}</span><span class="value">${match.startedAt ? new Date(match.startedAt).toLocaleString() : '-'}</span></div>
             <div class="match-detail-row"><span class="label">${t('admin:matches.detailFinished')}</span><span class="value">${match.finishedAt ? new Date(match.finishedAt).toLocaleString() : '-'}</span></div>
@@ -354,17 +361,33 @@ export class MatchesTab {
     }
   }
 
+  private modeLabel(mode: string): string {
+    return escapeHtml(t(gameModeName(mode), { defaultValue: mode }));
+  }
+
+  /** Unfinished (playing/countdown, no finished_at): live if its room is still playing. */
+  private unfinishedState(m: AdminMatchListItem): 'live' | 'abandoned' | null {
+    if ((m.status !== 'playing' && m.status !== 'countdown') || m.finished_at) return null;
+    return this.liveRoomCodes.has(m.room_code) ? 'live' : 'abandoned';
+  }
+
   private statusBadgeClass(m: AdminMatchListItem): string {
     if (m.status === 'finished') return 'active';
     if (m.status === 'aborted') return 'deactivated';
-    // playing/countdown without a finished_at is likely abandoned
-    if ((m.status === 'playing' || m.status === 'countdown') && !m.finished_at) return 'banned';
+    const unfinished = this.unfinishedState(m);
+    if (unfinished === 'live') return 'admin';
+    if (unfinished === 'abandoned') return 'banned';
     return 'user';
   }
 
   private statusLabel(m: AdminMatchListItem): string {
-    if ((m.status === 'playing' || m.status === 'countdown') && !m.finished_at)
-      return t('admin:matches.statusAbandoned');
-    return m.status;
+    const unfinished = this.unfinishedState(m);
+    if (unfinished === 'live') return t('admin:matches.statusLive');
+    if (unfinished === 'abandoned') return t('admin:matches.statusAbandoned');
+    return this.statusText(m.status);
+  }
+
+  private statusText(status: string): string {
+    return escapeHtml(t(`admin:matches.statuses.${status}`, { defaultValue: status }));
   }
 }

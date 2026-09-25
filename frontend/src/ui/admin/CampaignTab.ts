@@ -25,7 +25,7 @@ import {
   getErrorMessage,
 } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
-import { createModal } from '../../utils/modal';
+import { createModal, confirmModal } from '../../utils/modal';
 import { EnemyTextureGenerator } from '../../game/EnemyTextureGenerator';
 import { game } from '../../main';
 import { ensureLevelEditorScene } from '../../scenes/levelEditorLoader';
@@ -541,12 +541,13 @@ export class CampaignTab {
       world.levels = [];
     }
 
-    // Re-render the levels section inline
-    const levelsEl = this.container?.querySelector(`#camp-levels-${world.id}`);
+    // Re-render the levels section inline. Bind only inside the section just rendered: binding
+    // across #camp-content re-bound every other expanded world's buttons, so "Add level" created
+    // duplicate levels and Delete asked twice.
+    const levelsEl = this.container?.querySelector<HTMLElement>(`#camp-levels-${world.id}`);
     if (levelsEl) {
       setHtml(levelsEl, this.renderLevelsSection(world));
-      const content = this.container?.querySelector('#camp-content') as HTMLElement;
-      if (content) this.attachLevelHandlers(content);
+      this.attachLevelHandlers(levelsEl);
     }
   }
 
@@ -1545,7 +1546,9 @@ export class CampaignTab {
         }
       });
 
-      this.attachCampaignReplayHandlers(content as HTMLElement);
+      // Same function every page, so re-adding it on the persistent #camp-content is a no-op.
+      // An inline listener here stacked one per page: Watch opened N replays, Delete ran N times.
+      content.addEventListener('click', this.onCampaignReplayClick);
     } catch (err: unknown) {
       setHtml(
         content,
@@ -1594,29 +1597,33 @@ export class CampaignTab {
     `;
   }
 
-  private attachCampaignReplayHandlers(content: HTMLElement): void {
-    content.addEventListener('click', async (e) => {
-      const target = e.target as HTMLElement;
+  private onCampaignReplayClick = async (e: Event): Promise<void> => {
+    const target = e.target as HTMLElement;
 
-      if (target.classList.contains('camp-replay-watch')) {
-        const sessionId = target.dataset.session;
-        if (sessionId) await this.launchCampaignReplay(sessionId);
-      }
+    if (target.classList.contains('camp-replay-watch')) {
+      const sessionId = target.dataset.session;
+      if (sessionId) await this.launchCampaignReplay(sessionId);
+    }
 
-      if (target.classList.contains('camp-replay-delete')) {
-        const sessionId = target.dataset.session;
-        if (sessionId) {
-          try {
-            await ApiClient.delete(`/admin/campaign-replays/${sessionId}`);
-            this.notifications.success(t('admin:campaign.replays.replayDeleted'));
-            this.loadCampaignReplays();
-          } catch (err: unknown) {
-            this.notifications.error(getErrorMessage(err));
-          }
-        }
+    if (target.classList.contains('camp-replay-delete')) {
+      const sessionId = target.dataset.session;
+      if (!sessionId) return;
+      const confirmed = await confirmModal({
+        title: t('admin:campaign.replays.deleteConfirmTitle'),
+        message: t('admin:campaign.replays.deleteConfirm'),
+        confirmLabel: t('admin:campaign.replays.deleteBtn'),
+        danger: true,
+      });
+      if (!confirmed) return;
+      try {
+        await ApiClient.delete(`/admin/campaign-replays/${sessionId}`);
+        this.notifications.success(t('admin:campaign.replays.replayDeleted'));
+        this.loadCampaignReplays();
+      } catch (err: unknown) {
+        this.notifications.error(getErrorMessage(err));
       }
-    });
-  }
+    }
+  };
 
   private async launchCampaignReplay(sessionId: string): Promise<void> {
     try {

@@ -14,6 +14,7 @@ import {
   ChatMode,
   THEME_IDS,
   THEME_NAMES,
+  ROOM_MAP_SIZES,
 } from '@blast-arena/shared';
 import type { ThemeId } from '@blast-arena/shared';
 
@@ -67,10 +68,14 @@ export class DashboardTab {
   }
 
   async render(parent: HTMLElement): Promise<void> {
-    this.container = document.createElement('div');
-    parent.appendChild(this.container);
+    const container = document.createElement('div');
+    this.container = container;
+    parent.appendChild(container);
     await this.loadStats();
     await this.loadSettings();
+    // destroy() ran during the loads (a quick tab switch): starting the poll now would leak it.
+    if (this.container !== container) return;
+    if (this.refreshInterval) clearInterval(this.refreshInterval);
     this.refreshInterval = setInterval(() => this.loadStats(), 30000);
   }
 
@@ -276,50 +281,50 @@ export class DashboardTab {
         </div>
       </div>
 
-      <h3 style="margin-top:var(--sp-4);">Open World</h3>
+      <h3 style="margin-top:var(--sp-4);">${t('admin:dashboard.openWorld.title')}</h3>
       <div class="settings-grid" id="ow-settings-grid">
         <div class="setting-item">
           <label class="setting-item-checkbox">
             <input type="checkbox" id="ow-enabled" ${this.owSettings.enabled ? 'checked' : ''}>
-            <span class="setting-item-label">Enabled</span>
+            <span class="setting-item-label">${t('admin:dashboard.openWorld.enabled')}</span>
           </label>
         </div>
         <div class="setting-item">
           <label class="setting-item-checkbox">
             <input type="checkbox" id="ow-guest-access" ${this.owSettings.guestAccess ? 'checked' : ''}>
-            <span class="setting-item-label">Guest Access</span>
+            <span class="setting-item-label">${t('admin:dashboard.openWorld.guestAccess')}</span>
           </label>
         </div>
         <div class="setting-item">
-          <span class="setting-item-label">Max Players</span>
+          <span class="setting-item-label">${t('admin:dashboard.openWorld.maxPlayers')}</span>
           <input id="ow-max-players" type="number" min="2" max="50" value="${this.owSettings.maxPlayers}" class="admin-select" style="width:70px;">
         </div>
         <div class="setting-item">
-          <span class="setting-item-label">Round Time (s)</span>
+          <span class="setting-item-label">${t('admin:dashboard.openWorld.roundTime')}</span>
           <input id="ow-round-time" type="number" min="60" max="3600" value="${this.owSettings.roundTime}" class="admin-select" style="width:80px;">
         </div>
         <div class="setting-item">
-          <span class="setting-item-label">Map Width</span>
+          <span class="setting-item-label">${t('admin:dashboard.openWorld.mapWidth')}</span>
           <input id="ow-map-width" type="number" min="21" max="101" step="2" value="${this.owSettings.mapWidth}" class="admin-select" style="width:70px;">
         </div>
         <div class="setting-item">
-          <span class="setting-item-label">Map Height</span>
+          <span class="setting-item-label">${t('admin:dashboard.openWorld.mapHeight')}</span>
           <input id="ow-map-height" type="number" min="21" max="101" step="2" value="${this.owSettings.mapHeight}" class="admin-select" style="width:70px;">
         </div>
         <div class="setting-item">
-          <span class="setting-item-label">Wall Density</span>
+          <span class="setting-item-label">${t('admin:dashboard.openWorld.wallDensity')}</span>
           <input id="ow-wall-density" type="number" min="0.1" max="0.9" step="0.1" value="${this.owSettings.wallDensity}" class="admin-select" style="width:70px;">
         </div>
         <div class="setting-item">
-          <span class="setting-item-label">Respawn Delay (s)</span>
+          <span class="setting-item-label">${t('admin:dashboard.openWorld.respawnDelay')}</span>
           <input id="ow-respawn-delay" type="number" min="1" max="30" value="${this.owSettings.respawnDelay}" class="admin-select" style="width:70px;">
         </div>
         <div class="setting-item">
-          <span class="setting-item-label">AFK Timeout (s)</span>
-          <input id="ow-afk-timeout" type="number" min="0" max="600" value="${this.owSettings.afkTimeoutSeconds}" class="admin-select" style="width:70px;" title="0 = disabled">
+          <span class="setting-item-label">${t('admin:dashboard.openWorld.afkTimeout')}</span>
+          <input id="ow-afk-timeout" type="number" min="0" max="600" value="${this.owSettings.afkTimeoutSeconds}" class="admin-select" style="width:70px;" title="${escapeAttr(t('admin:dashboard.openWorld.afkTimeoutHint'))}">
         </div>
         <div class="setting-item">
-          <button id="ow-save-btn" class="btn btn-primary" style="padding:6px 16px;font-size:13px;">Save Open World Settings</button>
+          <button id="ow-save-btn" class="btn btn-primary" style="padding:6px 16px;font-size:13px;">${t('admin:dashboard.openWorld.save')}</button>
         </div>
       </div>
 
@@ -413,9 +418,9 @@ export class DashboardTab {
       try {
         await ApiClient.put('/admin/settings/open_world', settings);
         this.owSettings = settings;
-        this.notifications.success('Open World settings saved');
+        this.notifications.success(t('admin:dashboard.openWorld.saved'));
       } catch {
-        this.notifications.error('Failed to save Open World settings');
+        this.notifications.error(t('admin:dashboard.openWorld.saveFailed'));
       }
     });
 
@@ -812,9 +817,10 @@ export class DashboardTab {
       current?: string | number,
     ) => {
       const val = current !== undefined ? String(current) : '';
+      // Labels include admin-uploaded bot AI names: escaped like any other data.
       return `<select id="${id}" class="admin-select w-full">
         <option value="">${t('admin:dashboard.defaultOption')}</option>
-        ${options.map((o) => `<option value="${o.value}" ${val === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+        ${options.map((o) => `<option value="${escapeAttr(o.value)}" ${val === o.value ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
       </select>`;
     };
 
@@ -844,13 +850,10 @@ export class DashboardTab {
       { value: '300', label: t('admin:dashboard.roundTime5min') },
       { value: '600', label: t('admin:dashboard.roundTime10min') },
     ];
-    const mapSizeOpts = [
-      { value: '21', label: '21x21' },
-      { value: '31', label: '31x31' },
-      { value: '39', label: '39x39' },
-      { value: '51', label: '51x51' },
-      { value: '61', label: '61x61' },
-    ];
+    const mapSizeOpts = ROOM_MAP_SIZES.map((size) => ({
+      value: String(size),
+      label: `${size}x${size}`,
+    }));
     const wallDensityOpts = [
       { value: '0.3', label: '30%' },
       { value: '0.5', label: '50%' },
@@ -1005,6 +1008,21 @@ export class DashboardTab {
       const isHidden = getComputedStyle(body).display === 'none';
       body.style.display = isHidden ? 'block' : 'none';
       arrow.style.transform = isHidden ? 'rotate(90deg)' : '';
+    });
+
+    // An unset toggle renders with data-indeterminate ("use the default") and collectDefaults
+    // skips it — which it kept doing after the admin clicked it, so the choice was never saved.
+    // The power-up checks are one setting: touching any of them makes the whole list explicit.
+    body.addEventListener('change', (e) => {
+      const input = e.target as HTMLInputElement;
+      if (input.type !== 'checkbox' || !input.dataset.indeterminate) return;
+      const group = input.classList.contains(`${prefix}-powerup-check`)
+        ? Array.from(body.querySelectorAll<HTMLInputElement>(`.${prefix}-powerup-check`))
+        : [input];
+      for (const el of group) {
+        delete el.dataset.indeterminate;
+        el.closest('label')?.querySelector('.default-indicator')?.remove();
+      }
     });
 
     // Save

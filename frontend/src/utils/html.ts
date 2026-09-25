@@ -2,9 +2,18 @@ import DOMPurify, { type Config } from 'dompurify';
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
+/**
+ * Controls that use the arrow keys themselves: the caret in a text field, the value of a select
+ * or range input, the choice in a radio group. Moving focus away on an arrow press broke them.
+ */
+const OWNS_ARROW_KEYS = 'input, textarea, select, [role="radio"], [contenteditable="true"]';
+
 /** Trap Tab/Arrow focus within a modal element. Returns a cleanup function. */
 export function trapFocus(modal: HTMLElement): () => void {
   const handler = (e: KeyboardEvent) => {
+    if (e.key.startsWith('Arrow') && (e.target as Element | null)?.closest?.(OWNS_ARROW_KEYS)) {
+      return;
+    }
     const focusable = Array.from(modal.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
       (el) => !el.hasAttribute('disabled') && el.offsetParent !== null,
     );
@@ -68,11 +77,38 @@ export function escapeHtml(text: string): string {
 }
 
 export function escapeAttr(text: string): string {
+  // `&` first: a value like `a&quot;b` would otherwise be decoded back to `a"b` by the parser.
   return text
+    .replace(/&/g, '&amp;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+const STRICT_HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+/**
+ * A server-supplied colour for a `style` attribute: kept only when it is a strict `#hex`,
+ * otherwise `fallback` (a CSS variable). Anything else could close the declaration and add its own.
+ */
+export function safeCssColor(value: unknown, fallback: string): string {
+  return typeof value === 'string' && STRICT_HEX_COLOR.test(value) ? value : fallback;
+}
+
+/**
+ * `#rrggbb` for a colour stored as a `#rrggbb` / `0xrrggbb` string or a 0xRRGGBB number (cosmetic
+ * configs hold both), or null when it is neither.
+ */
+export function toCssHex(value: unknown): string | null {
+  if (typeof value === 'number') {
+    return Number.isInteger(value) && value >= 0 && value <= 0xffffff
+      ? `#${value.toString(16).padStart(6, '0')}`
+      : null;
+  }
+  if (typeof value !== 'string') return null;
+  const hex = value.trim().replace(/^(#|0x)/i, '');
+  return /^[0-9a-f]{6}$/i.test(hex) ? `#${hex.toLowerCase()}` : null;
 }
 
 /**

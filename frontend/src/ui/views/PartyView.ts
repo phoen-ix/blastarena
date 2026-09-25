@@ -25,15 +25,13 @@ export class PartyView implements ILobbyView {
   private deps: ViewDeps;
   private container: HTMLElement | null = null;
   private partyBar: PartyBar;
-  private party: Party | null = null;
   private chatMessages: PartyChatMessage[] = [];
   private chatMode: ChatMode = 'everyone';
   private currentUserId: number;
   private currentUserRole: string;
+  private unsubscribeParty: () => void;
 
   // Socket handlers
-  private partyStateHandler!: ServerToClientEvents['party:state'];
-  private partyDisbandedHandler!: ServerToClientEvents['party:disbanded'];
   private partyChatHandler!: ServerToClientEvents['party:chat'];
   private settingsChangedHandler!: ServerToClientEvents['admin:settingsChanged'];
 
@@ -43,9 +41,19 @@ export class PartyView implements ILobbyView {
     const user = deps.authManager.getUser();
     this.currentUserId = user?.id ?? 0;
     this.currentUserRole = user?.role ?? 'user';
-    this.party = partyBar.getParty();
+    // Party state lives in the PartyBar only. This view used to keep a copy with its own
+    // party:state/party:disbanded handlers, so a party created or left in one of them stayed
+    // stale in the other.
+    this.unsubscribeParty = partyBar.onPartyChange((party) => {
+      if (!party) this.chatMessages = [];
+      this.renderView();
+    });
     this.setupSocketListeners();
     this.loadChatMode();
+  }
+
+  private get party(): Party | null {
+    return this.partyBar.getParty();
   }
 
   async render(container: HTMLElement): Promise<void> {
@@ -55,28 +63,14 @@ export class PartyView implements ILobbyView {
 
   destroy(): void {
     this.container = null;
+    this.unsubscribeParty();
     const sc = this.deps.socketClient;
-    sc.off('party:state', this.partyStateHandler);
-    sc.off('party:disbanded', this.partyDisbandedHandler);
     sc.off('party:chat', this.partyChatHandler);
     sc.off('admin:settingsChanged', this.settingsChangedHandler);
   }
 
   private setupSocketListeners(): void {
     const sc = this.deps.socketClient;
-
-    this.partyStateHandler = (party: Party) => {
-      this.party = party;
-      this.renderView();
-    };
-    sc.on('party:state', this.partyStateHandler);
-
-    this.partyDisbandedHandler = () => {
-      this.party = null;
-      this.chatMessages = [];
-      this.renderView();
-    };
-    sc.on('party:disbanded', this.partyDisbandedHandler);
 
     this.partyChatHandler = (msg: PartyChatMessage) => {
       this.chatMessages.push(msg);
@@ -235,33 +229,13 @@ export class PartyView implements ILobbyView {
       inviteBtn.addEventListener('click', () => this.showInviteModal());
     }
 
-    // Leave button
-    const leaveBtn = this.container.querySelector('#party-page-leave');
-    if (leaveBtn) {
-      leaveBtn.addEventListener('click', () => {
-        this.deps.socketClient.emit('party:leave', (res) => {
-          if (res.success) {
-            this.party = null;
-            this.chatMessages = [];
-            this.renderView();
-          }
-        });
-      });
-    }
-
-    // Disband button
-    const disbandBtn = this.container.querySelector('#party-page-disband');
-    if (disbandBtn) {
-      disbandBtn.addEventListener('click', () => {
-        this.deps.socketClient.emit('party:leave', (res) => {
-          if (res.success) {
-            this.party = null;
-            this.chatMessages = [];
-            this.renderView();
-          }
-        });
-      });
-    }
+    // Leave / disband (the leader leaving disbands) — through the bar, which notifies both
+    this.container
+      .querySelector('#party-page-leave')
+      ?.addEventListener('click', () => this.partyBar.leaveParty());
+    this.container
+      .querySelector('#party-page-disband')
+      ?.addEventListener('click', () => this.partyBar.leaveParty());
 
     // Kick buttons
     this.container.querySelectorAll('.party-kick-btn').forEach((btn) => {

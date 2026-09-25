@@ -1,6 +1,6 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
-import { Friend, FriendRequest, ActivityStatus } from '@blast-arena/shared';
+import { Friend, FriendRequest, ActivityStatus, Room } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, enableKeyboardActions, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
@@ -14,6 +14,8 @@ export class FriendsView implements ILobbyView {
   private deps: ViewDeps;
   private container: HTMLElement | null = null;
   private onMessageFriend: (userId: number, username: string) => void;
+  private onJoinRoom: (room: Room) => void;
+  private joinPending = false;
 
   private activeTab: 'friends' | 'requests' | 'blocked' = 'friends';
   private friends: Friend[] = [];
@@ -30,7 +32,11 @@ export class FriendsView implements ILobbyView {
   }) => void;
   private friendRequestHandler!: (data: FriendRequest) => void;
   private friendRemovedHandler!: (data: { userId: number }) => void;
-  private friendOnlineHandler!: (data: { userId: number; activity: ActivityStatus }) => void;
+  private friendOnlineHandler!: (data: {
+    userId: number;
+    activity: ActivityStatus;
+    roomCode?: string;
+  }) => void;
   private friendOfflineHandler!: (data: { userId: number }) => void;
 
   // Delegated DOM handlers on the persistent `.main-body`, removed in destroy(). They used to be
@@ -40,9 +46,14 @@ export class FriendsView implements ILobbyView {
   private disposeKeyboardActions: (() => void) | null = null;
   private boundContainer: HTMLElement | null = null;
 
-  constructor(deps: ViewDeps, onMessageFriend: (userId: number, username: string) => void) {
+  constructor(
+    deps: ViewDeps,
+    onMessageFriend: (userId: number, username: string) => void,
+    onJoinRoom: (room: Room) => void,
+  ) {
     this.deps = deps;
     this.onMessageFriend = onMessageFriend;
+    this.onJoinRoom = onJoinRoom;
     this.setupSocketListeners();
   }
 
@@ -150,9 +161,16 @@ export class FriendsView implements ILobbyView {
           break;
         }
         case 'join': {
+          if (this.joinPending) break;
+          this.joinPending = true;
           const roomCode = btn.dataset.room!;
           sc.emit('room:join', { code: roomCode }, (res) => {
-            if (!res.success) {
+            this.joinPending = false;
+            if (res.success && res.room) {
+              // Into the room the same way RoomsView does. Before, a successful join left the
+              // user on this page, in a room whose UI never opened.
+              this.onJoinRoom(res.room);
+            } else {
               this.deps.notifications.error(res.error || t('ui:friends.joinFailed'));
             }
           });
@@ -296,10 +314,12 @@ export class FriendsView implements ILobbyView {
     };
     sc.on('friend:removed', this.friendRemovedHandler);
 
-    this.friendOnlineHandler = (data: { userId: number; activity: ActivityStatus }) => {
+    this.friendOnlineHandler = (data) => {
       const friend = this.friends.find((f) => f.userId === data.userId);
       if (friend) {
         friend.activity = data.activity;
+        // Set while the friend sits in a waiting room: drives the Join button live.
+        friend.roomCode = data.roomCode;
         this.renderContent();
       }
     };
@@ -309,6 +329,7 @@ export class FriendsView implements ILobbyView {
       const friend = this.friends.find((f) => f.userId === data.userId);
       if (friend) {
         friend.activity = 'offline';
+        friend.roomCode = undefined;
         this.renderContent();
       }
     };

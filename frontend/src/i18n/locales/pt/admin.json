@@ -93,6 +93,14 @@
     "deleteSuccess": "Usuário excluído permanentemente",
     "revokeSessions": "Revogar sessões",
     "revokeSessionsSuccess": "Sessões do usuário revogadas",
+    "confirm": {
+      "roleTitle": "Alterar função",
+      "roleMessage": "Alterar a função de {{username}} para {{role}}?",
+      "deactivateTitle": "Desativar usuário",
+      "deactivateMessage": "Desativar {{username}}? O usuário será desconectado e não poderá entrar até ser reativado.",
+      "revokeTitle": "Revogar sessões",
+      "revokeMessage": "Revogar todas as sessões de {{username}}? O usuário será desconectado em todos os dispositivos."
+    },
     "cleanup": {
       "button": "Account Cleanup",
       "title": "Account Cleanup",
@@ -175,6 +183,14 @@
     "replayEmptyOrCorrupted": "Dados do replay estão vazios ou corrompidos",
     "failedToLoadReplay": "Falha ao carregar replay",
     "statusAbandoned": "abandonada",
+    "statusLive": "em andamento",
+    "statuses": {
+      "waiting": "aguardando",
+      "countdown": "contagem regressiva",
+      "playing": "em andamento",
+      "finished": "finalizada",
+      "aborted": "cancelada"
+    },
     "durationSeconds": "{{duration}}s"
   },
   "logs": {
@@ -289,6 +305,7 @@
     "cancelBtn": "Cancelar",
     "sendBtn": "Enviar",
     "messageSent": "Mensagem enviada",
+    "messageFailed": "Falha ao enviar a mensagem",
     "kickPlayerTitle": "Expulsar Jogador da Sala {{code}}",
     "playerUserIdLabel": "ID do Usuário do Jogador",
     "enterUserIdPlaceholder": "Digite o ID do usuário",
@@ -600,7 +617,23 @@
     "revokeAllSuccess": "Todas as sessões revogadas",
     "spectatorActionsDesc": "Permite que jogadores eliminados gastem energia em paredes, meteoros, power-ups e zonas de velocidade (as salas podem desativá-lo por partida)",
     "spectatorActionsToggled": "Game Master espectador {{status}}",
-    "spectatorActionsGlobal": "Game Master espectador (global)"
+    "spectatorActionsGlobal": "Game Master espectador (global)",
+    "openWorld": {
+      "title": "Mundo aberto",
+      "enabled": "Ativado",
+      "guestAccess": "Acesso de convidados",
+      "maxPlayers": "Máximo de Jogadores",
+      "roundTime": "Duração da rodada (s)",
+      "mapWidth": "Largura do mapa",
+      "mapHeight": "Altura do mapa",
+      "wallDensity": "Densidade de Paredes",
+      "respawnDelay": "Atraso de renascimento (s)",
+      "afkTimeout": "Tempo limite AFK (s)",
+      "afkTimeoutHint": "0 = desativado",
+      "save": "Salvar configurações do mundo aberto",
+      "saved": "Configurações do mundo aberto salvas",
+      "saveFailed": "Falha ao salvar as configurações do mundo aberto"
+    }
   },
   "seasons": {
     "sectionTitle": "Gerenciamento de Temporadas",
@@ -656,6 +689,12 @@
       "seasonEnded": "Temporada encerrada (reset {{resetMode}})",
       "seasonDeleted": "Temporada excluída",
       "rankConfigSaved": "Configuração de ranks salva"
+    },
+    "confirm": {
+      "activateTitle": "Ativar temporada",
+      "activateMessage": "Ativar \"{{name}}\"? Qualquer outra temporada ativa será desativada.",
+      "deleteTitle": "Excluir temporada",
+      "deleteMessage": "Excluir \"{{name}}\"? Esta ação não pode ser desfeita."
     }
   },
   "campaign": {
@@ -883,6 +922,8 @@
       "watchBtn": "Assistir",
       "deleteBtn": "Excluir",
       "replayDeleted": "Replay de campanha excluído",
+      "deleteConfirmTitle": "Excluir replay",
+      "deleteConfirm": "Excluir este replay? Esta ação não pode ser desfeita.",
       "loadingReplay": "Carregando replay de campanha...",
       "replayEmptyOrCorrupted": "Dados do replay estão vazios ou corrompidos",
       "loadFailed": "Falha ao carregar replay de campanha",
@@ -1041,6 +1082,7 @@
     "globalToggle": "Sistema de desafios",
     "enabled": "Desafios ativados",
     "toggleSaved": "Configuração de desafio salva",
+    "toggleLoadFailed": "Não foi possível carregar a configuração de desafios",
     "title": "Desafios de mapa",
     "titleLabel": "Título",
     "description": "Descrição",
@@ -1060,6 +1102,11 @@
     "activate": "Ativar",
     "deactivate": "Desativar",
     "deleteBtn": "Excluir",
-    "none": "Nenhum desafio ainda"
+    "none": "Nenhum desafio ainda",
+    "statusActive": "Ativo",
+    "statusInactive": "Inativo",
+    "unknownCreator": "Desconhecido",
+    "deleteConfirmTitle": "Excluir desafio",
+    "deleteConfirm": "Excluir o desafio \"{{title}}\"? Esta ação não pode ser desfeita."
   }
 }

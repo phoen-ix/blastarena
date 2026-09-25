@@ -32,7 +32,9 @@
     "joined": "Salon rejoint : {{name}}",
     "joinFailed": "Échec de la connexion au salon",
     "loadFailed": "Échec du chargement des salons : {{error}}",
-    "kicked": "Vous avez été expulsé"
+    "kicked": "Vous avez été expulsé",
+    "statusWaiting": "En attente",
+    "statusPlaying": "En cours"
   },
   "maps": {
     "title": "Mes cartes",
@@ -306,7 +308,7 @@
     "noParty": "Vous n'êtes pas dans un groupe.",
     "noPartyTitle": "Pas de groupe actif",
     "noPartyDescription": "Créez un groupe pour faire équipe avec des amis avant de rejoindre un salon.",
-    "noPartyTip": "Astuce : Invitez des amis depuis la page Amis après avoir créé un groupe.",
+    "noPartyTip": "Astuce : Après avoir créé un groupe, invitez des amis avec « + Inviter un ami » sur cette page.",
     "chatHeader": "Chat du groupe",
     "chatPlaceholder": "Écrivez un message...",
     "chatDisabled": "Le chat est actuellement désactivé",
@@ -326,7 +328,7 @@
     "disbanded": "Groupe dissous",
     "created": "Groupe créé",
     "createFailed": "Échec de la création du groupe",
-    "useFriendsPanel": "Utilisez le panneau Amis pour inviter des joueurs",
+    "usePartyPage": "Invitez des amis depuis la page Groupe",
     "invitedToParty": "<strong>{{username}}</strong> vous a invité dans son groupe",
     "invitedToRoom": "<strong>{{username}}</strong> vous a invité dans un salon",
     "accept": "Accepter",
@@ -387,7 +389,8 @@
     "date": "Date",
     "win": "WIN",
     "prev": "Prev",
-    "next": "Next"
+    "next": "Next",
+    "modeSummary": "{{winRate}} % de victoires · {{kd}} K/D"
   },
   "createRoom": {
     "title": "Créer un salon",
@@ -433,8 +436,8 @@
     "powerUps": "Bonus",
     "botCount": "Nombre de bots",
     "none": "Aucun",
-    "nBots": "{{count}} Bot",
-    "nBots_plural": "{{count}} Bots",
+    "nBots_one": "{{count}} Bot",
+    "nBots_other": "{{count}} Bots",
     "newMap": "+ Nouvelle carte",
     "randomGenerated": "Aléatoire (Générée)",
     "communityMaps": "Cartes communautaires",
@@ -444,6 +447,7 @@
     "mapSpawnHint": "Cette carte a {{count}} points d'apparition ({{count}} joueurs max)",
     "mapDimensions": "Carte {{width}}x{{height}}",
     "mapOptionLabel": "{{name}} ({{width}}x{{height}}, {{spawns}} apparitions)",
+    "mapBy": "par {{username}}",
     "loadingPreview": "Chargement de l'aperçu...",
     "recordGame": "Enregistrer la partie",
     "hazardTypes": {
@@ -471,8 +475,7 @@
       "21": "21×21 (Petite)",
       "31": "31×31 (Normale)",
       "39": "39×39 (Grande)",
-      "51": "51×51 (Très grande)",
-      "61": "61×61 (Massive)"
+      "51": "51×51 (Très grande)"
     },
     "wallDensities": {
       "low30": "Faible (30%)",
@@ -548,6 +551,7 @@
     "back": "← Retour",
     "inviteFriend": "Inviter un ami",
     "inviteInfo": "Utilisez le panneau Amis (lobby) pour inviter des amis dans ce salon",
+    "noFriendsToInvite": "Aucun ami en ligne à inviter",
     "roomCode": "Code du salon :",
     "playersCount": "Joueurs ({{current}}/{{max}})",
     "needPlayers": "Joueurs ou bots nécessaires",

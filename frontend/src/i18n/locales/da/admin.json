@@ -93,6 +93,14 @@
     "deleteSuccess": "Bruger slettet permanent",
     "revokeSessions": "Tilbagekald sessioner",
     "revokeSessionsSuccess": "Brugersessioner tilbagekaldt",
+    "confirm": {
+      "roleTitle": "Skift rolle",
+      "roleMessage": "Skift rollen for {{username}} til {{role}}?",
+      "deactivateTitle": "Deaktivér bruger",
+      "deactivateMessage": "Deaktivér {{username}}? Brugeren logges ud og kan ikke logge ind, før kontoen genaktiveres.",
+      "revokeTitle": "Tilbagekald sessioner",
+      "revokeMessage": "Tilbagekald alle sessioner for {{username}}? Brugeren logges ud på alle enheder."
+    },
     "cleanup": {
       "button": "Account Cleanup",
       "title": "Account Cleanup",
@@ -175,6 +183,14 @@
     "replayEmptyOrCorrupted": "Genafspilningsdata er tomme eller korrupte",
     "failedToLoadReplay": "Kunne ikke indlæse genafspilning",
     "statusAbandoned": "forladt",
+    "statusLive": "i gang",
+    "statuses": {
+      "waiting": "venter",
+      "countdown": "nedtælling",
+      "playing": "i gang",
+      "finished": "afsluttet",
+      "aborted": "afbrudt"
+    },
     "durationSeconds": "{{duration}}s"
   },
   "logs": {
@@ -289,6 +305,7 @@
     "cancelBtn": "Annuller",
     "sendBtn": "Send",
     "messageSent": "Besked sendt",
+    "messageFailed": "Kunne ikke sende beskeden",
     "kickPlayerTitle": "Smid spiller ud af rum {{code}}",
     "playerUserIdLabel": "Spiller bruger-ID",
     "enterUserIdPlaceholder": "Indtast bruger-ID",
@@ -600,7 +617,23 @@
     "revokeAllSuccess": "Alle sessioner tilbagekaldt",
     "spectatorActionsDesc": "Lad eliminerede spillere bruge energi på vægge, meteorer, power-ups og fartzoner (rum kan stadig slå det fra pr. kamp)",
     "spectatorActionsToggled": "Tilskuer-spilleder {{status}}",
-    "spectatorActionsGlobal": "Tilskuer-spilleder (globalt)"
+    "spectatorActionsGlobal": "Tilskuer-spilleder (globalt)",
+    "openWorld": {
+      "title": "Åben verden",
+      "enabled": "Aktiveret",
+      "guestAccess": "Gæsteadgang",
+      "maxPlayers": "Maks spillere",
+      "roundTime": "Rundetid (s)",
+      "mapWidth": "Kortbredde",
+      "mapHeight": "Korthøjde",
+      "wallDensity": "Vægtæthed",
+      "respawnDelay": "Genopstandelsesforsinkelse (s)",
+      "afkTimeout": "AFK-timeout (s)",
+      "afkTimeoutHint": "0 = deaktiveret",
+      "save": "Gem indstillinger for åben verden",
+      "saved": "Indstillinger for åben verden gemt",
+      "saveFailed": "Kunne ikke gemme indstillinger for åben verden"
+    }
   },
   "seasons": {
     "sectionTitle": "Sæsonadministration",
@@ -656,6 +689,12 @@
       "seasonEnded": "Sæson afsluttet ({{resetMode}} nulstilling)",
       "seasonDeleted": "Sæson slettet",
       "rankConfigSaved": "Rangkonfiguration gemt"
+    },
+    "confirm": {
+      "activateTitle": "Aktivér sæson",
+      "activateMessage": "Aktivér »{{name}}«? Alle andre aktive sæsoner deaktiveres.",
+      "deleteTitle": "Slet sæson",
+      "deleteMessage": "Slet »{{name}}«? Dette kan ikke fortrydes."
     }
   },
   "campaign": {
@@ -883,6 +922,8 @@
       "watchBtn": "Se",
       "deleteBtn": "Slet",
       "replayDeleted": "Kampagnegenafspilning slettet",
+      "deleteConfirmTitle": "Slet genafspilning",
+      "deleteConfirm": "Slet denne genafspilning? Dette kan ikke fortrydes.",
       "loadingReplay": "Indlæser kampagnegenafspilning...",
       "replayEmptyOrCorrupted": "Genafspilningsdata er tomme eller korrupte",
       "loadFailed": "Kunne ikke indlæse kampagnegenafspilning",
@@ -1041,6 +1082,7 @@
     "globalToggle": "Udfordringssystem",
     "enabled": "Udfordringer aktiveret",
     "toggleSaved": "Udfordringsindstilling gemt",
+    "toggleLoadFailed": "Kunne ikke indlæse indstillingen for udfordringer",
     "title": "Kortudfordringer",
     "titleLabel": "Titel",
     "description": "Beskrivelse",
@@ -1060,6 +1102,11 @@
     "activate": "Aktiver",
     "deactivate": "Deaktiver",
     "deleteBtn": "Slet",
-    "none": "Ingen udfordringer endnu"
+    "none": "Ingen udfordringer endnu",
+    "statusActive": "Aktiv",
+    "statusInactive": "Inaktiv",
+    "unknownCreator": "Ukendt",
+    "deleteConfirmTitle": "Slet udfordring",
+    "deleteConfirm": "Slet udfordringen »{{title}}«? Dette kan ikke fortrydes."
   }
 }

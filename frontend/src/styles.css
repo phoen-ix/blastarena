@@ -78,6 +78,10 @@
       --shadow-glow-primary: 0 0 16px rgba(255, 107, 53, 0.15);
       --shadow-glow-accent: 0 0 16px rgba(0, 212, 170, 0.15);
       --primary-contrast: #000;
+
+      /* Native controls (scrollbars, pickers, date inputs) follow the theme. This was a
+         hard-coded <meta name="color-scheme" content="dark">, dark in the light themes too. */
+      color-scheme: dark;
     }
 
     /* ================================================
@@ -279,6 +283,13 @@
       --shadow-glow-accent: 0 0 16px rgba(120, 176, 144, 0.08);
     }
 
+    [data-theme="daylight"],
+    [data-theme="sakura"],
+    [data-theme="sand"],
+    [data-theme="frost"],
+    [data-theme="blossom"],
+    [data-theme="dune"] { color-scheme: light; }
+
     /* Light theme overrides for hardcoded dark overlays */
     [data-theme="daylight"] .connection-overlay,
     [data-theme="sakura"] .connection-overlay,
@@ -331,7 +342,13 @@
     [data-theme="sand"] .hud-ow-roundend,
     [data-theme="frost"] .hud-ow-roundend,
     [data-theme="blossom"] .hud-ow-roundend,
-    [data-theme="dune"] .hud-ow-roundend { background: rgba(255, 255, 255, 0.88) !important; color: var(--text) !important; }
+    [data-theme="dune"] .hud-ow-roundend,
+    [data-theme="daylight"] .hud-admin-banner,
+    [data-theme="sakura"] .hud-admin-banner,
+    [data-theme="sand"] .hud-admin-banner,
+    [data-theme="frost"] .hud-admin-banner,
+    [data-theme="blossom"] .hud-admin-banner,
+    [data-theme="dune"] .hud-admin-banner { background: rgba(255, 255, 255, 0.88) !important; color: var(--text) !important; }
     [data-theme="daylight"] .hud-ow-row.self,
     [data-theme="sakura"] .hud-ow-row.self,
     [data-theme="sand"] .hud-ow-row.self,
@@ -652,6 +669,25 @@
     }
 
     .auth-switch a:hover {
+      color: var(--primary-hover);
+      text-decoration: underline;
+    }
+
+    /* In-form actions (Register, Forgot password, Back to login): real buttons, so they are
+       keyboard-focusable, styled as the links they used to be. */
+    .auth-switch .auth-link {
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      color: var(--primary);
+      cursor: pointer;
+      font-weight: 600;
+      transition: color var(--transition);
+    }
+
+    .auth-switch .auth-link:hover,
+    .auth-switch .auth-link:focus-visible {
       color: var(--primary-hover);
       text-decoration: underline;
     }
@@ -1982,7 +2018,7 @@
       border: 1px solid rgba(255, 80, 80, 0.6);
       border-radius: var(--radius);
       padding: 12px 28px;
-      font-family: var(--font-heading);
+      font-family: var(--font-display);
       font-size: 18px;
       font-weight: 700;
       color: #fff;
@@ -2016,7 +2052,7 @@
       border-radius: var(--radius);
       background: var(--bg-surface);
       color: var(--text);
-      font-family: var(--font-heading);
+      font-family: var(--font-display);
       font-size: 13px;
       font-weight: 700;
       cursor: pointer;
@@ -2982,7 +3018,7 @@
       justify-content: center;
       font-weight: 700;
       font-size: 16px;
-      color: var(--bg);
+      color: var(--bg-deep);
       position: relative;
       flex-shrink: 0;
     }
@@ -3016,7 +3052,7 @@
       border-left: 1px solid var(--border);
       display: flex;
       flex-direction: column;
-      background: var(--bg);
+      background: var(--bg-base);
       flex-shrink: 0;
     }
     .party-page-chat-header {
@@ -3085,7 +3121,7 @@
       justify-content: center;
       font-weight: 700;
       font-size: 14px;
-      color: var(--bg);
+      color: var(--bg-deep);
       flex-shrink: 0;
     }
     .party-invite-name {
@@ -4206,6 +4242,23 @@
 
     .modal-footer .btn { flex: 1; }
 
+    .modal-close {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      padding: 0 4px;
+      font-size: 22px;
+      line-height: 1;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: color var(--transition);
+    }
+
+    .modal-close:hover,
+    .modal-close:focus-visible {
+      color: var(--text);
+    }
+
     /* ================================================
        THEME PICKER
        ================================================ */
@@ -5307,7 +5360,7 @@
 
     .friend-card:hover {
       background: var(--bg-hover);
-      border-color: var(--border-light);
+      border-color: var(--border-bright);
     }
 
     .friend-card-avatar {

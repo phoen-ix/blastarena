@@ -214,7 +214,8 @@ export async function getPublicProfile(userId: number): Promise<PublicProfile | 
             COALESCE(us.win_streak, 0) as win_streak,
             COALESCE(us.best_win_streak, 0) as best_win_streak,
             COALESCE(us.total_xp, 0) as total_xp,
-            COALESCE(us.level, 1) as level
+            COALESCE(us.level, 1) as level,
+            COALESCE(us.total_playtime, 0) as total_playtime
      FROM users u
      LEFT JOIN user_stats us ON us.user_id = u.id
      WHERE u.id = ? AND u.is_deactivated = 0`,
@@ -252,6 +253,7 @@ export async function getPublicProfile(userId: number): Promise<PublicProfile | 
       bestWinStreak: row.best_win_streak,
       level: row.level || 1,
       totalXp: row.total_xp || 0,
+      totalPlaytime: row.total_playtime || 0,
     },
     rankTier: rank.name,
     rankColor: rank.color,

@@ -1,8 +1,9 @@
 import { SocketClient } from '../network/SocketClient';
 import { AuthManager } from '../network/AuthManager';
 import { NotificationUI } from './NotificationUI';
-import { Room, RoomPlayer, POWERUP_DEFINITIONS } from '@blast-arena/shared';
+import { Room, RoomPlayer, POWERUP_DEFINITIONS, Friend } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../utils/html';
+import { createModal } from '../utils/modal';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { t } from '../i18n';
 
@@ -65,7 +66,7 @@ export class RoomUI {
       id: 'room',
       elements: () => [
         ...this.container.querySelectorAll<HTMLElement>(
-          '[data-action="back"], .team-select, .bot-team-select, [data-action="ready"], [data-action="start"]',
+          '[data-action="back"], [data-action="invite-friends"], .team-select, .bot-team-select, [data-action="ready"], [data-action="start"]',
         ),
       ],
       onBack: () => {
@@ -138,8 +139,8 @@ export class RoomUI {
         case 'ready':
           this.socketClient.emit('room:ready', { ready: !this.isReady() });
           break;
-        case 'invite-info':
-          this.notifications.info(t('ui:room.inviteInfo'));
+        case 'invite-friends':
+          this.showInvitePicker();
           break;
       }
     });
@@ -207,6 +208,72 @@ export class RoomUI {
     }
   }
 
+  /**
+   * Pick online friends to invite into this room. The server only accepts `invite:room` from
+   * someone in a room, and the only sender was the Friends view — which is hidden while you are
+   * in one — so room invites could not actually be sent.
+   */
+  private showInvitePicker(): void {
+    this.socketClient.emit('friend:list', (res) => {
+      if (!res.success) {
+        this.notifications.error(res.error || t('ui:party.loadFriendsFailed'));
+        return;
+      }
+      const inRoom = new Set(this.room.players.map((p) => p.user.id));
+      const friends = (res.friends ?? []).filter(
+        (f: Friend) => f.status === 'accepted' && f.activity !== 'offline' && !inRoom.has(f.userId),
+      );
+      if (friends.length === 0) {
+        this.notifications.info(t('ui:room.noFriendsToInvite'));
+        return;
+      }
+
+      const { overlay, content, close } = createModal({
+        ariaLabel: t('ui:room.inviteFriend'),
+        style: 'max-width:400px;',
+        parent: document.getElementById('ui-overlay') ?? document.body,
+      });
+      setHtml(
+        content,
+        `
+        <div class="modal-header">
+          <h3>${t('ui:room.inviteFriend')}</h3>
+          <button class="modal-close" aria-label="${escapeAttr(t('common:actions.close'))}">&times;</button>
+        </div>
+        <div class="modal-body" style="max-height:300px;overflow-y:auto;padding:0;">
+          ${friends
+            .map(
+              (f) => `
+            <div class="party-invite-item" data-invite-user-id="${f.userId}">
+              <div class="party-invite-avatar" style="background:var(--primary);">${escapeHtml(f.username.charAt(0).toUpperCase())}</div>
+              <span class="party-invite-name">${escapeHtml(f.username)}</span>
+              <button class="btn btn-sm btn-primary room-invite-send">${t('ui:friends.invite')}</button>
+            </div>`,
+            )
+            .join('')}
+        </div>
+      `,
+      );
+      overlay.querySelector('.modal-close')!.addEventListener('click', close);
+      overlay.querySelectorAll<HTMLButtonElement>('.room-invite-send').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const item = btn.closest('.party-invite-item') as HTMLElement;
+          const userId = parseInt(item.dataset.inviteUserId!, 10);
+          btn.disabled = true;
+          this.socketClient.emit('invite:room', { userId }, (ack) => {
+            if (ack.success) {
+              btn.textContent = t('ui:party.chatSent');
+              btn.classList.remove('btn-primary');
+            } else {
+              btn.disabled = false;
+              this.notifications.error(ack.error || t('ui:friends.inviteFailed'));
+            }
+          });
+        });
+      });
+    });
+  }
+
   private isHost(): boolean {
     const user = this.authManager.getUser();
     return user?.id === this.room.host.id;
@@ -241,7 +308,7 @@ export class RoomUI {
           <span class="room-mode" style="font-size:12px;padding:4px 12px;">${modeLabel}</span>
         </div>
         <div style="display:flex;gap:12px;align-items:center;">
-          <button class="btn btn-ghost" data-action="invite-info" style="padding:6px 14px;font-size:12px;color:var(--accent);">${t('ui:room.inviteFriend')}</button>
+          <button class="btn btn-ghost" data-action="invite-friends" style="padding:6px 14px;font-size:12px;color:var(--accent);">${t('ui:room.inviteFriend')}</button>
           <span style="color:var(--text-dim);font-size:13px;">${t('ui:room.roomCode')} <strong style="color:var(--text);letter-spacing:2px;font-family:var(--font-mono);">${this.room.code}</strong></span>
         </div>
       </div>

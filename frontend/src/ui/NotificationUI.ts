@@ -10,6 +10,8 @@ export class NotificationUI {
   show(message: string, type: ToastType = 'info', duration: number = 3000): void {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
+    // The container is a polite live region (index.html); errors interrupt.
+    if (type === 'error') toast.setAttribute('role', 'alert');
     toast.textContent = message;
     this.container.appendChild(toast);
 

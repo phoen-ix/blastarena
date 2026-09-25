@@ -1,5 +1,6 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
+import { gameModeName } from '@blast-arena/shared';
 import { t } from '../../i18n';
 import { escapeHtml, setHtml } from '../../utils/html';
 
@@ -22,14 +23,10 @@ interface MatchHistoryResponse {
   limit: number;
 }
 
-const MODE_LABELS: Record<string, string> = {
-  ffa: 'FFA',
-  teams: 'Teams',
-  battle_royale: 'BR',
-  sudden_death: 'SD',
-  deathmatch: 'DM',
-  koth: 'KOTH',
-};
+/** Translated mode name; the raw id (escaped) for a mode without one. */
+function modeLabel(mode: string): string {
+  return escapeHtml(t(gameModeName(mode), { defaultValue: mode }));
+}
 
 export class MatchHistoryView implements ILobbyView {
   readonly viewId = 'matchHistory';
@@ -68,6 +65,7 @@ export class MatchHistoryView implements ILobbyView {
       );
       this.renderMatches(data);
     } catch {
+      if (!this.container) return; // view left while loading
       setHtml(
         this.container,
         `<div style="padding:20px;color:var(--danger);text-align:center;">${t('ui:matchHistory.error')}</div>`,
@@ -106,7 +104,7 @@ export class MatchHistoryView implements ILobbyView {
       .map(([mode, s]) => {
         const wr = s.games > 0 ? Math.round((s.wins / s.games) * 100) : 0;
         const kd = s.deaths > 0 ? (s.kills / s.deaths).toFixed(1) : s.kills.toString();
-        return `<div class="mini-stat"><div class="mini-stat-value">${MODE_LABELS[mode] || mode}</div><div class="mini-stat-label">${wr}% WR &middot; ${kd} K/D</div></div>`;
+        return `<div class="mini-stat"><div class="mini-stat-value">${modeLabel(mode)}</div><div class="mini-stat-label">${t('ui:matchHistory.modeSummary', { winRate: wr, kd })}</div></div>`;
       })
       .join('');
 
@@ -120,7 +118,7 @@ export class MatchHistoryView implements ILobbyView {
           : '-';
         const date = m.finishedAt ? new Date(m.finishedAt).toLocaleDateString() : '-';
         return `<tr>
-          <td>${MODE_LABELS[m.gameMode] || escapeHtml(m.gameMode)}</td>
+          <td>${modeLabel(m.gameMode)}</td>
           <td style="${resultClass};font-weight:bold;">${resultText}</td>
           <td>${m.kills}</td>
           <td>${m.deaths}</td>

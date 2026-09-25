@@ -30,6 +30,14 @@ export class LobbyUI {
   private roomsView: RoomsView | null = null;
   private initialView: string | null = null;
   private initialViewOptions: Record<string, unknown> | null = null;
+  // Bumped by every navigateTo(). A navigation still awaiting createView()/render() when a newer
+  // one starts must not install its view: it used to orphan the first view (listeners, timers)
+  // and let two views write into the shared .main-body.
+  private navSeq = 0;
+  // Set once this lobby has handed the user to a room; later join answers (a double click, a
+  // second invite accepted) must not build another RoomUI on top.
+  private enteredRoom = false;
+  private joinPending = false;
 
   constructor(
     socketClient: SocketClient,
@@ -64,6 +72,8 @@ export class LobbyUI {
   show(initialView?: string, viewOptions?: Record<string, unknown>): void {
     this.initialView = initialView || null;
     this.initialViewOptions = viewOptions || null;
+    this.enteredRoom = false;
+    this.joinPending = false;
     if (this.panelsDestroyed) this.createPanels();
 
     const uiOverlay = document.getElementById('ui-overlay');
@@ -84,13 +94,6 @@ export class LobbyUI {
     // the lobby shell, and they still want live room counts there. (audit LOBBY-BROADCAST-1)
     this.socketClient.emit('lobby:subscribe');
 
-    // Mount persistent UI
-    const mainContent = this.container.querySelector('.main-content') as HTMLElement;
-    if (mainContent) {
-      this.partyBar.mount(mainContent);
-    }
-    this.lobbyChatPanel.mount(this.container);
-
     // Listen for lobby chat user-setting toggle
     this.lobbyChatToggleHandler = () => this.lobbyChatPanel.refreshVisibility();
     window.addEventListener('lobbychat-toggle', this.lobbyChatToggleHandler);
@@ -104,9 +107,6 @@ export class LobbyUI {
 
     // Navigate to initial view
     this.navigateTo(this.initialView || 'rooms', this.initialViewOptions || undefined);
-
-    // Sidebar rank/level badges
-    this.loadSidebarBadges();
   }
 
   showView(viewId: string, options?: Record<string, unknown>): void {
@@ -114,6 +114,7 @@ export class LobbyUI {
   }
 
   hide(): void {
+    this.navSeq++; // a navigation still in flight must not install its view into a hidden lobby
     this.activeView?.destroy();
     this.activeView = null;
     this.roomsView = null;
@@ -148,6 +149,8 @@ export class LobbyUI {
   }
 
   private async navigateTo(viewId: string, options?: Record<string, unknown>): Promise<void> {
+    const seq = ++this.navSeq;
+
     // Destroy current view
     if (this.activeView) {
       this.activeView.destroy();
@@ -163,6 +166,12 @@ export class LobbyUI {
 
     // Create view
     const view = await this.createView(viewId, options);
+    if (seq !== this.navSeq) {
+      // Superseded while the view's chunk was loading. Views subscribe in their constructors,
+      // so release it even though it never rendered.
+      view.destroy();
+      return;
+    }
     this.activeView = view;
 
     // Update main header actions
@@ -185,9 +194,19 @@ export class LobbyUI {
       setHtml(mainBody, '');
       await view.render(mainBody);
     }
+    // A newer navigation destroyed this view while it rendered and owns the gamepad context now.
+    if (seq !== this.navSeq) return;
 
     // Update gamepad context
     this.updateGamepadContext();
+  }
+
+  /** Hand the user over to a room, exactly once per shown lobby. */
+  private enterRoom(room: Room): void {
+    if (this.enteredRoom) return;
+    this.enteredRoom = true;
+    this.hide();
+    this.onJoinRoom(room);
   }
 
   private async createView(viewId: string, options?: Record<string, unknown>): Promise<ILobbyView> {
@@ -203,10 +222,7 @@ export class LobbyUI {
         return new OpenWorldView(deps);
       }
       case 'rooms': {
-        const view = new RoomsView(deps, (room) => {
-          this.hide();
-          this.onJoinRoom(room);
-        });
+        const view = new RoomsView(deps, (room) => this.enterRoom(room));
         this.roomsView = view;
         return view;
       }
@@ -236,9 +252,13 @@ export class LobbyUI {
       }
       case 'friends': {
         const { FriendsView } = await import('./views/FriendsView');
-        return new FriendsView(deps, (userId: number, username: string) => {
-          this.navigateTo('messages', { userId, username });
-        });
+        return new FriendsView(
+          deps,
+          (userId: number, username: string) => {
+            this.navigateTo('messages', { userId, username });
+          },
+          (room) => this.enterRoom(room),
+        );
       }
       case 'messages': {
         const { MessagesView } = await import('./views/MessagesView');
@@ -254,16 +274,13 @@ export class LobbyUI {
       }
       case 'challenge': {
         const { ChallengeView } = await import('./views/ChallengeView');
-        return new ChallengeView(deps);
+        return new ChallengeView(deps, (room) => this.enterRoom(room));
       }
       case 'create-room': {
         const { CreateRoomView } = await import('./views/CreateRoomView');
         return new CreateRoomView(
           deps,
-          (room) => {
-            this.hide();
-            this.onJoinRoom(room);
-          },
+          (room) => this.enterRoom(room),
           () => this.navigateTo('rooms'),
         );
       }
@@ -276,10 +293,7 @@ export class LobbyUI {
         return new ProfileView(deps, options);
       }
       default:
-        return new RoomsView(deps, (room) => {
-          this.hide();
-          this.onJoinRoom(room);
-        });
+        return new RoomsView(deps, (room) => this.enterRoom(room));
     }
   }
 
@@ -454,6 +468,15 @@ export class LobbyUI {
     );
 
     this.bindEvents();
+
+    // setHtml above replaced the whole shell, persistent panels included; a language change
+    // re-renders it, and the party bar and lobby chat used to vanish until the next room trip.
+    const mainContent = this.container.querySelector('.main-content') as HTMLElement | null;
+    if (mainContent) this.partyBar.mount(mainContent);
+    this.lobbyChatPanel.mount(this.container);
+
+    // Sidebar rank/level badges (their elements were just rebuilt too)
+    this.loadSidebarBadges();
   }
 
   private bindEvents(): void {
@@ -538,14 +561,16 @@ export class LobbyUI {
   }
 
   private async joinRoom(code: string): Promise<void> {
+    if (this.joinPending || this.enteredRoom) return;
+    this.joinPending = true;
     this.socketClient.emit(
       'room:join',
       { code },
       (response: { success: boolean; room?: Room; error?: string }) => {
+        this.joinPending = false;
         if (response.success && response.room) {
           this.notifications.success(t('ui:rooms.joined', { name: response.room.name }));
-          this.hide();
-          this.onJoinRoom(response.room);
+          this.enterRoom(response.room);
         } else {
           this.notifications.error(response.error || t('ui:rooms.joinFailed'));
         }
@@ -554,6 +579,9 @@ export class LobbyUI {
   }
 
   private loadSidebarBadges(): void {
+    // /user/rank needs a session. A guest's 401 went through the refresh path and ended in
+    // authManager.logout(), which bounced the guest out of the lobby to the menu.
+    if (this.authManager.isGuest || !this.authManager.getAccessToken()) return;
     import('../network/ApiClient').then(({ ApiClient }) => {
       ApiClient.get<{ rankTier: string; rankColor: string; level?: number }>('/user/rank')
         .then((rank) => {
@@ -579,7 +607,7 @@ export class LobbyUI {
       elements: () => [
         ...this.container.querySelectorAll<HTMLElement>('.sidebar-nav-item'),
         ...this.container.querySelectorAll<HTMLElement>(
-          '.main-body input, .main-body select, .main-body textarea, .main-body button, .main-body .btn, .main-body .room-card, .main-body .admin-tab, .main-body .tab-item, .main-body .messages-conv-item',
+          '.main-body input, .main-body select, .main-body textarea, .main-body button, .main-body .btn, .main-body .room-card, .main-body .admin-tab, .main-body .tab-item, .main-body .messages-conv-item, .main-body .log-row, .main-body .lb-user-link, .main-body .campaign-world-header, .main-body .campaign-level-card:not([data-locked="true"]), .main-body .help-guide-section summary, .main-body .help-markdown a',
         ),
         ...this.container.querySelectorAll<HTMLElement>('.main-header .btn'),
       ],
