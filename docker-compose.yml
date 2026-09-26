@@ -1,6 +1,6 @@
 services:
   db:
-    image: mariadb:11
+    image: mariadb:12.3
     container_name: ${COMPOSE_PROJECT_NAME:-blast-arena}-db
     restart: unless-stopped
     deploy:
@@ -13,6 +13,8 @@ services:
       MYSQL_DATABASE: ${DB_NAME:-blast_arena}
       MYSQL_USER: ${DB_USER:-blast_user}
       MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      # Upgrade an existing data directory in place when the image moves to a newer major (dump first).
+      MARIADB_AUTO_UPGRADE: "1"
     volumes:
       - ./data/db:/var/lib/mysql
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro

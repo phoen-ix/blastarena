@@ -120,7 +120,7 @@ When no human is left playing (each has left, died without a respawn, or stayed 
 - **Development**: `docker compose -p blast-arena-dev -f docker-compose.yml -f docker-compose.dev.yml up --build` (or `npm run dev`) — hot reload, DB/Redis ports exposed. **The `-p` flag is mandatory.** `.env` sets `COMPOSE_PROJECT_NAME=blast-arena`, which outranks the `name:` field in `docker-compose.dev.yml`, so without `-p` Compose treats the dev stack as the *production* project: it adopts the running production containers, stops them, and starts dev ones in their place — with no port clash to warn you. Before 2026-08-23 the dev override also shared production's `./data` mounts, so a dev backend would have run in `NODE_ENV=development` directly against the live MariaDB and Redis data. The stacks are now separated on project name, container names, host ports (nginx `8285`, Vite `5183`, DB `3317`, Redis `6390`) and data directory (`./data-dev`), and `tests/backend/utils/composeIsolation.test.ts` asserts they stay separated. (audit DEV-STACK-ISOLATION-1)
 
 ### Services
-MariaDB 11, Redis 7, Node.js backend, Nginx (static + reverse proxy)
+MariaDB 12.3, Redis 7, Node.js backend, Nginx (static + reverse proxy)
 
 ### Data Persistence
 All data persists in `./data/` via bind mounts:

@@ -23,6 +23,8 @@ The dev stack is fully isolated from production — its own Compose project, con
 
 In production, Nginx binds to `127.0.0.1:8280` (loopback only) and is expected to sit behind a host-level reverse proxy that terminates TLS and forwards traffic to it. For local/dev use, open the app on the proxied port (or forward `127.0.0.1:8280`). See `.env.example` for all configuration options.
 
+**Upgrading an existing install to a newer MariaDB major:** the `db` service sets `MARIADB_AUTO_UPGRADE=1`, so the container upgrades `data/db` in place on its first start. Take a verified dump first (`docker compose exec db mariadb-dump ...`) — a major-version upgrade cannot be rolled back.
+
 ## Game Modes
 
 | Mode | Players | Duration | Description |
@@ -256,7 +258,7 @@ Full i18n support via [i18next](https://www.i18next.com/). UI strings live in JS
 | Frontend | Phaser 3 + TypeScript + Vite |
 | Backend | Node.js + Express + TypeScript |
 | Real-time | Socket.io |
-| Database | MariaDB 11 + Redis 7 |
+| Database | MariaDB 12.3 + Redis 7 |
 | Auth | JWT + bcrypt + httpOnly cookies, HMAC-SHA256 email hashing, email verification enforcement (max 3 resends), email enumeration prevention, optional TOTP 2FA |
 | Security | CSP + HSTS + COOP + Trusted Types + upgrade-insecure-requests, parameterized queries, nginx + Express + socket rate limiting, Zod validation on REST + socket events, DOMPurify, email verification on REST + socket, atomic token operations, role-from-DB socket auth |
 | Validation | Zod |
