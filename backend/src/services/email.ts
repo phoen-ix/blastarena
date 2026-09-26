@@ -1,11 +1,11 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type Transporter } from 'nodemailer';
 import { getConfig } from '../config';
 import { logger } from '../utils/logger';
 import { getEmailSettings } from './settings';
 import { getFixedT } from '../i18n';
 import { generateEmailHint, scrubEmailError } from '../utils/crypto';
 
-let transporter: nodemailer.Transporter | null = null;
+let transporter: Transporter | null = null;
 
 interface ResolvedEmailConfig {
   host: string;
@@ -30,7 +30,7 @@ async function getResolvedEmailConfig(): Promise<ResolvedEmailConfig> {
   };
 }
 
-async function getTransporter(): Promise<nodemailer.Transporter | null> {
+async function getTransporter(): Promise<Transporter | null> {
   const emailConfig = await getResolvedEmailConfig();
 
   if (!emailConfig.host) {
