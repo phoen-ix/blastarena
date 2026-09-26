@@ -14,7 +14,7 @@
 # cannot survive them being gated — its .node binary is fetched from GitHub Releases by its install
 # script, and `--fallback-to-build` then hits node-gyp, which has no toolchain here. A floating tag
 # would import that change silently on a future rebuild. Bump this deliberately for Node patches.
-FROM node:24.19.0-alpine3.24 AS builder
+FROM node:24.21.0-alpine3.24 AS builder
 
 WORKDIR /app
 
@@ -35,7 +35,7 @@ COPY backend/ ./backend/
 # Build shared first, then backend
 RUN npm run build --workspace=shared && npm run build --workspace=backend
 
-FROM node:24.19.0-alpine3.24
+FROM node:24.21.0-alpine3.24
 
 WORKDIR /app
 

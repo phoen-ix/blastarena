@@ -1,6 +1,6 @@
 services:
   db:
-    image: mariadb:12.3
+    image: mariadb:12.3.3
     container_name: ${COMPOSE_PROJECT_NAME:-blast-arena}-db
     restart: unless-stopped
     deploy:
@@ -33,7 +33,7 @@ services:
         max-file: "3"
 
   redis:
-    image: redis:7-alpine
+    image: redis:8.10.2-alpine3.23
     container_name: ${COMPOSE_PROJECT_NAME:-blast-arena}-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy volatile-lru

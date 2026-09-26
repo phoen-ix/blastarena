@@ -258,7 +258,7 @@ Full i18n support via [i18next](https://www.i18next.com/). UI strings live in JS
 | Frontend | Phaser 3 + TypeScript + Vite |
 | Backend | Node.js + Express + TypeScript |
 | Real-time | Socket.io |
-| Database | MariaDB 12.3 + Redis 7 |
+| Database | MariaDB 12.3 + Redis 8 |
 | Auth | JWT + bcrypt + httpOnly cookies, HMAC-SHA256 email hashing, email verification enforcement (max 3 resends), email enumeration prevention, optional TOTP 2FA |
 | Security | CSP + HSTS + COOP + Trusted Types + upgrade-insecure-requests, parameterized queries, nginx + Express + socket rate limiting, Zod validation on REST + socket events, DOMPurify, email verification on REST + socket, atomic token operations, role-from-DB socket auth |
 | Validation | Zod |
