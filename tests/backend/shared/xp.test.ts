@@ -161,12 +161,33 @@ describe('calculateXpGained', () => {
   });
 
   test('placement bonuses for top 3', () => {
-    expect(calculateXpGained({ kills: 0, bombsPlaced: 0, powerupsCollected: 0, placement: 1, isWinner: false }))
-      .toBe(XP_MATCH_COMPLETION + XP_PLACEMENT_BONUS[0]); // 125
-    expect(calculateXpGained({ kills: 0, bombsPlaced: 0, powerupsCollected: 0, placement: 2, isWinner: false }))
-      .toBe(XP_MATCH_COMPLETION + XP_PLACEMENT_BONUS[1]); // 75
-    expect(calculateXpGained({ kills: 0, bombsPlaced: 0, powerupsCollected: 0, placement: 3, isWinner: false }))
-      .toBe(XP_MATCH_COMPLETION + XP_PLACEMENT_BONUS[2]); // 50
+    expect(
+      calculateXpGained({
+        kills: 0,
+        bombsPlaced: 0,
+        powerupsCollected: 0,
+        placement: 1,
+        isWinner: false,
+      }),
+    ).toBe(XP_MATCH_COMPLETION + XP_PLACEMENT_BONUS[0]); // 125
+    expect(
+      calculateXpGained({
+        kills: 0,
+        bombsPlaced: 0,
+        powerupsCollected: 0,
+        placement: 2,
+        isWinner: false,
+      }),
+    ).toBe(XP_MATCH_COMPLETION + XP_PLACEMENT_BONUS[1]); // 75
+    expect(
+      calculateXpGained({
+        kills: 0,
+        bombsPlaced: 0,
+        powerupsCollected: 0,
+        placement: 3,
+        isWinner: false,
+      }),
+    ).toBe(XP_MATCH_COMPLETION + XP_PLACEMENT_BONUS[2]); // 50
   });
 
   test('no placement bonus for 4th+', () => {
@@ -181,31 +202,40 @@ describe('calculateXpGained', () => {
   });
 
   test('multiplier scales XP', () => {
-    const base = calculateXpGained({
-      kills: 2,
-      bombsPlaced: 10,
-      powerupsCollected: 1,
-      placement: 1,
-      isWinner: true,
-    }, 1);
-    const doubled = calculateXpGained({
-      kills: 2,
-      bombsPlaced: 10,
-      powerupsCollected: 1,
-      placement: 1,
-      isWinner: true,
-    }, 2);
+    const base = calculateXpGained(
+      {
+        kills: 2,
+        bombsPlaced: 10,
+        powerupsCollected: 1,
+        placement: 1,
+        isWinner: true,
+      },
+      1,
+    );
+    const doubled = calculateXpGained(
+      {
+        kills: 2,
+        bombsPlaced: 10,
+        powerupsCollected: 1,
+        placement: 1,
+        isWinner: true,
+      },
+      2,
+    );
     expect(doubled).toBe(base * 2);
   });
 
   test('zero multiplier gives 0 XP', () => {
-    const xp = calculateXpGained({
-      kills: 10,
-      bombsPlaced: 50,
-      powerupsCollected: 5,
-      placement: 1,
-      isWinner: true,
-    }, 0);
+    const xp = calculateXpGained(
+      {
+        kills: 10,
+        bombsPlaced: 50,
+        powerupsCollected: 5,
+        placement: 1,
+        isWinner: true,
+      },
+      0,
+    );
     expect(xp).toBe(0);
   });
 

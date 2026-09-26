@@ -1,5 +1,8 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { createSocketRateLimiter, createRateLimiters } from '../../../backend/src/utils/socketRateLimit';
+import {
+  createSocketRateLimiter,
+  createRateLimiters,
+} from '../../../backend/src/utils/socketRateLimit';
 
 describe('createSocketRateLimiter', () => {
   beforeEach(() => {

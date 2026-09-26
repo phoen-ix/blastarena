@@ -51,7 +51,12 @@ describe('Cosmetics Service', () => {
     it('should return mapped cosmetics', async () => {
       const rows = [
         makeCosmeticRow({ id: 1, name: 'Red', type: 'color' }),
-        makeCosmeticRow({ id: 2, name: 'Big Eyes', type: 'eyes', config: JSON.stringify({ style: 'big' }) }),
+        makeCosmeticRow({
+          id: 2,
+          name: 'Big Eyes',
+          type: 'eyes',
+          config: JSON.stringify({ style: 'big' }),
+        }),
       ];
       mockQuery.mockResolvedValue(rows);
 
@@ -86,9 +91,7 @@ describe('Cosmetics Service', () => {
 
       await getAllCosmetics(true);
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE is_active = TRUE'),
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE is_active = TRUE'));
     });
 
     it('should return empty array when no cosmetics exist', async () => {
@@ -150,10 +153,7 @@ describe('Cosmetics Service', () => {
       expect(result).not.toBeNull();
       expect(result!.id).toBe(42);
       expect(result!.name).toBe('Golden Trail');
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE id = ?'),
-        [42],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE id = ?'), [42]);
     });
 
     it('should return null when not found', async () => {
@@ -183,10 +183,15 @@ describe('Cosmetics Service', () => {
         config,
       });
 
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO cosmetics'),
-        ['New Color', 'color', JSON.stringify(config), 'common', 'achievement', null, 0],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO cosmetics'), [
+        'New Color',
+        'color',
+        JSON.stringify(config),
+        'common',
+        'achievement',
+        null,
+        0,
+      ]);
       expect(result.id).toBe(10);
       expect(result.name).toBe('New Color');
     });
@@ -219,10 +224,15 @@ describe('Cosmetics Service', () => {
         sortOrder: 10,
       });
 
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO cosmetics'),
-        ['Rare Color', 'color', JSON.stringify(config), 'epic', 'campaign_stars', JSON.stringify(unlockReq), 10],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO cosmetics'), [
+        'Rare Color',
+        'color',
+        JSON.stringify(config),
+        'epic',
+        'campaign_stars',
+        JSON.stringify(unlockReq),
+        10,
+      ]);
     });
 
     it('should default rarity to common, unlockType to achievement, sortOrder to 0', async () => {
@@ -244,10 +254,7 @@ describe('Cosmetics Service', () => {
 
       await createCosmetic({ name: 'Test', type: 'color', config: {} });
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE id = ?'),
-        [77],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE id = ?'), [77]);
     });
   });
 
@@ -257,10 +264,10 @@ describe('Cosmetics Service', () => {
 
       await updateCosmetic(5, { name: 'Renamed' });
 
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('SET name = ?'),
-        ['Renamed', 5],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('SET name = ?'), [
+        'Renamed',
+        5,
+      ]);
     });
 
     it('should update type only', async () => {
@@ -268,10 +275,10 @@ describe('Cosmetics Service', () => {
 
       await updateCosmetic(5, { type: 'eyes' });
 
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('SET type = ?'),
-        ['eyes', 5],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('SET type = ?'), [
+        'eyes',
+        5,
+      ]);
     });
 
     it('should update config with JSON.stringify', async () => {
@@ -394,10 +401,7 @@ describe('Cosmetics Service', () => {
       expect(result[1].id).toBe(20);
       expect(result[1].name).toBe('Big Eyes');
       expect(result[1].type).toBe('eyes');
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('JOIN cosmetics'),
-        [1],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('JOIN cosmetics'), [1]);
     });
 
     it('should handle config that is already an object', async () => {
@@ -476,14 +480,16 @@ describe('Cosmetics Service', () => {
 
   describe('getEquippedCosmetics', () => {
     it('should return equipped ids when row exists', async () => {
-      mockQuery.mockResolvedValue([{
-        user_id: 1,
-        color_id: 10,
-        eyes_id: 20,
-        trail_id: 30,
-        bomb_skin_id: 40,
-        updated_at: new Date(),
-      }]);
+      mockQuery.mockResolvedValue([
+        {
+          user_id: 1,
+          color_id: 10,
+          eyes_id: 20,
+          trail_id: 30,
+          bomb_skin_id: 40,
+          updated_at: new Date(),
+        },
+      ]);
 
       const result = await getEquippedCosmetics(1);
 
@@ -513,14 +519,16 @@ describe('Cosmetics Service', () => {
     });
 
     it('should return partial nulls when some slots are null', async () => {
-      mockQuery.mockResolvedValue([{
-        user_id: 1,
-        color_id: 10,
-        eyes_id: null,
-        trail_id: null,
-        bomb_skin_id: 40,
-        updated_at: new Date(),
-      }]);
+      mockQuery.mockResolvedValue([
+        {
+          user_id: 1,
+          color_id: 10,
+          eyes_id: null,
+          trail_id: null,
+          bomb_skin_id: 40,
+          updated_at: new Date(),
+        },
+      ]);
 
       const result = await getEquippedCosmetics(1);
 
@@ -600,9 +608,7 @@ describe('Cosmetics Service', () => {
     it('should throw when user does not own the cosmetic', async () => {
       mockQuery.mockResolvedValueOnce([{ total: 0 }]);
 
-      await expect(equipCosmetic(1, 'color', 10)).rejects.toThrow(
-        'You do not own this cosmetic',
-      );
+      await expect(equipCosmetic(1, 'color', 10)).rejects.toThrow('You do not own this cosmetic');
       expect(mockExecute).not.toHaveBeenCalled();
     });
 
@@ -618,9 +624,7 @@ describe('Cosmetics Service', () => {
     });
 
     it('should throw when cosmetic not found by id', async () => {
-      mockQuery
-        .mockResolvedValueOnce([{ total: 1 }])
-        .mockResolvedValueOnce([]); // getCosmeticById returns null
+      mockQuery.mockResolvedValueOnce([{ total: 1 }]).mockResolvedValueOnce([]); // getCosmeticById returns null
 
       await expect(equipCosmetic(1, 'color', 999)).rejects.toThrow(
         'Cosmetic type does not match slot',
@@ -634,10 +638,11 @@ describe('Cosmetics Service', () => {
       await equipCosmetic(1, 'color', null);
 
       expect(mockQuery).not.toHaveBeenCalled();
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('color_id'),
-        [1, null, null],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('color_id'), [
+        1,
+        null,
+        null,
+      ]);
     });
 
     it('should use ON DUPLICATE KEY UPDATE for upsert', async () => {
@@ -669,20 +674,19 @@ describe('Cosmetics Service', () => {
 
       await getPlayerCosmeticsForGame([1, 2, 3]);
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('IN (?,?,?)'),
-        [1, 2, 3],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('IN (?,?,?)'), [1, 2, 3]);
     });
 
     it('should map color config hex correctly', async () => {
-      mockQuery.mockResolvedValue([{
-        user_id: 1,
-        color_config: JSON.stringify({ hex: 'ff6600' }),
-        eyes_config: null,
-        trail_config: null,
-        bomb_skin_config: null,
-      }]);
+      mockQuery.mockResolvedValue([
+        {
+          user_id: 1,
+          color_config: JSON.stringify({ hex: 'ff6600' }),
+          eyes_config: null,
+          trail_config: null,
+          bomb_skin_config: null,
+        },
+      ]);
 
       const result = await getPlayerCosmeticsForGame([1]);
 
@@ -692,13 +696,15 @@ describe('Cosmetics Service', () => {
     });
 
     it('should map color config with numeric hex', async () => {
-      mockQuery.mockResolvedValue([{
-        user_id: 1,
-        color_config: JSON.stringify({ hex: 0xff0000 }),
-        eyes_config: null,
-        trail_config: null,
-        bomb_skin_config: null,
-      }]);
+      mockQuery.mockResolvedValue([
+        {
+          user_id: 1,
+          color_config: JSON.stringify({ hex: 0xff0000 }),
+          eyes_config: null,
+          trail_config: null,
+          bomb_skin_config: null,
+        },
+      ]);
 
       const result = await getPlayerCosmeticsForGame([1]);
 
@@ -707,13 +713,15 @@ describe('Cosmetics Service', () => {
     });
 
     it('should map eyes config style correctly', async () => {
-      mockQuery.mockResolvedValue([{
-        user_id: 1,
-        color_config: null,
-        eyes_config: JSON.stringify({ style: 'angry' }),
-        trail_config: null,
-        bomb_skin_config: null,
-      }]);
+      mockQuery.mockResolvedValue([
+        {
+          user_id: 1,
+          color_config: null,
+          eyes_config: JSON.stringify({ style: 'angry' }),
+          trail_config: null,
+          bomb_skin_config: null,
+        },
+      ]);
 
       const result = await getPlayerCosmeticsForGame([1]);
 
@@ -722,13 +730,15 @@ describe('Cosmetics Service', () => {
     });
 
     it('should map trail config with defaults', async () => {
-      mockQuery.mockResolvedValue([{
-        user_id: 1,
-        color_config: null,
-        eyes_config: null,
-        trail_config: JSON.stringify({ particleKey: 'particle_fire' }),
-        bomb_skin_config: null,
-      }]);
+      mockQuery.mockResolvedValue([
+        {
+          user_id: 1,
+          color_config: null,
+          eyes_config: null,
+          trail_config: JSON.stringify({ particleKey: 'particle_fire' }),
+          bomb_skin_config: null,
+        },
+      ]);
 
       const result = await getPlayerCosmeticsForGame([1]);
 
@@ -741,13 +751,19 @@ describe('Cosmetics Service', () => {
     });
 
     it('should map trail config with custom tint and frequency', async () => {
-      mockQuery.mockResolvedValue([{
-        user_id: 1,
-        color_config: null,
-        eyes_config: null,
-        trail_config: JSON.stringify({ particleKey: 'particle_star', tint: 0xff0000, frequency: 100 }),
-        bomb_skin_config: null,
-      }]);
+      mockQuery.mockResolvedValue([
+        {
+          user_id: 1,
+          color_config: null,
+          eyes_config: null,
+          trail_config: JSON.stringify({
+            particleKey: 'particle_star',
+            tint: 0xff0000,
+            frequency: 100,
+          }),
+          bomb_skin_config: null,
+        },
+      ]);
 
       const result = await getPlayerCosmeticsForGame([1]);
 
@@ -760,13 +776,15 @@ describe('Cosmetics Service', () => {
     });
 
     it('should map bomb skin config with defaults', async () => {
-      mockQuery.mockResolvedValue([{
-        user_id: 1,
-        color_config: null,
-        eyes_config: null,
-        trail_config: null,
-        bomb_skin_config: JSON.stringify({ baseColor: 0x222222 }),
-      }]);
+      mockQuery.mockResolvedValue([
+        {
+          user_id: 1,
+          color_config: null,
+          eyes_config: null,
+          trail_config: null,
+          bomb_skin_config: JSON.stringify({ baseColor: 0x222222 }),
+        },
+      ]);
 
       const result = await getPlayerCosmeticsForGame([1]);
 
@@ -779,13 +797,19 @@ describe('Cosmetics Service', () => {
     });
 
     it('should map bomb skin config with custom fuseColor and label', async () => {
-      mockQuery.mockResolvedValue([{
-        user_id: 1,
-        color_config: null,
-        eyes_config: null,
-        trail_config: null,
-        bomb_skin_config: JSON.stringify({ baseColor: 0x111111, fuseColor: 0x00ff00, label: 'skull' }),
-      }]);
+      mockQuery.mockResolvedValue([
+        {
+          user_id: 1,
+          color_config: null,
+          eyes_config: null,
+          trail_config: null,
+          bomb_skin_config: JSON.stringify({
+            baseColor: 0x111111,
+            fuseColor: 0x00ff00,
+            label: 'skull',
+          }),
+        },
+      ]);
 
       const result = await getPlayerCosmeticsForGame([1]);
 
@@ -798,13 +822,15 @@ describe('Cosmetics Service', () => {
     });
 
     it('should not add entries when all configs are null', async () => {
-      mockQuery.mockResolvedValue([{
-        user_id: 1,
-        color_config: null,
-        eyes_config: null,
-        trail_config: null,
-        bomb_skin_config: null,
-      }]);
+      mockQuery.mockResolvedValue([
+        {
+          user_id: 1,
+          color_config: null,
+          eyes_config: null,
+          trail_config: null,
+          bomb_skin_config: null,
+        },
+      ]);
 
       const result = await getPlayerCosmeticsForGame([1]);
 
@@ -837,13 +863,15 @@ describe('Cosmetics Service', () => {
     });
 
     it('should handle config that is already an object (not string)', async () => {
-      mockQuery.mockResolvedValue([{
-        user_id: 1,
-        color_config: { hex: 'aabb00' },
-        eyes_config: null,
-        trail_config: null,
-        bomb_skin_config: null,
-      }]);
+      mockQuery.mockResolvedValue([
+        {
+          user_id: 1,
+          color_config: { hex: 'aabb00' },
+          eyes_config: null,
+          trail_config: null,
+          bomb_skin_config: null,
+        },
+      ]);
 
       const result = await getPlayerCosmeticsForGame([1]);
 
@@ -851,13 +879,15 @@ describe('Cosmetics Service', () => {
     });
 
     it('should skip trail entry when particleKey is missing', async () => {
-      mockQuery.mockResolvedValue([{
-        user_id: 1,
-        color_config: null,
-        eyes_config: null,
-        trail_config: JSON.stringify({ tint: 0xff0000 }),
-        bomb_skin_config: null,
-      }]);
+      mockQuery.mockResolvedValue([
+        {
+          user_id: 1,
+          color_config: null,
+          eyes_config: null,
+          trail_config: JSON.stringify({ tint: 0xff0000 }),
+          bomb_skin_config: null,
+        },
+      ]);
 
       const result = await getPlayerCosmeticsForGame([1]);
 
@@ -865,13 +895,15 @@ describe('Cosmetics Service', () => {
     });
 
     it('should skip bomb skin entry when baseColor is missing', async () => {
-      mockQuery.mockResolvedValue([{
-        user_id: 1,
-        color_config: null,
-        eyes_config: null,
-        trail_config: null,
-        bomb_skin_config: JSON.stringify({ label: 'test' }),
-      }]);
+      mockQuery.mockResolvedValue([
+        {
+          user_id: 1,
+          color_config: null,
+          eyes_config: null,
+          trail_config: null,
+          bomb_skin_config: JSON.stringify({ label: 'test' }),
+        },
+      ]);
 
       const result = await getPlayerCosmeticsForGame([1]);
 
@@ -898,10 +930,7 @@ describe('Cosmetics Service', () => {
 
       await unlockDefaultCosmetics(42);
 
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.any(String),
-        [42],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.any(String), [42]);
     });
   });
 
@@ -974,9 +1003,7 @@ describe('Cosmetics Service', () => {
     });
 
     it('should handle unlock_requirement that is already an object', async () => {
-      mockQuery.mockResolvedValue([
-        { id: 10, unlock_requirement: { totalStars: 3 } },
-      ]);
+      mockQuery.mockResolvedValue([{ id: 10, unlock_requirement: { totalStars: 3 } }]);
       mockExecute.mockResolvedValue({ affectedRows: 1 });
 
       const result = await checkCampaignStarUnlocks(1, 5);

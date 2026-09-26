@@ -231,9 +231,7 @@ describe('BotAI Service', () => {
 
       await listActiveAIs();
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE ba.is_active = TRUE'),
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE ba.is_active = TRUE'));
     });
 
     it('should return empty array when no active AIs', async () => {
@@ -256,10 +254,9 @@ describe('BotAI Service', () => {
 
       expect(result).not.toBeNull();
       expect(result!.id).toBe('uuid-1');
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE ba.id = ?'),
-        ['uuid-1'],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE ba.id = ?'), [
+        'uuid-1',
+      ]);
     });
 
     it('should return null when AI is not found', async () => {
@@ -297,27 +294,27 @@ describe('BotAI Service', () => {
       expect(mockCompileBotAI).toHaveBeenCalledWith(source);
 
       // Created directory
-      expect(mockMkdirSync).toHaveBeenCalledWith(
-        expect.stringContaining(FIXED_UUID),
-        { recursive: true },
-      );
+      expect(mockMkdirSync).toHaveBeenCalledWith(expect.stringContaining(FIXED_UUID), {
+        recursive: true,
+      });
 
       // Wrote source and compiled files
       expect(mockWriteFileSync).toHaveBeenCalledTimes(2);
-      expect(mockWriteFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('source.ts'),
-        source,
-      );
+      expect(mockWriteFileSync).toHaveBeenCalledWith(expect.stringContaining('source.ts'), source);
       expect(mockWriteFileSync).toHaveBeenCalledWith(
         expect.stringContaining('compiled.js'),
         'var TestAI = ...;',
       );
 
       // Inserted DB row
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO bot_ais'),
-        [FIXED_UUID, 'My Bot', 'desc', 'bot.ts', 1, Buffer.byteLength(source)],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO bot_ais'), [
+        FIXED_UUID,
+        'My Bot',
+        'desc',
+        'bot.ts',
+        1,
+        Buffer.byteLength(source),
+      ]);
 
       // Loaded into registry
       expect(mockLoadAI).toHaveBeenCalledWith(FIXED_UUID);
@@ -365,7 +362,8 @@ describe('BotAI Service', () => {
     });
 
     it('should calculate file_size from source buffer byte length', async () => {
-      const unicodeSource = 'export class AI { /* \u00e9\u00e0\u00fc */ generateInput() { return null; } }';
+      const unicodeSource =
+        'export class AI { /* \u00e9\u00e0\u00fc */ generateInput() { return null; } }';
       const unicodeBuffer = Buffer.from(unicodeSource);
       mockCompileBotAI.mockResolvedValue({
         success: true,
@@ -409,10 +407,10 @@ describe('BotAI Service', () => {
 
       await updateAI('uuid-1', { description: 'New desc' }, 1);
 
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('description = ?'),
-        ['New desc', 'uuid-1'],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('description = ?'), [
+        'New desc',
+        'uuid-1',
+      ]);
     });
 
     it('should load AI in registry when activating a non-builtin AI', async () => {
@@ -421,10 +419,10 @@ describe('BotAI Service', () => {
 
       await updateAI('uuid-1', { isActive: true }, 1);
 
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('is_active = ?'),
-        [true, 'uuid-1'],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('is_active = ?'), [
+        true,
+        'uuid-1',
+      ]);
       expect(mockLoadAI).toHaveBeenCalledWith('uuid-1');
     });
 
@@ -509,20 +507,18 @@ describe('BotAI Service', () => {
       expect(mockCompileBotAI).toHaveBeenCalledWith(source);
 
       // Wrote updated files
-      expect(mockWriteFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('source.ts'),
-        source,
-      );
+      expect(mockWriteFileSync).toHaveBeenCalledWith(expect.stringContaining('source.ts'), source);
       expect(mockWriteFileSync).toHaveBeenCalledWith(
         expect.stringContaining('compiled.js'),
         'var ReBot = ...;',
       );
 
       // Updated DB with version increment
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('version = version + 1'),
-        ['rebot.ts', Buffer.byteLength(source), 'uuid-1'],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('version = version + 1'), [
+        'rebot.ts',
+        Buffer.byteLength(source),
+        'uuid-1',
+      ]);
 
       // Reloaded because active
       expect(mockReloadAI).toHaveBeenCalledWith('uuid-1');
@@ -619,10 +615,9 @@ describe('BotAI Service', () => {
       });
 
       // Deleted DB row
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM bot_ais'),
-        ['uuid-1'],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM bot_ais'), [
+        'uuid-1',
+      ]);
 
       // Audit logged
       expect(mockExecute).toHaveBeenCalledWith(

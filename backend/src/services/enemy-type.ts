@@ -63,8 +63,14 @@ export async function updateEnemyType(
   const sets: string[] = [];
   const params: unknown[] = [];
 
-  if (updates.name !== undefined) { sets.push('name = ?'); params.push(updates.name); }
-  if (updates.description !== undefined) { sets.push('description = ?'); params.push(updates.description); }
+  if (updates.name !== undefined) {
+    sets.push('name = ?');
+    params.push(updates.name);
+  }
+  if (updates.description !== undefined) {
+    sets.push('description = ?');
+    params.push(updates.description);
+  }
   if (updates.config !== undefined) {
     sets.push('config = ?');
     params.push(JSON.stringify(updates.config));

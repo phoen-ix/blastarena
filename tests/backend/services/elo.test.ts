@@ -246,15 +246,15 @@ describe('Elo Service', () => {
 
   describe('calculateTeamElo', () => {
     it('should return [] when winners array is empty', () => {
-      expect(
-        calculateTeamElo([], [{ userId: 2, currentElo: 1000, matchesPlayed: 10 }]),
-      ).toEqual([]);
+      expect(calculateTeamElo([], [{ userId: 2, currentElo: 1000, matchesPlayed: 10 }])).toEqual(
+        [],
+      );
     });
 
     it('should return [] when losers array is empty', () => {
-      expect(
-        calculateTeamElo([{ userId: 1, currentElo: 1000, matchesPlayed: 10 }], []),
-      ).toEqual([]);
+      expect(calculateTeamElo([{ userId: 1, currentElo: 1000, matchesPlayed: 10 }], [])).toEqual(
+        [],
+      );
     });
 
     it('should return [] when both arrays are empty', () => {

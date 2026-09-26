@@ -39,9 +39,7 @@ type RouteLayer = {
 
 function getHandler(method: string, path: string) {
   const stack = (router as any).stack as RouteLayer[];
-  const layer = stack.find(
-    (l: RouteLayer) => l.route?.path === path && l.route.methods[method],
-  );
+  const layer = stack.find((l: RouteLayer) => l.route?.path === path && l.route.methods[method]);
   if (!layer) throw new Error(`${method.toUpperCase()} ${path} not found`);
   const routeStack = layer.route.stack;
   return routeStack[routeStack.length - 1].handle;
@@ -49,9 +47,7 @@ function getHandler(method: string, path: string) {
 
 function getRouteStack(method: string, path: string) {
   const stack = (router as any).stack as RouteLayer[];
-  const layer = stack.find(
-    (l: RouteLayer) => l.route?.path === path && l.route.methods[method],
-  );
+  const layer = stack.find((l: RouteLayer) => l.route?.path === path && l.route.methods[method]);
   if (!layer) throw new Error(`${method.toUpperCase()} ${path} not found`);
   return layer.route.stack;
 }

@@ -195,10 +195,7 @@ describe('Enemy Type Service', () => {
 
       await getEnemyType(42);
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE id = ?'),
-        [42],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE id = ?'), [42]);
     });
 
     it('should return entry when found', async () => {
@@ -235,10 +232,7 @@ describe('Enemy Type Service', () => {
 
       await getEnemyTypeConfigs([5]);
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE id IN (?)'),
-        [5],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE id IN (?)'), [5]);
     });
 
     it('should build correct placeholders for multiple ids', async () => {
@@ -362,10 +356,10 @@ describe('Enemy Type Service', () => {
 
       await updateEnemyType(5, { name: 'Renamed' });
 
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('SET name = ?'),
-        ['Renamed', 5],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('SET name = ?'), [
+        'Renamed',
+        5,
+      ]);
     });
 
     it('should update description only', async () => {
@@ -373,10 +367,10 @@ describe('Enemy Type Service', () => {
 
       await updateEnemyType(5, { description: 'New desc' });
 
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('SET description = ?'),
-        ['New desc', 5],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('SET description = ?'), [
+        'New desc',
+        5,
+      ]);
     });
 
     it('should update config and set is_boss column', async () => {
@@ -462,10 +456,7 @@ describe('Enemy Type Service', () => {
       const sql = mockExecute.mock.calls[0][0] as string;
       expect(sql).not.toContain('config = ?');
       expect(sql).not.toContain('is_boss = ?');
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.any(String),
-        ['A', 'B', 5],
-      );
+      expect(mockExecute).toHaveBeenCalledWith(expect.any(String), ['A', 'B', 5]);
     });
   });
 

@@ -38,9 +38,7 @@ type RouteLayer = {
 
 function getHandler(method: string, path: string) {
   const stack = (friendsRouter as any).stack as RouteLayer[];
-  const layer = stack.find(
-    (l: RouteLayer) => l.route?.path === path && l.route.methods[method],
-  );
+  const layer = stack.find((l: RouteLayer) => l.route?.path === path && l.route.methods[method]);
   if (!layer) throw new Error(`${method.toUpperCase()} ${path} not found`);
   const routeStack = layer.route.stack;
   return routeStack[routeStack.length - 1].handle;
@@ -48,22 +46,29 @@ function getHandler(method: string, path: string) {
 
 function getRouteStack(method: string, path: string) {
   const stack = (friendsRouter as any).stack as RouteLayer[];
-  const layer = stack.find(
-    (l: RouteLayer) => l.route?.path === path && l.route.methods[method],
-  );
+  const layer = stack.find((l: RouteLayer) => l.route?.path === path && l.route.methods[method]);
   if (!layer) throw new Error(`${method.toUpperCase()} ${path} not found`);
   return layer.route.stack;
 }
 
 function mockReq(overrides: Record<string, unknown> = {}): any {
-  return { body: {}, params: {}, user: { userId: 1, username: 'alice', role: 'user' }, ...overrides };
+  return {
+    body: {},
+    params: {},
+    user: { userId: 1, username: 'alice', role: 'user' },
+    ...overrides,
+  };
 }
 
 function mockRes() {
   const data: { _status: number; _json: unknown } = { _status: 200, _json: null };
   const res: any = {
-    get _status() { return data._status; },
-    get _json() { return data._json; },
+    get _status() {
+      return data._status;
+    },
+    get _json() {
+      return data._json;
+    },
     status(code: number) {
       data._status = code;
       return res;
