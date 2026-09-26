@@ -345,8 +345,7 @@ export class GameScene extends Phaser.Scene {
     // Reset state
     this.paused = false;
     this.localPlayerDead = false;
-    this.freeCamX = 0;
-    this.freeCamY = 0;
+    this.resetFreeCam(initialState);
     this.spectateTargetId = null;
     this.isDragging = false;
     this.lastGameState = null;
@@ -1398,6 +1397,18 @@ export class GameScene extends Phaser.Scene {
     if (returnTo) this.registry.set('returnToAdmin', returnTo);
     this.scene.stop('HUDScene');
     this.scene.start('LobbyScene');
+  }
+
+  /**
+   * Where the spectator free camera starts. A replay, a spectated simulation or a staff-spectated
+   * room has no player of its own to start on, so it opens on the middle of the map — at (0,0) it
+   * opened with the map's top-left corner in the centre of the screen. A player who dies in their
+   * own match takes the camera over where it is (see update()).
+   */
+  private resetFreeCam(initialState: GameState | undefined): void {
+    const map = this.spectatorOnly ? initialState?.map : undefined;
+    this.freeCamX = map ? (map.width * TILE_SIZE) / 2 : 0;
+    this.freeCamY = map ? (map.height * TILE_SIZE) / 2 : 0;
   }
 
   private updateCamera(): void {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ReplayData, ReplayTickEvents } from '@blast-arena/shared';
+import { TILE_SIZE } from '@blast-arena/shared';
+import type { GameState, ReplayData, ReplayTickEvents } from '@blast-arena/shared';
 
 /**
  * Replays and spectating, seen from the admin panel:
@@ -7,6 +8,8 @@ import type { ReplayData, ReplayTickEvents } from '@blast-arena/shared';
  * - Closing a replay went to the lobby's default view, not back to the admin tab it came from.
  * - A spectated simulation had no way out before the batch finished (Escape and Start were
  *   switched off, the HUD has no leave button), and leaving never sent `sim:unspectate`.
+ * - A replay or spectated match opened with the map's top-left corner in the centre of the
+ *   screen: the free camera started at (0,0).
  */
 
 vi.mock('phaser', () => ({
@@ -100,6 +103,39 @@ describe('simulation spectating', () => {
     });
     expect(sceneManager.stop).toHaveBeenCalledWith('HUDScene');
     expect(sceneManager.start).toHaveBeenCalledWith('LobbyScene');
+  });
+});
+
+describe('spectator camera', () => {
+  const state = { map: { width: 31, height: 21 } } as GameState;
+
+  function spectatingScene(spectatorOnly: boolean) {
+    const { scene } = gameScene();
+    const cam = { width: 1280, height: 800, scrollX: 0, scrollY: 0, removeBounds: vi.fn() };
+    Object.assign(scene, {
+      spectatorOnly,
+      localPlayerDead: true,
+      spectateTargetId: null,
+      cameras: { main: cam },
+    });
+    return { scene, cam };
+  }
+
+  it('a replay or spectated match opens on the middle of the map', () => {
+    const { scene, cam } = spectatingScene(true);
+    (scene.resetFreeCam as (s: GameState) => void).call(scene, state);
+    (scene.updateCamera as () => void).call(scene);
+
+    expect(cam.scrollX + cam.width / 2).toBe((31 * TILE_SIZE) / 2);
+    expect(cam.scrollY + cam.height / 2).toBe((21 * TILE_SIZE) / 2);
+  });
+
+  it('leaves a player in their own match to take the camera over where it is on death', () => {
+    const { scene } = spectatingScene(false);
+    (scene.resetFreeCam as (s: GameState) => void).call(scene, state);
+
+    expect(scene.freeCamX).toBe(0);
+    expect(scene.freeCamY).toBe(0);
   });
 });
 
