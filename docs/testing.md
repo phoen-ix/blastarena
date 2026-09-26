@@ -5,7 +5,7 @@ BlastArena has **3508 tests** across 153 test files covering the full stack: gam
 | Stack | Framework | Suites | Tests |
 |-------|-----------|--------|-------|
 | Backend (incl. `tests/shared`) | Jest + ts-jest | 115 | 3231 |
-| Frontend | Vitest + happy-dom | 32 | 235 |
+| Frontend | Vitest + jsdom | 32 | 235 |
 
 ## Running Tests
 
@@ -29,7 +29,7 @@ cd frontend && npx vitest                                     # Frontend watch m
 - Diagnostic override (`diagnostics.ignoreCodes`): TS1378 (top-level await) and TS6133/6192/6196 (unused locals and imports). The workspace tsconfigs enable `noUnusedLocals`/`noUnusedParameters` for `src/`, and test files are exempt so a leftover import cannot fail a suite
 
 **Frontend** (`frontend/vitest.config.ts`):
-- Environment: `happy-dom` (lightweight DOM implementation)
+- Environment: `jsdom` (spec-compliant DOM; DOMPurify 3.4 mis-sanitises under happy-dom)
 - Test include: `tests/**/*.test.ts` (relative to `frontend/`, so `tests/helpers/*.ts` are not collected as tests)
 - Module aliases: `@shared` and `@blast-arena/shared` → `../shared/src`
 
@@ -233,7 +233,7 @@ Backend utilities, config guards (nginx, Compose, Node version) and the shared-p
 
 ### Frontend (37 files, 266 tests)
 
-All frontend tests run on Vitest + happy-dom. Paths are relative to `frontend/`.
+All frontend tests run on Vitest + jsdom. Paths are relative to `frontend/`.
 
 | File | Tests | Coverage |
 |------|-------|----------|
@@ -567,10 +567,10 @@ it('player moves correctly', () => {
 
 ## Frontend Testing
 
-Frontend tests use Vitest with `happy-dom` for DOM APIs. They come in four kinds:
+Frontend tests use Vitest with `jsdom` for DOM APIs. They come in four kinds:
 
 - **Pure functions** (HTML escaping, colors, grid math, wrap ghosts, replay index): plain imports, no mocking.
-- **UI and view tests** render real views, modals and HUD pieces into happy-dom's `document`. They `vi.mock` the modules around the view (typically `i18n`, `UIGamepadNavigator` and `ApiClient`) and pass small fakes for the `SocketClient`/`AuthManager` dependencies.
+- **UI and view tests** render real views, modals and HUD pieces into jsdom's `document`. They `vi.mock` the modules around the view (typically `i18n`, `UIGamepadNavigator` and `ApiClient`) and pass small fakes for the `SocketClient`/`AuthManager` dependencies.
 - **Renderer and scene tests** drive the real renderer classes (and `GameScene`) against `tests/helpers/fakeScene.ts` (`makeFakeScene()`), a minimal stand-in for the parts of `Phaser.Scene` they touch, with `vi.mock('phaser', ...)` so Phaser itself never boots.
 - **Source scans** parse `src/` with the TypeScript compiler API: `sceneListenerLifecycle` checks socket listener cleanup in every scene, and `sanitizerFidelity`/`trustedTypesEnforcement` share the HTML-literal corpus from `tests/helpers/htmlLiterals.ts`.
 

@@ -60,8 +60,33 @@ function canonical(root: Element): string {
   return out.join('\n');
 }
 
+/**
+ * `${cond ? `<td>…</td>` : ''}` between two cells (or `${rows}` inside a `<tbody>`) turns into bare
+ * text once the placeholder is substituted. A spec-compliant parser — jsdom, like every browser —
+ * foster-parents text found directly in table structure out of the table, and does not do it the
+ * same way for innerHTML and for DOMPurify's parse. That is an artefact of this scan: the real
+ * interpolation there yields cells, rows or nothing. So drop a placeholder that stands where only
+ * table structure can.
+ */
+const TABLE_GAP = new RegExp(
+  `(<(?:/t[dhr]|tr|tbody|thead|tfoot)\\b[^>]*>)(\\s*)${PLACEHOLDER}(?=\\s*<)`,
+  'g',
+);
+
+function withoutTableGapPlaceholders(html: string): string {
+  let prev: string;
+  do {
+    prev = html;
+    html = html.replace(TABLE_GAP, '$1$2');
+  } while (html !== prev);
+  return html;
+}
+
 describe('sanitiser fidelity against this app markup', () => {
-  const literals = collectHtmlLiterals();
+  const literals = collectHtmlLiterals().map((lit) => ({
+    ...lit,
+    text: withoutTableGapPlaceholders(lit.text),
+  }));
 
   it('finds the markup to check (guards against the scan silently breaking)', () => {
     expect(literals.length).toBeGreaterThan(200);

@@ -41,7 +41,7 @@ beforeEach(() => {
     <div role="radiogroup"><span role="radio" tabindex="0" id="r1">x</span></div>
     <button id="b">B</button>`;
   document.body.appendChild(modal);
-  // happy-dom has no layout: give everything an offsetParent so trapFocus counts it as visible
+  // jsdom has no layout: give everything an offsetParent so trapFocus counts it as visible
   for (const el of modal.querySelectorAll<HTMLElement>('*')) {
     Object.defineProperty(el, 'offsetParent', { get: () => modal, configurable: true });
   }
