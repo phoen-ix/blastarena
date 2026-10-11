@@ -1,12 +1,30 @@
 import fs from 'fs';
 import path from 'path';
 import type { RowDataPacket } from 'mysql2';
+import type { Pool } from 'mysql2/promise';
 import { getPool } from '../connection';
+import { getConfig } from '../../config';
 import { logger } from '../../utils/logger';
 
 /** Row shape returned by `SELECT name FROM _migrations` queries */
 interface MigrationRow extends RowDataPacket {
   name: string;
+}
+
+/**
+ * How long to wait for another process to finish migrating before giving up. Generous: the whole
+ * set applies in seconds on an empty database, so anything approaching this means the other side
+ * is wedged, not slow.
+ */
+const MIGRATION_LOCK_TIMEOUT_SEC = 60;
+
+/**
+ * MariaDB advisory locks are namespaced per *server*, not per database, so include the database
+ * name — otherwise two schemas on one server (a dev stack and a test database, say) would
+ * serialise against each other for no reason. Lock names are capped at 64 characters.
+ */
+function migrationLockName(): string {
+  return `blast_arena_migrations_${getConfig().DB_NAME}`.slice(0, 64);
 }
 
 /** Resolve to source directory since SQL files aren't compiled */
@@ -112,9 +130,60 @@ export function parseSqlStatements(sql: string): string[] {
   return statements;
 }
 
+/**
+ * Apply every migration that has not been recorded in `_migrations` yet.
+ *
+ * Serialised across processes by a MariaDB advisory lock (same approach as reclaim's runner).
+ * Without it, two backends that start together — a rolling restart, a second replica — both read
+ * the applied-set below, both conclude the same file is pending, and both run it. The visible
+ * symptom is one of them dying on `Duplicate entry '0NN_….sql' for key 'name'` (and crash-looping
+ * on restart), but the real damage is the migration BODY executing twice: guarded DDL survives
+ * that, the data migrations (e.g. 030's email hashing) do not.
+ *
+ * The applied-set is deliberately read INSIDE the lock. Reading it outside would hand the waiter a
+ * snapshot taken before the holder's work, so it would wake up and redo everything it had just
+ * waited for — the same race with extra steps.
+ */
 export async function runMigrations(): Promise<void> {
   const pool = getPool();
+  const lockName = migrationLockName();
+  const lock = await pool.getConnection();
 
+  try {
+    const [rows] = await lock.query<RowDataPacket[]>('SELECT GET_LOCK(?, ?) AS acquired', [
+      lockName,
+      MIGRATION_LOCK_TIMEOUT_SEC,
+    ]);
+    // GET_LOCK: 1 = acquired, 0 = timed out, NULL = error (e.g. killed session).
+    const acquired = rows[0]?.acquired;
+    if (acquired === null || acquired === undefined) {
+      throw new Error(`Could not acquire migration lock "${lockName}": GET_LOCK returned an error`);
+    }
+    if (Number(acquired) !== 1) {
+      throw new Error(
+        `Timed out after ${MIGRATION_LOCK_TIMEOUT_SEC}s waiting for migration lock "${lockName}" — ` +
+          'another process is still migrating, or one died holding it.',
+      );
+    }
+
+    await applyPendingMigrations(pool);
+  } finally {
+    // Release BEFORE returning the connection to the pool. A pooled connection that goes back
+    // still holding the lock would block every later migration run in this process.
+    try {
+      await lock.query('SELECT RELEASE_LOCK(?)', [lockName]);
+      lock.release();
+    } catch (err) {
+      logger.error(
+        { err, lockName },
+        'Failed to release migration lock; discarding the connection',
+      );
+      lock.destroy();
+    }
+  }
+}
+
+async function applyPendingMigrations(pool: Pool): Promise<void> {
   // Create migrations tracking table
   await pool.execute(`
     CREATE TABLE IF NOT EXISTS _migrations (

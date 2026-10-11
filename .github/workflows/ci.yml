@@ -18,6 +18,23 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # tests/backend/db/migrationLock.test.ts runs the migration runner against this (every other
+    # backend suite mocks the database). REQUIRE_DB_TESTS on the Test step switches it on.
+    services:
+      mariadb:
+        image: mariadb:12.3.3
+        env:
+          MARIADB_ROOT_PASSWORD: ci_root_pw
+          MARIADB_DATABASE: blast_arena
+          MARIADB_USER: blast_user
+          MARIADB_PASSWORD: ci_pass_pw
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
     env:
       HUSKY: "0"
     steps:
@@ -45,6 +62,13 @@ jobs:
 
       - name: Test
         run: npm test
+        env:
+          REQUIRE_DB_TESTS: "1"
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: blast_arena
+          DB_USER: blast_user
+          DB_PASSWORD: ci_pass_pw
 
       - name: Audit production dependencies (high+)
         run: npm audit --omit=dev --audit-level=high

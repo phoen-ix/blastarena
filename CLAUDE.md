@@ -182,6 +182,7 @@ Full-stack i18n via **i18next**. `t('namespace:section.key')` with `{{variable}}
 - Forward: `backend/src/db/migrations/*.sql`, numbered `NNN_description.sql`
 - Rollback: `backend/src/db/migrations/down/*.down.sql`
 - Runner: `runMigrations()` (auto on startup), `rollbackMigration(steps)`, `getAppliedMigrations()`
+- `runMigrations()` holds a MariaDB advisory lock (`GET_LOCK('blast_arena_migrations_<DB_NAME>')`) while it reads `_migrations` and applies what is pending, so backends starting together apply each file exactly once (`tests/backend/db/migrationLock.test.ts`, the one suite that runs against a real MariaDB: CI and fleet set `REQUIRE_DB_TESTS=1`)
 - MariaDB DDL auto-commits: a migration that fails halfway keeps the statements before the failure while `_migrations` does not record it. Write up and down scripts so they can run again — `IF [NOT] EXISTS`, and data changes that are safe to repeat (from 042 on, `tests/backend/db/migrationParity.test.ts` rejects an unguarded schema change)
 
 ## Testing

@@ -1,11 +1,11 @@
 # Testing
 
-BlastArena has **3508 tests** across 153 test files covering the full stack: game logic, backend services, API routes, socket handlers, middleware, database migrations, utilities, shared code, config guards, and frontend.
+BlastArena has **3514 tests** across 154 test files covering the full stack: game logic, backend services, API routes, socket handlers, middleware, database migrations, utilities, shared code, config guards, and frontend.
 
 | Stack | Framework | Suites | Tests |
 |-------|-----------|--------|-------|
-| Backend (incl. `tests/shared`) | Jest + ts-jest | 115 | 3231 |
-| Frontend | Vitest + jsdom | 32 | 235 |
+| Backend (incl. `tests/shared`) | Jest + ts-jest | 117 | 3246 |
+| Frontend | Vitest + jsdom | 37 | 268 |
 
 ## Running Tests
 
@@ -43,7 +43,7 @@ tests/
 │   ├── routes/         15 files — API endpoint handlers, admin validation, route mounting, JSON 404 + headers
 │   ├── handlers/        6 files — Socket.io event handlers, socket.ts AST guards
 │   ├── middleware/      7 files — auth, validation, rate limiting, errors, body parsing, email, locale
-│   ├── db/              3 files — SQL statement parser, migration up/down parity, rollback guard
+│   ├── db/              4 files — SQL statement parser, migration up/down parity, rollback guard, migration lock (real MariaDB)
 │   ├── simulation/      2 files — batch bot simulation manager and runner
 │   ├── utils/          10 files — crypto, rate limiting, log/replay pruning, guest gate, nginx/Compose/Node config guards
 │   └── shared/          1 file  — XP math
@@ -192,15 +192,16 @@ Socket.io event handler tests — handlers tested with mock socket/io objects an
 | `middleware/validation.test.ts` | 8 | Zod validation of body/query/params, parsed output replaces the input (extra fields stripped), field-level error details, non-Zod errors forwarded |
 | `middleware/bodyParserErrors.test.ts` | 6 | Real Express stack: malformed JSON → 400 INVALID_JSON (body not reflected), corrupt gzip → 4xx, oversized → 413, unsupported charset → 415 |
 
-### Database (3 files, 124 tests)
+### Database (4 files, 127 tests)
 
-Migration tooling — the SQL statement splitter and the migration files themselves, checked without a database.
+Migration tooling — the SQL statement splitter and the migration files themselves, checked without a database, and the runner's advisory lock against a real MariaDB. `migrationLock.test.ts` is the only backend suite that is not mocked: it runs when `REQUIRE_DB_TESTS=1` (CI and fleet set it, with a MariaDB service and the `DB_*` settings) and is skipped otherwise.
 
 | File | Tests | Coverage |
 |------|-------|----------|
 | `db/sqlStatementParser.test.ts` | 113 | parseSqlStatements: comments (`--`, `#`, block, version-gated), quoting and escapes, statement splitting; plus one parse check per repository migration file (up and down) |
 | `db/migrationParity.test.ts` | 10 | Every up migration has a down file and vice versa, numbering unique and gap-free from 001, no empty files, up/down symmetry for 030 (re-applicable after rollback), 040 and 041; 046 drops only the index 035 added, which 008's composite index covers; from 042 on every schema change, up and down, is guarded with `IF [NOT] EXISTS` so an interrupted migration can run again |
 | `db/migrationRunner.test.ts` | 1 | rollbackMigration refuses to roll back the irreversible email migration without force |
+| `db/migrationLock.test.ts` | 3 | Two concurrent runMigrations() calls apply each (throwaway, non-idempotent) migration exactly once; a run waits while another session holds the lock; the lock is released before its connection goes back to the pool |
 
 ### Simulation (2 files, 85 tests)
 
