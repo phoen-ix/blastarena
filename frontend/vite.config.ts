@@ -14,8 +14,10 @@ if (appUrl) {
 export default defineConfig({
   resolve: {
     alias: {
-      '@shared': path.resolve(__dirname, '../shared/src'),
-      '@blast-arena/shared': path.resolve(__dirname, '../shared/src'),
+      // import.meta.dirname, not __dirname: Vite 8 warns that its native config loader cannot
+      // provide the CommonJS globals.
+      '@shared': path.resolve(import.meta.dirname, '../shared/src'),
+      '@blast-arena/shared': path.resolve(import.meta.dirname, '../shared/src'),
     },
   },
   server: {
@@ -40,10 +42,13 @@ export default defineConfig({
     sourcemap: false,
     modulePreload: { polyfill: false },
     minify: 'terser',
-    rollupOptions: {
+    // Vite 8 bundles with rolldown: `rollupOptions` is `rolldownOptions`, and `codeSplitting`
+    // replaces the object form of `manualChunks` (which rolldown rejects). Phaser stays in its
+    // own long-cached chunk.
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          phaser: ['phaser'],
+        codeSplitting: {
+          groups: [{ name: 'phaser', test: /node_modules[\\/]phaser[\\/]/ }],
         },
       },
     },
