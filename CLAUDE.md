@@ -32,8 +32,8 @@ docker compose -p blast-arena-dev -f docker-compose.yml -f docker-compose.dev.ym
 ```
 
 ## Tech Stack
-- Backend: Node.js 26 + Express + TypeScript + Socket.io
-- Frontend: Phaser.js + TypeScript + Vite
+- Backend: Node.js 26 + Express 5 + TypeScript + Socket.io
+- Frontend: Phaser 4 + TypeScript + Vite
 - Database: MariaDB 12.3 + Redis 8
 - Shared types between frontend/backend via workspace
 
