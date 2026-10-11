@@ -34,8 +34,10 @@ const DANGEROUS_MODULES = [
   'inspector',
   // Defence in depth only — blockImportsPlugin rejects every onResolve, so no import survives the
   // bundle step whether or not it is listed here. Kept current anyway so the list does not lag the
-  // runtime: `sqlite` graduated to a stable builtin in Node 24, and the rest were never listed.
+  // runtime: `sqlite` graduated to a stable builtin in Node 24, `node:ffi` (foreign function
+  // calls into native libraries) arrived in Node 26, and the rest were never listed.
   'sqlite',
+  'ffi',
   'module',
   'process',
   'repl',
@@ -170,7 +172,7 @@ export async function scanAndBuildAI(source: string): Promise<CompileResult> {
       bundle: true,
       platform: 'node',
       format: 'cjs',
-      target: 'node24',
+      target: 'node26',
       write: false,
       plugins: [blockImportsPlugin],
     });

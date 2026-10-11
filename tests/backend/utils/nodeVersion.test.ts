@@ -26,7 +26,7 @@ import path from 'path';
 const ROOT = path.join(__dirname, '../../..');
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf-8');
 
-const EXPECTED_MAJOR = 24;
+const EXPECTED_MAJOR = 26;
 
 const DOCKERFILES = [
   'docker/backend/Dockerfile',
@@ -68,7 +68,7 @@ describe('Node version consistency', () => {
   it('declares the same major in the root package.json engines field', () => {
     const engines = JSON.parse(read('package.json')).engines;
     expect(engines?.node).toBeDefined();
-    // Accepts ">=24", "^24", "24.x" — only the major has to line up.
+    // Accepts ">=26", "^26", "26.x" — only the major has to line up.
     expect(Number(String(engines.node).match(/(\d+)/)?.[1])).toBe(EXPECTED_MAJOR);
   });
 

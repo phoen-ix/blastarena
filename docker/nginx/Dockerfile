@@ -1,10 +1,10 @@
 # Stage 1: Build frontend
 #
-# Node 24 (LTS "Krypton"). Both Node stages in this file must stay in lockstep with the two in
+# Node 26 (LTS from 2026-10-28). Both Node stages in this file must stay in lockstep with the two in
 # docker/backend/Dockerfile*: all five install from the same root package-lock.json. This file is
 # the half that drifted — it sat on Node 20 while the backend moved to 22, and nothing caught it
 # because the Dockerfile tags were the only pin. Guarded by tests/backend/utils/nodeVersion.test.ts.
-FROM node:24.21.0-alpine3.24 AS frontend-builder
+FROM node:26.11.1-alpine3.24 AS frontend-builder
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ COPY frontend/ ./frontend/
 RUN npm run build --workspace=frontend
 
 # Stage 2: Dev frontend (for docker-compose.dev.yml)
-FROM node:24.21.0-alpine3.24 AS frontend-dev
+FROM node:26.11.1-alpine3.24 AS frontend-dev
 
 WORKDIR /app
 

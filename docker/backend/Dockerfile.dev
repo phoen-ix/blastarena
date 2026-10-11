@@ -1,11 +1,12 @@
-# Node 24 (LTS "Krypton"). This image has no build toolchain — the only apk is wget — so every
+# Node 26 (LTS from 2026-10-28). This image has no build toolchain — the only apk is wget — so every
 # native module must resolve to a prebuilt binary. isolated-vm needs
-# prebuilds/linux-x64/isolated-vm.abi137.musl.node, where abi137 is Node 24's NODE_MODULE_VERSION.
+# prebuilds/linux-x64/isolated-vm.abi147.musl.node, where abi147 is Node 26's NODE_MODULE_VERSION
+# (isolated-vm 7 is the first release that ships it).
 # Moving to a major that isolated-vm ships no prebuild for does NOT fail loudly: its install script
 # is `node-gyp-build || node-gyp rebuild`, and the `||` falls through to a source build that cannot
 # succeed here. Keep this in lockstep with docker/backend/Dockerfile and docker/nginx/Dockerfile.
 # Guarded by tests/backend/utils/nodeVersion.test.ts.
-FROM node:24.21.0-alpine3.24
+FROM node:26.11.1-alpine3.24
 
 WORKDIR /app
 
