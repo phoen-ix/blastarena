@@ -1,5 +1,5 @@
 import { PowerUpState, Position, PowerUpType } from '@blast-arena/shared';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 export class PowerUp {
   public readonly id: string;
@@ -7,7 +7,7 @@ export class PowerUp {
   public readonly type: PowerUpType;
 
   constructor(position: Position, type: PowerUpType) {
-    this.id = uuidv4();
+    this.id = randomUUID();
     this.position = { ...position };
     this.type = type;
   }

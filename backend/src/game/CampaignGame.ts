@@ -37,7 +37,7 @@ import { PuzzleTileProcessor } from './PuzzleTileProcessor';
 import { ReplayRecorder } from '../utils/replayRecorder';
 import { GameLogger } from '../utils/gameLogger';
 import { logger } from '../utils/logger';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { SeededRandom } from './SeededRandom';
 import { DEFAULT_MAX_BOMBS, DEFAULT_FIRE_RANGE, DEFAULT_SPEED } from '@blast-arena/shared';
 
@@ -218,7 +218,7 @@ export class CampaignGame {
     theme?: string,
     localCoop?: boolean,
   ) {
-    this.sessionId = uuidv4();
+    this.sessionId = randomUUID();
     this.localCoop = !!localCoop;
     this.userIds = userIds;
     this.usernames = usernames;

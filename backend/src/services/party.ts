@@ -1,6 +1,6 @@
 import { getRedis } from '../db/redis';
 import { Party, PartyInvite, MAX_PARTY_SIZE } from '@blast-arena/shared';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { AppError } from '../middleware/errorHandler';
 
 const PARTY_TTL = 3600; // 1 hour
@@ -111,7 +111,7 @@ const CREATE_PARTY_LUA = `
 export async function createParty(userId: number, username: string): Promise<Party> {
   const redis = getRedis();
 
-  const partyId = uuidv4();
+  const partyId = randomUUID();
   const party: Party = {
     id: partyId,
     leaderId: userId,
@@ -303,7 +303,7 @@ export async function createInvite(
   },
 ): Promise<string> {
   const redis = getRedis();
-  const inviteId = uuidv4();
+  const inviteId = randomUUID();
   const inviteData = {
     inviteId,
     ...invite,

@@ -1,6 +1,6 @@
 import path from 'path';
 import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { EnemyAIEntry } from '@blast-arena/shared';
 import { query, execute } from '../db/connection';
 import { logAdminAction } from './admin-audit';
@@ -88,7 +88,7 @@ export async function uploadEnemyAI(
     };
   }
 
-  const id = uuidv4();
+  const id = randomUUID();
   const aiDir = path.join(ENEMY_AI_BASE_DIR, id);
   fs.mkdirSync(aiDir, { recursive: true });
 
@@ -132,7 +132,7 @@ export async function uploadEnemyAIFromSource(
     return { entry: null, errors: result.errors };
   }
 
-  const id = uuidv4();
+  const id = randomUUID();
   const aiDir = path.join(ENEMY_AI_BASE_DIR, id);
   fs.mkdirSync(aiDir, { recursive: true });
 

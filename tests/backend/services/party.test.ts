@@ -39,9 +39,10 @@ jest.mock('../../../backend/src/db/redis', () => ({
   getRedis: () => mockRedis,
 }));
 
-// Mock uuid
-jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'test-uuid-1234'),
+// Mock crypto.randomUUID
+jest.mock('crypto', () => ({
+  ...jest.requireActual<typeof import('crypto')>('crypto'),
+  randomUUID: jest.fn(() => 'test-uuid-1234'),
 }));
 
 import * as partyService from '../../../backend/src/services/party';

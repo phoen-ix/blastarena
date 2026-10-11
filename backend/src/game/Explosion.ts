@@ -1,6 +1,6 @@
 import { ExplosionState, Position } from '@blast-arena/shared';
 import { EXPLOSION_DURATION_TICKS } from '@blast-arena/shared';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 export class Explosion {
   public readonly id: string;
@@ -12,7 +12,7 @@ export class Explosion {
   private cellsSent = false;
 
   constructor(cells: Position[], ownerId: number) {
-    this.id = uuidv4();
+    this.id = randomUUID();
     this.cells = cells.map((c) => ({ ...c }));
     this.ownerId = ownerId;
     this.ticksRemaining = EXPLOSION_DURATION_TICKS;

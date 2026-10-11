@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { getRedis } from '../db/redis';
 import { Room, RoomListItem, MatchConfig } from '@blast-arena/shared';
 import { PublicUser } from '@blast-arena/shared';
@@ -21,7 +21,7 @@ const ROOM_TTL_SECONDS = 3600; // 1 hour
 const ROOM_INDEX_KEY = 'rooms:index';
 
 function generateRoomCode(): string {
-  return uuidv4().substring(0, 6).toUpperCase();
+  return randomUUID().substring(0, 6).toUpperCase();
 }
 
 /** MatchConfig fields that hold arrays. */

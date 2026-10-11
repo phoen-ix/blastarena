@@ -52,8 +52,9 @@ jest.mock('fs', () => ({
 
 // ── UUID mock ───────────────────────────────────────────────────────────────
 const FIXED_UUID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
-jest.mock('uuid', () => ({
-  v4: () => FIXED_UUID,
+jest.mock('crypto', () => ({
+  ...jest.requireActual<typeof import('crypto')>('crypto'),
+  randomUUID: () => FIXED_UUID,
 }));
 
 // ── Logger mock ─────────────────────────────────────────────────────────────

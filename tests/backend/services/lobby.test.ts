@@ -57,8 +57,9 @@ jest.mock('../../../backend/src/db/redis', () => ({
   getRedis: () => mockRedis,
 }));
 
-jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'abcdef-1234-5678-9012'),
+jest.mock('crypto', () => ({
+  ...jest.requireActual<typeof import('crypto')>('crypto'),
+  randomUUID: jest.fn(() => 'abcdef-1234-5678-9012'),
 }));
 
 jest.mock('../../../backend/src/utils/logger', () => ({
@@ -322,8 +323,8 @@ describe('lobby service', () => {
     });
 
     it('keeps live rooms while dropping expired ones', async () => {
-      // uuid.v4 is mocked to a constant, so every createRoom yields the same code — the second
-      // room is seeded by hand to get a distinct one.
+      // crypto.randomUUID is mocked to a constant, so every createRoom yields the same code — the
+      // second room is seeded by hand to get a distinct one.
       const alive = await createRoom(makeUser(1, 'alice') as any, 'Alive', makeConfig() as any);
       setFor('rooms:index').add('DEAD01'); // indexed, but its room key never existed / expired
 

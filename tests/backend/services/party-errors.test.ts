@@ -22,7 +22,10 @@ jest.mock('../../../backend/src/db/redis', () => ({
   getRedis: () => ({ eval: mockEval, get: mockGet, set: jest.fn(), del: jest.fn() }),
 }));
 
-jest.mock('uuid', () => ({ v4: () => 'party-uuid' }));
+jest.mock('crypto', () => ({
+  ...jest.requireActual<typeof import('crypto')>('crypto'),
+  randomUUID: () => 'party-uuid',
+}));
 
 import * as partyService from '../../../backend/src/services/party';
 import { AppError } from '../../../backend/src/middleware/errorHandler';

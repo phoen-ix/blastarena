@@ -1,6 +1,6 @@
 import path from 'path';
 import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import type { RowDataPacket } from 'mysql2';
 import { compileEnemyAI } from '../../services/enemyai-compiler';
 import { getEnemyAIRegistry } from '../../services/enemyai-registry';
@@ -57,7 +57,7 @@ export async function seedDefaultEnemyAIs(): Promise<void> {
         id = rows[0].id;
         active = !!rows[0].is_active;
       } else {
-        id = uuidv4();
+        id = randomUUID();
         await execute(
           `INSERT INTO enemy_ais (id, name, description, filename, is_active, uploaded_by, version, file_size, builtin_key)
            VALUES (?, ?, ?, ?, TRUE, NULL, 1, ?, ?)`,

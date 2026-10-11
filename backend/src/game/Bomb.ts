@@ -1,6 +1,6 @@
 import { BombState, Position, Direction } from '@blast-arena/shared';
 import { BOMB_TIMER_TICKS } from '@blast-arena/shared';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 export type BombType = 'normal' | 'remote' | 'pierce';
 
@@ -22,7 +22,7 @@ export class Bomb {
     fireRange: number,
     bombType: BombType = 'normal',
   ) {
-    this.id = uuidv4();
+    this.id = randomUUID();
     this.position = { ...position };
     this.ownerId = ownerId;
     this.fireRange = fireRange;

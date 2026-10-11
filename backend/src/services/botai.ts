@@ -1,6 +1,6 @@
 import path from 'path';
 import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { BotAIEntry } from '@blast-arena/shared';
 import { query, execute } from '../db/connection';
 import { logAdminAction } from './admin-audit';
@@ -81,7 +81,7 @@ export async function uploadAI(
     };
   }
 
-  const id = uuidv4();
+  const id = randomUUID();
   const aiDir = path.join(AI_BASE_DIR, id);
   fs.mkdirSync(aiDir, { recursive: true });
 
