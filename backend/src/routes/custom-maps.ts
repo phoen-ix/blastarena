@@ -6,6 +6,7 @@ import { validate } from '../middleware/validation';
 import { AppError } from '../middleware/errorHandler';
 import * as customMapsService from '../services/custom-maps';
 import { validateCustomMap, TileType, Position } from '@blast-arena/shared';
+import { param } from '../utils/params';
 
 const router = Router();
 
@@ -42,7 +43,7 @@ router.get('/maps/published', authMiddleware, emailVerifiedMiddleware, async (_r
 // Get full map data (own or published)
 router.get('/maps/:id', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(param(req.params.id), 10);
     if (isNaN(id)) throw new AppError('Invalid map ID', 400);
 
     const map = await customMapsService.getMap(id);
@@ -105,7 +106,7 @@ router.put(
   validate(customMapSchema),
   async (req, res, next) => {
     try {
-      const id = parseInt(req.params.id, 10);
+      const id = parseInt(param(req.params.id), 10);
       if (isNaN(id)) throw new AppError('Invalid map ID', 400);
 
       const data = req.body;
@@ -149,7 +150,7 @@ router.post(
   validate(ratingSchema),
   async (req, res, next) => {
     try {
-      const id = parseInt(req.params.id, 10);
+      const id = parseInt(param(req.params.id), 10);
       if (isNaN(id)) throw new AppError('Invalid map ID', 400);
 
       const map = await customMapsService.getMap(id);
@@ -169,7 +170,7 @@ router.post(
 // Get user's rating for a map
 router.get('/maps/:id/rating', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(param(req.params.id), 10);
     if (isNaN(id)) throw new AppError('Invalid map ID', 400);
 
     const rating = await customMapsService.getUserRating(id, req.user!.userId);
@@ -182,7 +183,7 @@ router.get('/maps/:id/rating', authMiddleware, emailVerifiedMiddleware, async (r
 // Delete map (owner only)
 router.delete('/maps/:id', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(param(req.params.id), 10);
     if (isNaN(id)) throw new AppError('Invalid map ID', 400);
 
     const deleted = await customMapsService.deleteMap(id, req.user!.userId);

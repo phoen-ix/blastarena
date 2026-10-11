@@ -58,7 +58,7 @@ export const userIdSchema = z.object({
 });
 
 export const inviteIdSchema = z.object({
-  inviteId: z.string().uuid(),
+  inviteId: z.uuid(),
 });
 
 export const dmReadSchema = z.object({

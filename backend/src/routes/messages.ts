@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { emailVerifiedMiddleware } from '../middleware/emailVerified';
 import * as messageService from '../services/messages';
+import { param } from '../utils/params';
 
 const router = Router();
 
@@ -18,7 +19,7 @@ router.get('/messages', authMiddleware, emailVerifiedMiddleware, async (req, res
 // GET /messages/:userId — paginated conversation history
 router.get('/messages/:userId', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
-    const otherUserId = parseInt(req.params.userId);
+    const otherUserId = parseInt(param(req.params.userId));
     if (isNaN(otherUserId)) {
       res.status(400).json({ error: 'Invalid user ID' });
       return;
@@ -43,7 +44,7 @@ router.put(
   emailVerifiedMiddleware,
   async (req, res, next) => {
     try {
-      const senderId = parseInt(req.params.userId);
+      const senderId = parseInt(param(req.params.userId));
       if (isNaN(senderId)) {
         res.status(400).json({ error: 'Invalid user ID' });
         return;

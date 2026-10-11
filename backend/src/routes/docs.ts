@@ -3,6 +3,7 @@ import { authMiddleware } from '../middleware/auth';
 import { staffMiddleware } from '../middleware/admin';
 import * as fs from 'fs';
 import * as path from 'path';
+import { param } from '../utils/params';
 
 const router = Router();
 
@@ -22,7 +23,7 @@ function resolveDocPath(filename: string): string {
 
 // Staff-only docs — admin + moderator (must be registered before the generic :filename route)
 router.get('/docs/admin/:filename', authMiddleware, staffMiddleware, async (req, res) => {
-  const filename = req.params.filename;
+  const filename = param(req.params.filename);
   if (!STAFF_DOCS.includes(filename)) {
     res.status(400).json({ error: 'Invalid document name' });
     return;
@@ -39,7 +40,7 @@ router.get('/docs/admin/:filename', authMiddleware, staffMiddleware, async (req,
 
 // Public docs — any authenticated user
 router.get('/docs/:filename', authMiddleware, async (req, res) => {
-  const filename = req.params.filename;
+  const filename = param(req.params.filename);
   if (!PUBLIC_DOCS.includes(filename)) {
     res.status(400).json({ error: 'Invalid document name' });
     return;

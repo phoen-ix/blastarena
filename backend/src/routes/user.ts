@@ -17,6 +17,7 @@ import {
   validateEmail as validateEmailFn,
   validatePassword,
 } from '@blast-arena/shared';
+import { param } from '../utils/params';
 
 const router = Router();
 
@@ -25,7 +26,7 @@ const updateProfileSchema = z.object({
 });
 
 const changeEmailSchema = z.object({
-  email: z.string().email().max(255),
+  email: z.email().max(255),
 });
 
 const changePasswordSchema = z.object({
@@ -260,7 +261,7 @@ router.get(
   rateLimiter({ windowMs: 15 * 60 * 1000, maxRequests: 10 }),
   async (req, res, next) => {
     try {
-      await userService.confirmEmailChange(req.params.token);
+      await userService.confirmEmailChange(param(req.params.token));
       res.redirect(`${getConfig().APP_URL}?emailChanged=true`);
     } catch (err) {
       next(err);

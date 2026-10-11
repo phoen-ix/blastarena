@@ -118,6 +118,24 @@ describe('validate middleware', () => {
     expect(next).toHaveBeenCalled();
   });
 
+  it('replaces req.query even though Express 5 defines it as a getter', () => {
+    // Express 5 puts `query` on the request prototype as a getter with no setter; a plain
+    // `req.query = data` would throw a TypeError there.
+    const proto = {};
+    Object.defineProperty(proto, 'query', {
+      get: () => ({ page: '5', extra: 'gone' }),
+      configurable: true,
+    });
+    const req = Object.assign(Object.create(proto), { body: {}, params: {} }) as Request;
+    const res = mockRes();
+    const middleware = validate(z.object({ page: z.string() }), 'query');
+
+    middleware(req, res, next);
+
+    expect(req.query).toEqual({ page: '5' });
+    expect(next).toHaveBeenCalledWith();
+  });
+
   it('works with params source', () => {
     const paramsSchema = z.object({ id: z.string() });
     const req = mockReq({ params: { id: '42', slug: 'extra' } });

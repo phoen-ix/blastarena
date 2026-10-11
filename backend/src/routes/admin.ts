@@ -37,6 +37,7 @@ import {
 import multer from 'multer';
 import { AppError } from '../middleware/errorHandler';
 import { scrubEmailError } from '../utils/crypto';
+import { param } from '../utils/params';
 
 const router = Router();
 
@@ -66,7 +67,7 @@ const createUserSchema = z.object({
     .min(3)
     .max(20)
     .regex(/^[a-zA-Z0-9_-]+$/),
-  email: z.string().email().max(255),
+  email: z.email().max(255),
   password: z.string().min(6).max(128),
   role: z.enum(['user', 'moderator', 'admin']).optional(),
 });
@@ -821,12 +822,12 @@ const emailSettingsSchema = z.object({
   smtpPort: z.number().int().min(1).max(65535).optional(),
   smtpUser: z.string().max(255).optional(),
   smtpPassword: z.string().max(255).optional(),
-  fromEmail: z.union([z.string().email().max(255), z.literal('')]).optional(),
+  fromEmail: z.union([z.email().max(255), z.literal('')]).optional(),
   fromName: z.string().max(100).optional(),
 });
 
 const testEmailSchema = z.object({
-  to: z.string().email(),
+  to: z.email(),
 });
 
 router.get('/admin/settings/email_settings', adminOnlyMiddleware, async (_req, res, next) => {
@@ -946,7 +947,7 @@ router.put(
   validate(roleSchema),
   async (req, res, next) => {
     try {
-      const userId = parseInt(req.params.id);
+      const userId = parseInt(param(req.params.id));
       if (isNaN(userId)) return res.status(400).json({ error: 'Invalid user ID' });
       await adminService.changeUserRole(req.user!.userId, userId, req.body.role);
       res.json({ message: 'Role updated' });
@@ -962,7 +963,7 @@ router.put(
   validate(deactivateSchema),
   async (req, res, next) => {
     try {
-      const userId = parseInt(req.params.id);
+      const userId = parseInt(param(req.params.id));
       if (isNaN(userId)) return res.status(400).json({ error: 'Invalid user ID' });
       await adminService.deactivateUser(req.user!.userId, userId, req.body.deactivated);
       res.json({ message: req.body.deactivated ? 'User deactivated' : 'User reactivated' });
@@ -978,7 +979,7 @@ router.put(
   validate(resetPasswordSchema),
   async (req, res, next) => {
     try {
-      const userId = parseInt(req.params.id);
+      const userId = parseInt(param(req.params.id));
       if (isNaN(userId)) return res.status(400).json({ error: 'Invalid user ID' });
       await adminService.resetUserPassword(req.user!.userId, userId, req.body.password);
       res.json({ message: 'Password reset' });
@@ -990,7 +991,7 @@ router.put(
 
 router.delete('/admin/users/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const userId = parseInt(req.params.id);
+    const userId = parseInt(param(req.params.id));
     if (isNaN(userId)) return res.status(400).json({ error: 'Invalid user ID' });
     await adminService.deleteUser(req.user!.userId, userId);
     res.json({ message: 'User deleted' });
@@ -1001,7 +1002,7 @@ router.delete('/admin/users/:id', adminOnlyMiddleware, async (req, res, next) =>
 
 router.post('/admin/users/:id/reset-totp', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const userId = parseInt(req.params.id);
+    const userId = parseInt(param(req.params.id));
     if (isNaN(userId)) return res.status(400).json({ error: 'Invalid user ID' });
     await adminService.resetUserTotp(req.user!.userId, userId);
     res.json({ message: 'User 2FA reset' });
@@ -1012,7 +1013,7 @@ router.post('/admin/users/:id/reset-totp', adminOnlyMiddleware, async (req, res,
 
 router.post('/admin/users/:id/revoke-sessions', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const userId = parseInt(req.params.id);
+    const userId = parseInt(param(req.params.id));
     if (isNaN(userId)) return res.status(400).json({ error: 'Invalid user ID' });
     await adminService.revokeUserSessions(req.user!.userId, userId);
     res.json({ message: 'User sessions revoked' });
@@ -1103,7 +1104,7 @@ router.get('/admin/matches', async (req, res, next) => {
 
 router.get('/admin/matches/:id', async (req, res, next) => {
   try {
-    const matchId = parseInt(req.params.id);
+    const matchId = parseInt(param(req.params.id));
     if (isNaN(matchId)) return res.status(400).json({ error: 'Invalid match ID' });
     const result = await adminService.getMatchDetail(matchId);
     res.json(result);
@@ -1114,7 +1115,7 @@ router.get('/admin/matches/:id', async (req, res, next) => {
 
 router.delete('/admin/matches/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const matchId = parseInt(req.params.id);
+    const matchId = parseInt(param(req.params.id));
     if (isNaN(matchId))
       return res.status(400).json({ error: 'Invalid match ID', code: 'INVALID_ID' });
     // Checked first: an unknown id answered 200 and wrote an audit entry
@@ -1274,7 +1275,7 @@ router.get('/admin/replays', fsReadLimiter, async (req, res, next) => {
 
 router.get('/admin/replays/:matchId', fsReadLimiter, async (req, res, next) => {
   try {
-    const matchId = parseInt(req.params.matchId);
+    const matchId = parseInt(param(req.params.matchId));
     const replay = await replayService.getReplay(matchId);
     if (!replay) {
       res.status(404).json({ error: 'Replay not found' });
@@ -1288,7 +1289,7 @@ router.get('/admin/replays/:matchId', fsReadLimiter, async (req, res, next) => {
 
 router.delete('/admin/replays/:matchId', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const matchId = parseInt(req.params.matchId);
+    const matchId = parseInt(param(req.params.matchId));
     const deleted = await replayService.deleteReplay(matchId);
     if (!deleted) {
       res.status(404).json({ error: 'Replay not found' });
@@ -1320,7 +1321,7 @@ router.get('/admin/campaign-replays', async (req, res, next) => {
 
 router.get('/admin/campaign-replays/:sessionId', fsReadLimiter, async (req, res, next) => {
   try {
-    const replay = await replayService.getCampaignReplay(req.params.sessionId);
+    const replay = await replayService.getCampaignReplay(param(req.params.sessionId));
     if (!replay) {
       res.status(404).json({ error: 'Campaign replay not found' });
       return;
@@ -1333,7 +1334,7 @@ router.get('/admin/campaign-replays/:sessionId', fsReadLimiter, async (req, res,
 
 router.delete('/admin/campaign-replays/:sessionId', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    await replayService.deleteCampaignReplay(req.params.sessionId);
+    await replayService.deleteCampaignReplay(param(req.params.sessionId));
     res.json({ message: 'Campaign replay deleted' });
   } catch (err) {
     next(err);
@@ -1405,7 +1406,7 @@ router.get(
   async (req, res, next) => {
     try {
       const mgr = getSimulationManager();
-      const data = await mgr.getBatchResults(req.params.batchId);
+      const data = await mgr.getBatchResults(param(req.params.batchId));
       if (!data) {
         res.status(404).json({ error: 'Batch not found' });
         return;
@@ -1424,12 +1425,12 @@ router.get(
   async (req, res, next) => {
     try {
       const mgr = getSimulationManager();
-      const gameIndex = parseInt(req.params.gameIndex);
+      const gameIndex = parseInt(param(req.params.gameIndex));
       if (isNaN(gameIndex) || gameIndex < 0) {
         res.status(400).json({ error: 'Invalid game index' });
         return;
       }
-      const replay = await mgr.getSimulationReplay(req.params.batchId, gameIndex);
+      const replay = await mgr.getSimulationReplay(param(req.params.batchId), gameIndex);
       if (!replay) {
         res.status(404).json({ error: 'Replay not found' });
         return;
@@ -1460,9 +1461,9 @@ router.delete('/admin/simulations/:batchId', adminOnlyMiddleware, async (req, re
   try {
     const mgr = getSimulationManager();
     // Try cancelling if running
-    mgr.cancelBatch(req.params.batchId);
+    mgr.cancelBatch(param(req.params.batchId));
     // Delete from disk and memory
-    const deleted = await mgr.deleteBatch(req.params.batchId);
+    const deleted = await mgr.deleteBatch(param(req.params.batchId));
     if (!deleted) {
       res.status(404).json({ error: 'Batch not found' });
       return;
@@ -1538,7 +1539,7 @@ router.put(
   validate(aiUpdateSchema),
   async (req, res, next) => {
     try {
-      await botaiService.updateAI(req.params.id, req.body, req.user!.userId);
+      await botaiService.updateAI(param(req.params.id), req.body, req.user!.userId);
       res.json({ message: 'AI updated' });
     } catch (err) {
       next(err);
@@ -1557,7 +1558,7 @@ router.put(
         return;
       }
       const result = await botaiService.reuploadAI(
-        req.params.id,
+        param(req.params.id),
         req.file.buffer,
         req.file.originalname,
         req.user!.userId,
@@ -1575,7 +1576,7 @@ router.put(
 
 router.get('/admin/ai/:id/download', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const source = await botaiService.downloadSource(req.params.id);
+    const source = await botaiService.downloadSource(param(req.params.id));
     if (!source) {
       res.status(404).json({ error: 'AI source not found' });
       return;
@@ -1590,7 +1591,7 @@ router.get('/admin/ai/:id/download', adminOnlyMiddleware, async (req, res, next)
 
 router.delete('/admin/ai/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    await botaiService.deleteAI(req.params.id, req.user!.userId);
+    await botaiService.deleteAI(param(req.params.id), req.user!.userId);
     res.json({ message: 'AI deleted' });
   } catch (err) {
     next(err);
@@ -1676,7 +1677,7 @@ router.put(
   validate(enemyAiUpdateSchema),
   async (req, res, next) => {
     try {
-      await enemyaiService.updateEnemyAI(req.params.id, req.body, req.user!.userId);
+      await enemyaiService.updateEnemyAI(param(req.params.id), req.body, req.user!.userId);
       res.json({ message: 'Enemy AI updated' });
     } catch (err) {
       next(err);
@@ -1695,7 +1696,7 @@ router.put(
         return;
       }
       const result = await enemyaiService.reuploadEnemyAI(
-        req.params.id,
+        param(req.params.id),
         req.file.buffer,
         req.file.originalname,
         req.user!.userId,
@@ -1713,7 +1714,7 @@ router.put(
 
 router.get('/admin/enemy-ai/:id/download', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const source = await enemyaiService.downloadEnemyAISource(req.params.id);
+    const source = await enemyaiService.downloadEnemyAISource(param(req.params.id));
     if (!source) {
       res.status(404).json({ error: 'Enemy AI source not found' });
       return;
@@ -1728,7 +1729,7 @@ router.get('/admin/enemy-ai/:id/download', adminOnlyMiddleware, async (req, res,
 
 router.delete('/admin/enemy-ai/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    await enemyaiService.deleteEnemyAI(req.params.id, req.user!.userId);
+    await enemyaiService.deleteEnemyAI(param(req.params.id), req.user!.userId);
     res.json({ message: 'Enemy AI deleted' });
   } catch (err) {
     next(err);
@@ -1788,7 +1789,7 @@ router.put(
   validate(seasonSchema.partial()),
   async (req, res, next) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(param(req.params.id));
       if (Number.isNaN(id))
         return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
       await seasonService.updateSeason(id, req.body);
@@ -1803,7 +1804,7 @@ router.put(
 
 router.delete('/admin/seasons/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(param(req.params.id));
     if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     await seasonService.deleteSeason(id);
     await logAdminAction(req.user!.userId, 'season_delete', 'season', id, 'Deleted season');
@@ -1815,7 +1816,7 @@ router.delete('/admin/seasons/:id', adminOnlyMiddleware, async (req, res, next) 
 
 router.post('/admin/seasons/:id/activate', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(param(req.params.id));
     if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     await seasonService.activateSeason(id);
     await logAdminAction(req.user!.userId, 'season_activate', 'season', id, 'Activated season');
@@ -1835,7 +1836,7 @@ router.post(
   validate(endSeasonSchema),
   async (req, res, next) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(param(req.params.id));
       if (Number.isNaN(id))
         return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
       await seasonService.endSeason(id, req.body.resetMode);
@@ -1921,7 +1922,7 @@ const achievementSchema = z.object({
   icon: z.string().max(10).optional(),
   category: z.string().max(50).optional(),
   conditionType: z.enum(['cumulative', 'per_game', 'mode_specific', 'campaign']),
-  conditionConfig: z.record(z.unknown()),
+  conditionConfig: z.record(z.string(), z.unknown()),
   rewardType: z.enum(['cosmetic', 'title', 'none']).optional(),
   rewardId: z.number().int().nullable().optional(),
   sortOrder: z.number().int().optional(),
@@ -1959,7 +1960,7 @@ router.put(
   validate(achievementUpdateSchema),
   async (req, res, next) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(param(req.params.id));
       if (Number.isNaN(id))
         return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
       // An unknown id used to answer 200 with `null` (and write an audit entry)
@@ -1984,7 +1985,7 @@ router.put(
 
 router.delete('/admin/achievements/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(param(req.params.id));
     if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     await achievementsService.deleteAchievement(id);
     await logAdminAction(
@@ -2014,11 +2015,11 @@ router.get('/admin/cosmetics', adminOnlyMiddleware, async (_req, res, next) => {
 const cosmeticSchema = z.object({
   name: z.string().min(1).max(100),
   type: z.enum(['color', 'eyes', 'trail', 'bomb_skin']),
-  config: z.record(z.unknown()),
+  config: z.record(z.string(), z.unknown()),
   rarity: z.enum(['common', 'rare', 'epic', 'legendary']).optional(),
   // level_milestone was missing: those cosmetics could only arrive by import
   unlockType: z.enum(['achievement', 'campaign_stars', 'level_milestone', 'default']).optional(),
-  unlockRequirement: z.record(z.unknown()).nullable().optional(),
+  unlockRequirement: z.record(z.string(), z.unknown()).nullable().optional(),
   sortOrder: z.number().int().optional(),
 });
 
@@ -2053,7 +2054,7 @@ router.put(
   validate(cosmeticUpdateSchema),
   async (req, res, next) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(param(req.params.id));
       if (Number.isNaN(id))
         return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
       // An unknown id used to answer 200 with `null` (and write an audit entry)
@@ -2072,7 +2073,7 @@ router.put(
 
 router.delete('/admin/cosmetics/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(param(req.params.id));
     if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     await cosmeticsService.deleteCosmetic(id);
     await logAdminAction(req.user!.userId, 'cosmetic_delete', 'cosmetic', id, 'Deleted cosmetic');
@@ -2086,7 +2087,7 @@ router.delete('/admin/cosmetics/:id', adminOnlyMiddleware, async (req, res, next
 
 router.get('/admin/achievements/:id/export', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(param(req.params.id));
     const achievement = await achievementsService.getAchievementById(id);
     if (!achievement) {
       res.status(404).json({ error: 'Achievement not found' });
@@ -2210,11 +2211,12 @@ router.get('/admin/achievements/export-all', adminOnlyMiddleware, async (_req, r
 
 router.post('/admin/achievements/import', adminOnlyMiddleware, async (req, res, next) => {
   try {
+    // Express 5 leaves req.body undefined when nothing was parsed (Express 4 gave {}).
     const {
       achievements: achData,
       cosmetics: cosData,
       cosmeticIdMap,
-    } = req.body as {
+    } = (req.body ?? {}) as {
       achievements: AchievementBundleExportData['achievements'];
       cosmetics?: AchievementBundleExportData['cosmetics'];
       cosmeticIdMap?: Record<string, 'create' | 'skip' | number>;
@@ -2346,7 +2348,7 @@ router.post('/admin/achievements/import', adminOnlyMiddleware, async (req, res, 
 
 router.get('/admin/cosmetics/:id/export', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(param(req.params.id));
     const cosmetic = await cosmeticsService.getCosmeticById(id);
     if (!cosmetic) {
       res.status(404).json({ error: 'Cosmetic not found' });
@@ -2375,7 +2377,8 @@ router.get('/admin/cosmetics/:id/export', adminOnlyMiddleware, async (req, res, 
 
 router.post('/admin/cosmetics/import', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const data = req.body as CosmeticExportData;
+    // Express 5 leaves req.body undefined when nothing was parsed (Express 4 gave {}).
+    const data = (req.body ?? {}) as CosmeticExportData;
     if (!data.name || !data.type || !data.config) {
       res.status(400).json({ error: 'Invalid cosmetic import data' });
       return;
@@ -2435,6 +2438,13 @@ const challengeSchema = z.object({
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
+// zod 4 applies a field's default even under .partial() (zod 3 left an absent key absent), so the
+// update schema re-declares description without the POST default; otherwise every partial update
+// would blank the description. (audit B9)
+const challengeUpdateSchema = challengeSchema
+  .extend({ description: z.string().max(2000) })
+  .partial();
+
 router.post(
   '/admin/challenges',
   adminOnlyMiddleware,
@@ -2467,10 +2477,10 @@ router.post(
 router.put(
   '/admin/challenges/:id',
   adminOnlyMiddleware,
-  validate(challengeSchema.partial()),
+  validate(challengeUpdateSchema),
   async (req, res, next) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(param(req.params.id));
       if (Number.isNaN(id))
         return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
       await challengesService.updateChallenge(id, req.body);
@@ -2483,7 +2493,7 @@ router.put(
 
 router.delete('/admin/challenges/:id', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(param(req.params.id));
     if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     await challengesService.deleteChallenge(id);
     await logAdminAction(
@@ -2501,7 +2511,7 @@ router.delete('/admin/challenges/:id', adminOnlyMiddleware, async (req, res, nex
 
 router.post('/admin/challenges/:id/activate', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(param(req.params.id));
     if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     await challengesService.activateChallenge(id);
     await logAdminAction(
@@ -2519,7 +2529,7 @@ router.post('/admin/challenges/:id/activate', adminOnlyMiddleware, async (req, r
 
 router.post('/admin/challenges/:id/deactivate', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(param(req.params.id));
     if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     await challengesService.deactivateChallenge(id);
     await logAdminAction(

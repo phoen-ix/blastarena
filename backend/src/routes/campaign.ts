@@ -17,6 +17,7 @@ import {
   EnemyTypeConfig,
   TileType,
 } from '@blast-arena/shared';
+import { param } from '../utils/params';
 
 interface BundledEnemyType {
   originalId: number;
@@ -128,7 +129,7 @@ const enemyTypeSchema = z.object({
         }),
       )
       .optional(),
-    enemyAiId: z.string().uuid().optional(),
+    enemyAiId: z.uuid().optional(),
     difficulty: z.enum(['easy', 'normal', 'hard']).optional(),
   }),
 });
@@ -161,7 +162,7 @@ const levelSchema = z.object({
     .optional(),
   puzzleConfig: z
     .object({
-      switchVariants: z.record(z.enum(['toggle', 'pressure', 'oneshot'])).optional(),
+      switchVariants: z.record(z.string(), z.enum(['toggle', 'pressure', 'oneshot'])).optional(),
     })
     .nullable()
     .optional(),
@@ -201,7 +202,7 @@ router.get(
   async (req, res, next) => {
     try {
       const userId = req.user!.userId;
-      const worldId = parseIntParam(req.params.worldId, 'worldId');
+      const worldId = parseIntParam(param(req.params.worldId), 'worldId');
       const levels = await campaignService.listLevelsWithProgress(worldId, userId);
       res.json({ levels });
     } catch (err) {
@@ -217,7 +218,7 @@ router.get(
   emailVerifiedMiddleware,
   async (req, res, next) => {
     try {
-      const levelId = parseIntParam(req.params.levelId, 'levelId');
+      const levelId = parseIntParam(param(req.params.levelId), 'levelId');
       const level = await campaignService.getLevel(levelId);
       if (!level || !level.isPublished) {
         return res.status(404).json({ error: 'Level not found' });
@@ -308,7 +309,7 @@ router.put(
   validate(worldUpdateSchema),
   async (req, res, next) => {
     try {
-      const id = parseIntParam(req.params.id, 'id');
+      const id = parseIntParam(param(req.params.id), 'id');
       await campaignService.updateWorld(id, req.body);
       res.json({ success: true });
     } catch (err) {
@@ -323,7 +324,7 @@ router.delete(
   adminOnlyMiddleware,
   async (req, res, next) => {
     try {
-      const id = parseIntParam(req.params.id, 'id');
+      const id = parseIntParam(param(req.params.id), 'id');
       await campaignService.deleteWorld(id);
       res.json({ success: true });
     } catch (err) {
@@ -339,7 +340,7 @@ router.put(
   validate(orderSchema),
   async (req, res, next) => {
     try {
-      const id = parseIntParam(req.params.id, 'id');
+      const id = parseIntParam(param(req.params.id), 'id');
       await campaignService.reorderWorld(id, req.body.sortOrder);
       res.json({ success: true });
     } catch (err) {
@@ -387,7 +388,7 @@ router.get(
   adminOnlyMiddleware,
   async (req, res, next) => {
     try {
-      const id = parseIntParam(req.params.id, 'id');
+      const id = parseIntParam(param(req.params.id), 'id');
       const level = await campaignService.getLevel(id);
       if (!level) return res.status(404).json({ error: 'Level not found' });
       res.json({ level });
@@ -404,7 +405,7 @@ router.put(
   validate(levelSchema),
   async (req, res, next) => {
     try {
-      const id = parseIntParam(req.params.id, 'id');
+      const id = parseIntParam(param(req.params.id), 'id');
       await campaignService.updateLevel(id, req.body);
       res.json({ success: true });
     } catch (err) {
@@ -419,7 +420,7 @@ router.delete(
   adminOnlyMiddleware,
   async (req, res, next) => {
     try {
-      const id = parseIntParam(req.params.id, 'id');
+      const id = parseIntParam(param(req.params.id), 'id');
       await campaignService.deleteLevel(id);
       res.json({ success: true });
     } catch (err) {
@@ -435,7 +436,7 @@ router.put(
   validate(orderSchema),
   async (req, res, next) => {
     try {
-      const id = parseIntParam(req.params.id, 'id');
+      const id = parseIntParam(param(req.params.id), 'id');
       await campaignService.reorderLevel(id, req.body.sortOrder);
       res.json({ success: true });
     } catch (err) {
@@ -483,7 +484,7 @@ router.put(
   validate(enemyTypeSchema),
   async (req, res, next) => {
     try {
-      const id = parseIntParam(req.params.id, 'id');
+      const id = parseIntParam(param(req.params.id), 'id');
       await enemyTypeService.updateEnemyType(id, req.body);
       res.json({ success: true });
     } catch (err) {
@@ -498,7 +499,7 @@ router.delete(
   adminOnlyMiddleware,
   async (req, res, next) => {
     try {
-      const id = parseIntParam(req.params.id, 'id');
+      const id = parseIntParam(param(req.params.id), 'id');
       await enemyTypeService.deleteEnemyType(id);
       res.json({ success: true });
     } catch (err) {
@@ -535,7 +536,7 @@ router.get(
   adminOnlyMiddleware,
   async (req, res, next) => {
     try {
-      const id = parseIntParam(req.params.id, 'id');
+      const id = parseIntParam(param(req.params.id), 'id');
       const level = await campaignService.getLevel(id);
       if (!level) return res.status(404).json({ error: 'Level not found' });
 
@@ -562,7 +563,7 @@ router.get(
   adminOnlyMiddleware,
   async (req, res, next) => {
     try {
-      const id = parseIntParam(req.params.id, 'id');
+      const id = parseIntParam(param(req.params.id), 'id');
       const level = await campaignService.getLevel(id);
       if (!level) return res.status(404).json({ error: 'Level not found' });
 
@@ -616,7 +617,7 @@ router.get(
   adminOnlyMiddleware,
   async (req, res, next) => {
     try {
-      const id = parseIntParam(req.params.id, 'id');
+      const id = parseIntParam(param(req.params.id), 'id');
       const et = await enemyTypeService.getEnemyType(id);
       if (!et) return res.status(404).json({ error: 'Enemy type not found' });
 
@@ -651,7 +652,9 @@ const importLevelSchema = z.object({
   level: z.any(),
   enemyTypes: z.array(z.any()).optional(),
   worldId: z.number().int(),
-  enemyIdMap: z.record(z.union([z.number(), z.literal('create'), z.literal('skip')])).optional(),
+  enemyIdMap: z
+    .record(z.string(), z.union([z.number(), z.literal('create'), z.literal('skip')]))
+    .optional(),
 });
 
 router.post(
@@ -689,11 +692,11 @@ router.post(
       }
       // Same bounds as creating a level (map size, lives, times, …); unknown export fields pass
       // through. Imports used to skip validation entirely, so a level could carry any map size.
-      const checked = levelSchema.passthrough().safeParse(levelData);
+      const checked = levelSchema.loose().safeParse(levelData);
       if (!checked.success) {
         return res.status(400).json({
           error: 'Invalid level data',
-          details: checked.error.errors.map((e) => ({
+          details: checked.error.issues.map((e) => ({
             field: e.path.join('.'),
             message: e.message,
           })),

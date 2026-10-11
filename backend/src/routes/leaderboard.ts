@@ -3,6 +3,7 @@ import { authMiddleware } from '../middleware/auth';
 import { emailVerifiedMiddleware } from '../middleware/emailVerified';
 import * as leaderboardService from '../services/leaderboard';
 import * as seasonService from '../services/season';
+import { param } from '../utils/params';
 
 const router = Router();
 
@@ -46,7 +47,7 @@ router.get('/leaderboard/seasons', async (req, res, next) => {
 // Public: user public profile
 router.get('/user/:id/public', async (req, res, next) => {
   try {
-    const userId = parseInt(req.params.id);
+    const userId = parseInt(param(req.params.id));
     if (isNaN(userId)) return res.status(400).json({ error: 'Invalid user ID' });
 
     const profile = await leaderboardService.getPublicProfile(userId);

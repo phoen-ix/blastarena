@@ -19,12 +19,13 @@ import {
   PASSWORD_MIN_LENGTH,
   PASSWORD_MAX_LENGTH,
 } from '@blast-arena/shared';
+import { param } from '../utils/params';
 
 const router = Router();
 
 const registerSchema = z.object({
   username: z.string().min(USERNAME_MIN_LENGTH).max(USERNAME_MAX_LENGTH),
-  email: z.string().email().max(255),
+  email: z.email().max(255),
   password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
 });
 
@@ -34,7 +35,7 @@ const loginSchema = z.object({
 });
 
 const forgotPasswordSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
 });
 
 const resetPasswordSchema = z.object({
@@ -181,7 +182,7 @@ router.get(
   rateLimiter({ windowMs: 15 * 60 * 1000, maxRequests: 10 }),
   async (req, res, next) => {
     try {
-      await authService.verifyEmail(req.params.token);
+      await authService.verifyEmail(param(req.params.token));
       const config = getConfig();
       res.redirect(`${config.APP_URL}?emailVerified=true`);
     } catch (err) {

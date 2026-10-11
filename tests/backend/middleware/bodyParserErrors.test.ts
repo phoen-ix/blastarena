@@ -89,7 +89,10 @@ describe('body-parser faults through the real Express stack', () => {
   });
 
   it('an unsupported charset is 415, not 500', async () => {
-    const res = await post('{"a":1}', { 'Content-Type': 'application/json; charset=utf-32' });
+    // JSON must be UTF-8/16/32 (RFC 8259), so body-parser refuses any other charset. utf-32 no
+    // longer works as the example: body-parser 2 (express 5) decodes it, so that body is now a
+    // 400 INVALID_JSON instead.
+    const res = await post('{"a":1}', { 'Content-Type': 'application/json; charset=iso-8859-1' });
     expect(res.status).toBe(415);
     expect(JSON.parse(res.text).code).toBe('UNSUPPORTED_MEDIA_TYPE');
   });
