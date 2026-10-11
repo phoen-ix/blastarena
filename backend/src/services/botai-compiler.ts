@@ -115,8 +115,7 @@ export function loadBotAIInSandbox(code: string): Record<string, unknown> {
   // context-local bindings via an IIFE wrapper and return whatever the module exported.
   const wrapped = `(function () { 'use strict'; const module = { exports: {} }; const exports = module.exports;\n${code}\n;\nreturn module.exports; })()`;
   const result = vm.runInContext(wrapped, context, { timeout: VM_TIMEOUT_MS }) as
-    | Record<string, unknown>
-    | undefined;
+    Record<string, unknown> | undefined;
 
   return result ?? {};
 }

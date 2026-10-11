@@ -392,8 +392,7 @@ function playerSnap(p: Player) {
  * (audit ISOLATE-SNAPSHOT-1)
  */
 export type TileSync =
-  | { tiles: readonly (readonly string[])[] }
-  | { tileDiffs: readonly TileDiff[] };
+  { tiles: readonly (readonly string[])[] } | { tileDiffs: readonly TileDiff[] };
 
 export function buildBotSnapshotJson(
   self: Player,

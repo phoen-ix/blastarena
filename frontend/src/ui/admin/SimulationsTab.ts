@@ -852,8 +852,7 @@ export class SimulationsTab {
         (el) => (el as HTMLInputElement).value,
       );
       const speed = (modal.querySelector('#sim-speed') as HTMLSelectElement).value as
-        | 'fast'
-        | 'realtime';
+        'fast' | 'realtime';
 
       const config: SimulationConfig = {
         gameMode: (modal.querySelector('#sim-mode') as HTMLSelectElement).value as GameMode,

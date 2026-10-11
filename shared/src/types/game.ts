@@ -59,12 +59,7 @@ export const HAZARD_TILE_TYPES: HazardTileType[] = [
 ];
 
 export type MapEventType =
-  | 'meteor'
-  | 'powerup_rain'
-  | 'wall_collapse'
-  | 'freeze_wave'
-  | 'bomb_surge'
-  | 'ufo_abduction';
+  'meteor' | 'powerup_rain' | 'wall_collapse' | 'freeze_wave' | 'bomb_surge' | 'ufo_abduction';
 
 export type PuzzleTileCategory = 'switches_and_gates' | 'crumbling';
 
@@ -104,14 +99,7 @@ export interface Position {
 }
 
 export type KillCause =
-  | 'bomb'
-  | 'zone'
-  | 'lava'
-  | 'quicksand'
-  | 'spikes'
-  | 'dark_rift'
-  | 'disconnect'
-  | 'self';
+  'bomb' | 'zone' | 'lava' | 'quicksand' | 'spikes' | 'dark_rift' | 'disconnect' | 'self';
 
 export interface PlayerState {
   id: number;

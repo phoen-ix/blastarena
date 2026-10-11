@@ -31,11 +31,9 @@ export class EffectSystem {
   private debrisEmitter: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
 
   private explosionHandler:
-    | ((data: { cells: { x: number; y: number }[]; ownerId: number }) => void)
-    | null = null;
+    ((data: { cells: { x: number; y: number }[]; ownerId: number }) => void) | null = null;
   private playerDiedHandler:
-    | ((data: { playerId: number; killerId: number | null }) => void)
-    | null = null;
+    ((data: { playerId: number; killerId: number | null }) => void) | null = null;
   private powerupCollectedHandler:
     | ((data: { playerId: number; type: string; position: { x: number; y: number } }) => void)
     | null = null;

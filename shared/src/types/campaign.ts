@@ -3,11 +3,7 @@ import { Position, Direction, TileType, PowerUpType, GameState } from './game';
 // --- Enemy Configuration ---
 
 export type EnemyMovementPattern =
-  | 'random_walk'
-  | 'chase_player'
-  | 'patrol_path'
-  | 'wall_follow'
-  | 'stationary';
+  'random_walk' | 'chase_player' | 'patrol_path' | 'wall_follow' | 'stationary';
 
 export type EnemyBodyShape = 'blob' | 'spiky' | 'ghost' | 'robot' | 'bug' | 'skull';
 export type EnemyEyeStyle = 'round' | 'angry' | 'sleepy' | 'crazy';

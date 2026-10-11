@@ -3,15 +3,7 @@ import type { TileType } from '../types/game';
 // --- Campaign World Theme Types ---
 
 export type CampaignWorldTheme =
-  | 'classic'
-  | 'forest'
-  | 'desert'
-  | 'ice'
-  | 'volcano'
-  | 'void'
-  | 'castle'
-  | 'swamp'
-  | 'sky';
+  'classic' | 'forest' | 'desert' | 'ice' | 'volcano' | 'void' | 'castle' | 'swamp' | 'sky';
 
 export const CAMPAIGN_THEME_NAMES: Record<CampaignWorldTheme, string> = {
   classic: 'Classic',

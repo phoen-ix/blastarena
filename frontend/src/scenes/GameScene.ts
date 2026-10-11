@@ -213,8 +213,7 @@ export class GameScene extends Phaser.Scene {
       }) => void)
     | null = null;
   private openWorldRoundStartHandler:
-    | ((data: { roundNumber: number; state: GameState }) => void)
-    | null = null;
+    ((data: { roundNumber: number; state: GameState }) => void) | null = null;
   private openWorldAfkKickHandler: (() => void) | null = null;
   private openWorldInfoHandler:
     | ((data: {
@@ -682,8 +681,7 @@ export class GameScene extends Phaser.Scene {
         // Set up buddy rendering (smaller sprite with glow)
         if (this.buddyMode && this.localP2Id) {
           const buddyConfig = this.registry.get('buddyConfig') as
-            | { name: string; color: string; size: number }
-            | undefined;
+            { name: string; color: string; size: number } | undefined;
           const sizePercent = buddyConfig ? Math.round(buddyConfig.size * 100) : 60;
           const glowColor = buddyConfig
             ? parseInt(buddyConfig.color.replace('#', ''), 16)
@@ -1534,8 +1532,7 @@ export class GameScene extends Phaser.Scene {
     // Start button = pause toggle (campaign) or leave overlay (multiplayer); spectators leave
     if (menu.pause) {
       const simSpectate = this.registry.get('simulationSpectate') as
-        | { batchId: string }
-        | undefined;
+        { batchId: string } | undefined;
       if (this.campaignMode) {
         if (this.paused) this.resumeCampaign();
         else this.pauseCampaign();

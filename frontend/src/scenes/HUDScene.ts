@@ -45,13 +45,13 @@ export class HUDScene extends Phaser.Scene {
   private boundClickHandler: ((e: MouseEvent) => void) | null = null;
   private socketClient: SocketClient | null = null;
   private playerDiedHandler:
-    | ((data: { playerId: number; killerId: number | null; cause?: KillCause }) => void)
-    | null = null;
+    ((data: { playerId: number; killerId: number | null; cause?: KillCause }) => void) | null =
+    null;
   private killFeedEntries: { text: string; time: number; el?: HTMLElement }[] = [];
   /** Replay playback feeds the kill feed from the recorded frames, and a seek clears it. */
   private replayPlayerDiedHandler:
-    | ((data: { playerId: number; killerId: number | null; cause?: KillCause }) => void)
-    | null = null;
+    ((data: { playerId: number; killerId: number | null; cause?: KillCause }) => void) | null =
+    null;
   private replaySeekHandler: (() => void) | null = null;
   private stateUpdateHandler: ((state: GameState) => void) | null = null;
   private campaignStateHandler: ((state: CampaignGameState) => void) | null = null;
@@ -1025,8 +1025,7 @@ export class HUDScene extends Phaser.Scene {
     // Seed from the last snapshot GameScene saw (or the one carried in the join ack), so the
     // board isn't blank until the next 5s broadcast — the HUD can mount long after the arena.
     const seed = this.registry.get('openWorldInfo') as
-      | { roundNumber: number; leaderboard: OpenWorldScoreEntry[] }
-      | undefined;
+      { roundNumber: number; leaderboard: OpenWorldScoreEntry[] } | undefined;
     if (seed) {
       this.owRoundNumber = seed.roundNumber;
       this.updateRoundChip();

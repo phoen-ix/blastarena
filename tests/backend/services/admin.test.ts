@@ -162,7 +162,7 @@ describe('admin service', () => {
 
       try {
         await createUser(1, 'taken', 'taken@example.com', 'pass');
-        fail('Expected AppError to be thrown');
+        throw new Error('Expected AppError to be thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(AppError);
         expect((err as AppError).statusCode).toBe(409);
@@ -263,7 +263,7 @@ describe('admin service', () => {
     it('throws 400 SELF_ACTION when admin tries to change own role', async () => {
       try {
         await changeUserRole(3, 3, 'user');
-        fail('Expected AppError to be thrown');
+        throw new Error('Expected AppError to be thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(AppError);
         expect((err as AppError).statusCode).toBe(400);
@@ -318,7 +318,7 @@ describe('admin service', () => {
     it('throws 400 SELF_ACTION when admin tries to deactivate self', async () => {
       try {
         await deactivateUser(3, 3, true);
-        fail('Expected AppError to be thrown');
+        throw new Error('Expected AppError to be thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(AppError);
         expect((err as AppError).statusCode).toBe(400);
@@ -350,7 +350,7 @@ describe('admin service', () => {
 
       try {
         await deleteUser(1, 999);
-        fail('Expected AppError to be thrown');
+        throw new Error('Expected AppError to be thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(AppError);
         expect((err as AppError).statusCode).toBe(404);
@@ -361,7 +361,7 @@ describe('admin service', () => {
     it('throws 400 SELF_ACTION when admin tries to delete self', async () => {
       try {
         await deleteUser(3, 3);
-        fail('Expected AppError to be thrown');
+        throw new Error('Expected AppError to be thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(AppError);
         expect((err as AppError).statusCode).toBe(400);
@@ -398,7 +398,7 @@ describe('admin service', () => {
 
       try {
         await resetUserPassword(1, 999, 'newpass');
-        fail('Expected AppError to be thrown');
+        throw new Error('Expected AppError to be thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(AppError);
         expect((err as AppError).statusCode).toBe(404);
@@ -620,7 +620,7 @@ describe('admin service', () => {
 
       try {
         await getMatchDetail(999);
-        fail('Expected AppError to be thrown');
+        throw new Error('Expected AppError to be thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(AppError);
         expect((err as AppError).statusCode).toBe(404);
@@ -767,7 +767,7 @@ describe('admin service', () => {
 
       try {
         await sendToast(1, 'test');
-        fail('Expected AppError to be thrown');
+        throw new Error('Expected AppError to be thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(AppError);
         expect((err as AppError).statusCode).toBe(500);
