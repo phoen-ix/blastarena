@@ -15,7 +15,7 @@
 # cannot survive them being gated — its .node binary is fetched from GitHub Releases by its install
 # script, and `--fallback-to-build` then hits node-gyp, which has no toolchain here. A floating tag
 # would import that change silently on a future rebuild. Bump this deliberately for Node patches.
-FROM node:26.11.1-alpine3.24 AS builder
+FROM node:26.12.0-alpine3.24 AS builder
 
 WORKDIR /app
 
@@ -36,7 +36,7 @@ COPY backend/ ./backend/
 # Build shared first, then backend
 RUN npm run build --workspace=shared && npm run build --workspace=backend
 
-FROM node:26.11.1-alpine3.24
+FROM node:26.12.0-alpine3.24
 
 WORKDIR /app
 
@@ -61,7 +61,7 @@ RUN chmod +x /entrypoint.sh
 # Drop root. This process executes untrusted, admin-uploaded bot and enemy AI (in isolated-vm
 # isolates) and writes to five bind-mounted host directories; running it as uid 0 removed the
 # second layer of defence behind the isolate boundary and left root-owned files on the host.
-# The node:26.11.1-alpine3.24 image already provides the `node` user (uid 1000). (audit CONTAINER-ROOT-1)
+# The node:26.12.0-alpine3.24 image already provides the `node` user (uid 1000). (audit CONTAINER-ROOT-1)
 RUN mkdir -p /app/gamelogs /app/simulations /app/replays /app/ai /app/enemy-ai \
     && chown -R node:node /app
 USER node
