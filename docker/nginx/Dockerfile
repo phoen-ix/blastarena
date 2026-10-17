@@ -40,7 +40,7 @@ EXPOSE 5173
 CMD ["sh", "-c", "node frontend/scripts/copy-locales.cjs && npx --workspace=frontend vite --host 0.0.0.0"]
 
 # Stage 3: Dev nginx (proxies to Vite dev server)
-FROM nginx:1.31.6-alpine3.24 AS nginx-dev
+FROM nginx:1.31.7-alpine3.24 AS nginx-dev
 
 COPY docker/nginx/nginx.dev.conf /etc/nginx/nginx.conf
 COPY docker/nginx/security-headers.conf /etc/nginx/security-headers.conf
@@ -53,7 +53,7 @@ EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 
 # Stage 4: Production nginx (default target)
-FROM nginx:1.31.6-alpine3.24
+FROM nginx:1.31.7-alpine3.24
 
 COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
 COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
