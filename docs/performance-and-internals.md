@@ -58,6 +58,18 @@ Bot AI runs full `generateInput()` every other tick (even ticks only); odd ticks
 - Players and enemies are interpolated once per rendered frame (`frame(delta)`, speed independent of frame rate: `1 - 0.55^(delta / 50ms)` of the remaining distance), not once per 20 Hz state. Enemy HP bars are drawn at their origin, moved with the sprite, and redrawn only when the HP changes
 - SoundGenerator fills one 1 s white-noise buffer once; each burst plays a random slice of it (`start(when, offset, duration)`) instead of allocating and filling a fresh buffer per explosion
 
+## Art Styles & Sharp Rendering
+
+The arena can be drawn in Classic (BootScene's procedural textures) or one of the drawn styles (Neon Arena, Toy Diorama, Crisp Pixel). The code lives in `frontend/src/art/`.
+
+- **Baked once, drawn as atlas frames**: a drawn style's painters (`art/styles/{neon,toy,pixel}/`) are pure Canvas 2D functions. `StyleArt` bakes what a match needs into a few atlases (`art/atlas.ts`, shelf packing, 2 px padding): one tile atlas per world, one effects atlas (flames, bombs, pickups, particles, decals), one per player colour + eye style and one per enemy type. Frame pivots sit at the painter origin, so raised blocks and tall characters need no per-sprite offsets. Nothing is painted per frame.
+- **Edge extrusion in one pass**: floor frames copy their edge pixels into the padding so neighbours meet without seams. It runs as one `getImageData`/`putImageData` pass per atlas; drawing the canvas onto itself per frame forced the browser to flush and copy the whole atlas each time (seconds per tile atlas).
+- **Texture scale**: an atlas records its bake scale in `texture.customData.texScale` (`art/scale.ts`); renderers size sprites with `fit()`/`base()` instead of absolute scales, so 1×, 2× and Pixel's 1/3× (nearest filtering) textures all show at the same size. Legacy textures without the entry count as 1.
+- **Depth bands** (`art/depth.ts`): ground 0–99, world, above-world 50000+, overlay 100000+. Classic keeps its relative order; drawn styles y-sort the world band by foot position (`ySortDepth`). `setDepthIfChanged` avoids Phaser's re-sort on every `setDepth`.
+- **Quality gates** (Settings → Graphics quality): Low draws none of the extras; Medium adds light pools (`MAX_LIGHTS` 64), scorch marks (`MAX_SCORCH` 48) and shockwaves; High adds ambient particles and, for Neon, bloom. Bloom is dropped after ~3 s below 40 fps (`StylePost.watch`). Particle counts halve below Medium.
+- **Sharp rendering** (`art/hidpi.ts`): the canvas is sized in device pixels (CSS size × ratio, ratio = device pixel ratio capped at 2; 1 with the setting off or at Low quality) and shown at CSS size. Cameras zoom by the ratio, Phaser Text renders at it (the `add.text`/`make.text` factories are patched once), and textures are baked at the boot-time ratio — Classic's through `hiResGraphics()`/`bakeGraphics()`, which scale the same Graphics drawing code, so Classic looks identical, only sharper. At 2× this is four times the pixels to fill and roughly four times the atlas memory (a drawn style's tile + effects atlases come to about 2048×2600 each); Low quality turns it off.
+- **DOM over the canvas**: the countdown and the split-screen divider and partner arrows are DOM overlays, so neither camera zoom nor bloom touches them. HUD icons and kill-feed portraits are painted once per size and cached as data URLs (`ui/hudIcons.ts`, `ui/portraits.ts`; the CSP allows `data:` images).
+
 ## Database & Backend
 
 - Admin dashboard stats consolidated into single SQL query with subselects (3 queries -> 1)

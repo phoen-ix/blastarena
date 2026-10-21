@@ -1,11 +1,11 @@
 # Testing
 
-BlastArena has **3514 tests** across 154 test files covering the full stack: game logic, backend services, API routes, socket handlers, middleware, database migrations, utilities, shared code, config guards, and frontend.
+BlastArena has **3582 tests** across 164 test files covering the full stack: game logic, backend services, API routes, socket handlers, middleware, database migrations, utilities, shared code, config guards, and frontend.
 
 | Stack | Framework | Suites | Tests |
 |-------|-----------|--------|-------|
-| Backend (incl. `tests/shared`) | Jest + ts-jest | 117 | 3246 |
-| Frontend | Vitest + jsdom | 37 | 268 |
+| Backend (incl. `tests/shared`) | Jest + ts-jest | 118 | 3258 |
+| Frontend | Vitest + jsdom | 46 | 324 |
 
 ## Running Tests
 
@@ -63,20 +63,20 @@ frontend/tests/
 
 Backend paths are relative to `tests/backend/`, frontend paths to `frontend/`. Counts are `it`/`test` cases as the runner reports them, so each `it.each` case and each test generated in a loop (one per locale file, migration, Lua script, paginated query or nginx location) counts individually.
 
-### Game Logic (27 files, 710 tests)
+### Game Logic (27 files, 714 tests)
 
 Core game mechanics — most of these drive the server-authoritative game state directly, without mocks; the room/session wrappers (`GameRoom`, `RoomManager`, `OpenWorldManager`, campaign) mock the DB, `GameLoop` and AI registries around the real engine.
 
 | File | Tests | Coverage |
 |------|-------|----------|
 | `game/GameState.test.ts` | 109 | Full lifecycle, time-up ranking, movement, bombs, explosions, chain reactions, power-ups, FFA/teams/deathmatch/KOTH (+ zone init), grace period, conveyors, teleporters, remote/pierce/line bombs, bomb throw/kick, shield, self-kill, buddy collision |
-| `game/Player.test.ts` | 87 | State management, movement cooldowns, all 9 power-up effects, shield, death, respawn, buddy mode, remote detonation, frozen state, cosmetics |
+| `game/Player.test.ts` | 89 | State management, movement cooldowns, all 9 power-up effects, shield, death, respawn, buddy mode, remote detonation, frozen state, cosmetics, spawn invulnerability in toState() |
 | `game/CampaignGame.test.ts` | 76 | Map building, spawn fallback chains, enemy spawning, starting/carried power-ups, time-up per win condition, idempotent finish, buddy mode, hazard tiles, boss enemies, puzzle tiles, covered tiles |
 | `game/Enemy.test.ts` | 54 | ID allocation clear of user/bot/buddy/guest ranges, cooldowns, speed divisor formula, bomb config, HP/damage, boss phase transitions, toState() |
 | `game/EnemyAI.test.ts` | 52 | 5 movement patterns (stationary, random_walk, chase_player, patrol_path, wall_follow), BFS pathfinding, canPassWalls/canPassBombs, bomb triggers (timer/proximity/random) |
 | `game/RoomManager.test.ts` | 36 | Create/get/remove rooms, active count, cleanup reaps stopped rooms and stops them (releases AI isolates + log stream) |
 | `game/BotAI.test.ts` | 33 | Difficulty tiers, input shape/seq, danger avoidance, bombing next to enemies, power-up seeking + value scoring, aggression by difficulty, cornered case, team awareness, GameStateManager integration |
-| `game/Explosion.test.ts` | 29 | Construction (UUID ids, cell deep copy), tick countdown and expiry at EXPLOSION_DURATION_TICKS, containsCell, toState(), edge cases |
+| `game/Explosion.test.ts` | 30 | Construction (UUID ids, cell deep copy), tick countdown and expiry at EXPLOSION_DURATION_TICKS, containsCell, toState(), pierce flag, edge cases |
 | `game/HazardTiles.test.ts` | 29 | Vine/quicksand/mud slowdown, quicksand kill timer, ice sliding, lava (impassable, detonates adjacent bombs), spike cycling, dark rift teleport, walkability of 8 hazard tiles, campaign theme in state, buddy/enemy interaction |
 | `game/GameRoom.test.ts` | 27 | Start flow (match record, human-only match_players, game:start), negative bot IDs, reconnect, isAbandoned rules, game-over persistence (two batched transactions, Elo before stats, achievements, never rejects on DB failure), bots-only speed-up in respawn modes |
 | `game/CollisionSystem.test.ts` | 24 | Blocking by walls/bombs, walkability of every special tile (hazards, lava/pit, switches, gates), reinforced-wall cracking, vine destruction, out-of-bounds reads as wall |
@@ -84,7 +84,7 @@ Core game mechanics — most of these drive the server-authoritative game state 
 | `game/BattleRoyale.test.ts` | 15 | Round-length-fitted shrink schedule (starts at the half-diagonal, reaches min radius before the round ends, touches the corners early), initial delay, min-radius floor, inside/boundary checks, center stability, asymmetric maps, toState() |
 | `game/Map.test.ts` | 15 | Map generation, seed determinism, border + indestructible wall grid pattern, spawn clearing, min/max sizes, wallDensity, hazard placement |
 | `game/PowerUp.test.ts` | 15 | Construction for 8 types (not bomb_throw), UUID ids, position deep copy, toState(), readonly fields |
-| `game/Bomb.test.ts` | 13 | Bomb creation, countdown, detonation, remote/pierce types, REMOTE_BOMB_MAX_TIMER, sliding/conveyor defaults, toState() |
+| `game/Bomb.test.ts` | 14 | Bomb creation, countdown, detonation, remote/pierce types, REMOTE_BOMB_MAX_TIMER, sliding/conveyor defaults, toState() (incl. slide direction) |
 | `game/EngineRegressions.test.ts` | 12 | Room config arrays survive the cjson round trip, time-up ranking (deathmatch/KOTH/teams), spectator meteor + wall refund, shared placement for same-tick deaths, meteor chains bombs, freeze-wave ice, InputBuffer action merge (first pending action kept, later ones on following ticks) |
 | `game/PowerUpDrops.test.ts` | 12 | Weighted drop pick honours POWERUP_DEFINITIONS weights (re-normalised over the enabled set, null when none); death drops every permanent pickup incl. bomb_throw, never shield |
 | `game/GameLoop.test.ts` | 10 | Tick timing, game state progression, circuit breaker, double-start, onGameOver, setTickRate |
@@ -145,13 +145,13 @@ Business logic layer — DB/Redis-backed services are tested with mocked databas
 | `services/ai-output.test.ts` | 3 | toPlayerInput/toEnemyAIResult: well-formed bot input kept + tick stamped, unknown directions/actions dropped, malformed enemy decision → no-op |
 | `services/totp-verify.test.ts` | 3 | verifyCode: a code is accepted once per time step, lockout (429) after repeated failures, success clears the failure count |
 
-### Routes / API (15 files, 606 tests)
+### Routes / API (15 files, 612 tests)
 
 HTTP endpoint tests — Express route handlers tested with mocked services and pass-through middleware. `route-mounting` and `notFound` instead send real HTTP requests to the mounted routers on an ephemeral port.
 
 | File | Tests | Coverage |
 |------|-------|----------|
-| `routes/admin.test.ts` | 205 | Public settings/banner/active-AI endpoints, settings (registration, recordings, game/simulation defaults, email + test send), users, matches (incl. bulk delete; unknown match → 404, nothing deleted or logged), rooms, audit log, announcements, replays, simulations, bot-ai, account cleanup, staff vs admin middleware |
+| `routes/admin.test.ts` | 211 | Public settings/banner/active-AI endpoints, settings (registration, recordings, game/simulation defaults, default art style, email + test send), users, matches (incl. bulk delete; unknown match → 404, nothing deleted or logged), rooms, audit log, announcements, replays, simulations, bot-ai, account cleanup, staff vs admin middleware |
 | `routes/campaign.test.ts` | 181 | Worlds/levels/enemies CRUD, reorder, progress, import/export with conflict resolution (an enemy-type use-existing AI must exist: 400 AI_NOT_FOUND; a level import checks the world before creating anything), param validation, middleware presence, router completeness |
 | `routes/auth.test.ts` | 33 | Register (uniform result, registration toggle), login, logout, refresh, verify email, forgot/reset password, cookie flags from APP_URL, local co-op P2 login (incl. 2FA), rate-limit/validation middleware |
 | `routes/user.test.ts` | 26 | Profile CRUD, email change (admin direct vs confirmation), password validation, confirm-email public endpoint (redirect, rate limited), TOTP route rate limiters |
@@ -180,7 +180,7 @@ Socket.io event handler tests — handlers tested with mock socket/io objects an
 | `handlers/lobbyHandlers.test.ts` | 10 | lobby:chat mode enforcement (disabled/admin_only/staff), message truncation, empty/non-string messages dropped |
 | `handlers/socket-await-guard.test.ts` | 3 | AST scan of `socket.ts` + `handlers/`: no `await` outside a `try` in any socket.on handler, connection listeners registered synchronously |
 
-### Middleware (7 files, 98 tests)
+### Middleware (7 files, 99 tests)
 
 | File | Tests | Coverage |
 |------|-------|----------|
@@ -189,7 +189,7 @@ Socket.io event handler tests — handlers tested with mock socket/io objects an
 | `middleware/emailVerified.test.ts` | 16 | 401/403/500 paths, DB query verification, next() never called on error, the token's emailVerified claim skips the DB (legacy tokens fall back) |
 | `middleware/rateLimiter.test.ts` | 10 | Redis-backed rate limiting (atomic Lua, 429 + Retry-After), in-memory fallback, keys per IP and per route pattern (all ids of a parameterised route such as `/admin/replays/:matchId` share one budget) |
 | `middleware/locale.test.ts` | 8 | x-language priority, accept-language fallback, base language extraction, default 'en' |
-| `middleware/validation.test.ts` | 8 | Zod validation of body/query/params, parsed output replaces the input (extra fields stripped), field-level error details, non-Zod errors forwarded |
+| `middleware/validation.test.ts` | 9 | Zod validation of body/query/params, parsed output replaces the input (extra fields stripped), field-level error details, non-Zod errors forwarded |
 | `middleware/bodyParserErrors.test.ts` | 6 | Real Express stack: malformed JSON → 400 INVALID_JSON (body not reflected), corrupt gzip → 4xx, oversized → 413, unsupported charset → 415 |
 
 ### Database (4 files, 127 tests)
@@ -210,7 +210,7 @@ Migration tooling — the SQL statement splitter and the migration files themsel
 | `simulation/SimulationManager.test.ts` | 81 | Batch lifecycle, queue management (max 10), sim:admin broadcast wiring, getHistory pagination + ordering, cached async disk scan, batch results/replays/deletion, finished-runner cleanup |
 | `simulation/SimulationRunner.test.ts` | 4 | Game (and AI isolate) disposal after normal completion, a runFast throw, a mid-batch failure, and realtime batches |
 
-### Utilities & Shared (15 files, 518 tests)
+### Utilities & Shared (16 files, 520 tests)
 
 Backend utilities, config guards (nginx, Compose, Node version) and the shared-package tests. `shared/` rows are `tests/backend/shared/`; `../shared/` rows are the top-level `tests/shared/`, which the backend Jest config also runs.
 
@@ -227,12 +227,13 @@ Backend utilities, config guards (nginx, Compose, Node version) and the shared-p
 | `utils/socketRateLimit.test.ts` | 12 | Per-socket sliding window (1s reset, stale-entry cleanup), createRateLimiters presets (input 30/s, create 2/s, join 5/s), removeSocket |
 | `utils/guestUsername.test.ts` | 9 | sanitizeGuestUsername (strips/trims/caps, result always USERNAME_REGEX-valid), adminSpectateSchema room-code shape |
 | `../shared/validation.test.ts` | 9 | Username, password, email validation rules |
+| `../shared/artStyles.test.ts` | 2 | Art style ids: Classic is the built-in default, isArtStyleId accepts the listed styles only |
 | `utils/composeIsolation.test.ts` | 8 | Dev compose stack cannot adopt prod: no shared container names, host ports or data mounts, overrides instead of appends, own project name, documented dev command always passes `-p` |
 | `utils/replayPrune.test.ts` | 7 | pruneOldReplays: age/size limits oldest-first, campaign replays never auto-deleted, fresh files kept, throttled, missing directory tolerated |
 | `utils/totpKeyValidation.test.ts` | 7 | isValidTotpKey requires exactly 64 hex chars; TOTP secret encryption round-trips, rejects invalid keys, cannot decrypt with another key |
 | `utils/nodeVersion.test.ts` | 5 | Same Node major across Docker stages, package.json engines, .nvmrc and the AI bundle target |
 
-### Frontend (37 files, 266 tests)
+### Frontend (46 files, 324 tests)
 
 All frontend tests run on Vitest + jsdom. Paths are relative to `frontend/`.
 
@@ -241,11 +242,13 @@ All frontend tests run on Vitest + jsdom. Paths are relative to `frontend/`.
 | `tests/utils/colors.test.ts` | 18 | toCssHex (number/string → #rrggbb, malformed or out-of-range → null), safeCssColor strict-hex fallback |
 | `tests/utils/html.test.ts` | 13 | escapeHtml, escapeAttr — XSS prevention |
 | `tests/utils/trapFocus.test.ts` | 13 | Arrow-key focus movement (text fields and radios keep their arrows), Tab wrap, cleanup; createModal gamepad context push/pop, Back closes, confirmModal result; focus returns to the opener on close (never taken from an element outside the modal) |
-| `tests/ui/hudPlayerList.test.ts` | 12 | HUD player list: keyed DOM reuse (no writes when unchanged), alive-first order, click-to-spectate only while dead, team headers, live KOTH reorder + crown, username escaping, bot/buddy tags, reset() |
+| `tests/ui/hudPlayerList.test.ts` | 13 | HUD player list: keyed DOM reuse (no writes when unchanged), alive-first order, click-to-spectate only while dead, team headers, live KOTH reorder + crown icon, username escaping, bot/buddy tags, colour-blind shape markers, reset() |
 | `tests/utils/wrapGhosts.test.ts` | 12 | wrapGhostOffsets/wrapGhostPositions: ghost copies only near the seams (edges, corners, margin), at most 3 copies, degenerate and oversized worlds |
+| `tests/art/painters.test.ts` | 12 | Every drawn-style painter (Toy, Neon, Pixel) over every world, tile, character, bomb, flame, pickup and effect draws something without throwing, against a fake 2D context; deterministic output; sane frame counts and palettes |
 | `tests/shared/grid.test.ts` | 11 | manhattanDistance, getExplosionCells (range, walls, bounds, first destructible stops the blast, pierce, cracked walls) |
 | `tests/utils/tileTexture.test.ts` | 11 | themePrefix, getTileTexture (themed/unthemed keys, classic = no theme, floor variation, unknown-tile fallback), conveyor helpers |
 | `tests/game/gameClientFixes.test.ts` | 10 | PowerUpRenderer kills its float tween, LocalCoopInput releases keys on blur, GamepadManager.suppressHeldButtons, ReplayPlayer.seekToTick by game tick, campaign run helpers (P2 socket token, guest P2) |
+| `tests/game/Settings.test.ts` | 10 | getSettings defaults (graphics quality by pointer type, reduced motion, sharp rendering, colour-blind)/merge/invalid-JSON or array fallback/caching, saveSettings persists and updates the cache |
 | `tests/game/replayLogIndex.test.ts` | 9 | lowerBound/upperBound, findTickRange (range + scroll anchor, agrees with a linear scan), stable sortByTick |
 | `tests/utils/wrapGhostTileSpans.test.ts` | 9 | Ghost tile spans for the wrapping map: only past a seam (never the canonical copy), corner copies, clamped to grid and screen, stable layout key |
 | `tests/network/apiClient.test.ts` | 8 | ApiError code/status + validation details, 401 handling (guest not logged out, one retry after refresh, logout when refresh fails, wrong-password 401 not retried), authenticated download |
@@ -253,28 +256,35 @@ All frontend tests run on Vitest + jsdom. Paths are relative to `frontend/`.
 | `tests/network/socketClientConnect.test.ts` | 8 | connect/connectAsGuest open exactly one socket while one is in flight, replace stale sockets, no token → no connect, disconnect then connect opens a fresh socket |
 | `tests/ui/lobbyNavigation.test.ts` | 8 | No /user/rank request for guests, navigation token discards superseded views, destroyed views stop writing to `.main-body` (ChallengeView, OpenWorldView), each view renders into its own root (late renders and container listeners go with it) |
 | `tests/ui/adminTabContracts.test.ts` | 8 | Dashboard, Users, Rooms, Matches, Announcements, Achievements/cosmetics, Campaign and Simulations tabs render fixtures shaped like their backend handlers' responses, with no error |
+| `tests/game/spriteInterpolation.test.ts` | 8 | Enemies move per rendered frame at a frame-rate-independent speed, HP bar follows and redraws only on HP change; enemies and players jump (not slide) when the target moves further than a step, never while walking fast; short way over the open-world seam; Classic spawn-protection flicker; a player's look is kept through a knockout |
+| `tests/scenes/replayAndSpectatorExits.test.ts` | 8 | Closing a replay reopens its admin tab/view, leaving a spectated simulation sends sim:unspectate and reopens the batch, replay deaths (with cause) feed the HUD kill feed, a seek clears it, listeners removed on shutdown |
 | `tests/ui/adminTabs.test.ts` | 7 | ChallengesTab ({ maps } shape, load error, aria-checked revert on failed save), SeasonsTab paging + unsaved tier edits, LogsTab single listener, AITab authenticated download |
 | `tests/ui/partyState.test.ts` | 7 | PartyBar fetches the current party on build and after reconnect, PartyView follows the bar (create/leave sync both ways), no disband toast for the leaver |
-| `tests/game/Settings.test.ts` | 7 | getSettings defaults/merge/invalid-JSON or array fallback/caching, saveSettings persists and updates the cache |
+| `tests/game/styledTileMap.test.ts` | 7 | Drawn-style tile map: floor frames carry the shadows of W/N/NW blocks, wall frames connect to neighbours, tile diffs destroy (reported, shadows cleared), crack in place and drop in crates, blocks y-sort, animated hazards stay on the ground, gates switch between block and ground |
+| `tests/art/artStyleManager.test.ts` | 7 | Art style resolution: Classic until the admin default arrives, the player's own pick wins, unknown values ignored, fetch failure keeps Classic, picks stored and cleared, admin broadcasts only reach players without a pick, ready() times out |
 | `tests/ui/authResetMode.test.ts` | 6 | Password-reset form: token + password posted with skipAuthRetry, Enter submits, local validation, rejected/missing token offers a new link |
 | `tests/ui/i18nPlurals.test.ts` | 6 | Plural keys with real i18next (en/de, Polish few/many), 61x61 map size gone, AuthUI translates server error codes (message fallback), form links are buttons |
 | `tests/game/minimapTerrain.test.ts` | 6 | minimapTileColor fallback, MinimapTerrain paints once then repaints only changed cells (applyDiffs/sync), no grid aliasing, ragged grids tolerated |
-| `tests/game/spriteInterpolation.test.ts` | 6 | Enemies move per rendered frame at a frame-rate-independent speed, HP bar follows and redraws only on HP change; enemies and players jump (not slide) when the target moves further than a step, never while walking fast; short way over the open-world seam |
-| `tests/scenes/replayAndSpectatorExits.test.ts` | 6 | Closing a replay reopens its admin tab/view, leaving a spectated simulation sends sim:unspectate and reopens the batch, replay deaths (with cause) feed the HUD kill feed, a seek clears it, listeners removed on shutdown |
 | `tests/utils/sanitizerFidelity.test.ts` | 6 | setHtml builds the same DOM as the innerHTML it replaced for every HTML literal in `src/` (table fragments, CSS custom properties), still strips what it should |
 | `tests/network/socketClientReconnect.test.ts` | 6 | Handshake sends the current access token, refreshes an expired one and reconnects (not after a failed refresh), onReconnect fires only after the first connect |
 | `tests/game/tileMapApplyDiffs.test.ts` | 6 | TileMapRenderer.applyTileDiffs swaps only listed cells, ignores no-op/out-of-grid diffs, matches updateTiles(), idempotent, consistent with a later full sync |
 | `tests/ui/viewListenerLifecycle.test.ts` | 6 | MapsView/MessagesView/FriendsView/embedded LeaderboardUI keep one handler across re-renders and none after destroy; in-app confirm modals for delete/block |
+| `tests/art/explosionPieces.test.ts` | 6 | Flame pieces from the server's cell order (centre, arms, end caps, range 1, pierce gaps, wrapping maps); fuse fraction and frame helpers |
 | `tests/ui/adminReturn.test.ts` | 5 | Matches/Campaign/Simulations tabs reopen the page, replay list or batch a replay came from (once); Watch replay closes its modal and pops its gamepad context; AdminUI hands the view to the tab |
 | `tests/utils/trustedTypesEnforcement.test.ts` | 5 | Under enforced Trusted Types: raw assignment throws, setHtml/insertHtml insert every HTML literal without touching a sink, HUD player list renders, escapeHtml still works |
+| `tests/game/enemySpriteDying.test.ts` | 5 | Enemy death tween starts once per enemy, tracked per enemy, guard cleared on removal/destroy; bosses drawn at their size multiplier (kept when they turn); ghost-bodied enemies translucent |
+| `tests/art/depthAndScale.test.ts` | 5 | Depth bands keep Classic's draw order and y-sort the drawn styles between it and the labels; setDepth only on change; texture bake scale bookkeeping |
+| `tests/art/hidpi.test.ts` | 5 | Render ratio from the screen density (capped at 2), 1 with Sharp rendering off or at Low quality, `?dpr=` override; canvas sized in device pixels; UI cameras lay out in CSS pixels |
 | `tests/ui/localCoopTotp.test.ts` | 4 | LocalCoopModal 2FA: code step after the challenge, wrong code/expired challenge handling, 6-digit check before any request, one gamepad context |
 | `tests/scenes/sceneListenerLifecycle.test.ts` | 4 | AST scan of `src/scenes`: no blanket socketClient.off(event), every socket subscription unsubscribed, shutdown registered explicitly |
+| `tests/game/playerPalette.test.ts` | 4 | Standard colours unchanged; colour-blind player and team colours follow the setting (teams never share a colour); index wrapping; eight marker shapes traced as closed paths |
 | `tests/network/authRefresh.test.ts` | 3 | AuthManager.refresh shares one request between concurrent callers, starts fresh afterwards, runs inside a Web Lock across tabs |
-| `tests/game/enemySpriteDying.test.ts` | 3 | Enemy death tween starts once per enemy, tracked per enemy, guard cleared on removal/destroy |
 | `tests/ui/lobbyPanels.test.ts` | 3 | Panel handlers registered once across room↔lobby cycles, one toast per party invite, idempotent destroyPanels() |
 | `tests/ui/profileAddFriend.test.ts` | 3 | ProfileView Add Friend over the socket (success, retry after failure), hostile rank colour/achievement icon kept out of the markup |
 | `tests/scenes/openWorldMapResize.test.ts` | 2 | A new open-world round with a different map size rebuilds the tile renderer and wrap sizes; the same size keeps the renderer |
 | `tests/game/soundNoise.test.ts` | 1 | Noise bursts share one cached buffer and each plays a random slice as long as the burst |
+| `tests/game/explosionEmitters.test.ts` | 1 | Classic explosion particle emitters are counted down once, also when the explosion ends before an emitter's own timer |
+| `tests/game/splitScreenOverlay.test.ts` | 1 | Split-screen divider per mode, partner arrows shown only when placed, overlay removed on destroy |
 
 ## Mocking Patterns
 
@@ -572,7 +582,8 @@ Frontend tests use Vitest with `jsdom` for DOM APIs. They come in four kinds:
 
 - **Pure functions** (HTML escaping, colors, grid math, wrap ghosts, replay index): plain imports, no mocking.
 - **UI and view tests** render real views, modals and HUD pieces into jsdom's `document`. They `vi.mock` the modules around the view (typically `i18n`, `UIGamepadNavigator` and `ApiClient`) and pass small fakes for the `SocketClient`/`AuthManager` dependencies.
-- **Renderer and scene tests** drive the real renderer classes (and `GameScene`) against `tests/helpers/fakeScene.ts` (`makeFakeScene()`), a minimal stand-in for the parts of `Phaser.Scene` they touch, with `vi.mock('phaser', ...)` so Phaser itself never boots.
+- **Renderer and scene tests** drive the real renderer classes (and `GameScene`) against `tests/helpers/fakeScene.ts` (`makeFakeScene()`), a minimal stand-in for the parts of `Phaser.Scene` they touch, with `vi.mock('phaser', ...)` so Phaser itself never boots. Fake sprites record their frame, depth, tint and the animation they play; `time.delayedCall` runs at once (replace it on the scene to hold timers back), and `add.particles` returns a fake emitter that counts `explode()` and records `destroy()`.
+- **Art style painters** run against a Proxy that accepts any Canvas 2D call (`tests/art/painters.test.ts`); jsdom has no 2D canvas, so `getContext` is mocked to null and the painters' sprite caches draw directly. They check that every painter draws without errors and deterministically; the look itself is checked by eye.
 - **Source scans** parse `src/` with the TypeScript compiler API: `sceneListenerLifecycle` checks socket listener cleanup in every scene, and `sanitizerFidelity`/`trustedTypesEnforcement` share the HTML-literal corpus from `tests/helpers/htmlLiterals.ts`.
 
 ```typescript

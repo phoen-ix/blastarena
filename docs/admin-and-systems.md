@@ -8,7 +8,7 @@ A lobby view (sidebar → Admin, shown to admin and moderator roles). Tabs a mod
 
 | Tab | Access | Features |
 |-----|--------|----------|
-| Dashboard | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings: recordings toggle, registration toggle, party chat mode, email/SMTP config, game defaults, simulation defaults |
+| Dashboard | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings: recordings toggle, registration toggle, party chat mode, default theme, default art style, email/SMTP config, game defaults, simulation defaults |
 | Users | Admin + Mod | Search and paginated table for both roles. Every change is admin only: role change, deactivate/reactivate, delete (type-to-confirm), create user, password reset, 2FA reset, session revocation, bulk cleanup of unverified/inactive/deactivated accounts. Role changes, deactivation and session revocation ask for confirmation |
 | Matches | Admin + Mod | Paginated history, per-player stats modal. Admin delete per row / delete all (cleans up replay files) |
 | Rooms | Admin + Mod | Active rooms, updated live by the `room:list` broadcast (60s safety refresh). Spectate opens a spectator view of the match (Escape or gamepad Start goes back to the Rooms tab); send message (any room, waiting or running), kick player, force close (admin only) |
@@ -34,6 +34,7 @@ A lobby view (sidebar → Admin, shown to admin and moderator roles). Tabs a mod
 - Public endpoint `GET /admin/settings/registration_enabled` (no auth, needed by AuthUI)
 - Admin-only `PUT /admin/settings/recordings_enabled`, `PUT /admin/settings/registration_enabled`, and `PUT /admin/settings/party_chat_mode` — update DB, log to audit, broadcast `admin:settingsChanged`
 - Public endpoint `GET /admin/settings/party_chat_mode` (no auth, needed by PartyBar)
+- Public endpoint `GET /admin/settings/default_art_style` (no auth, read at boot by `ArtStyleManager`); admin-only `PUT` takes `{ style }` (`classic` / `neon` / `toy` / `pixel`), audit-logged, broadcast to every socket
 - Match deletion: `DELETE /admin/matches/:id` and `DELETE /admin/matches` — deletes DB records (cascades to match_players) + replay files from disk; both audit-logged
 
 ### Server Settings
@@ -43,6 +44,8 @@ A lobby view (sidebar → Admin, shown to admin and moderator roles). Tabs a mod
 **Registration toggle**: `registration_enabled` boolean setting (defaults to `true`). When disabled, `POST /auth/register` returns 403 and the AuthUI hides the register link. Admins can still create users via the admin panel.
 
 **Party chat mode**: `party_chat_mode` setting — `ChatMode` type (`'everyone'` | `'staff'` | `'admin_only'` | `'disabled'`), defaults to `'everyone'`. Controls who can send party chat messages. Backend enforces in `party:chat` socket handler by checking `socket.data.role`. Frontend `PartyBar` hides the Chat button for users without access and auto-closes open chat windows when mode changes via `admin:settingsChanged` broadcast. Admin-only PUT at `/admin/settings/party_chat_mode`; public GET for frontend.
+
+**Default art style**: `default_art_style` setting, one of `ART_STYLE_IDS` (`shared/src/constants/artStyles.ts`), defaults to `classic`; no migration, an unset key reads as Classic. It is the arena art style for players who have not picked one in Settings (their pick lives in localStorage on their device). The dashboard select only appears when the client build has more than one style. A change reaches open clients live through `admin:settingsChanged` (LobbyScene hands it to `ArtStyleManager`) and takes effect the next time a game scene starts.
 
 **Admin-configurable defaults**: `game_defaults` and `simulation_defaults` stored as JSON blobs. Public `GET /admin/settings/game_defaults`; staff `GET /admin/settings/simulation_defaults`; admin-only PUT for both. Zod-validated with all fields optional — empty `{}` means "use hardcoded defaults". `GameDefaults` and `SimulationDefaults` types in `shared/src/types/settings.ts`.
 

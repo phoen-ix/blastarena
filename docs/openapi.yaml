@@ -5005,6 +5005,57 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /admin/settings/default_art_style:
+    get:
+      tags: [Settings]
+      summary: Get default art style
+      description: >-
+        The arena art style for players who have not picked their own (a player's pick is stored
+        on their device). An unset or unknown stored value is reported as `classic`.
+      security: []
+      operationId: getDefaultArtStyle
+      responses:
+        '200':
+          description: Default art style
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  style:
+                    type: string
+                    enum: [classic, neon, toy, pixel]
+                    example: classic
+    put:
+      tags: [Settings]
+      summary: Set default art style (admin only)
+      description: Audit-logged; broadcasts `admin:settingsChanged` with key `default_art_style` to every socket.
+      operationId: setDefaultArtStyle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [style]
+              properties:
+                style:
+                  type: string
+                  enum: [classic, neon, toy, pixel]
+      responses:
+        '200':
+          description: Default art style updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /admin/settings/imprint:
     get:
       tags: [Settings]

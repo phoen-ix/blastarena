@@ -195,7 +195,7 @@ On disconnect, the server:
 | Event | Payload | Scope | Description |
 |-------|---------|-------|-------------|
 | `game:start` | `GameState` | `room:{code}` | Initial game state when game starts or player reconnects to active game |
-| `game:state` | `GameState` | `room:{code}` | Game state update every tick (20 ticks/sec) |
+| `game:state` | `GameState` | `room:{code}` | Game state update every tick (20 ticks/sec). For the client's renderers it also carries a player's remaining spawn protection (`invulnerableTicks`, only while above 0), a sliding bomb's direction (`slideDir`) and whether an explosion came from a pierce bomb (`pierce`); all optional, so older replays without them still play |
 | `game:explosion` | `{ cells: { x: number, y: number }[], ownerId: number }` | `room:{code}` | Bomb explosion with affected cell coordinates and owner |
 | `game:powerupCollected` | `{ playerId: number, type: string, position: { x: number, y: number } }` | `room:{code}` | A player collected a power-up |
 | `game:playerDied` | `{ playerId: number, killerId: number \| null, cause: KillCause }` | `room:{code}` | A player was killed. `killerId` is null for environmental/self deaths; `cause` is `bomb`, `self`, `zone`, a hazard (`lava`, `quicksand`, `spikes`, `dark_rift`) or `disconnect` |
@@ -228,7 +228,7 @@ On disconnect, the server:
 | `admin:banner` | `{ message: string \| null }` | broadcast (all) | Admin banner message. `null` to clear |
 | `admin:kicked` | `{ reason: string }` | target socket | Player was kicked from a room (or room was force-closed) |
 | `admin:roomMessage` | `{ message: string, from: string }` | `room:{code}` | System message from an admin spectating the room |
-| `admin:settingsChanged` | `{ key: string, value?: unknown }` | all sockets or `role:staff` | A server setting changed. Settings that change what every user sees (party/lobby/DM/emote/spectator chat modes, the spectator-actions toggle, default theme) go to everyone; admin-only ones (registration, open world, XP multiplier, game defaults, email) to staff only |
+| `admin:settingsChanged` | `{ key: string, value?: unknown }` | all sockets or `role:staff` | A server setting changed. Settings that change what every user sees (party/lobby/DM/emote/spectator chat modes, the spectator-actions toggle, default theme, default art style) go to everyone; admin-only ones (registration, open world, XP multiplier, game defaults, email) to staff only |
 
 ### Simulation Events
 
