@@ -93,8 +93,11 @@ export function bakeAtlas(
       console.error(`Art frame ${key}/${spec.name} failed`, err);
     }
     g.restore();
-    if (spec.extrude) extrudeEdges(g, p);
   }
+  extrudeEdges(
+    g,
+    placed.filter((p) => p.spec.extrude),
+  );
 
   if (scene.textures.exists(key)) scene.textures.remove(key);
   const tex = scene.textures.addCanvas(key, canvas);
@@ -112,17 +115,34 @@ export function bakeAtlas(
   return tex;
 }
 
-/** Copy a frame's outermost pixel rows and columns into its padding. */
-function extrudeEdges(g: CanvasRenderingContext2D, p: Placed): void {
-  const c = g.canvas;
-  const { x, y, pw, ph } = p;
-  g.save();
-  g.imageSmoothingEnabled = false;
-  g.drawImage(c, x, y, pw, 1, x, y - PAD, pw, PAD);
-  g.drawImage(c, x, y + ph - 1, pw, 1, x, y + ph, pw, PAD);
-  g.drawImage(c, x, y - PAD, 1, ph + PAD * 2, x - PAD, y - PAD, PAD, ph + PAD * 2);
-  g.drawImage(c, x + pw - 1, y - PAD, 1, ph + PAD * 2, x + pw, y - PAD, PAD, ph + PAD * 2);
-  g.restore();
+/**
+ * Copy each frame's outermost pixel rows and columns into its padding. Done in one pixel pass
+ * for all frames: drawing the canvas onto itself per frame made the browser flush and copy the
+ * whole atlas every time, which took seconds for a tile atlas.
+ */
+function extrudeEdges(g: CanvasRenderingContext2D, frames: Placed[]): void {
+  if (frames.length === 0) return;
+  const { width, height } = g.canvas;
+  const image = g.getImageData(0, 0, width, height);
+  const px = new Uint32Array(image.data.buffer);
+  const at = (x: number, y: number) => y * width + x;
+  for (const { x, y, pw, ph } of frames) {
+    for (let k = 1; k <= PAD; k++) {
+      for (let i = 0; i < pw; i++) {
+        if (y - k >= 0) px[at(x + i, y - k)] = px[at(x + i, y)];
+        if (y + ph - 1 + k < height) px[at(x + i, y + ph - 1 + k)] = px[at(x + i, y + ph - 1)];
+      }
+    }
+    for (let j = -PAD; j < ph + PAD; j++) {
+      const row = y + j;
+      if (row < 0 || row >= height) continue;
+      for (let k = 1; k <= PAD; k++) {
+        if (x - k >= 0) px[at(x - k, row)] = px[at(x, row)];
+        if (x + pw - 1 + k < width) px[at(x + pw - 1 + k, row)] = px[at(x + pw - 1, row)];
+      }
+    }
+  }
+  g.putImageData(image, 0, 0);
 }
 
 /** Create (or replace) a looping animation over named frames of one texture. */

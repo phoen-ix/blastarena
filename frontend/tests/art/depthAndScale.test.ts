@@ -36,8 +36,6 @@ const CLASSIC: Record<string, number> = {
   EMOTE_BG: 99,
   EMOTE: 100,
   SPECTATOR_FLASH: 120,
-  PARTNER_ARROW: 9998,
-  SPLIT_DIVIDER: 9999,
 };
 
 describe('depth bands', () => {

@@ -23,6 +23,8 @@ describe('Settings', () => {
         lobbyChat: true,
         minimap: true,
         quality: 'high',
+        sharpRendering: true,
+        colorBlind: false,
       });
     });
 
@@ -41,6 +43,8 @@ describe('Settings', () => {
             lobbyChat: true,
             minimap: true,
             quality: 'high',
+            sharpRendering: true,
+            colorBlind: false,
           });
         })
       );
@@ -60,6 +64,8 @@ describe('Settings', () => {
             lobbyChat: true,
             minimap: true,
             quality: 'high',
+            sharpRendering: true,
+            colorBlind: false,
           });
         })
       );
@@ -79,6 +85,8 @@ describe('Settings', () => {
             lobbyChat: true,
             minimap: true,
             quality: 'high',
+            sharpRendering: true,
+            colorBlind: false,
           });
         })
       );

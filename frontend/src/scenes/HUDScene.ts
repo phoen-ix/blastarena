@@ -734,10 +734,12 @@ export class HUDScene extends Phaser.Scene {
     // Player list (open world renders the leaderboard instead)
     const playersEl = this.openWorldMode ? null : this.playerListEl;
     if (playersEl) {
+      const game = this.scene.get('GameScene') as GameScene | null;
       this.playerList.render(playersEl, state.players, {
         kothScores: state.kothScores,
         controllingPlayerId: state.hillZone?.controllingPlayer ?? null,
         localPlayerDead: this.localPlayerDead,
+        markerOf: (id) => game?.playerMarker?.(id),
       });
     }
 
@@ -818,11 +820,15 @@ export class HUDScene extends Phaser.Scene {
       ctx.fillRect(px + offset, py + offset, half, half);
     }
 
-    // Draw players
+    // Draw players, in the colours their sprites are drawn in (team and colour-blind aware)
+    const game = this.scene.get('GameScene') as GameScene | null;
     for (let i = 0; i < state.players.length; i++) {
       const p = state.players[i];
       if (!p.alive) continue;
-      const color = p.cosmetics?.colorHex ?? PLAYER_COLORS[i % PLAYER_COLORS.length];
+      const color =
+        p.cosmetics?.colorHex ??
+        game?.playerLook?.(p.id)?.color ??
+        PLAYER_COLORS[i % PLAYER_COLORS.length];
       ctx.fillStyle = typeof color === 'number' ? '#' + color.toString(16).padStart(6, '0') : color;
       const px = p.position.x * ts;
       const py = p.position.y * ts;

@@ -4,10 +4,12 @@ import { POWERUP_ICON_DRAWERS } from '../utils/powerUpIcons';
 import { generateHazardTileTextures } from '../utils/campaignThemes';
 import { t } from '../i18n';
 import { POWERUP_COLORS } from '../utils/powerUpColors';
+import { STANDARD_PLAYER_COLORS } from '../game/playerPalette';
+import { bakeGraphics, hiResGraphics, textureRatio, uiCamera } from '../art/hidpi';
+import { markTexScale } from '../art/scale';
 
-export const PLAYER_COLORS = [
-  0xe94560, 0x44aaff, 0x44ff44, 0xff8800, 0xcc44ff, 0xffff44, 0xff44ff, 0x44ffff,
-];
+/** Standard player colours (Classic's `player_{i}_{dir}` textures). See game/playerPalette. */
+export const PLAYER_COLORS = STANDARD_PLAYER_COLORS;
 
 export { POWERUP_COLORS };
 
@@ -17,8 +19,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
-    const width = this.cameras.main.width;
-    const height = this.cameras.main.height;
+    const { width, height } = uiCamera(this);
 
     const progressBar = this.add.graphics();
     const progressBox = this.add.graphics();
@@ -73,7 +74,7 @@ export class BootScene extends Phaser.Scene {
 
     PLAYER_COLORS.forEach((color, i) => {
       for (const dir of directions) {
-        const gfx = this.make.graphics({ x: 0, y: 0 });
+        const gfx = hiResGraphics(this);
         const cx = 24,
           cy = 24;
 
@@ -103,7 +104,7 @@ export class BootScene extends Phaser.Scene {
         gfx.fillCircle(cx + offsets.lx + offsets.px, cy + offsets.ly + offsets.py, 2.5);
         gfx.fillCircle(cx + offsets.rx + offsets.px, cy + offsets.ry + offsets.py, 2.5);
 
-        gfx.generateTexture(`player_${i}_${dir}`, 48, 48);
+        bakeGraphics(gfx, `player_${i}_${dir}`, 48, 48);
         gfx.destroy();
       }
     });
@@ -111,7 +112,7 @@ export class BootScene extends Phaser.Scene {
 
   private generateTileTextures(): void {
     // Indestructible wall with bevel/3D effect
-    const wallGfx = this.make.graphics({ x: 0, y: 0 });
+    const wallGfx = hiResGraphics(this);
     wallGfx.fillStyle(0x333355, 1);
     wallGfx.fillRect(0, 0, 48, 48);
     // 3D bevel: lighter top-left edges
@@ -130,11 +131,11 @@ export class BootScene extends Phaser.Scene {
     wallGfx.fillStyle(0x555577, 0.3);
     wallGfx.fillRect(6, 6, 8, 8);
     wallGfx.fillRect(28, 28, 8, 8);
-    wallGfx.generateTexture('wall', 48, 48);
+    bakeGraphics(wallGfx, 'wall', 48, 48);
     wallGfx.destroy();
 
     // Destructible wall with cracks
-    const destGfx = this.make.graphics({ x: 0, y: 0 });
+    const destGfx = hiResGraphics(this);
     destGfx.fillStyle(0x886633, 1);
     destGfx.fillRect(0, 0, 48, 48);
     // Bevel
@@ -156,11 +157,11 @@ export class BootScene extends Phaser.Scene {
     destGfx.lineStyle(1, 0x553311, 0.3);
     destGfx.lineBetween(8, 4, 14, 12);
     destGfx.lineBetween(34, 20, 42, 28);
-    destGfx.generateTexture('destructible', 48, 48);
+    bakeGraphics(destGfx, 'destructible', 48, 48);
     destGfx.destroy();
 
     // Cracked destructible wall (multi-hit)
-    const crackGfx = this.make.graphics({ x: 0, y: 0 });
+    const crackGfx = hiResGraphics(this);
     crackGfx.fillStyle(0x775522, 1);
     crackGfx.fillRect(0, 0, 48, 48);
     crackGfx.fillStyle(0x886633, 1);
@@ -183,12 +184,12 @@ export class BootScene extends Phaser.Scene {
     crackGfx.lineBetween(30, 18, 44, 34);
     crackGfx.lineBetween(44, 34, 38, 46);
     crackGfx.lineBetween(10, 34, 24, 44);
-    crackGfx.generateTexture('destructible_cracked', 48, 48);
+    bakeGraphics(crackGfx, 'destructible_cracked', 48, 48);
     crackGfx.destroy();
 
     // Floor tiles (4 variants for variety)
     for (let v = 0; v < 4; v++) {
-      const floorGfx = this.make.graphics({ x: 0, y: 0 });
+      const floorGfx = hiResGraphics(this);
       const baseShade = 0x2a2a3e + v * 0x010102;
       floorGfx.fillStyle(baseShade, 1);
       floorGfx.fillRect(0, 0, 48, 48);
@@ -205,13 +206,13 @@ export class BootScene extends Phaser.Scene {
         floorGfx.fillCircle(36, 12, 1);
         floorGfx.fillCircle(12, 36, 1);
       }
-      floorGfx.generateTexture(`floor_${v}`, 48, 48);
+      bakeGraphics(floorGfx, `floor_${v}`, 48, 48);
       floorGfx.destroy();
     }
 
     // Teleporter textures
     for (const suffix of ['a', 'b']) {
-      const tpGfx = this.make.graphics({ x: 0, y: 0 });
+      const tpGfx = hiResGraphics(this);
       // Floor base
       tpGfx.fillStyle(0x2a2a3e, 1);
       tpGfx.fillRect(0, 0, 48, 48);
@@ -233,7 +234,7 @@ export class BootScene extends Phaser.Scene {
       tpGfx.beginPath();
       tpGfx.arc(24, 24, 10, Math.PI, Math.PI * 2, true);
       tpGfx.strokePath();
-      tpGfx.generateTexture(`teleporter_${suffix}`, 48, 48);
+      bakeGraphics(tpGfx, `teleporter_${suffix}`, 48, 48);
       tpGfx.destroy();
     }
 
@@ -255,7 +256,7 @@ export class BootScene extends Phaser.Scene {
     };
     for (const [dir, { horizontal, positive }] of Object.entries(conveyorDirs)) {
       for (let f = 0; f < CONVEYOR_FRAMES; f++) {
-        const gfx = this.make.graphics({ x: 0, y: 0 });
+        const gfx = hiResGraphics(this);
         // Background
         gfx.fillStyle(0x2a2a3e, 1);
         gfx.fillRect(0, 0, 48, 48);
@@ -295,7 +296,7 @@ export class BootScene extends Phaser.Scene {
         gfx.strokePath();
         // Frame 0 keeps the base key for backward compatibility
         const key = f === 0 ? `conveyor_${dir}` : `conveyor_${dir}_${f}`;
-        gfx.generateTexture(key, 48, 48);
+        bakeGraphics(gfx, key, 48, 48);
         gfx.destroy();
       }
       // Create looping animation
@@ -310,7 +311,7 @@ export class BootScene extends Phaser.Scene {
     }
 
     // Exit tile (trapdoor)
-    const exitGfx = this.make.graphics({ x: 0, y: 0 });
+    const exitGfx = hiResGraphics(this);
     exitGfx.fillStyle(0x2a2a3e, 1);
     exitGfx.fillRect(0, 0, 48, 48);
     exitGfx.fillStyle(0x4a3a2e, 1);
@@ -323,11 +324,11 @@ export class BootScene extends Phaser.Scene {
     // Arrow down indicator
     exitGfx.fillStyle(0x44ff44, 0.7);
     exitGfx.fillTriangle(24, 34, 18, 26, 30, 26);
-    exitGfx.generateTexture('exit', 48, 48);
+    bakeGraphics(exitGfx, 'exit', 48, 48);
     exitGfx.destroy();
 
     // Goal tile (star marker)
-    const goalGfx = this.make.graphics({ x: 0, y: 0 });
+    const goalGfx = hiResGraphics(this);
     goalGfx.fillStyle(0x2a2a3e, 1);
     goalGfx.fillRect(0, 0, 48, 48);
     goalGfx.fillStyle(0xffcc00, 0.2);
@@ -342,7 +343,7 @@ export class BootScene extends Phaser.Scene {
     goalGfx.fillTriangle(24, 36, 21, 28, 13, 28);
     goalGfx.fillTriangle(13, 20, 17, 24, 13, 28);
     goalGfx.fillTriangle(35, 20, 31, 24, 35, 28);
-    goalGfx.generateTexture('goal', 48, 48);
+    bakeGraphics(goalGfx, 'goal', 48, 48);
     goalGfx.destroy();
 
     // Puzzle tile textures
@@ -363,7 +364,7 @@ export class BootScene extends Phaser.Scene {
       const darkerColor = Phaser.Display.Color.IntegerToColor(colorVal).darken(30).color;
 
       // Inactive switch
-      const swGfx = this.make.graphics({ x: 0, y: 0 });
+      const swGfx = hiResGraphics(this);
       // Floor base
       swGfx.fillStyle(0x2a2a3e, 1);
       swGfx.fillRect(0, 0, 48, 48);
@@ -381,11 +382,11 @@ export class BootScene extends Phaser.Scene {
       // Inner highlight
       swGfx.fillStyle(0xffffff, 0.2);
       swGfx.fillCircle(22, 22, 3);
-      swGfx.generateTexture(`switch_${colorName}`, 48, 48);
+      bakeGraphics(swGfx, `switch_${colorName}`, 48, 48);
       swGfx.destroy();
 
       // Active switch
-      const swActGfx = this.make.graphics({ x: 0, y: 0 });
+      const swActGfx = hiResGraphics(this);
       // Floor base
       swActGfx.fillStyle(0x2a2a3e, 1);
       swActGfx.fillRect(0, 0, 48, 48);
@@ -406,7 +407,7 @@ export class BootScene extends Phaser.Scene {
       // Inner highlight
       swActGfx.fillStyle(0xffffff, 0.35);
       swActGfx.fillCircle(22, 21, 4);
-      swActGfx.generateTexture(`switch_${colorName}_active`, 48, 48);
+      bakeGraphics(swActGfx, `switch_${colorName}_active`, 48, 48);
       swActGfx.destroy();
     }
 
@@ -415,7 +416,7 @@ export class BootScene extends Phaser.Scene {
       const darkerColor = Phaser.Display.Color.IntegerToColor(colorVal).darken(20).color;
 
       // Closed gate (portcullis bars)
-      const gateGfx = this.make.graphics({ x: 0, y: 0 });
+      const gateGfx = hiResGraphics(this);
       // Dark background
       gateGfx.fillStyle(0x2a2a40, 1);
       gateGfx.fillRect(0, 0, 48, 48);
@@ -433,11 +434,11 @@ export class BootScene extends Phaser.Scene {
       gateGfx.fillStyle(darkerColor, 0.6);
       gateGfx.fillRect(0, 0, 48, 3);
       gateGfx.fillRect(0, 45, 48, 3);
-      gateGfx.generateTexture(`gate_${colorName}`, 48, 48);
+      bakeGraphics(gateGfx, `gate_${colorName}`, 48, 48);
       gateGfx.destroy();
 
       // Open gate (retracted bar stubs at top)
-      const gateOpenGfx = this.make.graphics({ x: 0, y: 0 });
+      const gateOpenGfx = hiResGraphics(this);
       // Floor base (same as empty tile)
       gateOpenGfx.fillStyle(0x2a2a3e, 1);
       gateOpenGfx.fillRect(0, 0, 48, 48);
@@ -452,12 +453,12 @@ export class BootScene extends Phaser.Scene {
       // Top frame remnant
       gateOpenGfx.fillStyle(colorVal, 0.2);
       gateOpenGfx.fillRect(0, 0, 48, 2);
-      gateOpenGfx.generateTexture(`gate_${colorName}_open`, 48, 48);
+      bakeGraphics(gateOpenGfx, `gate_${colorName}_open`, 48, 48);
       gateOpenGfx.destroy();
     }
 
     // Crumbling floor texture
-    const crumbleGfx = this.make.graphics({ x: 0, y: 0 });
+    const crumbleGfx = hiResGraphics(this);
     // Brownish-tinted floor base
     crumbleGfx.fillStyle(0x33302e, 1);
     crumbleGfx.fillRect(0, 0, 48, 48);
@@ -482,11 +483,11 @@ export class BootScene extends Phaser.Scene {
     crumbleGfx.fillCircle(32, 26, 1.5);
     crumbleGfx.fillCircle(14, 38, 1);
     crumbleGfx.fillCircle(28, 40, 1);
-    crumbleGfx.generateTexture('crumbling', 48, 48);
+    bakeGraphics(crumbleGfx, 'crumbling', 48, 48);
     crumbleGfx.destroy();
 
     // Pit texture (dark void)
-    const pitGfx = this.make.graphics({ x: 0, y: 0 });
+    const pitGfx = hiResGraphics(this);
     // Very dark void center
     pitGfx.fillStyle(0x0a0a12, 1);
     pitGfx.fillRect(0, 0, 48, 48);
@@ -511,7 +512,7 @@ export class BootScene extends Phaser.Scene {
     pitGfx.fillCircle(24, 44, 1);
     pitGfx.fillCircle(4, 24, 1);
     pitGfx.fillCircle(44, 24, 1);
-    pitGfx.generateTexture('pit', 48, 48);
+    bakeGraphics(pitGfx, 'pit', 48, 48);
     pitGfx.destroy();
 
     // Hazard tile textures (vine, quicksand, ice, lava, mud, spikes, dark_rift)
@@ -519,7 +520,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   private generateBombTexture(): void {
-    const bombGfx = this.make.graphics({ x: 0, y: 0 });
+    const bombGfx = hiResGraphics(this);
     // Body with gradient
     bombGfx.fillStyle(0x111111, 1);
     bombGfx.fillCircle(24, 26, 16);
@@ -540,11 +541,11 @@ export class BootScene extends Phaser.Scene {
     bombGfx.fillCircle(30, 7, 4);
     bombGfx.fillStyle(0xffaa00, 0.8);
     bombGfx.fillCircle(30, 7, 2);
-    bombGfx.generateTexture('bomb', 48, 48);
+    bakeGraphics(bombGfx, 'bomb', 48, 48);
     bombGfx.destroy();
 
     // Remote bomb variant (blue tint)
-    const remGfx = this.make.graphics({ x: 0, y: 0 });
+    const remGfx = hiResGraphics(this);
     remGfx.fillStyle(0x111133, 1);
     remGfx.fillCircle(24, 26, 16);
     remGfx.fillStyle(0x222244, 1);
@@ -559,12 +560,12 @@ export class BootScene extends Phaser.Scene {
     // Antenna indicator
     remGfx.fillStyle(0x4488ff, 1);
     remGfx.fillCircle(28, 5, 3);
-    remGfx.generateTexture('bomb_remote', 48, 48);
+    bakeGraphics(remGfx, 'bomb_remote', 48, 48);
     remGfx.destroy();
   }
 
   private generateExplosionTexture(): void {
-    const expGfx = this.make.graphics({ x: 0, y: 0 });
+    const expGfx = hiResGraphics(this);
     // Radial gradient: bright center to dark edge
     expGfx.fillStyle(0xff2200, 0.6);
     expGfx.fillCircle(24, 24, 22);
@@ -574,17 +575,19 @@ export class BootScene extends Phaser.Scene {
     expGfx.fillCircle(24, 24, 10);
     expGfx.fillStyle(0xffff44, 0.9);
     expGfx.fillCircle(24, 24, 5);
-    expGfx.generateTexture('explosion', 48, 48);
+    bakeGraphics(expGfx, 'explosion', 48, 48);
     expGfx.destroy();
   }
 
   private generatePowerUpTextures(): void {
     for (const [type, colorInt] of Object.entries(POWERUP_COLORS)) {
       const color = '#' + colorInt.toString(16).padStart(6, '0');
+      const r = textureRatio();
       const canvas = document.createElement('canvas');
-      canvas.width = 48;
-      canvas.height = 48;
+      canvas.width = Math.ceil(48 * r);
+      canvas.height = Math.ceil(48 * r);
       const ctx = canvas.getContext('2d')!;
+      ctx.scale(r, r);
 
       // Glow behind
       ctx.globalAlpha = 0.1;
@@ -613,7 +616,7 @@ export class BootScene extends Phaser.Scene {
         drawIcon(ctx, 24, 24, 1);
       }
 
-      this.textures.addCanvas(`powerup_${type}`, canvas);
+      markTexScale(this.textures.addCanvas(`powerup_${type}`, canvas), r);
     }
   }
 
@@ -692,7 +695,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   private generateMeteorTexture(): void {
-    const gfx = this.make.graphics({ x: 0, y: 0 });
+    const gfx = hiResGraphics(this);
     // Fiery rock body
     gfx.fillStyle(0x663311, 1);
     gfx.fillCircle(24, 24, 18);
@@ -715,7 +718,7 @@ export class BootScene extends Phaser.Scene {
     gfx.fillEllipse(32, 8, 14, 8);
     gfx.fillStyle(0xff6600, 0.3);
     gfx.fillEllipse(36, 4, 10, 6);
-    gfx.generateTexture('meteor', 48, 48);
+    bakeGraphics(gfx, 'meteor', 48, 48);
     gfx.destroy();
   }
 
@@ -745,7 +748,7 @@ export class BootScene extends Phaser.Scene {
       const key = `player_custom_${suffix}_${dir}`;
       if (scene.textures.exists(key)) continue;
 
-      const gfx = scene.make.graphics({ x: 0, y: 0 });
+      const gfx = hiResGraphics(scene);
       const cx = 24,
         cy = 24;
 
@@ -795,7 +798,7 @@ export class BootScene extends Phaser.Scene {
         gfx.fillCircle(cx + offsets.rx + offsets.px, cy + offsets.ry + offsets.py, 2.5);
       }
 
-      gfx.generateTexture(key, 48, 48);
+      bakeGraphics(gfx, key, 48, 48);
       gfx.destroy();
     }
   }
@@ -819,7 +822,7 @@ export class BootScene extends Phaser.Scene {
     const key = BootScene.customBombKey(config);
     if (scene.textures.exists(key)) return;
 
-    const gfx = scene.make.graphics({ x: 0, y: 0 });
+    const gfx = hiResGraphics(scene);
     const darkerColor = Phaser.Display.Color.IntegerToColor(config.baseColor).darken(25).color;
 
     // Main body
@@ -846,7 +849,7 @@ export class BootScene extends Phaser.Scene {
     gfx.fillStyle(0xffffff, 1);
     gfx.fillCircle(32, 6, 1.5);
 
-    gfx.generateTexture(key, 48, 48);
+    bakeGraphics(gfx, key, 48, 48);
     gfx.destroy();
   }
 }

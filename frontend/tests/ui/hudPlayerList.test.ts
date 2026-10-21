@@ -175,4 +175,15 @@ describe('HudPlayerList', () => {
     expect(el.querySelector('[data-player-id="1"]')).not.toBe(row);
     expect(rows()).toEqual(['1']); // and the stale node is gone, not duplicated
   });
+
+  it('shows the colour-blind shape of each player before the name', () => {
+    const el = document.createElement('div');
+    const list = new HudPlayerList();
+    list.render(el, [player({ id: 1 }), player({ id: 2 })], {
+      localPlayerDead: false,
+      markerOf: (id) => (id === 1 ? 'star' : undefined),
+    });
+    expect(el.querySelector('[data-player-id="1"] .hud-marker-star')).not.toBeNull();
+    expect(el.querySelector('[data-player-id="2"] .hud-marker')).toBeNull();
+  });
 });

@@ -1701,7 +1701,54 @@
       pointer-events: none;
     }
 
+    /* Local co-op split screen: divider and partner arrows (game/SplitScreenOverlay.ts) */
+    #ui-overlay > .split-overlay,
+    .split-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 90;
+    }
+
+    .split-divider {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.7);
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.9);
+    }
+
+    .split-divider-h {
+      left: 0;
+      right: 0;
+      top: calc(50% - 1px);
+      height: 2px;
+    }
+
+    .split-divider-v {
+      top: 0;
+      bottom: 0;
+      left: calc(50% - 1px);
+      width: 2px;
+    }
+
+    .split-arrow {
+      position: absolute;
+      left: -12px;
+      top: -12px;
+      width: 24px;
+      height: 24px;
+      overflow: visible;
+    }
+
+    .split-arrow polygon {
+      fill: rgba(0, 204, 255, 0.9);
+      stroke: rgba(0, 0, 0, 0.8);
+      stroke-width: 2;
+      stroke-linejoin: round;
+    }
+
     /* 3-2-1-GO before a match (game/CountdownOverlay.ts) */
+    /* Selector includes the overlay root: `#ui-overlay > *` turns pointer events back on. */
+    #ui-overlay > .countdown-overlay,
     .countdown-overlay {
       position: fixed;
       inset: 0;

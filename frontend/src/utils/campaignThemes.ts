@@ -4,6 +4,7 @@ import {
   CampaignThemePalette,
   CAMPAIGN_THEME_PALETTES,
 } from '@blast-arena/shared';
+import { bakeGraphics, hiResGraphics } from '../art/hidpi';
 
 const S = 48; // tile size
 
@@ -22,7 +23,7 @@ function lighten(color: number, factor: number): number {
 }
 
 function generateThemedWall(scene: Phaser.Scene, palette: CampaignThemePalette): void {
-  const g = scene.make.graphics({ x: 0, y: 0 });
+  const g = hiResGraphics(scene);
   g.fillStyle(palette.wall, 1);
   g.fillRect(0, 0, S, S);
   g.fillStyle(lighten(palette.wall, 1.3), 1);
@@ -37,12 +38,12 @@ function generateThemedWall(scene: Phaser.Scene, palette: CampaignThemePalette):
   g.fillStyle(lighten(palette.wallAccent, 1.2), 0.3);
   g.fillRect(6, 6, 8, 8);
   g.fillRect(28, 28, 8, 8);
-  g.generateTexture('themed_wall', S, S);
+  bakeGraphics(g, 'themed_wall', S, S);
   g.destroy();
 }
 
 function generateThemedDestructible(scene: Phaser.Scene, palette: CampaignThemePalette): void {
-  const g = scene.make.graphics({ x: 0, y: 0 });
+  const g = hiResGraphics(scene);
   g.fillStyle(palette.destructible, 1);
   g.fillRect(0, 0, S, S);
   g.fillStyle(palette.destructibleAccent, 1);
@@ -61,11 +62,11 @@ function generateThemedDestructible(scene: Phaser.Scene, palette: CampaignThemeP
   g.lineStyle(1, darken(palette.destructible, 0.5), 0.3);
   g.lineBetween(8, 4, 14, 12);
   g.lineBetween(34, 20, 42, 28);
-  g.generateTexture('themed_destructible', S, S);
+  bakeGraphics(g, 'themed_destructible', S, S);
   g.destroy();
 
   // Cracked variant
-  const c = scene.make.graphics({ x: 0, y: 0 });
+  const c = hiResGraphics(scene);
   c.fillStyle(darken(palette.destructible, 0.85), 1);
   c.fillRect(0, 0, S, S);
   c.fillStyle(palette.destructible, 1);
@@ -87,13 +88,13 @@ function generateThemedDestructible(scene: Phaser.Scene, palette: CampaignThemeP
   c.lineBetween(30, 18, 44, 34);
   c.lineBetween(44, 34, 38, 46);
   c.lineBetween(10, 34, 24, 44);
-  c.generateTexture('themed_destructible_cracked', S, S);
+  bakeGraphics(c, 'themed_destructible_cracked', S, S);
   c.destroy();
 }
 
 function generateThemedFloors(scene: Phaser.Scene, palette: CampaignThemePalette): void {
   for (let v = 0; v < 4; v++) {
-    const g = scene.make.graphics({ x: 0, y: 0 });
+    const g = hiResGraphics(scene);
     const shade = palette.floor + v * 0x010101;
     g.fillStyle(shade, 1);
     g.fillRect(0, 0, S, S);
@@ -109,14 +110,14 @@ function generateThemedFloors(scene: Phaser.Scene, palette: CampaignThemePalette
       g.fillCircle(36, 12, 1);
       g.fillCircle(12, 36, 1);
     }
-    g.generateTexture(`themed_floor_${v}`, S, S);
+    bakeGraphics(g, `themed_floor_${v}`, S, S);
     g.destroy();
   }
 }
 
 function generateThemedTeleporters(scene: Phaser.Scene, palette: CampaignThemePalette): void {
   for (const suffix of ['a', 'b']) {
-    const g = scene.make.graphics({ x: 0, y: 0 });
+    const g = hiResGraphics(scene);
     g.fillStyle(palette.floor, 1);
     g.fillRect(0, 0, S, S);
     const padColor = suffix === 'a' ? 0x44aaff : 0xff8844;
@@ -135,7 +136,7 @@ function generateThemedTeleporters(scene: Phaser.Scene, palette: CampaignThemePa
     g.beginPath();
     g.arc(24, 24, 10, Math.PI, Math.PI * 2, true);
     g.strokePath();
-    g.generateTexture(`themed_teleporter_${suffix}`, S, S);
+    bakeGraphics(g, `themed_teleporter_${suffix}`, S, S);
     g.destroy();
   }
 }
@@ -159,7 +160,7 @@ function generateThemedConveyors(scene: Phaser.Scene, palette: CampaignThemePale
   };
   for (const [dir, { horizontal, positive }] of Object.entries(conveyorDirs)) {
     for (let f = 0; f < CONVEYOR_FRAMES; f++) {
-      const g = scene.make.graphics({ x: 0, y: 0 });
+      const g = hiResGraphics(scene);
       g.fillStyle(palette.floor, 1);
       g.fillRect(0, 0, S, S);
       g.fillStyle(palette.floorAccent, 0.5);
@@ -192,7 +193,7 @@ function generateThemedConveyors(scene: Phaser.Scene, palette: CampaignThemePale
       g.lineTo(24 - ax * 0.4 - px * 4, 24 - ay * 0.4 - py * 4);
       g.strokePath();
       const key = f === 0 ? `themed_conveyor_${dir}` : `themed_conveyor_${dir}_${f}`;
-      g.generateTexture(key, S, S);
+      bakeGraphics(g, key, S, S);
       g.destroy();
     }
     scene.anims.create({
@@ -218,7 +219,7 @@ function generateThemedSwitches(scene: Phaser.Scene, palette: CampaignThemePalet
     const darkerColor = Phaser.Display.Color.IntegerToColor(colorVal).darken(30).color;
 
     // Inactive switch
-    const sw = scene.make.graphics({ x: 0, y: 0 });
+    const sw = hiResGraphics(scene);
     sw.fillStyle(palette.floor, 1);
     sw.fillRect(0, 0, S, S);
     sw.lineStyle(1, palette.floorAccent, 0.2);
@@ -231,11 +232,11 @@ function generateThemedSwitches(scene: Phaser.Scene, palette: CampaignThemePalet
     sw.fillCircle(24, 24, 6);
     sw.fillStyle(0xffffff, 0.2);
     sw.fillCircle(22, 22, 3);
-    sw.generateTexture(`themed_switch_${colorName}`, S, S);
+    bakeGraphics(sw, `themed_switch_${colorName}`, S, S);
     sw.destroy();
 
     // Active switch
-    const swAct = scene.make.graphics({ x: 0, y: 0 });
+    const swAct = hiResGraphics(scene);
     swAct.fillStyle(palette.floor, 1);
     swAct.fillRect(0, 0, S, S);
     swAct.lineStyle(1, palette.floorAccent, 0.2);
@@ -250,7 +251,7 @@ function generateThemedSwitches(scene: Phaser.Scene, palette: CampaignThemePalet
     swAct.fillCircle(24, 24, 8);
     swAct.fillStyle(0xffffff, 0.35);
     swAct.fillCircle(22, 21, 4);
-    swAct.generateTexture(`themed_switch_${colorName}_active`, S, S);
+    bakeGraphics(swAct, `themed_switch_${colorName}_active`, S, S);
     swAct.destroy();
   }
 }
@@ -266,7 +267,7 @@ function generateThemedGates(scene: Phaser.Scene, palette: CampaignThemePalette)
     const darkerGateColor = Phaser.Display.Color.IntegerToColor(colorVal).darken(20).color;
 
     // Closed gate
-    const g = scene.make.graphics({ x: 0, y: 0 });
+    const g = hiResGraphics(scene);
     g.fillStyle(darken(palette.floor, 0.9), 1);
     g.fillRect(0, 0, S, S);
     g.lineStyle(4, colorVal, 0.8);
@@ -280,11 +281,11 @@ function generateThemedGates(scene: Phaser.Scene, palette: CampaignThemePalette)
     g.fillStyle(darkerGateColor, 0.6);
     g.fillRect(0, 0, S, 3);
     g.fillRect(0, 45, S, 3);
-    g.generateTexture(`themed_gate_${colorName}`, S, S);
+    bakeGraphics(g, `themed_gate_${colorName}`, S, S);
     g.destroy();
 
     // Open gate
-    const o = scene.make.graphics({ x: 0, y: 0 });
+    const o = hiResGraphics(scene);
     o.fillStyle(palette.floor, 1);
     o.fillRect(0, 0, S, S);
     o.lineStyle(1, palette.floorAccent, 0.2);
@@ -296,13 +297,13 @@ function generateThemedGates(scene: Phaser.Scene, palette: CampaignThemePalette)
     }
     o.fillStyle(colorVal, 0.2);
     o.fillRect(0, 0, S, 2);
-    o.generateTexture(`themed_gate_${colorName}_open`, S, S);
+    bakeGraphics(o, `themed_gate_${colorName}_open`, S, S);
     o.destroy();
   }
 }
 
 function generateThemedCrumbling(scene: Phaser.Scene, palette: CampaignThemePalette): void {
-  const g = scene.make.graphics({ x: 0, y: 0 });
+  const g = hiResGraphics(scene);
   g.fillStyle(darken(palette.floor, 0.9), 1);
   g.fillRect(0, 0, S, S);
   g.lineStyle(1, palette.floorAccent, 0.2);
@@ -318,13 +319,13 @@ function generateThemedCrumbling(scene: Phaser.Scene, palette: CampaignThemePale
   g.fillCircle(10, 36, 4);
   g.fillCircle(38, 10, 3);
   g.fillCircle(30, 30, 3);
-  g.generateTexture('themed_crumbling', S, S);
+  bakeGraphics(g, 'themed_crumbling', S, S);
   g.destroy();
 }
 
 function generateThemedExitGoal(scene: Phaser.Scene, palette: CampaignThemePalette): void {
   // Exit tile (trapdoor)
-  const e = scene.make.graphics({ x: 0, y: 0 });
+  const e = hiResGraphics(scene);
   e.fillStyle(palette.floor, 1);
   e.fillRect(0, 0, S, S);
   e.fillStyle(0x4a3a2e, 1);
@@ -335,11 +336,11 @@ function generateThemedExitGoal(scene: Phaser.Scene, palette: CampaignThemePalet
   e.fillCircle(30, 24, 3);
   e.fillStyle(0x44ff44, 0.7);
   e.fillTriangle(24, 34, 18, 26, 30, 26);
-  e.generateTexture('themed_exit', S, S);
+  bakeGraphics(e, 'themed_exit', S, S);
   e.destroy();
 
   // Goal tile (star marker)
-  const gl = scene.make.graphics({ x: 0, y: 0 });
+  const gl = hiResGraphics(scene);
   gl.fillStyle(palette.floor, 1);
   gl.fillRect(0, 0, S, S);
   gl.fillStyle(0xffcc00, 0.2);
@@ -353,7 +354,7 @@ function generateThemedExitGoal(scene: Phaser.Scene, palette: CampaignThemePalet
   gl.fillTriangle(24, 36, 21, 28, 13, 28);
   gl.fillTriangle(13, 20, 17, 24, 13, 28);
   gl.fillTriangle(35, 20, 31, 24, 35, 28);
-  gl.generateTexture('themed_goal', S, S);
+  bakeGraphics(gl, 'themed_goal', S, S);
   gl.destroy();
 }
 
@@ -387,7 +388,7 @@ export function generateHazardTileTextures(scene: Phaser.Scene): void {
   if (scene.textures.exists('vine') && scene.textures.exists('dark_rift')) return;
 
   // Vine: green tendrils over earthy floor
-  const vineGfx = scene.make.graphics({ x: 0, y: 0 });
+  const vineGfx = hiResGraphics(scene);
   vineGfx.fillStyle(0x2a3a1e, 1);
   vineGfx.fillRect(0, 0, S, S);
   vineGfx.lineStyle(1, 0x2a3a1e, 0.3);
@@ -408,11 +409,11 @@ export function generateHazardTileTextures(scene: Phaser.Scene): void {
   vineGfx.fillStyle(0x5aaa3a, 0.5);
   vineGfx.fillCircle(12, 16, 3);
   vineGfx.fillCircle(36, 36, 3);
-  vineGfx.generateTexture('vine', S, S);
+  bakeGraphics(vineGfx, 'vine', S, S);
   vineGfx.destroy();
 
   // Quicksand: swirling sand pattern
-  const qsGfx = scene.make.graphics({ x: 0, y: 0 });
+  const qsGfx = hiResGraphics(scene);
   qsGfx.fillStyle(0x8b7a4a, 1);
   qsGfx.fillRect(0, 0, S, S);
   // Swirl rings
@@ -434,11 +435,11 @@ export function generateHazardTileTextures(scene: Phaser.Scene): void {
   // Warning border
   qsGfx.lineStyle(1, 0x6a5a3a, 0.4);
   qsGfx.strokeRect(0, 0, S, S);
-  qsGfx.generateTexture('quicksand', S, S);
+  bakeGraphics(qsGfx, 'quicksand', S, S);
   qsGfx.destroy();
 
   // Ice: blue-white translucent surface
-  const iceGfx = scene.make.graphics({ x: 0, y: 0 });
+  const iceGfx = hiResGraphics(scene);
   iceGfx.fillStyle(0x8ac8e8, 1);
   iceGfx.fillRect(0, 0, S, S);
   // Shine highlights
@@ -454,11 +455,11 @@ export function generateHazardTileTextures(scene: Phaser.Scene): void {
   // Border shimmer
   iceGfx.lineStyle(1, 0xa0d8f0, 0.3);
   iceGfx.strokeRect(0, 0, S, S);
-  iceGfx.generateTexture('ice', S, S);
+  bakeGraphics(iceGfx, 'ice', S, S);
   iceGfx.destroy();
 
   // Lava: red-orange bubbling surface (impassable)
-  const lavaGfx = scene.make.graphics({ x: 0, y: 0 });
+  const lavaGfx = hiResGraphics(scene);
   lavaGfx.fillStyle(0xcc3300, 1);
   lavaGfx.fillRect(0, 0, S, S);
   // Darker undercurrents
@@ -477,11 +478,11 @@ export function generateHazardTileTextures(scene: Phaser.Scene): void {
   // Glow rim
   lavaGfx.lineStyle(2, 0xff4400, 0.8);
   lavaGfx.strokeRect(1, 1, S - 2, S - 2);
-  lavaGfx.generateTexture('lava', S, S);
+  bakeGraphics(lavaGfx, 'lava', S, S);
   lavaGfx.destroy();
 
   // Mud: brown-green murky surface
-  const mudGfx = scene.make.graphics({ x: 0, y: 0 });
+  const mudGfx = hiResGraphics(scene);
   mudGfx.fillStyle(0x4a4030, 1);
   mudGfx.fillRect(0, 0, S, S);
   // Darker muddy patches
@@ -499,11 +500,11 @@ export function generateHazardTileTextures(scene: Phaser.Scene): void {
   // Border
   mudGfx.lineStyle(1, 0x3a3020, 0.4);
   mudGfx.strokeRect(0, 0, S, S);
-  mudGfx.generateTexture('mud', S, S);
+  bakeGraphics(mudGfx, 'mud', S, S);
   mudGfx.destroy();
 
   // Spikes: retracted/safe state (gray metallic)
-  const spkGfx = scene.make.graphics({ x: 0, y: 0 });
+  const spkGfx = hiResGraphics(scene);
   spkGfx.fillStyle(0x3a3a40, 1);
   spkGfx.fillRect(0, 0, S, S);
   // Metal plate base
@@ -521,11 +522,11 @@ export function generateHazardTileTextures(scene: Phaser.Scene): void {
       spkGfx.fillCircle(cx, cy, 1);
     }
   }
-  spkGfx.generateTexture('spikes', S, S);
+  bakeGraphics(spkGfx, 'spikes', S, S);
   spkGfx.destroy();
 
   // Spikes active: extended/lethal state (red metallic)
-  const spkActGfx = scene.make.graphics({ x: 0, y: 0 });
+  const spkActGfx = hiResGraphics(scene);
   spkActGfx.fillStyle(0x3a2020, 1);
   spkActGfx.fillRect(0, 0, S, S);
   spkActGfx.fillStyle(0x4a2a2a, 0.6);
@@ -546,11 +547,11 @@ export function generateHazardTileTextures(scene: Phaser.Scene): void {
   // Danger border
   spkActGfx.lineStyle(2, 0xcc3333, 0.7);
   spkActGfx.strokeRect(1, 1, S - 2, S - 2);
-  spkActGfx.generateTexture('spikes_active', S, S);
+  bakeGraphics(spkActGfx, 'spikes_active', S, S);
   spkActGfx.destroy();
 
   // Dark Rift: purple-black swirling void
-  const riftGfx = scene.make.graphics({ x: 0, y: 0 });
+  const riftGfx = hiResGraphics(scene);
   riftGfx.fillStyle(0x0a0812, 1);
   riftGfx.fillRect(0, 0, S, S);
   // Void swirl
@@ -578,6 +579,6 @@ export function generateHazardTileTextures(scene: Phaser.Scene): void {
   riftGfx.fillCircle(38, 16, 1);
   riftGfx.fillCircle(14, 38, 1);
   riftGfx.fillCircle(36, 36, 1);
-  riftGfx.generateTexture('dark_rift', S, S);
+  bakeGraphics(riftGfx, 'dark_rift', S, S);
   riftGfx.destroy();
 }

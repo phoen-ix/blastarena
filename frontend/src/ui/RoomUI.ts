@@ -6,6 +6,7 @@ import { escapeHtml, escapeAttr, setHtml } from '../utils/html';
 import { createModal } from '../utils/modal';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { t } from '../i18n';
+import { teamColor } from '../game/playerPalette';
 
 export class RoomUI {
   private container: HTMLElement;
@@ -421,7 +422,7 @@ export class RoomUI {
     const iAmHost = this.isHost();
 
     // In teams mode, use team color; otherwise individual color
-    const teamColors = ['#ff4466', '#448aff'];
+    const teamColors = [teamColor(0), teamColor(1)];
     const individualColors = [
       '#ff6b35',
       '#448aff',
@@ -464,8 +465,8 @@ export class RoomUI {
           isTeamsMode && iAmHost
             ? `
           <select class="team-select admin-select" data-user-id="${player.user.id}" aria-label="${escapeAttr(t('ui:room.teamAssignment', { username: player.user.username }))}">
-            <option value="0" ${playerTeam === 0 ? 'selected' : ''} style="color:#ff4466;">${t('game:teams.red')}</option>
-            <option value="1" ${playerTeam === 1 ? 'selected' : ''} style="color:#448aff;">${t('game:teams.blue')}</option>
+            <option value="0" ${playerTeam === 0 ? 'selected' : ''} style="color:${teamColor(0)};">${t('game:teams.red')}</option>
+            <option value="1" ${playerTeam === 1 ? 'selected' : ''} style="color:${teamColor(1)};">${t('game:teams.blue')}</option>
           </select>
         `
             : ''
@@ -504,7 +505,7 @@ export class RoomUI {
     for (let i = 0; i < botCount; i++) {
       const botName = botNames[i % botNames.length];
       const botTeam = botTeams[i] ?? (humanCount + i) % 2;
-      const teamColors = ['#ff4466', '#448aff'];
+      const teamColors = [teamColor(0), teamColor(1)];
       const color = isTeamsMode ? teamColors[botTeam] : 'var(--text-muted)';
       const teamLabel = isTeamsMode
         ? botTeam === 0
@@ -533,8 +534,8 @@ export class RoomUI {
             isTeamsMode && iAmHost
               ? `
             <select class="bot-team-select admin-select" data-bot-index="${i}" aria-label="${t('ui:room.botTeamAssignment', { index: i + 1 })}">
-              <option value="0" ${botTeam === 0 ? 'selected' : ''} style="color:#ff4466;">${t('game:teams.red')}</option>
-              <option value="1" ${botTeam === 1 ? 'selected' : ''} style="color:#448aff;">${t('game:teams.blue')}</option>
+              <option value="0" ${botTeam === 0 ? 'selected' : ''} style="color:${teamColor(0)};">${t('game:teams.red')}</option>
+              <option value="1" ${botTeam === 1 ? 'selected' : ''} style="color:${teamColor(1)};">${t('game:teams.blue')}</option>
             </select>
           `
               : ''

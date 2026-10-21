@@ -1,6 +1,8 @@
 import type { KillCause } from '@blast-arena/shared';
 import { POWERUP_ICON_DRAWERS } from '../utils/powerUpIcons';
 import { POWERUP_COLORS } from '../utils/powerUpColors';
+import { traceMarker } from '../game/playerPalette';
+import type { MarkerShape } from '../art/painters/types';
 
 /**
  * Small drawn icons for the in-game HUD (stats bar, kill feed, death banner, campaign lives,
@@ -464,4 +466,32 @@ export function hudIcon(name: HudIconName, size = 16): string {
   const url = hudIconUrl(name, size);
   const src = url ? ` src="${url}"` : '';
   return `<img class="hud-icon hud-icon-${name}"${src} width="${size}" height="${size}" alt="" aria-hidden="true">`;
+}
+
+/** `<img>` markup for a colour-blind shape marker: white with a dark outline, like in the arena. */
+export function markerIcon(shape: MarkerShape, size = 12): string {
+  const px = Math.round(size * pixelRatio());
+  const key = `marker:${shape}:${px}`;
+  let url = cache.get(key);
+  if (url === undefined) {
+    url = '';
+    const c = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    const g = c?.getContext('2d');
+    if (c && g) {
+      c.width = c.height = px;
+      g.translate(px / 2, px / 2);
+      g.scale(px / 12, px / 12);
+      traceMarker(g, shape, 4.5);
+      g.fillStyle = '#ffffff';
+      g.fill();
+      g.strokeStyle = 'rgba(0,0,0,0.9)';
+      g.lineWidth = 1.5;
+      g.lineJoin = 'round';
+      g.stroke();
+      url = c.toDataURL('image/png');
+    }
+    cache.set(key, url);
+  }
+  const src = url ? ` src="${url}"` : '';
+  return `<img class="hud-icon hud-marker hud-marker-${shape}"${src} width="${size}" height="${size}" alt="" aria-hidden="true">`;
 }

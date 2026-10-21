@@ -1,7 +1,9 @@
 import type { PlayerState } from '@blast-arena/shared';
 import { escapeHtml, reconcileChildren, setHtml } from '../utils/html';
 import { t } from '../i18n';
-import { hudIcon } from './hudIcons';
+import { hudIcon, markerIcon } from './hudIcons';
+import { teamColor } from '../game/playerPalette';
+import type { MarkerShape } from '../art/painters/types';
 
 /**
  * The in-match HUD player list.
@@ -16,14 +18,14 @@ import { hudIcon } from './hudIcons';
  * signature gating any DOM write. (audit HUD-PLAYERLIST-1)
  */
 
-const TEAM_COLORS = ['#ff4466', '#448aff'];
-
 export interface PlayerListContext {
   /** Present only in King of the Hill; its presence is what switches the score badge on. */
   kothScores?: Record<number, number> | null;
   controllingPlayerId?: number | null;
   /** Dead players can click a row to spectate, which is what makes rows `clickable`. */
   localPlayerDead: boolean;
+  /** Colour-blind mode: each player's shape marker, shown before the name. */
+  markerOf?: (playerId: number) => MarkerShape | undefined;
 }
 
 interface Row {
@@ -85,7 +87,7 @@ export class HudPlayerList {
         headerCount++;
         const teamName = p.team === 0 ? t('ui:hud.teamRed') : t('ui:hud.teamBlue');
         if (header.textContent !== teamName) header.textContent = teamName;
-        header.style.cssText = `font-size:11px;font-weight:600;color:${TEAM_COLORS[team]};padding:4px 8px 2px;margin-top:${team > 0 ? '6px' : '0'};`;
+        header.style.cssText = `font-size:11px;font-weight:600;color:${teamColor(team)};padding:4px 8px 2px;margin-top:${team > 0 ? '6px' : '0'};`;
         order.push(header);
       }
 
@@ -94,7 +96,9 @@ export class HudPlayerList {
       const clickable = p.alive && ctx.localPlayerDead;
       const score = isKOTH ? (ctx.kothScores?.[p.id] ?? 0) : 0;
       const isControlling = isKOTH && ctx.controllingPlayerId === p.id;
+      const marker = ctx.markerOf?.(p.id);
       const sig = [
+        marker ?? '',
         dead,
         clickable,
         isTeamMode,
@@ -129,14 +133,14 @@ export class HudPlayerList {
         row.el.style.gap = isKOTH ? '4px' : '';
 
         const teamDot = isTeamMode
-          ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${TEAM_COLORS[p.team ?? 0]};margin-right:4px;vertical-align:middle;"></span>`
+          ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${teamColor(p.team ?? 0)};margin-right:4px;vertical-align:middle;"></span>`
           : '';
         const buddyTag = p.isBuddy
           ? `<span style="color:var(--accent);font-size:10px;font-weight:700;margin-left:4px;">${escapeHtml(t('ui:hud.buddyTag'))}</span>`
           : '';
         setHtml(
           row.nameEl,
-          `${teamDot}${p.isBot ? hudIcon('bot', 14) : ''}${escapeHtml(p.username)}${buddyTag}`,
+          `${marker ? markerIcon(marker, 12) : ''}${teamDot}${p.isBot ? hudIcon('bot', 14) : ''}${escapeHtml(p.username)}${buddyTag}`,
         );
 
         if (isKOTH) {

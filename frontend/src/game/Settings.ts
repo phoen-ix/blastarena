@@ -12,6 +12,10 @@ export interface VisualSettings {
   lobbyChat: boolean;
   minimap: boolean;
   quality: GraphicsQuality;
+  /** Render at the screen's pixel density (up to 2×) for sharp edges; off at Low quality. */
+  sharpRendering: boolean;
+  /** Colour-blind safe player and team colours, plus a shape marker per player. */
+  colorBlind: boolean;
 }
 
 function media(query: string): boolean {
@@ -36,6 +40,20 @@ function defaults(): VisualSettings {
     lobbyChat: true,
     minimap: true,
     quality: media('(pointer: coarse)') ? 'medium' : 'high',
+    sharpRendering: true,
+    colorBlind: false,
+  };
+}
+
+type SettingsListener = (settings: VisualSettings) => void;
+const listeners: SettingsListener[] = [];
+
+/** Run `fn` after every saveSettings(); returns a function that stops it. */
+export function onSettingsChange(fn: SettingsListener): () => void {
+  listeners.push(fn);
+  return () => {
+    const i = listeners.indexOf(fn);
+    if (i >= 0) listeners.splice(i, 1);
   };
 }
 
@@ -65,7 +83,12 @@ export function getSettings(): VisualSettings {
 
 export function saveSettings(settings: VisualSettings): void {
   cached = { ...settings };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(cached));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cached));
+  } catch {
+    // Storage blocked: the settings still apply for this page load.
+  }
+  for (const fn of [...listeners]) fn(cached);
 }
 
 /** True when the chosen quality is at least `level`. */

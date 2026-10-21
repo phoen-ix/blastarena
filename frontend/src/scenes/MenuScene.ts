@@ -10,6 +10,7 @@ import { API_URL } from '../config';
 import { t } from '../i18n';
 import type { GameState, OpenWorldScoreEntry } from '@blast-arena/shared';
 import { setHtml } from '../utils/html';
+import { uiCamera } from '../art/hidpi';
 
 interface OpenWorldStatus {
   enabled: boolean;
@@ -81,9 +82,8 @@ export class MenuScene extends Phaser.Scene {
     this.registry.set('socketClient', this.socketClient);
     this.registry.set('notifications', this.notifications);
 
-    // Title
-    const width = this.cameras.main.width;
-    const height = this.cameras.main.height;
+    // Title (laid out in CSS pixels; see uiCamera)
+    const { width, height } = uiCamera(this);
 
     const titleStyle = {
       fontSize: '52px',

@@ -58,8 +58,6 @@ export const DEPTH = {
   EMOTE_BG: OVER + 99,
   EMOTE: OVER + 100,
   SPECTATOR_FLASH: OVER + 120,
-  PARTNER_ARROW: OVER + 9998,
-  SPLIT_DIVIDER: OVER + 9999,
 } as const;
 
 /** Base of the y-sorted part of the WORLD band. */

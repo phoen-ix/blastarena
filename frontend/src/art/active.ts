@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import { artStyleManager } from './ArtStyleManager';
 import { StyleArt } from './StyleArt';
+import { textureRatio } from './hidpi';
 
 let current: StyleArt | null = null;
 
@@ -19,7 +20,7 @@ export function activeStyleArt(scene: Phaser.Scene): StyleArt | null {
   }
   if (!current || current.id !== style.id) {
     current?.release(scene);
-    current = new StyleArt(style.painters, 1);
+    current = new StyleArt(style.painters, textureRatio());
   }
   return current;
 }

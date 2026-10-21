@@ -393,5 +393,3 @@ export function icon(
   draw(g, cx, cy, s);
   g.restore();
 }
-
-export const TEAM_COLORS = ['#ff4466', '#448aff'];

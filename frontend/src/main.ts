@@ -8,6 +8,7 @@ import { HUDScene } from './scenes/HUDScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { themeManager } from './themes/ThemeManager';
 import { artStyleManager } from './art/ArtStyleManager';
+import { installHiDpi, scaleConfig } from './art/hidpi';
 import { initI18n } from './i18n';
 import { audioManager } from './game/AudioManager';
 
@@ -24,13 +25,9 @@ async function boot(): Promise<Phaser.Game> {
   const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
     parent: 'game-container',
-    width: window.innerWidth,
-    height: window.innerHeight,
     backgroundColor: bgColor,
-    scale: {
-      mode: Phaser.Scale.RESIZE,
-      autoCenter: Phaser.Scale.CENTER_BOTH,
-    },
+    // Sized in device pixels and shown at CSS size, for sharp rendering (see art/hidpi.ts).
+    scale: scaleConfig(),
     // No `physics` block: nothing uses this.physics (the server is authoritative), and the
     // arcade plugin would step a physics world per active scene for nothing. (audit F9)
     audio: {
@@ -45,6 +42,7 @@ async function boot(): Promise<Phaser.Game> {
   };
 
   game = new Phaser.Game(config);
+  installHiDpi(game);
   // Dev builds only: a handle for poking at the running game from the console or test tooling.
   if (import.meta.env.DEV) Object.assign(window, { __blastArenaGame: game });
 

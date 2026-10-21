@@ -47,6 +47,7 @@ function makeScene() {
   const scene = new GameScene() as unknown as Record<string, unknown>;
   const events = { emit: vi.fn() };
   const camera = {
+    setZoom: vi.fn(),
     removeBounds: vi.fn(),
     centerOn: vi.fn(),
     worldView: fake.cameras.main.worldView,

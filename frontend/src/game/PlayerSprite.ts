@@ -1,20 +1,22 @@
 import Phaser from 'phaser';
 import { PlayerState, TILE_SIZE, TICK_MS } from '@blast-arena/shared';
 import { getSettings } from './Settings';
-import { PLAYER_COLORS, BootScene } from '../scenes/BootScene';
+import { BootScene } from '../scenes/BootScene';
+import {
+  colorBlindMode,
+  markerShape,
+  playerColor,
+  teamColor,
+  teamColorIndices,
+  teamTextColor,
+  traceMarker,
+} from './playerPalette';
 import { wrapGhostOffsets } from '../utils/wrapGhosts';
 import { DEPTH, Y_BIAS, setDepthIfChanged, ySortDepth } from '../art/depth';
 import { base } from '../art/scale';
 import { StyleArt } from '../art/StyleArt';
 import type { StyledFx } from '../art/StyledFx';
-import { TEAM_COLORS } from '../art/paint';
 import type { EyeStyle } from '../art/painters/types';
-
-// Team color indices: team 0 uses red-ish colors, team 1 uses blue-ish colors
-const TEAM_COLOR_INDICES: Record<number, number[]> = {
-  0: [0, 3, 5], // red (#e94560), orange (#ff8800), yellow (#ffff44)
-  1: [1, 7, 4], // blue (#44aaff), cyan (#44ffff), purple (#cc44ff)
-};
 
 /**
  * Fraction of the remaining distance a sprite covers per server tick (50ms). frame() rescales
@@ -102,6 +104,9 @@ export class PlayerSpriteRenderer {
    * dropped then) so the kill feed can still show the victim.
    */
   private looks: Map<number, { color: number; eyes: EyeStyle }> = new Map();
+  /** Colour-blind mode: colour index per player, for its shape marker. */
+  private markerIndex: Map<number, number> = new Map();
+  private markers: Map<number, Phaser.GameObjects.Graphics> = new Map();
   /** Classic sprites currently flickering for spawn invulnerability. */
   private flickering: Set<number> = new Set();
   /** Spawn-invulnerability ticks left per classic player (drawn styles keep it in `styled`). */
@@ -181,10 +186,7 @@ export class PlayerSpriteRenderer {
             existing.setTint(0xff0000);
 
             // Get player color for death particles
-            const colorIndex = this.playerColorIndex.get(player.id) ?? index % 8;
-            const playerColor =
-              player.cosmetics?.colorHex ??
-              (colorIndex >= 0 ? PLAYER_COLORS[colorIndex] : 0xffffff);
+            const playerColor = this.colorOf(player.id) ?? 0xffffff;
 
             this.scene.tweens.add({
               targets: existing,
@@ -217,6 +219,8 @@ export class PlayerSpriteRenderer {
             existing.destroy();
           }
 
+          this.markers.get(player.id)?.destroy();
+          this.markers.delete(player.id);
           // Remove label
           const existingLabel = this.labels.get(player.id);
           if (existingLabel) {
@@ -315,12 +319,24 @@ export class PlayerSpriteRenderer {
           }
           colorIndex = -1; // Sentinel: use custom prefix
         } else if (player.team !== null && player.team !== undefined) {
-          const teamColors = TEAM_COLOR_INDICES[player.team] || TEAM_COLOR_INDICES[0];
+          const teamColors = teamColorIndices(player.team);
           const teamIdx = this.teamPlayerCount[player.team] || 0;
           colorIndex = teamColors[teamIdx % teamColors.length];
           this.teamPlayerCount[player.team] = teamIdx + 1;
         } else {
           colorIndex = index % 8;
+        }
+        // Colour-blind palette: Classic draws these colours with the custom-colour textures.
+        if (colorIndex >= 0 && colorBlindMode()) {
+          const color = playerColor(colorIndex);
+          if (!this.fx) {
+            BootScene.generateCustomPlayerTextures(this.scene, color, undefined);
+            this.customTexturePrefix.set(player.id, `player_custom_${color.toString(16)}`);
+          }
+          this.markerIndex.set(player.id, colorIndex);
+        } else if (colorBlindMode()) {
+          // A cosmetic colour stays; the shape still tells the player apart.
+          this.markerIndex.set(player.id, index % 8);
         }
         this.playerColorIndex.set(player.id, colorIndex);
         this.playerTeams.set(player.id, player.team);
@@ -351,8 +367,7 @@ export class PlayerSpriteRenderer {
 
         // Create name label with team color tint
         const isTeamMode = player.team !== null && player.team !== undefined;
-        const teamLabelColors = ['#ff6b7f', '#6bb8ff'];
-        const labelColor = isTeamMode ? teamLabelColors[player.team!] : '#ffffff';
+        const labelColor = isTeamMode ? teamTextColor(player.team!) : '#ffffff';
         const labelOffset = isBuddy ? displaySize / 2 + 2 : TILE_SIZE / 2 + 2;
         const label = this.scene.add
           .text(targetX, targetY - labelOffset, player.username, {
@@ -364,13 +379,14 @@ export class PlayerSpriteRenderer {
           .setOrigin(0.5, 1)
           .setDepth(DEPTH.LABEL);
         this.labels.set(player.id, label);
+        this.createMarker(player.id);
 
         // Team colored underline indicator (drawn at origin, positioned via setPosition)
         if (isTeamMode && !this.fx) {
           const teamGfx = this.scene.add.graphics();
           teamGfx.setDepth(DEPTH.TEAM_BAR);
-          const teamColor = player.team === 0 ? 0xe94560 : 0x44aaff;
-          teamGfx.fillStyle(teamColor, 0.35);
+          // The team's first player colour (as before), from the active palette.
+          teamGfx.fillStyle(playerColor(teamColorIndices(player.team!)[0]), 0.35);
           teamGfx.fillRoundedRect(-TILE_SIZE / 2 + 1, TILE_SIZE / 2 - 5, TILE_SIZE - 2, 4, 2);
           teamGfx.setPosition(targetX, targetY);
           this.teamIndicators.set(player.id, teamGfx);
@@ -652,6 +668,7 @@ export class PlayerSpriteRenderer {
       if (label) {
         label.x = sprite.x;
         label.y = sprite.y - (isBuddy ? buddySize / 2 + 2 : TILE_SIZE / 2 + 2);
+        this.markers.get(id)?.setPosition(label.x - label.width / 2 - 8, label.y - 7);
       }
 
       // Team indicator: setPosition only — no clear/redraw
@@ -685,7 +702,7 @@ export class PlayerSpriteRenderer {
     fx: StyledFx,
   ): Phaser.GameObjects.Sprite {
     const color =
-      player.cosmetics?.colorHex ?? (colorIndex >= 0 ? PLAYER_COLORS[colorIndex] : 0xffffff);
+      player.cosmetics?.colorHex ?? (colorIndex >= 0 ? playerColor(colorIndex) : 0xffffff);
     const eyes = (player.cosmetics?.eyeStyle as EyeStyle | undefined) ?? 'default';
     const key = fx.art.ensurePlayer(this.scene, color, eyes);
     const dir = player.direction || 'down';
@@ -711,7 +728,7 @@ export class PlayerSpriteRenderer {
     const fxKey = fx.art.fxKey();
     if (player.team !== null && player.team !== undefined) {
       st.teamRing = this.scene.add.image(x, y + FOOT_OFFSET, fxKey, StyleArt.fxFrame('teamRing'));
-      st.teamRing.setTint(parseInt(TEAM_COLORS[player.team % 2].slice(1), 16));
+      st.teamRing.setTint(parseInt(teamColor(player.team).slice(1), 16));
       st.teamRing.setScale(base(st.teamRing) * 0.95);
       st.teamRing.setDepth(DEPTH.SHADOW + 1);
     }
@@ -1094,6 +1111,27 @@ export class PlayerSpriteRenderer {
    * The body colour a player is drawn in (cosmetic colour, team colour or index colour), once
    * they have been seen. Bombs and the minimap use it so an owner's colour matches their sprite.
    */
+  /** Colour-blind mode: the player's shape marker beside their name. */
+  private createMarker(id: number): void {
+    const index = this.markerIndex.get(id);
+    if (index === undefined || this.markers.has(id)) return;
+    const g = this.scene.add.graphics();
+    // Styles first: Phaser takes a path's line width when the path starts.
+    g.lineStyle(1.5, 0x000000, 0.9);
+    g.fillStyle(0xffffff, 1);
+    traceMarker(g, markerShape(index), 4.5);
+    g.fillPath();
+    g.strokePath();
+    g.setDepth(DEPTH.LABEL);
+    this.markers.set(id, g);
+  }
+
+  /** The shape marking a player in colour-blind mode, if any (for the HUD's player list). */
+  markerOf(playerId: number): ReturnType<typeof markerShape> | undefined {
+    const index = this.markerIndex.get(playerId);
+    return index === undefined ? undefined : markerShape(index);
+  }
+
   /** Body colour and eyes a player is drawn with, for portraits (kill feed, results). */
   lookOf(playerId: number): { color: number; eyes: EyeStyle } | undefined {
     return this.looks.get(playerId);
@@ -1103,7 +1141,7 @@ export class PlayerSpriteRenderer {
     const custom = this.customColor.get(playerId);
     if (custom !== undefined) return custom;
     const index = this.playerColorIndex.get(playerId);
-    return index !== undefined && index >= 0 ? PLAYER_COLORS[index] : undefined;
+    return index !== undefined && index >= 0 ? playerColor(index) : undefined;
   }
 
   destroy(): void {
@@ -1142,6 +1180,9 @@ export class PlayerSpriteRenderer {
     this.customColor.clear();
     this.customEyes.clear();
     this.looks.clear();
+    for (const m of this.markers.values()) m.destroy();
+    this.markers.clear();
+    this.markerIndex.clear();
     this.flickering.clear();
     this.invulnerable.clear();
     this.playerTeams.clear();
@@ -1166,6 +1207,9 @@ export class PlayerSpriteRenderer {
       label.destroy();
       this.labels.delete(id);
     }
+    this.markers.get(id)?.destroy();
+    this.markers.delete(id);
+    this.markerIndex.delete(id);
 
     const teamGfx = this.teamIndicators.get(id);
     if (teamGfx) {

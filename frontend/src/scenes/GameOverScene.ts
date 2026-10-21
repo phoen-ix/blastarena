@@ -19,9 +19,10 @@ import { audioManager } from '../game/AudioManager';
 import { AuthManager } from '../network/AuthManager';
 import { enterCoopLevel, clearCampaignRun, localP2StartData } from './coopStart';
 import { getSettings } from '../game/Settings';
-import { PLAYER_COLORS } from './BootScene';
+import { playerColor, teamColor } from '../game/playerPalette';
 import { paintPortrait } from '../ui/portraits';
 import type { EyeStyle } from '../art/painters/types';
+import { textureRatio, uiCamera } from '../art/hidpi';
 
 const DEADZONE = 0.3;
 
@@ -93,8 +94,7 @@ export class GameOverScene extends Phaser.Scene {
       }
     }
 
-    const width = this.cameras.main.width;
-    const height = this.cameras.main.height;
+    const { width, height } = uiCamera(this);
     const data = this.registry.get('gameOverData');
     const socketClient: SocketClient = this.registry.get('socketClient');
 
@@ -334,7 +334,7 @@ export class GameOverScene extends Phaser.Scene {
 
       // Check if team mode (winnerTeam is set)
       const isTeamMode = data.winnerTeam !== null && data.winnerTeam !== undefined;
-      const teamColors = ['#ff4466', '#448aff'];
+      const teamColors = [teamColor(0), teamColor(1)];
       const teamNames = [t('ui:gameOver.teamRed'), t('ui:gameOver.teamBlue')];
 
       // Column layout
@@ -452,15 +452,17 @@ export class GameOverScene extends Phaser.Scene {
       );
 
       const look: PlayerLook = looks[p.userId] ?? {
-        color: PLAYER_COLORS[slot.rank % PLAYER_COLORS.length],
+        color: playerColor(slot.rank),
         eyes: 'default',
       };
       const key = `gameover_portrait_${slot.rank}`;
       if (this.textures.exists(key)) this.textures.remove(key);
-      const canvas = paintPortrait(look.color, look.eyes, PORTRAIT, 'full');
+      // Painted at the texture ratio so it stays sharp under the camera's zoom.
+      const px = Math.round(PORTRAIT * textureRatio());
+      const canvas = paintPortrait(look.color, look.eyes, px, 'full');
       const faceY = base - slot.h - PORTRAIT / 2 + 4;
       if (this.textures.addCanvas(key, canvas)) {
-        const face = this.add.image(cx, faceY, key);
+        const face = this.add.image(cx, faceY, key).setScale(PORTRAIT / px);
         if (p.alive === false && slot.rank > 0) face.setAlpha(0.75);
         column.add(face);
       }
@@ -836,7 +838,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private showAchievementUnlock(data: AchievementUnlockEvent): void {
-    const width = this.cameras.main.width;
+    const width = this.cameras.main.width / this.cameras.main.zoom;
     const colors = themeManager.getCanvasColors();
 
     for (let i = 0; i < data.achievements.length; i++) {
@@ -882,7 +884,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private showXpResults(results: XpUpdateResult[]): void {
-    const width = this.cameras.main.width;
+    const width = this.cameras.main.width / this.cameras.main.zoom;
     const colors = themeManager.getCanvasColors();
 
     for (const result of results) {

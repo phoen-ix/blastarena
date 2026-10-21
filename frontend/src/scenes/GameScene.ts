@@ -25,7 +25,7 @@ import { StyledFx } from '../art/StyledFx';
 import { StylePost, AmbientParticles } from '../art/stylePost';
 import { artStyleManager } from '../art/ArtStyleManager';
 
-import type { EyeStyle, World } from '../art/painters/types';
+import type { EyeStyle, MarkerShape, World } from '../art/painters/types';
 import { PlayerSpriteRenderer } from '../game/PlayerSprite';
 import { BombSpriteRenderer } from '../game/BombSprite';
 import { ExplosionRenderer } from '../game/ExplosionSprite';
@@ -34,6 +34,9 @@ import { ShrinkingZoneRenderer } from '../game/ShrinkingZone';
 import { HillZoneRenderer } from '../game/HillZone';
 import { EffectSystem } from '../game/EffectSystem';
 import { CountdownOverlay } from '../game/CountdownOverlay';
+import { SplitScreenOverlay } from '../game/SplitScreenOverlay';
+import type { ArrowPlacement } from '../game/SplitScreenOverlay';
+import { renderRatio } from '../art/hidpi';
 import { GamepadManager } from '../game/GamepadManager';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { ReplayPlayer } from '../game/ReplayPlayer';
@@ -135,11 +138,9 @@ export class GameScene extends Phaser.Scene {
   private buddyMode: boolean = false;
   private coopCameraMode: CameraMode = 'shared';
   private p2Camera: Phaser.Cameras.Scene2D.Camera | null = null;
-  private splitDivider: Phaser.GameObjects.Graphics | null = null;
+  private splitOverlay: SplitScreenOverlay | null = null;
   private splitScreenInitialized: boolean = false;
   private splitBaseZoom: number = 1;
-  private p1PartnerArrow: Phaser.GameObjects.Graphics | null = null;
-  private p2PartnerArrow: Phaser.GameObjects.Graphics | null = null;
   private enemyRenderer: EnemySpriteRenderer | null = null;
   private lastCampaignState: CampaignGameState | null = null;
   private campaignStateHandler: ((state: CampaignGameState) => void) | null = null;
@@ -210,6 +211,11 @@ export class GameScene extends Phaser.Scene {
   /** The current grid with every tile diff applied (seeds the HUD minimap). */
   get liveTiles(): TileType[][] | null {
     return this.storedTiles;
+  }
+
+  /** A player's shape marker in colour-blind mode, for the HUD's player list. */
+  playerMarker(id: number): MarkerShape | undefined {
+    return this.playerRenderer?.markerOf(id);
   }
 
   /** How a player is drawn (body colour and eyes), for the HUD's portraits. */
@@ -401,12 +407,10 @@ export class GameScene extends Phaser.Scene {
     }
     this.spectatorClickHandler = (pointer: Phaser.Input.Pointer) => {
       if (!this.spectatorTargeting || !this.lastGameState) return;
-      // Convert screen coords to tile coords
-      const cam = this.cameras.main;
-      const worldX = pointer.x + cam.scrollX;
-      const worldY = pointer.y + cam.scrollY;
-      const tileX = Math.floor(worldX / 48);
-      const tileY = Math.floor(worldY / 48);
+      // Convert screen coords to tile coords (through the camera's zoom)
+      const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      const tileX = Math.floor(world.x / TILE_SIZE);
+      const tileY = Math.floor(world.y / TILE_SIZE);
       if (tileX < 0 || tileY < 0) return;
 
       // Get the SpectatorActionBar from HUDScene and execute
@@ -984,6 +988,10 @@ export class GameScene extends Phaser.Scene {
     if (initialState) {
       this.applyCameraBounds(initialState.map.width, initialState.map.height);
       this.initSplitScreen();
+      // Split-screen bounds and zoom need the second camera, which exists only now.
+      if (this.p2Camera) {
+        this.applyCameraBounds(initialState.map.width, initialState.map.height);
+      }
     }
 
     // Re-apply camera bounds when viewport resizes.
@@ -1241,8 +1249,12 @@ export class GameScene extends Phaser.Scene {
     const worldW = mapW * TILE_SIZE;
     const worldH = mapH * TILE_SIZE;
 
+    // Cameras zoom by the render ratio: the canvas is in device pixels (see art/hidpi.ts).
+    const r = renderRatio();
+
     // Wrapping maps: no bounds — ghost tiles handle the visual continuity
     if (this.lastGameState?.map?.wrapping || this.openWorldMode) {
+      cam.setZoom(r);
       cam.removeBounds();
       cam.centerOn(worldW / 2, worldH / 2);
       return;
@@ -1253,7 +1265,7 @@ export class GameScene extends Phaser.Scene {
       const fitZoom = (c: Phaser.Cameras.Scene2D.Camera) => {
         const zx = c.width / worldW;
         const zy = c.height / worldH;
-        return Phaser.Math.Clamp(Math.min(zx, zy), 0.5, 3.0);
+        return Phaser.Math.Clamp(Math.min(zx, zy), 0.5 * r, 3.0 * r);
       };
 
       this.splitBaseZoom = fitZoom(cam);
@@ -1269,11 +1281,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     // When the world is smaller than the viewport, expand bounds so the camera
-    // can center the world instead of being clamped to (0,0)
-    const boundsX = Math.min(0, (worldW - cam.width) / 2);
-    const boundsY = Math.min(0, (worldH - cam.height) / 2);
-    const boundsW = Math.max(worldW, cam.width);
-    const boundsH = Math.max(worldH, cam.height);
+    // can center the world instead of being clamped to (0,0). Bounds are in world units.
+    cam.setZoom(r);
+    const viewW = cam.width / r;
+    const viewH = cam.height / r;
+    const boundsX = Math.min(0, (worldW - viewW) / 2);
+    const boundsY = Math.min(0, (worldH - viewH) / 2);
+    const boundsW = Math.max(worldW, viewW);
+    const boundsH = Math.max(worldH, viewH);
 
     cam.setBounds(boundsX, boundsY, boundsW, boundsH);
     cam.centerOn(worldW / 2, worldH / 2);
@@ -1299,19 +1314,9 @@ export class GameScene extends Phaser.Scene {
 
     this.stylePost?.addCamera(this.p2Camera);
 
-    // Partner off-screen indicator arrows
-    this.p1PartnerArrow = this.add.graphics();
-    this.p1PartnerArrow.setScrollFactor(0);
-    this.p1PartnerArrow.setDepth(DEPTH.PARTNER_ARROW);
-    this.p2Camera.ignore(this.p1PartnerArrow);
-
-    this.p2PartnerArrow = this.add.graphics();
-    this.p2PartnerArrow.setScrollFactor(0);
-    this.p2PartnerArrow.setDepth(DEPTH.PARTNER_ARROW);
-    cam.ignore(this.p2PartnerArrow);
-
-    // Bounds + zoom are applied by applyCameraBounds() which is called right after
-    this.drawSplitDivider(w, h);
+    // Divider and off-screen partner arrows (DOM, so the cameras' zoom leaves them alone).
+    // Bounds + zoom are applied by applyCameraBounds() which is called right after.
+    this.splitOverlay = new SplitScreenOverlay(this.coopCameraMode);
   }
 
   private updateSplitViewports(w: number, h: number): void {
@@ -1328,76 +1333,48 @@ export class GameScene extends Phaser.Scene {
     if (this.lastGameState) {
       this.applyCameraBounds(this.lastGameState.map.width, this.lastGameState.map.height);
     }
-    this.drawSplitDivider(w, h);
-  }
-
-  private drawSplitDivider(w: number, h: number): void {
-    if (!this.splitDivider) {
-      this.splitDivider = this.add.graphics();
-      this.splitDivider.setScrollFactor(0);
-      this.splitDivider.setDepth(DEPTH.SPLIT_DIVIDER);
-    }
-    this.splitDivider.clear();
-    if (this.coopCameraMode === 'split-h') {
-      const y = Math.floor(h / 2);
-      // Dark outline
-      this.splitDivider.lineStyle(6, 0x000000, 0.9);
-      this.splitDivider.lineBetween(0, y, w, y);
-      this.splitDivider.strokePath();
-      // Bright inner line
-      this.splitDivider.lineStyle(2, 0xffffff, 0.7);
-      this.splitDivider.lineBetween(0, y, w, y);
-      this.splitDivider.strokePath();
-    } else {
-      const x = Math.floor(w / 2);
-      this.splitDivider.lineStyle(6, 0x000000, 0.9);
-      this.splitDivider.lineBetween(x, 0, x, h);
-      this.splitDivider.strokePath();
-      this.splitDivider.lineStyle(2, 0xffffff, 0.7);
-      this.splitDivider.lineBetween(x, 0, x, h);
-      this.splitDivider.strokePath();
-    }
   }
 
   private updatePartnerArrows(): void {
-    if (this.coopCameraMode === 'shared' || !this.p2Camera) return;
+    if (this.coopCameraMode === 'shared' || !this.p2Camera || !this.splitOverlay) return;
 
     const p1Sprite = this.playerRenderer?.getSprite(this.localPlayerId);
     const p2Sprite = this.playerRenderer?.getSprite(this.localP2Id);
 
-    this.drawPartnerArrow(this.p1PartnerArrow, this.cameras.main, p1Sprite, p2Sprite);
-    this.drawPartnerArrow(this.p2PartnerArrow, this.p2Camera, p2Sprite, p1Sprite);
+    this.splitOverlay.setArrow(0, this.partnerArrow(this.cameras.main, p1Sprite, p2Sprite));
+    this.splitOverlay.setArrow(1, this.partnerArrow(this.p2Camera, p2Sprite, p1Sprite));
   }
 
-  private drawPartnerArrow(
-    gfx: Phaser.GameObjects.Graphics | null,
+  /**
+   * Where `cam`'s view shows the arrow toward an off-screen partner, in CSS pixels from the top
+   * left of the game; null while the partner is in view.
+   */
+  private partnerArrow(
     cam: Phaser.Cameras.Scene2D.Camera,
     localSprite: Phaser.GameObjects.Sprite | undefined,
     partnerSprite: Phaser.GameObjects.Sprite | undefined,
-  ): void {
-    if (!gfx) return;
-    gfx.clear();
-    if (!partnerSprite || !localSprite) return;
+  ): ArrowPlacement | null {
+    if (!partnerSprite || !localSprite) return null;
+    const r = renderRatio();
+    const view = cam.worldView;
 
-    // Convert partner world position to camera-local coords
-    const localX = (partnerSprite.x - cam.scrollX) * cam.zoom;
-    const localY = (partnerSprite.y - cam.scrollY) * cam.zoom;
+    // Positions in the camera's viewport, in canvas pixels
+    const localX = (partnerSprite.x - view.x) * cam.zoom;
+    const localY = (partnerSprite.y - view.y) * cam.zoom;
 
     // Check if visible within viewport
-    const pad = 20;
+    const pad = 20 * r;
     if (localX >= pad && localX <= cam.width - pad && localY >= pad && localY <= cam.height - pad) {
-      return;
+      return null;
     }
 
     // Direction from local player to off-screen partner (line connecting the two)
-    const myX = (localSprite.x - cam.scrollX) * cam.zoom;
-    const myY = (localSprite.y - cam.scrollY) * cam.zoom;
-    const dx = localX - myX;
-    const dy = localY - myY;
-    const angle = Math.atan2(dy, dx);
+    const myX = (localSprite.x - view.x) * cam.zoom;
+    const myY = (localSprite.y - view.y) * cam.zoom;
+    const angle = Math.atan2(localY - myY, localX - myX);
 
     // Find edge intersection from local player along the player-to-partner line
-    const edgePad = 24;
+    const edgePad = 24 * r;
     const hw = cam.width / 2 - edgePad;
     const hh = cam.height / 2 - edgePad;
     const cx = cam.width / 2;
@@ -1418,31 +1395,10 @@ export class GameScene extends Phaser.Scene {
     }
     if (!isFinite(tMin)) tMin = 1;
 
-    const rawX = myX + Math.cos(angle) * tMin;
-    const rawY = myY + Math.sin(angle) * tMin;
     // Clamp to viewport bounds
-    const arrowX = Math.max(edgePad, Math.min(cam.width - edgePad, rawX));
-    const arrowY = Math.max(edgePad, Math.min(cam.height - edgePad, rawY));
-
-    // Triangle pointing toward partner
-    const size = 10;
-    const tipX = arrowX + Math.cos(angle) * size;
-    const tipY = arrowY + Math.sin(angle) * size;
-    const baseAngle = Math.PI * 0.75;
-    const x1 = arrowX + Math.cos(angle + baseAngle) * size;
-    const y1 = arrowY + Math.sin(angle + baseAngle) * size;
-    const x2 = arrowX + Math.cos(angle - baseAngle) * size;
-    const y2 = arrowY + Math.sin(angle - baseAngle) * size;
-
-    gfx.lineStyle(2, 0x000000, 0.8);
-    gfx.fillStyle(0x00ccff, 0.9);
-    gfx.beginPath();
-    gfx.moveTo(tipX, tipY);
-    gfx.lineTo(x1, y1);
-    gfx.lineTo(x2, y2);
-    gfx.closePath();
-    gfx.fillPath();
-    gfx.strokePath();
+    const arrowX = Math.max(edgePad, Math.min(cam.width - edgePad, myX + Math.cos(angle) * tMin));
+    const arrowY = Math.max(edgePad, Math.min(cam.height - edgePad, myY + Math.sin(angle) * tMin));
+    return { x: (cam.x + arrowX) / r, y: (cam.y + arrowY) / r, angle };
   }
 
   private handleReplayTickEvents(events: ReplayTickEvents): void {
@@ -1531,17 +1487,19 @@ export class GameScene extends Phaser.Scene {
           const midX = (p1Sprite.x + p2Sprite.x) / 2;
           const midY = (p1Sprite.y + p2Sprite.y) / 2;
           const dist = Phaser.Math.Distance.Between(p1Sprite.x, p1Sprite.y, p2Sprite.x, p2Sprite.y);
-          const maxDist = Math.max(cam.width, cam.height);
-          const targetZoom = Phaser.Math.Clamp(1.0 - (dist / maxDist) * 0.6, 0.5, 1.0);
+          const r = renderRatio();
+          const maxDist = Math.max(cam.width, cam.height) / r;
+          const targetZoom = Phaser.Math.Clamp(1.0 - (dist / maxDist) * 0.6, 0.5, 1.0) * r;
           cam.zoom = Phaser.Math.Linear(cam.zoom, targetZoom, 0.05);
-          cam.scrollX = Phaser.Math.Linear(cam.scrollX, midX - cam.width / (2 * cam.zoom), 0.15);
-          cam.scrollY = Phaser.Math.Linear(cam.scrollY, midY - cam.height / (2 * cam.zoom), 0.15);
+          // The camera zooms about its centre, so centring is the same at any zoom.
+          cam.scrollX = Phaser.Math.Linear(cam.scrollX, midX - cam.width / 2, 0.15);
+          cam.scrollY = Phaser.Math.Linear(cam.scrollY, midY - cam.height / 2, 0.15);
           return;
         }
         // One player dead — follow the alive one
         const aliveSprite = p1Sprite || p2Sprite;
         if (aliveSprite) {
-          cam.zoom = Phaser.Math.Linear(cam.zoom, 1.0, 0.05);
+          cam.zoom = Phaser.Math.Linear(cam.zoom, renderRatio(), 0.05);
           cam.scrollX = Phaser.Math.Linear(cam.scrollX, aliveSprite.x - cam.width / 2, 0.15);
           cam.scrollY = Phaser.Math.Linear(cam.scrollY, aliveSprite.y - cam.height / 2, 0.15);
           return;
@@ -1557,14 +1515,11 @@ export class GameScene extends Phaser.Scene {
           sprite: Phaser.GameObjects.Sprite | undefined,
         ) => {
           if (!sprite) return;
+          // The camera zooms about its centre: scroll + size / 2 is the view's centre.
           const fitsX = worldW * c.zoom <= c.width;
           const fitsY = worldH * c.zoom <= c.height;
-          const targetX = fitsX
-            ? (worldW - c.width / c.zoom) / 2
-            : sprite.x - c.width / (2 * c.zoom);
-          const targetY = fitsY
-            ? (worldH - c.height / c.zoom) / 2
-            : sprite.y - c.height / (2 * c.zoom);
+          const targetX = (fitsX ? worldW / 2 : sprite.x) - c.width / 2;
+          const targetY = (fitsY ? worldH / 2 : sprite.y) - c.height / 2;
           c.scrollX = Phaser.Math.Linear(c.scrollX, targetX, 0.15);
           c.scrollY = Phaser.Math.Linear(c.scrollY, targetY, 0.15);
         };
@@ -1880,13 +1835,14 @@ export class GameScene extends Phaser.Scene {
 
       if (!this.isDragging) {
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < GameScene.DRAG_THRESHOLD) return;
+        if (dist < GameScene.DRAG_THRESHOLD * renderRatio()) return;
         this.isDragging = true;
         this.spectateTargetId = null;
       }
 
-      this.freeCamX -= pointer.x - pointer.prevPosition.x;
-      this.freeCamY -= pointer.y - pointer.prevPosition.y;
+      const zoom = this.cameras.main.zoom;
+      this.freeCamX -= (pointer.x - pointer.prevPosition.x) / zoom;
+      this.freeCamY -= (pointer.y - pointer.prevPosition.y) / zoom;
     });
 
     this.input.on('pointerup', () => {
@@ -2527,12 +2483,8 @@ export class GameScene extends Phaser.Scene {
       this.cameras.remove(this.p2Camera);
       this.p2Camera = null;
     }
-    this.splitDivider?.destroy();
-    this.splitDivider = null;
-    this.p1PartnerArrow?.destroy();
-    this.p1PartnerArrow = null;
-    this.p2PartnerArrow?.destroy();
-    this.p2PartnerArrow = null;
+    this.splitOverlay?.destroy();
+    this.splitOverlay = null;
     this.coopCameraMode = 'shared';
     this.splitBaseZoom = 1;
     this.splitScreenInitialized = false;

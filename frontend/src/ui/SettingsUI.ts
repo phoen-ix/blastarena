@@ -794,6 +794,26 @@ export class SettingsUI {
           </div>
           <div class="setting-row">
             <label class="toggle-switch">
+              <input type="checkbox" name="sharpRendering" role="switch" aria-checked="${settings.sharpRendering ? 'true' : 'false'}" ${settings.sharpRendering ? 'checked' : ''}>
+              <span class="toggle-slider"></span>
+            </label>
+            <div class="setting-row-info">
+              <div class="setting-row-label">${t('settings.sharpRendering')}</div>
+              <div class="setting-row-desc">${t('settings.sharpRenderingDesc')}</div>
+            </div>
+          </div>
+          <div class="setting-row">
+            <label class="toggle-switch">
+              <input type="checkbox" name="colorBlind" role="switch" aria-checked="${settings.colorBlind ? 'true' : 'false'}" ${settings.colorBlind ? 'checked' : ''}>
+              <span class="toggle-slider"></span>
+            </label>
+            <div class="setting-row-info">
+              <div class="setting-row-label">${t('settings.colorBlind')}</div>
+              <div class="setting-row-desc">${t('settings.colorBlindDesc')}</div>
+            </div>
+          </div>
+          <div class="setting-row">
+            <label class="toggle-switch">
               <input type="checkbox" name="sound" role="switch" aria-checked="${settings.sound ? 'true' : 'false'}" ${settings.sound ? 'checked' : ''}>
               <span class="toggle-slider"></span>
             </label>

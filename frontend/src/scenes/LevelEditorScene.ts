@@ -25,6 +25,8 @@ import { generateThemedTileTextures, generateHazardTileTextures } from '../utils
 import { getTileTexture, isConveyorTile, conveyorAnimKey } from '../utils/tileTextures';
 import { setHtml } from '../utils/html';
 import { invalidateMapPreview } from '../utils/mapPreviewCache';
+import { fit } from '../art/scale';
+import { renderRatio } from '../art/hidpi';
 
 type EditorTool =
   | 'empty'
@@ -165,6 +167,11 @@ export class LevelEditorScene extends Phaser.Scene {
   private lastPanY = 0;
 
   private static readonly TOOLBAR_WIDTH = 200;
+
+  /** The toolbar's width in canvas pixels. */
+  private static toolbarPx(): number {
+    return LevelEditorScene.TOOLBAR_WIDTH * renderRatio();
+  }
 
   constructor() {
     super({ key: 'LevelEditorScene' });
@@ -376,6 +383,7 @@ export class LevelEditorScene extends Phaser.Scene {
           y * TILE_SIZE + TILE_SIZE / 2,
           texture,
         );
+        fit(sprite);
         sprite.setDepth(0);
         if (isConveyorTile(this.tiles[y][x])) {
           const animKey = conveyorAnimKey(this.tiles[y][x], this.worldTheme);
@@ -394,6 +402,7 @@ export class LevelEditorScene extends Phaser.Scene {
           enemy.y * TILE_SIZE + TILE_SIZE / 2,
           key,
         );
+        fit(enemy.sprite);
         enemy.sprite.setDepth(5);
       }
     }
@@ -406,6 +415,7 @@ export class LevelEditorScene extends Phaser.Scene {
           pu.y * TILE_SIZE + TILE_SIZE / 2,
           key,
         );
+        fit(pu.sprite);
         pu.sprite.setDepth(6);
       }
     }
@@ -575,16 +585,19 @@ export class LevelEditorScene extends Phaser.Scene {
     const worldH = this.mapHeight * TILE_SIZE;
     cam.setBounds(-TILE_SIZE, -TILE_SIZE, worldW + TILE_SIZE * 2, worldH + TILE_SIZE * 2);
 
-    // Restrict rendering to the area right of the toolbar
-    const tw = LevelEditorScene.TOOLBAR_WIDTH;
+    // Restrict rendering to the area right of the toolbar. The canvas is in device pixels
+    // (sharp rendering), so the CSS-sized toolbar and the zoom scale by the render ratio.
+    const tw = LevelEditorScene.toolbarPx();
     cam.setViewport(tw, 0, this.scale.width - tw, this.scale.height);
+    cam.setZoom(renderRatio());
     cam.centerOn(worldW / 2, worldH / 2);
 
     // Update viewport on window resize. Removed in shutdown(): `this.scale` is the game-wide
     // ScaleManager, so without that each visit to the editor leaves another closure running
     // setViewport on a camera belonging to a dead scene. (audit SCENE-RESIZE-LEAK-1)
     this.onResize = (gameSize: Phaser.Structs.Size) => {
-      cam.setViewport(tw, 0, gameSize.width - tw, gameSize.height);
+      const px = LevelEditorScene.toolbarPx();
+      cam.setViewport(px, 0, gameSize.width - px, gameSize.height);
     };
     this.scale.on('resize', this.onResize);
 
@@ -598,7 +611,8 @@ export class LevelEditorScene extends Phaser.Scene {
         _dy: number,
         dz: number,
       ) => {
-        const newZoom = Phaser.Math.Clamp(cam.zoom - dz * 0.001, 0.25, 3);
+        const r = renderRatio();
+        const newZoom = Phaser.Math.Clamp(cam.zoom - dz * 0.001 * r, 0.25 * r, 3 * r);
         cam.setZoom(newZoom);
       },
     );
@@ -615,7 +629,7 @@ export class LevelEditorScene extends Phaser.Scene {
       }
 
       // Check if clicking on UI
-      if (pointer.x < LevelEditorScene.TOOLBAR_WIDTH) return; // Left panel
+      if (pointer.x < LevelEditorScene.toolbarPx()) return; // Left panel
 
       // Blur any focused input so keyboard panning resumes
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
@@ -635,11 +649,7 @@ export class LevelEditorScene extends Phaser.Scene {
       }
 
       // Paint mode (left button held)
-      if (
-        pointer.isDown &&
-        pointer.leftButtonDown() &&
-        pointer.x >= LevelEditorScene.TOOLBAR_WIDTH
-      ) {
+      if (pointer.isDown && pointer.leftButtonDown() && pointer.x >= LevelEditorScene.toolbarPx()) {
         this.handlePlacement(pointer);
       }
     });
@@ -688,7 +698,7 @@ export class LevelEditorScene extends Phaser.Scene {
 
     const PAN_SPEED = 400;
     const cam = this.cameras.main;
-    const speed = (PAN_SPEED * delta) / (1000 * cam.zoom);
+    const speed = (PAN_SPEED * delta * renderRatio()) / (1000 * cam.zoom);
 
     let dx = 0;
     let dy = 0;
@@ -860,6 +870,7 @@ export class LevelEditorScene extends Phaser.Scene {
               ty * TILE_SIZE + TILE_SIZE / 2,
               key,
             );
+            fit(enemy.sprite);
             enemy.sprite.setDepth(5);
           }
           this.enemies.push(enemy);
@@ -883,6 +894,7 @@ export class LevelEditorScene extends Phaser.Scene {
             ty * TILE_SIZE + TILE_SIZE / 2,
             puKey,
           );
+          fit(pu.sprite);
           pu.sprite.setDepth(6);
         }
         this.powerups.push(pu);
@@ -898,7 +910,7 @@ export class LevelEditorScene extends Phaser.Scene {
     const sprite = this.tileSprites[y]?.[x];
     if (sprite) {
       sprite.stop();
-      sprite.setTexture(texture);
+      fit(sprite.setTexture(texture));
       if (isConveyorTile(tileType)) {
         const animKey = conveyorAnimKey(tileType, this.worldTheme);
         if (this.anims.exists(animKey)) sprite.play(animKey);
@@ -959,6 +971,7 @@ export class LevelEditorScene extends Phaser.Scene {
         y * TILE_SIZE + TILE_SIZE / 2,
         texture,
       );
+      fit(sprite);
       sprite.setDepth(4); // Above tile (3) but below entities (5+)
       sprite.setAlpha(0.7);
       if (isConveyorTile(type)) {
@@ -1142,6 +1155,7 @@ export class LevelEditorScene extends Phaser.Scene {
           enemy.y * TILE_SIZE + TILE_SIZE / 2,
           key,
         );
+        fit(enemy.sprite);
         enemy.sprite.setDepth(5);
       }
       this.enemies.push(enemy);
@@ -1155,6 +1169,7 @@ export class LevelEditorScene extends Phaser.Scene {
           pu.y * TILE_SIZE + TILE_SIZE / 2,
           puKey,
         );
+        fit(pu.sprite);
         pu.sprite.setDepth(6);
       }
       this.powerups.push(pu);

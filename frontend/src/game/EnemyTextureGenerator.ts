@@ -6,6 +6,7 @@ import {
   EnemyEyeStyle,
   EnemyAccessory,
 } from '@blast-arena/shared';
+import { bakeGraphics, hiResGraphics } from '../art/hidpi';
 
 const SIZE = 48;
 const DIRECTIONS = ['down', 'up', 'left', 'right'] as const;
@@ -67,9 +68,9 @@ export class EnemyTextureGenerator {
         const key = `enemy_${et.id}_${dir}`;
         if (scene.textures.exists(key)) continue;
 
-        const gfx = scene.make.graphics({ x: 0, y: 0 });
+        const gfx = hiResGraphics(scene);
         EnemyTextureGenerator.drawEnemy(gfx, et.config.sprite, dir, et.config.sizeMultiplier);
-        gfx.generateTexture(key, SIZE, SIZE);
+        bakeGraphics(gfx, key, SIZE, SIZE);
         gfx.destroy();
       }
     }
