@@ -5,6 +5,7 @@ import { classicStyle } from './styles/classic';
 import { drawnStyle } from './styles/drawn';
 import { neonPainters } from './styles/neon/painters';
 import { toyPainters } from './styles/toy/painters';
+import { pixelPainters } from './styles/pixel/painters';
 
 /**
  * Styles this client build can draw. An id the server knows but the client does not (an admin
@@ -14,6 +15,7 @@ const STYLES: Partial<Record<ArtStyleId, ArtStyle>> = {
   classic: classicStyle,
   neon: drawnStyle(neonPainters, { bloom: true }),
   toy: drawnStyle(toyPainters),
+  pixel: drawnStyle(pixelPainters),
 };
 
 export function isStyleAvailable(id: string): id is ArtStyleId {
