@@ -2,6 +2,7 @@ import { MapEvent, TILE_SIZE } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 import { DEPTH } from '../art/depth';
 import { base } from '../art/scale';
+import type { StyledFx } from '../art/StyledFx';
 
 interface TrackedWarning {
   type: 'wall_collapse' | 'freeze_wave';
@@ -67,8 +68,12 @@ export class MapEventRenderer {
   private worldWidth: number = 0;
   private worldHeight: number = 0;
 
-  constructor(scene: Phaser.Scene) {
+  /** Set for the drawn art styles (their meteor texture); null keeps the classic meteor. */
+  private fx: StyledFx | null;
+
+  constructor(scene: Phaser.Scene, fx: StyledFx | null = null) {
     this.scene = scene;
+    this.fx = fx;
   }
 
   /** Tell the renderer how large the map is (tiles). Call again when the map changes. */
@@ -350,7 +355,9 @@ export class MapEventRenderer {
 
     if (settings.animations) {
       // Falling meteor sprite
-      const meteorSprite = this.scene.add.sprite(px, py - 400, 'meteor');
+      const meteorSprite = this.fx
+        ? this.scene.add.sprite(px, py - 400, this.fx.art.fxKey(), 'meteor')
+        : this.scene.add.sprite(px, py - 400, 'meteor');
       meteorSprite.setDepth(DEPTH.METEOR);
       const mb = base(meteorSprite);
       meteorSprite.setScale(1.5 * mb);

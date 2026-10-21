@@ -8,4 +8,8 @@ import { CLASSIC_FEATURES } from '../types';
 export const classicStyle: ArtStyle = {
   id: 'classic',
   features: CLASSIC_FEATURES,
+  // Loaded on demand: its Canvas2D helpers import BootScene (and so Phaser).
+  drawPreview: (canvas) => {
+    void import('../classicPreview').then((m) => m.drawClassicPreview(canvas));
+  },
 };

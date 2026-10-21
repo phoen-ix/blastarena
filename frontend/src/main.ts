@@ -45,6 +45,8 @@ async function boot(): Promise<Phaser.Game> {
   };
 
   game = new Phaser.Game(config);
+  // Dev builds only: a handle for poking at the running game from the console or test tooling.
+  if (import.meta.env.DEV) Object.assign(window, { __blastArenaGame: game });
 
   // Initialize audio on first user interaction (required by browser autoplay policy)
   const initAudio = () => {

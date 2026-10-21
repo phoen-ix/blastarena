@@ -1,4 +1,5 @@
 import type { ArtStyleId } from '@blast-arena/shared';
+import type { StylePainters } from './painters/types';
 
 /**
  * What an art style changes beyond its textures. Renderers branch on these flags instead of on
@@ -36,6 +37,8 @@ export interface StyleFeatures {
 export interface ArtStyle {
   id: ArtStyleId;
   features: StyleFeatures;
+  /** Painters for drawn styles; absent for Classic, which keeps its own texture generators. */
+  painters?: StylePainters;
   /** Paint a small scene for the settings picker onto `canvas` (its own pixel size). */
   drawPreview?(canvas: HTMLCanvasElement): void;
 }

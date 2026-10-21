@@ -18,6 +18,14 @@ import {
 } from '@blast-arena/shared';
 import { t } from '../i18n';
 import { TileMapRenderer } from '../game/TileMap';
+import { StyledTileMap } from '../game/StyledTileMap';
+import type { TileMapLike } from '../game/StyledTileMap';
+import { activeStyleArt } from '../art/active';
+import { StyledFx } from '../art/StyledFx';
+import { StylePost, AmbientParticles } from '../art/stylePost';
+import { artStyleManager } from '../art/ArtStyleManager';
+
+import type { World } from '../art/painters/types';
 import { PlayerSpriteRenderer } from '../game/PlayerSprite';
 import { BombSpriteRenderer } from '../game/BombSprite';
 import { ExplosionRenderer } from '../game/ExplosionSprite';
@@ -50,7 +58,7 @@ import { ApiClient } from '../network/ApiClient';
 import { EmoteId, EMOTES, CampaignLevelSummary } from '@blast-arena/shared';
 import type { ServerToClientEvents, ChatMode } from '@blast-arena/shared';
 import { audioManager } from '../game/AudioManager';
-import { getSettings } from '../game/Settings';
+import { getSettings, qualityAtLeast } from '../game/Settings';
 import { enterCoopLevel, clearCampaignRun, localP2StartData } from './coopStart';
 import type { AdminReturn } from '../ui/admin/adminReturn';
 import { DEPTH } from '../art/depth';
@@ -68,7 +76,13 @@ export class GameScene extends Phaser.Scene {
   // Composed renderers. Nullable so cleanupRenderers() can drop them: Phaser keeps the scene
   // instance alive between games, and a destroyed renderer still held here kept its dead Phaser
   // objects (and the last map's sprites) reachable until the next create(). (audit C9)
-  private tileMap: TileMapRenderer | null = null;
+  private tileMap: TileMapLike | null = null;
+  /** Effects for the drawn art styles; null when the arena uses Classic art. */
+  private styledFx: StyledFx | null = null;
+  private stylePost: StylePost | null = null;
+  private ambient: AmbientParticles | null = null;
+  /** Scene time until which a knockout's hit pause holds the world still (drawn styles). */
+  private hitPauseUntil = 0;
   private playerRenderer: PlayerSpriteRenderer | null = null;
   private bombRenderer: BombSpriteRenderer | null = null;
   private explosionRenderer: ExplosionRenderer | null = null;
@@ -422,11 +436,16 @@ export class GameScene extends Phaser.Scene {
 
     this.gamepadManager = new GamepadManager(this);
 
-    // Create composed renderers
+    // Create composed renderers. A drawn art style bakes its textures here (once per style).
+    const styleArt = activeStyleArt(this);
+    this.styledFx = styleArt ? new StyledFx(this, styleArt) : null;
+    const fx = this.styledFx;
     this.effectSystem = new EffectSystem(this, this.socketClient, this.localPlayerId);
-    this.playerRenderer = new PlayerSpriteRenderer(this);
-    this.bombRenderer = new BombSpriteRenderer(this);
-    this.explosionRenderer = new ExplosionRenderer(this);
+    this.playerRenderer = new PlayerSpriteRenderer(this, fx);
+    this.playerRenderer.setLocalPlayerId(this.localPlayerId);
+    this.bombRenderer = new BombSpriteRenderer(this, fx);
+    this.bombRenderer.ownerColor = (id) => this.playerRenderer?.colorOf(id);
+    this.explosionRenderer = new ExplosionRenderer(this, fx);
     if (initialState?.map?.wrapping) {
       const wrapSize = {
         w: initialState.map.width * TILE_SIZE,
@@ -440,17 +459,19 @@ export class GameScene extends Phaser.Scene {
         height: initialState.map.height,
       };
     }
-    this.powerUpRenderer = new PowerUpRenderer(this);
+    this.powerUpRenderer = new PowerUpRenderer(this, fx);
     if (initialState?.map?.wrapping) {
       this.powerUpRenderer.wrappingWorldSize = {
         w: initialState.map.width * TILE_SIZE,
         h: initialState.map.height * TILE_SIZE,
       };
     }
-    this.zoneRenderer = new ShrinkingZoneRenderer(this);
-    this.hillZoneRenderer = new HillZoneRenderer(this);
+    const palette = fx ? fx.art.painters.palette : null;
+    this.zoneRenderer = new ShrinkingZoneRenderer(this, palette);
+    this.hillZoneRenderer = new HillZoneRenderer(this, palette);
+    this.hillZoneRenderer.colorOf = (id) => this.playerRenderer?.colorOf(id);
     this.countdownOverlay = new CountdownOverlay(this);
-    this.mapEventRenderer = new MapEventRenderer(this);
+    this.mapEventRenderer = new MapEventRenderer(this, fx);
     this.emoteRenderer = new EmoteBubbleRenderer(this);
 
     // Listen for bomb throws to animate arc before state arrives
@@ -515,6 +536,13 @@ export class GameScene extends Phaser.Scene {
 
       // Store a deep copy of initial tiles for delta updates
       this.storedTiles = initialState.map.tiles.map((row) => [...row]);
+      // A campaign replay carries its world theme; set it before the tile map is built (it used
+      // to be set afterwards, so campaign replays always showed the classic tiles).
+      if (this.registry.get('replayMode')) {
+        const replayTheme = (this.registry.get('replayData') as ReplayData | undefined)?.campaign
+          ?.theme;
+        if (replayTheme) this.registry.set('campaignTheme', replayTheme);
+      }
       const campaignTheme = this.registry.get('campaignTheme') as string | undefined;
 
       // Generate themed tile textures on demand (BootScene runs before theme is known)
@@ -525,14 +553,24 @@ export class GameScene extends Phaser.Scene {
         }
       }
 
-      this.tileMap = new TileMapRenderer(
-        this,
+      this.tileMap = this.createTileMap(
         initialState.map.tiles,
         initialState.map.width,
         initialState.map.height,
         campaignTheme,
         initialState.map.wrapping ?? false,
       );
+      this.effectSystem.setStyledFx(fx, (campaignTheme as World) || 'classic');
+      if (fx) {
+        this.stylePost = new StylePost(this, artStyleManager.style(), [this.cameras.main]);
+        this.ambient = new AmbientParticles(
+          this,
+          fx.art,
+          (campaignTheme as World) || 'classic',
+          DEPTH.IMPACT - 1,
+        );
+        this.effectSystem.onKnockout = (victim, killer) => this.hitPause(victim, killer);
+      }
       this.mapEventRenderer.setMapSize(initialState.map.width, initialState.map.height);
       this.updateState(initialState);
     }
@@ -550,7 +588,8 @@ export class GameScene extends Phaser.Scene {
       if (isCampaignReplay && replayData.campaign) {
         this.campaignMode = true;
         EnemyTextureGenerator.generateForLevel(this, replayData.campaign.enemyTypes);
-        this.enemyRenderer = new EnemySpriteRenderer(this);
+        this.enemyRenderer = new EnemySpriteRenderer(this, this.styledFx);
+        this.enemyRenderer.setEnemyTypes(replayData.campaign.enemyTypes);
         // Generate themed textures for replay playback
         const replayTheme = replayData.campaign.theme;
         if (replayTheme && replayTheme !== 'classic') {
@@ -696,7 +735,8 @@ export class GameScene extends Phaser.Scene {
       if (campaignEnemyTypes) {
         EnemyTextureGenerator.generateForLevel(this, campaignEnemyTypes);
       }
-      this.enemyRenderer = new EnemySpriteRenderer(this);
+      this.enemyRenderer = new EnemySpriteRenderer(this, this.styledFx);
+      if (campaignEnemyTypes) this.enemyRenderer.setEnemyTypes(campaignEnemyTypes);
 
       this.campaignStateHandler = (state: CampaignGameState) => {
         this.lastCampaignState = state;
@@ -1074,7 +1114,37 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  update(_time: number, delta: number): void {
+  /**
+   * Drawn styles: freeze the picture for a moment when someone is knocked out, with a small
+   * camera kick. Only on screen (the server keeps running); in the open world only for knockouts
+   * that involve you, since strangers' knockouts are constant there.
+   */
+  private hitPause(victim: number, killer: number | null): void {
+    if (!this.styledFx || !getSettings().animations || !qualityAtLeast('medium')) return;
+    if (this.openWorldMode && victim !== this.localPlayerId && killer !== this.localPlayerId) {
+      return;
+    }
+    const now = this.time.now;
+    if (now < this.hitPauseUntil) return;
+    this.hitPauseUntil = now + 80;
+    this.tweens.timeScale = 0;
+    this.anims.globalTimeScale = 0;
+    if (getSettings().screenShake) this.cameras.main.shake(120, 0.004);
+  }
+
+  update(time: number, delta: number): void {
+    if (this.hitPauseUntil) {
+      if (time < this.hitPauseUntil) {
+        delta = 0;
+      } else {
+        this.hitPauseUntil = 0;
+        this.tweens.timeScale = 1;
+        this.anims.globalTimeScale = 1;
+      }
+    }
+    this.stylePost?.watch(time);
+    this.ambient?.frame();
+
     // Detect local player death / campaign respawn
     if (this.lastGameState) {
       const me = this.lastGameState.players.find((p) => p.id === this.localPlayerId);
@@ -1215,6 +1285,8 @@ export class GameScene extends Phaser.Scene {
       cam.setViewport(0, 0, Math.floor(w / 2), h);
       this.p2Camera = this.cameras.add(Math.floor(w / 2), 0, Math.ceil(w / 2), h);
     }
+
+    this.stylePost?.addCamera(this.p2Camera);
 
     // Partner off-screen indicator arrows
     this.p1PartnerArrow = this.add.graphics();
@@ -1818,9 +1890,34 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Destroy every composed renderer and drop the references. (audit C9) */
+  /** The tile map for the current art style (drawn styles get floor layer + raised blocks). */
+  private createTileMap(
+    tiles: GameState['map']['tiles'],
+    width: number,
+    height: number,
+    theme: string | undefined,
+    wrapping: boolean,
+  ): TileMapLike {
+    if (this.styledFx) {
+      return new StyledTileMap(this, this.styledFx.art, tiles, width, height, theme, wrapping);
+    }
+    return new TileMapRenderer(this, tiles, width, height, theme, wrapping);
+  }
+
   private cleanupRenderers(): void {
     this.tileMap?.destroy();
     this.tileMap = null;
+    this.styledFx?.destroy();
+    this.styledFx = null;
+    this.stylePost?.destroy();
+    this.stylePost = null;
+    this.ambient?.destroy();
+    this.ambient = null;
+    if (this.hitPauseUntil) {
+      this.hitPauseUntil = 0;
+      this.tweens.timeScale = 1;
+      this.anims.globalTimeScale = 1;
+    }
     this.playerRenderer?.destroy();
     this.playerRenderer = null;
     this.bombRenderer?.destroy();
@@ -2141,6 +2238,7 @@ export class GameScene extends Phaser.Scene {
         this.localPlayerId = res.playerId;
         this.registry.set('openWorldPlayerId', res.playerId);
         this.effectSystem?.setLocalPlayerId(res.playerId);
+        this.playerRenderer?.setLocalPlayerId(res.playerId);
         this.events.emit('localPlayerChanged', res.playerId);
       }
       if (res.info) {
@@ -2174,8 +2272,7 @@ export class GameScene extends Phaser.Scene {
   /** New tile renderer and wrap sizes for a map of another size. */
   private rebuildForMapSize(map: GameState['map']): void {
     this.tileMap?.destroy();
-    this.tileMap = new TileMapRenderer(
-      this,
+    this.tileMap = this.createTileMap(
       map.tiles,
       map.width,
       map.height,

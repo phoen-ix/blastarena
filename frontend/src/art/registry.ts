@@ -2,6 +2,8 @@ import { ART_STYLE_IDS, DEFAULT_ART_STYLE } from '@blast-arena/shared';
 import type { ArtStyleId } from '@blast-arena/shared';
 import type { ArtStyle } from './types';
 import { classicStyle } from './styles/classic';
+import { drawnStyle } from './styles/drawn';
+import { toyPainters } from './styles/toy/painters';
 
 /**
  * Styles this client build can draw. An id the server knows but the client does not (an admin
@@ -9,6 +11,7 @@ import { classicStyle } from './styles/classic';
  */
 const STYLES: Partial<Record<ArtStyleId, ArtStyle>> = {
   classic: classicStyle,
+  toy: drawnStyle(toyPainters),
 };
 
 export function isStyleAvailable(id: string): id is ArtStyleId {

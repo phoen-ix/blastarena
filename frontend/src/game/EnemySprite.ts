@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { CampaignEnemyState, TILE_SIZE, TICK_MS } from '@blast-arena/shared';
 import { getSettings } from './Settings';
-import { DEPTH } from '../art/depth';
+import { DEPTH, Y_BIAS, setDepthIfChanged, ySortDepth } from '../art/depth';
 import { base, fit } from '../art/scale';
+import type { StyledFx } from '../art/StyledFx';
 
 /** Fraction of the remaining distance covered per server tick; frame() rescales it per frame. */
 const LERP_PER_TICK = 0.45;
@@ -32,8 +33,29 @@ export class EnemySpriteRenderer {
    */
   private dying: Set<number> = new Set();
 
-  constructor(scene: Phaser.Scene) {
+  /** Set for the drawn art styles; null keeps the classic enemy textures. */
+  private fx: StyledFx | null;
+  /** Size multiplier per enemy type (bosses), drawn styles only for now. */
+  private sizeByType: Map<number, number> = new Map();
+
+  constructor(scene: Phaser.Scene, fx: StyledFx | null = null) {
     this.scene = scene;
+    this.fx = fx;
+  }
+
+  /** Drawn styles: bake each enemy type's frames and remember its size. */
+  setEnemyTypes(
+    types: { id: number; config: { sprite: unknown; sizeMultiplier?: number } }[],
+  ): void {
+    if (!this.fx) return;
+    for (const t of types) {
+      this.fx.art.ensureEnemy(this.scene, t.id, t.config.sprite as never);
+      this.sizeByType.set(t.id, Math.max(1, Math.min(3, t.config.sizeMultiplier ?? 1)));
+    }
+  }
+
+  private styledScale(sprite: Phaser.GameObjects.Sprite, typeId: number): number {
+    return base(sprite) * (this.sizeByType.get(typeId) ?? 1);
   }
 
   update(enemies: CampaignEnemyState[]): void {
@@ -53,7 +75,16 @@ export class EnemySpriteRenderer {
 
       let sprite = this.sprites.get(enemy.id);
 
-      if (!sprite) {
+      if (!sprite && this.fx) {
+        const key = this.fx.art.enemyKey(enemy.enemyTypeId);
+        if (!this.scene.textures.exists(key)) continue;
+        sprite = this.scene.add.sprite(targetX, targetY, key, `${enemy.direction}:0`);
+        sprite.setScale(this.styledScale(sprite, enemy.enemyTypeId));
+        sprite.setDepth(ySortDepth(targetY + 20, Y_BIAS.ENEMY));
+        const anim = this.fx.art.enemyAnim(enemy.enemyTypeId, enemy.direction);
+        if (settings.animations && this.scene.anims.exists(anim)) sprite.play(anim);
+        this.sprites.set(enemy.id, sprite);
+      } else if (!sprite) {
         // Create new sprite
         const textureKey = `enemy_${enemy.enemyTypeId}_${enemy.direction}`;
         if (!this.scene.textures.exists(textureKey)) continue;
@@ -70,7 +101,13 @@ export class EnemySpriteRenderer {
 
       // Update texture for direction changes
       const textureKey = `enemy_${enemy.enemyTypeId}_${enemy.direction}`;
-      if (this.scene.textures.exists(textureKey) && sprite.texture.key !== textureKey) {
+      if (this.fx) {
+        const anim = this.fx.art.enemyAnim(enemy.enemyTypeId, enemy.direction);
+        if (sprite.anims?.currentAnim?.key !== anim && enemy.alive) {
+          if (settings.animations && this.scene.anims.exists(anim)) sprite.play(anim);
+          else sprite.setFrame(`${enemy.direction}:0`);
+        }
+      } else if (this.scene.textures.exists(textureKey) && sprite.texture.key !== textureKey) {
         fit(sprite.setTexture(textureKey));
       }
 
@@ -78,7 +115,22 @@ export class EnemySpriteRenderer {
         // Death animation — once per enemy (audit C5)
         if (sprite.visible && !this.dying.has(enemy.id)) {
           this.dying.add(enemy.id);
-          if (settings.animations) {
+          if (settings.animations && this.fx) {
+            // Pop, flash white and vanish into a puff.
+            const s0 = sprite.scaleX;
+            sprite.setTint(0xffffff);
+            sprite.setTintMode(Phaser.TintModes.FILL);
+            this.fx.puff(sprite.x, sprite.y, 6);
+            this.scene.tweens.add({
+              targets: sprite,
+              scaleX: s0 * 1.25,
+              scaleY: s0 * 0.8,
+              alpha: 0,
+              duration: 240,
+              ease: 'Quad.Out',
+              onComplete: () => sprite!.setVisible(false),
+            });
+          } else if (settings.animations) {
             sprite.setTint(0xff0000);
             this.scene.tweens.add({
               targets: sprite,
@@ -143,6 +195,7 @@ export class EnemySpriteRenderer {
         sprite.x + (target.x - sprite.x) * k,
         sprite.y + (target.y - sprite.y) * k,
       );
+      if (this.fx) setDepthIfChanged(sprite, ySortDepth(sprite.y + 20, Y_BIAS.ENEMY));
       this.hpBars.get(id)?.setPosition(sprite.x, sprite.y);
     }
   }

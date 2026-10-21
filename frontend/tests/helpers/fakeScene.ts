@@ -10,6 +10,8 @@ export interface FakeSprite {
   x: number;
   y: number;
   texture: { key: string };
+  frame: { name: string };
+  depth: number;
   active: boolean;
   visible: boolean;
   alpha: number;
@@ -17,7 +19,8 @@ export interface FakeSprite {
   scaleY: number;
   displayWidth: number;
   tint: number | null;
-  setTexture(key: string): FakeSprite;
+  setTexture(key: string, frame?: string): FakeSprite;
+  setFrame(name: string): FakeSprite;
   setAlpha(a: number): FakeSprite;
   setScale(s: number): FakeSprite;
   setDisplaySize(w: number, h: number): FakeSprite;
@@ -26,7 +29,11 @@ export interface FakeSprite {
   setVisible(v: boolean): FakeSprite;
   setTint(t: number): FakeSprite;
   stop(): FakeSprite;
-  play(key: string): FakeSprite;
+  play(key: string | { key: string }): FakeSprite;
+  setTintMode(mode: number): FakeSprite;
+  clearTint(): FakeSprite;
+  /** The animation key last passed to play(), for assertions. */
+  playing: string | null;
   destroy(): void;
 }
 
@@ -35,11 +42,13 @@ export interface FakeTween {
   config: Record<string, unknown>;
 }
 
-export function makeSprite(x: number, y: number, key: string): FakeSprite {
+export function makeSprite(x: number, y: number, key: string, frame?: string): FakeSprite {
   const sprite: FakeSprite = {
     x,
     y,
     texture: { key },
+    frame: { name: frame ?? '__BASE' },
+    depth: 0,
     active: true,
     visible: true,
     alpha: 1,
@@ -47,8 +56,21 @@ export function makeSprite(x: number, y: number, key: string): FakeSprite {
     scaleY: 1,
     displayWidth: 0,
     tint: null,
-    setTexture(k) {
+    playing: null,
+    setTintMode() {
+      return sprite;
+    },
+    clearTint() {
+      sprite.tint = null;
+      return sprite;
+    },
+    setTexture(k, f) {
       sprite.texture = { key: k };
+      sprite.frame = { name: f ?? '__BASE' };
+      return sprite;
+    },
+    setFrame(name) {
+      sprite.frame = { name };
       return sprite;
     },
     setAlpha(a) {
@@ -69,7 +91,8 @@ export function makeSprite(x: number, y: number, key: string): FakeSprite {
       sprite.y = py;
       return sprite;
     },
-    setDepth() {
+    setDepth(d: number) {
+      sprite.depth = d;
       return sprite;
     },
     setVisible(v) {
@@ -83,7 +106,8 @@ export function makeSprite(x: number, y: number, key: string): FakeSprite {
     stop() {
       return sprite;
     },
-    play() {
+    play(k) {
+      sprite.playing = typeof k === 'string' ? k : k.key;
       return sprite;
     },
     destroy() {
@@ -172,13 +196,13 @@ export function makeFakeScene(options: { textures?: string[] } = {}) {
       },
     },
     add: {
-      sprite(x: number, y: number, key: string) {
-        const sprite = makeSprite(x, y, key);
+      sprite(x: number, y: number, key: string, frame?: string) {
+        const sprite = makeSprite(x, y, key, frame);
         sprites.push(sprite);
         return sprite;
       },
-      image(x: number, y: number, key: string) {
-        const sprite = makeSprite(x, y, key);
+      image(x: number, y: number, key: string, frame?: string) {
+        const sprite = makeSprite(x, y, key, frame);
         sprites.push(sprite);
         return sprite;
       },
@@ -205,7 +229,12 @@ export function makeFakeScene(options: { textures?: string[] } = {}) {
     cameras: {
       main: { worldView: { x: 0, y: 0, width: 800, height: 600 } },
     },
-    time: { now: 0 },
+    time: {
+      now: 0,
+      delayedCall(_ms: number, fn: () => void) {
+        fn();
+      },
+    },
   };
   return scene;
 }

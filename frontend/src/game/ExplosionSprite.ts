@@ -1,9 +1,12 @@
+import Phaser from 'phaser';
 import { ExplosionState } from '@blast-arena/shared';
 import { TILE_SIZE } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 import { wrapGhostPositions } from '../utils/wrapGhosts';
-import { DEPTH } from '../art/depth';
-import { base } from '../art/scale';
+import { DEPTH, Y_BIAS, ySortDepth } from '../art/depth';
+import { base, fit } from '../art/scale';
+import { explosionPieces } from '../art/explosionPieces';
+import type { StyledFx } from '../art/StyledFx';
 
 interface TrackedExplosion {
   sprites: Phaser.GameObjects.Sprite[];
@@ -22,8 +25,12 @@ export class ExplosionRenderer {
   /** Reused across ticks instead of a fresh Set per update, like BombSpriteRenderer. (audit F5) */
   private _activeIds = new Set<string>();
 
-  constructor(scene: Phaser.Scene) {
+  /** Set for the drawn art styles; null draws the classic blob per cell. */
+  private fx: StyledFx | null;
+
+  constructor(scene: Phaser.Scene, fx: StyledFx | null = null) {
     this.scene = scene;
+    this.fx = fx;
   }
 
   update(explosions: ExplosionState[]): void {
@@ -44,8 +51,9 @@ export class ExplosionRenderer {
 
       if (!existing) {
         // New explosion — create sprites and particles
-        this.createExplosion(explosion);
-      } else {
+        if (this.fx) this.createStyledExplosion(explosion, this.fx);
+        else this.createExplosion(explosion);
+      } else if (!this.fx) {
         // Existing explosion — handle fade phase
         if (getSettings().animations && explosion.ticksRemaining <= 3 && !existing.fadingStarted) {
           existing.fadingStarted = true;
@@ -76,6 +84,76 @@ export class ExplosionRenderer {
     // its particles suppressed by off-screen ghost copies. (audit WRAP-GHOST-1)
     const { w, h } = this.wrappingWorldSize;
     return wrapGhostPositions(this.scene.cameras.main.worldView, px, py, w, h, TILE_SIZE);
+  }
+
+  /**
+   * Drawn styles: one sprite per cell playing the baked life of its flame piece (centre, arm or
+   * end cap, so the cross reads as one connected shape), rippling out from the centre, with
+   * light pools, a shockwave and scorch marks.
+   */
+  private createStyledExplosion(explosion: ExplosionState, fx: StyledFx): void {
+    const art = fx.art;
+    const sprites: Phaser.GameObjects.Sprite[] = [];
+    const key = art.fxKey();
+    const animations = getSettings().animations;
+    const additive = art.painters.id === 'neon';
+    const wrapTiles = this.wrappingWorldSize
+      ? { w: this.wrappingWorldSize.w / TILE_SIZE, h: this.wrappingWorldSize.h / TILE_SIZE }
+      : undefined;
+    const pieces = explosionPieces(explosion.cells, wrapTiles);
+    const center = explosion.cells[0];
+    const pierce = !!explosion.pierce;
+    const pal = art.painters.palette;
+
+    for (const piece of pieces) {
+      const dir =
+        piece.role === 'center'
+          ? 'down'
+          : piece.role === 'arm'
+            ? piece.dir === 'left' || piece.dir === 'right'
+              ? 'right'
+              : 'down'
+            : (piece.dir ?? 'down');
+      const anim = art.flameAnim(piece.role, dir, pierce);
+      const distance = Math.abs(piece.x - center.x) + Math.abs(piece.y - center.y);
+      for (const pos of this.getCellPositions(piece.x, piece.y)) {
+        const sprite = fit(this.scene.add.sprite(pos.x, pos.y, key));
+        sprite.setDepth(ySortDepth(pos.y + TILE_SIZE / 2, Y_BIAS.FLAME));
+        if (additive) sprite.setBlendMode(Phaser.BlendModes.ADD);
+        const play = () => {
+          if (!sprite.active) return;
+          sprite.setVisible(true);
+          if (this.scene.anims.exists(anim)) sprite.play(anim);
+        };
+        if (animations && distance > 0) {
+          sprite.setVisible(false);
+          this.scene.time.delayedCall(18 * distance, play);
+        } else {
+          play();
+        }
+        sprites.push(sprite);
+      }
+    }
+
+    // Light, shockwave and scorch at the centre (and its wrapped copies on screen).
+    for (const pos of this.getCellPositions(center.x, center.y)) {
+      fx.light(pos.x, pos.y, TILE_SIZE * 2.6, pal.flameLight, 0.85, 520);
+      fx.shockwave(pos.x, pos.y, 1.4 + Math.min(4, explosion.cells.length / 4) * 0.35, pal.shock);
+      fx.scorch(pos.x, pos.y, true);
+    }
+    for (const piece of pieces) {
+      if (piece.role === 'end') {
+        for (const pos of this.getCellPositions(piece.x, piece.y)) {
+          fx.light(pos.x, pos.y, TILE_SIZE * 1.4, pal.flameLight, 0.5, 420);
+        }
+      }
+      if (piece.role !== 'center' && Math.random() < 0.3) {
+        const pos = this.getCellPositions(piece.x, piece.y)[0];
+        fx.scorch(pos.x, pos.y, false);
+      }
+    }
+
+    this.tracked.set(explosion.id, { sprites, emitters: [], fadingStarted: true });
   }
 
   private createExplosion(explosion: ExplosionState): void {

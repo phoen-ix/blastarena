@@ -6,6 +6,9 @@ import { audioManager } from './AudioManager';
 import { POWERUP_COLORS } from '../scenes/BootScene';
 import { t } from '../i18n';
 import { DEPTH } from '../art/depth';
+import { PU_COLORS_NEW } from '../art/paint';
+import type { StyledFx } from '../art/StyledFx';
+import type { World } from '../art/painters/types';
 
 /**
  * Upper bound on debris bursts per tile-destruction batch. A wall-collapse event or a long pierce
@@ -39,11 +42,24 @@ export class EffectSystem {
     | ((data: { playerId: number; type: string; position: { x: number; y: number } }) => void)
     | null = null;
 
+  /** Set for the drawn art styles; null keeps the classic particles. */
+  private styled: StyledFx | null = null;
+  private styledWorld: World = 'classic';
+
   constructor(scene: Phaser.Scene, socketClient: SocketClient, localPlayerId: number) {
     this.scene = scene;
     this.socketClient = socketClient;
     this.localPlayerId = localPlayerId;
     this.setupListeners();
+  }
+
+  /** Called on every knockout (drawn styles use it for the hit pause). */
+  onKnockout: ((playerId: number, killerId: number | null) => void) | null = null;
+
+  /** Draw tile, pickup and enemy effects in a drawn art style (and the map's world). */
+  setStyledFx(fx: StyledFx | null, world: World): void {
+    this.styled = fx;
+    this.styledWorld = world;
   }
 
   private setupListeners(): void {
@@ -53,6 +69,7 @@ export class EffectSystem {
 
     this.playerDiedHandler = (data) => {
       this.onPlayerDied(data.playerId);
+      this.onKnockout?.(data.playerId, data.killerId);
     };
 
     this.powerupCollectedHandler = (data) => {
@@ -101,6 +118,20 @@ export class EffectSystem {
     const settings = getSettings();
     if (!settings.particles || positions.length === 0) return;
 
+    if (this.styled) {
+      const n = Math.min(positions.length, MAX_DEBRIS_BURSTS);
+      for (let i = 0; i < n; i++) {
+        const pos = positions[i];
+        this.styled.chunks(
+          pos.x * TILE_SIZE + TILE_SIZE / 2,
+          pos.y * TILE_SIZE + TILE_SIZE / 2,
+          this.styledWorld,
+          false,
+        );
+      }
+      return;
+    }
+
     const emitter = this.getDebrisEmitter();
     const bursts = Math.min(positions.length, MAX_DEBRIS_BURSTS);
     for (let i = 0; i < bursts; i++) {
@@ -136,6 +167,17 @@ export class EffectSystem {
     const px = x * TILE_SIZE + TILE_SIZE / 2;
     const py = y * TILE_SIZE + TILE_SIZE / 2;
     const color = POWERUP_COLORS[type] ?? 0xffffff;
+
+    if (this.styled) {
+      const css = PU_COLORS_NEW[type as keyof typeof PU_COLORS_NEW] ?? '#ffffff';
+      const c = parseInt(css.slice(1), 16);
+      this.styled.burst(px, py, c, 12);
+      this.styled.light(px, py, TILE_SIZE * 1.6, css, 0.7, 380);
+      this.styled.shockwave(px, py, 0.9, css);
+      const fallback = type.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
+      this.styled.label(px, py, t(`game:powerups.${type}.name`, { defaultValue: fallback }), css);
+      return;
+    }
 
     if (settings.particles) {
       this.burst(
@@ -263,7 +305,11 @@ export class EffectSystem {
     audioManager.shieldBreak();
     if (isBoss) audioManager.explosion(0);
 
-    if (settings.particles) {
+    if (this.styled && settings.particles) {
+      this.styled.burst(px, py, isBoss ? 0xffdd44 : 0xffffff, isBoss ? 36 : 14);
+      this.styled.puff(px, py, isBoss ? 14 : 6);
+      this.styled.light(px, py, TILE_SIZE * (isBoss ? 3 : 1.6), '#ffd27a', 0.8, 500);
+    } else if (settings.particles) {
       this.burst(
         px,
         py,
@@ -311,6 +357,7 @@ export class EffectSystem {
   /** Direct trigger for replay mode (no socket events) */
   triggerPlayerDied(data: { playerId: number; killerId: number | null }): void {
     this.onPlayerDied(data.playerId);
+    this.onKnockout?.(data.playerId, data.killerId);
   }
 
   destroy(): void {

@@ -3,8 +3,12 @@ import { BombState, PlayerCosmeticData, TILE_SIZE } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 import { BootScene } from '../scenes/BootScene';
 import { wrapGhostOffsets } from '../utils/wrapGhosts';
-import { DEPTH } from '../art/depth';
-import { base } from '../art/scale';
+import { DEPTH, Y_BIAS, setDepthIfChanged, ySortDepth } from '../art/depth';
+import { base, fit } from '../art/scale';
+import { fuseFraction, fuseFrame } from '../art/explosionPieces';
+import { StyleArt } from '../art/StyleArt';
+import type { StyledFx } from '../art/StyledFx';
+import type { BombType } from '../art/painters/types';
 
 /** Where the classic bomb texture's fuse tip sits, relative to the bomb's centre. */
 const FUSE_TIP_DX = 6;
@@ -26,8 +30,16 @@ export class BombSpriteRenderer {
   public wrappingWorldSize: { w: number; h: number } | null = null;
   private ghostSprites: Map<string, Phaser.GameObjects.Image[]> = new Map();
 
-  constructor(scene: Phaser.Scene) {
+  /** Set for the drawn art styles; null keeps the classic bomb. */
+  private fx: StyledFx | null;
+  /** Owner-colour stripes (drawn styles), one per bomb. */
+  private bands: Map<string, Phaser.GameObjects.Image> = new Map();
+  /** Body colour of a player, so a bomb's stripe matches its owner. */
+  ownerColor: (playerId: number) => number | undefined = () => undefined;
+
+  constructor(scene: Phaser.Scene, fx: StyledFx | null = null) {
     this.scene = scene;
+    this.fx = fx;
   }
 
   /** Register a bomb throw — called before update() so the arc animation plays on creation */
@@ -61,7 +73,9 @@ export class BombSpriteRenderer {
       const posY = bomb.position.y * TILE_SIZE + TILE_SIZE / 2;
       const existing = this.sprites.get(bomb.id);
 
-      if (existing) {
+      if (existing && this.fx) {
+        this.updateStyledBomb(bomb, existing, posX, posY, this.fx);
+      } else if (existing) {
         // Update position for sliding/kicked bombs
         existing.x = posX;
         existing.y = posY;
@@ -100,6 +114,8 @@ export class BombSpriteRenderer {
 
         // Sync ghost sprites: position, texture, and visual properties (tint, scale, alpha)
         this.updateGhosts(bomb.id, posX, posY, existing.texture.key, existing);
+      } else if (this.fx) {
+        this.createStyledBomb(bomb, posX, posY, this.fx);
       } else {
         // Create new bomb sprite — use different texture for remote bombs or custom skins
         const isRemote = bomb.bombType === 'remote';
@@ -223,6 +239,152 @@ export class BombSpriteRenderer {
     }
   }
 
+  /** Frame for a drawn-style bomb at its current fuse. */
+  private styledFrame(bomb: BombState): string {
+    const type = bomb.bombType as BombType;
+    const spark = (Math.floor(this.scene.time.now / 110) % 2) as 0 | 1;
+    if (bomb.ticksRemaining < 20 && type !== 'remote')
+      return StyleArt.bombFrame(type, 'hot', spark);
+    if (type === 'remote') return StyleArt.bombFrame('remote', 0, spark);
+    const art = this.fx!.art;
+    const i = fuseFrame(fuseFraction(bomb.ticksRemaining, type), art.fuseFrames);
+    return StyleArt.bombFrame(type, i, spark);
+  }
+
+  private createStyledBomb(bomb: BombState, posX: number, posY: number, fx: StyledFx): void {
+    const art = fx.art;
+    const key = art.fxKey();
+    const settings = getSettings();
+    const throwData = this.pendingThrows.get(bomb.id);
+    this.pendingThrows.delete(bomb.id);
+
+    const sprite = fit(this.scene.add.sprite(posX, posY, key, this.styledFrame(bomb)));
+    sprite.setDepth(ySortDepth(posY + 16, Y_BIAS.BOMB));
+    this.sprites.set(bomb.id, sprite);
+
+    const band = fit(
+      this.scene.add.image(posX, posY, key, StyleArt.bandFrame(bomb.bombType as BombType)),
+    );
+    band.setTint(this.ownerColor(bomb.ownerId) ?? 0xffffff);
+    band.setDepth(sprite.depth + 0.01);
+    this.bands.set(bomb.id, band);
+
+    const b = base(sprite);
+    if (throwData) {
+      let dx = posX - (throwData.from.x * TILE_SIZE + TILE_SIZE / 2);
+      let dy = posY - (throwData.from.y * TILE_SIZE + TILE_SIZE / 2);
+      if (this.wrappingWorldSize) {
+        const { w, h } = this.wrappingWorldSize;
+        if (dx > w / 2) dx -= w;
+        else if (dx < -w / 2) dx += w;
+        if (dy > h / 2) dy -= h;
+        else if (dy < -h / 2) dy += h;
+      }
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const arcHeight = Math.max(20, dist * 0.4);
+      const sx = posX - dx;
+      const sy = posY - dy;
+      sprite.setPosition(sx, sy);
+      sprite.setDepth(DEPTH.THROWN_BOMB);
+      sprite.setScale(0.8 * b);
+      const duration = Math.min(600, Math.max(300, (dist / (3 * TILE_SIZE)) * 300));
+      this.scene.tweens.add({
+        targets: sprite,
+        x: posX,
+        y: posY,
+        scale: b,
+        duration,
+        ease: 'Sine.easeOut',
+        onUpdate: (tween) => {
+          const p = tween.progress;
+          sprite.y = sy + dy * p + 4 * arcHeight * p * (p - 1);
+        },
+        onComplete: () => {
+          sprite.setDepth(ySortDepth(posY + 16, Y_BIAS.BOMB));
+          fx.dust(posX, posY + 14, 4);
+        },
+      });
+    } else if (settings.animations) {
+      // Plop down onto the floor.
+      sprite.setScale(b * 1.25, b * 0.75);
+      this.scene.tweens.add({
+        targets: sprite,
+        scaleX: b,
+        scaleY: b,
+        duration: 180,
+        ease: 'Back.Out',
+      });
+    }
+
+    if (settings.particles && bomb.bombType !== 'remote') {
+      const tip = art.painters.fuseTip;
+      const emitter = this.scene.add.particles(posX + tip.x, posY + tip.y, key, {
+        frame: StyleArt.fxFrame('spark'),
+        speed: { min: 15, max: 50 },
+        lifespan: 260,
+        scale: { start: 0.35 / art.scale, end: 0 },
+        alpha: { start: 1, end: 0 },
+        quantity: 1,
+        frequency: 110,
+        gravityY: -40,
+        angle: { min: 230, max: 310 },
+        blendMode: Phaser.BlendModes.ADD,
+      });
+      emitter.setDepth(DEPTH.IMPACT);
+      this.sparkEmitters.set(bomb.id, emitter);
+    }
+  }
+
+  private updateStyledBomb(
+    bomb: BombState,
+    sprite: Phaser.GameObjects.Sprite,
+    posX: number,
+    posY: number,
+    fx: StyledFx,
+  ): void {
+    const settings = getSettings();
+    // While a thrown bomb is in the air its arc tween owns the position.
+    const inFlight = sprite.depth === DEPTH.THROWN_BOMB;
+    if (!inFlight) {
+      const moving = Math.abs(sprite.x - posX) > 0.5 || Math.abs(sprite.y - posY) > 0.5;
+      if (moving && bomb.slideDir) fx.dust(sprite.x, sprite.y + 14, 2);
+      sprite.x = posX;
+      sprite.y = posY;
+    }
+    sprite.setFrame(this.styledFrame(bomb));
+    if (sprite.depth !== DEPTH.THROWN_BOMB) {
+      setDepthIfChanged(sprite, ySortDepth(posY + 16, Y_BIAS.BOMB));
+    }
+
+    // The last second: swell and throb, faster as it runs out.
+    const b = base(sprite);
+    if (bomb.ticksRemaining < 20 && bomb.bombType !== 'remote' && settings.animations) {
+      const phase = this.scene.time.now / (60 + bomb.ticksRemaining * 6);
+      const s = b * (1.08 + 0.07 * Math.sin(phase * Math.PI));
+      sprite.setScale(s);
+    } else if (!this.scene.tweens.isTweening(sprite)) {
+      const breathe = settings.animations ? 1 + 0.03 * Math.sin(this.scene.time.now / 180) : 1;
+      sprite.setScale(b * breathe);
+    }
+
+    const band = this.bands.get(bomb.id);
+    if (band) {
+      band.setPosition(sprite.x, sprite.y);
+      band.setScale(sprite.scaleX, sprite.scaleY);
+      band.setDepth(sprite.depth + 0.01);
+      const owner = this.ownerColor(bomb.ownerId);
+      if (owner !== undefined) band.setTint(owner);
+    }
+
+    const emitter = this.sparkEmitters.get(bomb.id);
+    if (emitter) {
+      const tip = fx.art.painters.fuseTip;
+      emitter.setPosition(sprite.x + tip.x, sprite.y + tip.y);
+      emitter.frequency = bomb.ticksRemaining < 20 ? Math.max(25, bomb.ticksRemaining * 5) : 110;
+    }
+    this.updateGhosts(bomb.id, posX, posY, sprite.texture.key, sprite);
+  }
+
   private updateGhosts(
     bombId: string,
     px: number,
@@ -264,7 +426,8 @@ export class BombSpriteRenderer {
     // Sync position, texture, and visual properties from canonical sprite
     for (let i = 0; i < offsets.length; i++) {
       ghosts[i].setPosition(px + offsets[i].ox, py + offsets[i].oy);
-      ghosts[i].setTexture(textureKey);
+      ghosts[i].setTexture(textureKey, canonical?.frame.name);
+      if (this.fx) setDepthIfChanged(ghosts[i], ySortDepth(ghosts[i].y + 16, Y_BIAS.BOMB));
       if (canonical) {
         ghosts[i].setScale(canonical.scaleX, canonical.scaleY);
         ghosts[i].setAlpha(canonical.alpha);
@@ -301,6 +464,12 @@ export class BombSpriteRenderer {
     if (tween) {
       tween.destroy();
       this.pulseTweens.delete(id);
+    }
+
+    const band = this.bands.get(id);
+    if (band) {
+      band.destroy();
+      this.bands.delete(id);
     }
 
     const emitter = this.sparkEmitters.get(id);
