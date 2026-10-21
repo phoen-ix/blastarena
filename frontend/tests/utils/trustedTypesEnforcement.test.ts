@@ -170,7 +170,9 @@ describe('Trusted Types enforcement', () => {
       }),
     ).not.toThrow();
     expect(el.querySelectorAll('.hud-player-item')).toHaveLength(3);
-    expect(el.querySelector('img')).toBeNull();
+    // The username was escaped: the only images are the list's own drawn icons.
+    expect(el.querySelector('img:not(.hud-icon)')).toBeNull();
+    expect(el.textContent).toContain('<img src=x>');
   });
 
   it('escapeHtml still works — it reads innerHTML, which is not a sink', async () => {

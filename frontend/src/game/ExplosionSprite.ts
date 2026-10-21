@@ -214,10 +214,10 @@ export class ExplosionRenderer {
           emitters.push(fireEmitter);
           this.activeEmitterCount++;
 
+          // Counted down once: here, or in destroyTracked() if the explosion goes first.
           this.scene.time.delayedCall(isReduced ? 300 : 400, () => {
-            if (fireEmitter && fireEmitter.active) {
-              fireEmitter.destroy();
-            }
+            if (!fireEmitter.active) return;
+            fireEmitter.destroy();
             this.activeEmitterCount = Math.max(0, this.activeEmitterCount - 1);
           });
 
@@ -237,9 +237,8 @@ export class ExplosionRenderer {
             this.activeEmitterCount++;
 
             this.scene.time.delayedCall(700, () => {
-              if (smokeEmitter && smokeEmitter.active) {
-                smokeEmitter.destroy();
-              }
+              if (!smokeEmitter.active) return;
+              smokeEmitter.destroy();
               this.activeEmitterCount = Math.max(0, this.activeEmitterCount - 1);
             });
           }

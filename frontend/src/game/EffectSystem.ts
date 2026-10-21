@@ -3,7 +3,7 @@ import { SocketClient } from '../network/SocketClient';
 import { TILE_SIZE, Position } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 import { audioManager } from './AudioManager';
-import { POWERUP_COLORS } from '../scenes/BootScene';
+import { POWERUP_COLORS } from '../utils/powerUpColors';
 import { t } from '../i18n';
 import { DEPTH } from '../art/depth';
 import { PU_COLORS_NEW } from '../art/paint';

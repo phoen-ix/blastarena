@@ -1,6 +1,7 @@
 import type { PlayerState } from '@blast-arena/shared';
 import { escapeHtml, reconcileChildren, setHtml } from '../utils/html';
 import { t } from '../i18n';
+import { hudIcon } from './hudIcons';
 
 /**
  * The in-match HUD player list.
@@ -135,12 +136,12 @@ export class HudPlayerList {
           : '';
         setHtml(
           row.nameEl,
-          `${teamDot}${p.isBot ? '🤖 ' : ''}${escapeHtml(p.username)}${buddyTag}`,
+          `${teamDot}${p.isBot ? hudIcon('bot', 14) : ''}${escapeHtml(p.username)}${buddyTag}`,
         );
 
         if (isKOTH) {
-          row.badgeEl.style.cssText = `margin-left:auto;font-size:11px;font-weight:700;color:${isControlling ? '#00e676' : '#ffaa22'};font-family:'Chakra Petch',monospace;`;
-          row.badgeEl.textContent = `${isControlling ? '👑 ' : ''}${score}`;
+          row.badgeEl.style.cssText = `margin-left:auto;display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;color:${isControlling ? 'var(--success)' : 'var(--warning)'};font-family:var(--font-display);`;
+          setHtml(row.badgeEl, `${isControlling ? hudIcon('crown', 14) : ''}${score}`);
         } else if (row.badgeEl.textContent) {
           row.badgeEl.style.cssText = 'display:none;';
           row.badgeEl.textContent = '';

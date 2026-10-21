@@ -35,7 +35,6 @@ const CLASSIC: Record<string, number> = {
   SURGE: 25,
   EMOTE_BG: 99,
   EMOTE: 100,
-  COUNTDOWN: 100,
   SPECTATOR_FLASH: 120,
   PARTNER_ARROW: 9998,
   SPLIT_DIVIDER: 9999,

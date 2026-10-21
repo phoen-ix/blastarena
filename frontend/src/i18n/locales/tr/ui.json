@@ -536,6 +536,8 @@
       "fifo": "1."
     },
     "buddyTag": "[BUDDY]",
+    "livesLeft": "{{max}} candan {{count}} kaldı",
+    "countdownGo": "BAŞLA!",
     "coopDead": "(öldü)",
     "coopReady": "(hazır)",
     "coopRespawnIn": "({{seconds}}sn)",

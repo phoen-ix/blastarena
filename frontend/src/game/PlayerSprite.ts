@@ -95,6 +95,17 @@ export class PlayerSpriteRenderer {
 
   /** Cosmetic body colour per player, for colorOf(). */
   private customColor: Map<number, number> = new Map();
+  /** Cosmetic eye style per player. */
+  private customEyes: Map<number, EyeStyle> = new Map();
+  /**
+   * How each player was last drawn, for lookOf(). Kept through death (the colour index is
+   * dropped then) so the kill feed can still show the victim.
+   */
+  private looks: Map<number, { color: number; eyes: EyeStyle }> = new Map();
+  /** Classic sprites currently flickering for spawn invulnerability. */
+  private flickering: Set<number> = new Set();
+  /** Spawn-invulnerability ticks left per classic player (drawn styles keep it in `styled`). */
+  private invulnerable: Map<number, number> = new Map();
 
   /** Trail particle emitters per player */
   private trailEmitters: Map<number, Phaser.GameObjects.Particles.ParticleEmitter> = new Map();
@@ -299,6 +310,9 @@ export class PlayerSpriteRenderer {
             : player.cosmetics.colorHex.toString(16);
           this.customTexturePrefix.set(player.id, `player_custom_${suffix}`);
           this.customColor.set(player.id, player.cosmetics.colorHex);
+          if (player.cosmetics.eyeStyle) {
+            this.customEyes.set(player.id, player.cosmetics.eyeStyle as EyeStyle);
+          }
           colorIndex = -1; // Sentinel: use custom prefix
         } else if (player.team !== null && player.team !== undefined) {
           const teamColors = TEAM_COLOR_INDICES[player.team] || TEAM_COLOR_INDICES[0];
@@ -310,6 +324,10 @@ export class PlayerSpriteRenderer {
         }
         this.playerColorIndex.set(player.id, colorIndex);
         this.playerTeams.set(player.id, player.team);
+        const color = this.colorOf(player.id);
+        if (color !== undefined) {
+          this.looks.set(player.id, { color, eyes: this.customEyes.get(player.id) ?? 'default' });
+        }
       }
 
       if (!sprite) {
@@ -386,6 +404,7 @@ export class PlayerSpriteRenderer {
         st.dir = player.direction || st.dir;
         st.invulnerable = player.invulnerableTicks ?? 0;
       } else {
+        this.invulnerable.set(player.id, player.invulnerableTicks ?? 0);
         // Update texture based on direction
         const customPrefix = this.customTexturePrefix.get(player.id);
         const dirTexture = customPrefix
@@ -592,6 +611,16 @@ export class PlayerSpriteRenderer {
         } else {
           sprite.x = Phaser.Math.Linear(sprite.x, target.x, k);
           sprite.y = Phaser.Math.Linear(sprite.y, target.y, k);
+        }
+      }
+
+      // Classic: a plain flicker while spawn-invulnerable (drawn styles do theirs in frameStyled).
+      if (!st) {
+        if ((this.invulnerable.get(id) ?? 0) > 0) {
+          sprite.setAlpha(Math.floor(time / 90) % 2 === 0 ? 0.35 : 1);
+          this.flickering.add(id);
+        } else if (this.flickering.delete(id)) {
+          sprite.setAlpha(1);
         }
       }
 
@@ -944,6 +973,7 @@ export class PlayerSpriteRenderer {
       } else {
         g.setTexture(textureKey);
         g.setDisplaySize(displaySize, displaySize);
+        g.setAlpha(this.sprites.get(playerId)?.alpha ?? 1);
       }
     }
 
@@ -1064,6 +1094,11 @@ export class PlayerSpriteRenderer {
    * The body colour a player is drawn in (cosmetic colour, team colour or index colour), once
    * they have been seen. Bombs and the minimap use it so an owner's colour matches their sprite.
    */
+  /** Body colour and eyes a player is drawn with, for portraits (kill feed, results). */
+  lookOf(playerId: number): { color: number; eyes: EyeStyle } | undefined {
+    return this.looks.get(playerId);
+  }
+
   colorOf(playerId: number): number | undefined {
     const custom = this.customColor.get(playerId);
     if (custom !== undefined) return custom;
@@ -1105,6 +1140,10 @@ export class PlayerSpriteRenderer {
     this.ghostTeamIndicators.clear();
     this.playerColorIndex.clear();
     this.customColor.clear();
+    this.customEyes.clear();
+    this.looks.clear();
+    this.flickering.clear();
+    this.invulnerable.clear();
     this.playerTeams.clear();
     this.prevShieldState.clear();
     this.prevPositions.clear();
@@ -1172,6 +1211,10 @@ export class PlayerSpriteRenderer {
     this.playerTeams.delete(id);
     this.customTexturePrefix.delete(id);
     this.customColor.delete(id);
+    this.customEyes.delete(id);
+    this.looks.delete(id);
+    this.flickering.delete(id);
+    this.invulnerable.delete(id);
     this.activeMoveAnim.delete(id);
   }
 }

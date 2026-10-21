@@ -181,10 +181,12 @@ export function makeFakeScene(options: { textures?: string[] } = {}) {
   const sprites: FakeSprite[] = [];
   const tweens: FakeTween[] = [];
   const graphics: ReturnType<typeof makeGraphics>[] = [];
+  const emitters: { active: boolean; key: string; exploded: number }[] = [];
   const known = new Set(options.textures ?? []);
   const scene = {
     sprites,
     graphics,
+    emitters,
     tweens: {
       list: tweens,
       add(config: { targets: unknown } & Record<string, unknown>) {
@@ -213,6 +215,31 @@ export function makeFakeScene(options: { textures?: string[] } = {}) {
       },
       text(x: number, y: number, text: string, style?: object) {
         return makeText(x, y, text, style);
+      },
+      particles(x: number, y: number, key: string) {
+        const emitter = {
+          x,
+          y,
+          key,
+          active: true,
+          exploded: 0,
+          setDepth() {
+            return emitter;
+          },
+          setPosition(px: number, py: number) {
+            emitter.x = px;
+            emitter.y = py;
+            return emitter;
+          },
+          explode(n: number) {
+            emitter.exploded += n;
+          },
+          destroy() {
+            emitter.active = false;
+          },
+        };
+        emitters.push(emitter);
+        return emitter;
       },
     },
     anims: {

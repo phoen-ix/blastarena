@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { CampaignEnemyState, TILE_SIZE, TICK_MS } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 import { DEPTH, Y_BIAS, setDepthIfChanged, ySortDepth } from '../art/depth';
-import { base, fit } from '../art/scale';
+import { base } from '../art/scale';
 import type { StyledFx } from '../art/StyledFx';
 
 /** Fraction of the remaining distance covered per server tick; frame() rescales it per frame. */
@@ -37,24 +37,28 @@ export class EnemySpriteRenderer {
   private fx: StyledFx | null;
   /** Size multiplier per enemy type (bosses), drawn styles only for now. */
   private sizeByType: Map<number, number> = new Map();
+  /** Enemy types drawn with the ghost body, shown translucent. */
+  private ghostTypes: Set<number> = new Set();
 
   constructor(scene: Phaser.Scene, fx: StyledFx | null = null) {
     this.scene = scene;
     this.fx = fx;
   }
 
-  /** Drawn styles: bake each enemy type's frames and remember its size. */
+  /** Remember each enemy type's size and body; drawn styles also bake its frames. */
   setEnemyTypes(
     types: { id: number; config: { sprite: unknown; sizeMultiplier?: number } }[],
   ): void {
-    if (!this.fx) return;
     for (const t of types) {
-      this.fx.art.ensureEnemy(this.scene, t.id, t.config.sprite as never);
       this.sizeByType.set(t.id, Math.max(1, Math.min(3, t.config.sizeMultiplier ?? 1)));
+      const sprite = t.config.sprite as { bodyShape?: string } | null;
+      if (sprite?.bodyShape === 'ghost') this.ghostTypes.add(t.id);
+      this.fx?.art.ensureEnemy(this.scene, t.id, t.config.sprite as never);
     }
   }
 
-  private styledScale(sprite: Phaser.GameObjects.Sprite, typeId: number): number {
+  /** Display scale for an enemy: its texture's base scale times the type's size (bosses). */
+  private scaleFor(sprite: Phaser.GameObjects.Sprite, typeId: number): number {
     return base(sprite) * (this.sizeByType.get(typeId) ?? 1);
   }
 
@@ -79,7 +83,7 @@ export class EnemySpriteRenderer {
         const key = this.fx.art.enemyKey(enemy.enemyTypeId);
         if (!this.scene.textures.exists(key)) continue;
         sprite = this.scene.add.sprite(targetX, targetY, key, `${enemy.direction}:0`);
-        sprite.setScale(this.styledScale(sprite, enemy.enemyTypeId));
+        sprite.setScale(this.scaleFor(sprite, enemy.enemyTypeId));
         sprite.setDepth(ySortDepth(targetY + 20, Y_BIAS.ENEMY));
         const anim = this.fx.art.enemyAnim(enemy.enemyTypeId, enemy.direction);
         if (settings.animations && this.scene.anims.exists(anim)) sprite.play(anim);
@@ -89,14 +93,17 @@ export class EnemySpriteRenderer {
         const textureKey = `enemy_${enemy.enemyTypeId}_${enemy.direction}`;
         if (!this.scene.textures.exists(textureKey)) continue;
 
-        sprite = fit(this.scene.add.sprite(targetX, targetY, textureKey));
+        sprite = this.scene.add.sprite(targetX, targetY, textureKey);
+        sprite.setScale(this.scaleFor(sprite, enemy.enemyTypeId));
         sprite.setDepth(DEPTH.ENEMY);
-
-        if (enemy.isBoss) {
-          // Boss scaling handled via sizeMultiplier on texture, keep sprite at 1x
-        }
-
         this.sprites.set(enemy.id, sprite);
+      }
+      if (
+        this.ghostTypes.has(enemy.enemyTypeId) &&
+        !this.dying.has(enemy.id) &&
+        sprite.alpha === 1
+      ) {
+        sprite.setAlpha(0.7);
       }
 
       // Update texture for direction changes
@@ -108,7 +115,8 @@ export class EnemySpriteRenderer {
           else sprite.setFrame(`${enemy.direction}:0`);
         }
       } else if (this.scene.textures.exists(textureKey) && sprite.texture.key !== textureKey) {
-        fit(sprite.setTexture(textureKey));
+        sprite.setTexture(textureKey);
+        sprite.setScale(this.scaleFor(sprite, enemy.enemyTypeId));
       }
 
       if (!enemy.alive) {
@@ -134,8 +142,8 @@ export class EnemySpriteRenderer {
             sprite.setTint(0xff0000);
             this.scene.tweens.add({
               targets: sprite,
-              scaleX: 0.2 * base(sprite),
-              scaleY: 0.2 * base(sprite),
+              scaleX: 0.2 * sprite.scaleX,
+              scaleY: 0.2 * sprite.scaleY,
               alpha: 0,
               duration: 300,
               onComplete: () => {
@@ -156,11 +164,6 @@ export class EnemySpriteRenderer {
         continue;
       }
 
-      // Ghost enemies get translucency
-      if (sprite.alpha > 0.5 && textureKey.includes('ghost')) {
-        sprite.setAlpha(0.7);
-      }
-
       // Record where the sprite should head; frame() moves it there
       const target = this.targets.get(enemy.id);
       if (target) {
@@ -175,7 +178,7 @@ export class EnemySpriteRenderer {
 
       // HP bar for enemies with HP > 1
       if (enemy.maxHp > 1) {
-        this.updateHPBar(enemy, sprite.x, sprite.y);
+        this.updateHPBar(enemy, sprite.x, sprite.y, this.sizeByType.get(enemy.enemyTypeId) ?? 1);
       }
     }
   }
@@ -200,7 +203,7 @@ export class EnemySpriteRenderer {
     }
   }
 
-  private updateHPBar(enemy: CampaignEnemyState, x: number, y: number): void {
+  private updateHPBar(enemy: CampaignEnemyState, x: number, y: number, size: number): void {
     let bar = this.hpBars.get(enemy.id);
     if (!bar) {
       bar = this.scene.add.graphics();
@@ -217,7 +220,8 @@ export class EnemySpriteRenderer {
     const barWidth = enemy.isBoss ? 40 : 28;
     const barHeight = 4;
     const barX = -barWidth / 2;
-    const barY = -TILE_SIZE / 2 - 6;
+    // Above the sprite, which bosses draw bigger; raised styles draw a little taller.
+    const barY = -(TILE_SIZE / 2) * size - (this.fx ? 12 : 6);
 
     // Background
     bar.fillStyle(0x000000, 0.6);

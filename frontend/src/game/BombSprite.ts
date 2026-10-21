@@ -124,7 +124,7 @@ export class BombSpriteRenderer {
         // Check for custom bomb skin from owner's cosmetics
         const ownerCosmetics = this.playerCosmetics.get(bomb.ownerId);
         if (ownerCosmetics?.bombSkinConfig && !isRemote) {
-          const customKey = `bomb_custom_${ownerCosmetics.bombSkinConfig.label}`;
+          const customKey = BootScene.customBombKey(ownerCosmetics.bombSkinConfig);
           BootScene.generateCustomBombTexture(this.scene, ownerCosmetics.bombSkinConfig);
           if (this.scene.textures.exists(customKey)) {
             textureKey = customKey;

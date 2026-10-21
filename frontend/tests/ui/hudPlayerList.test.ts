@@ -135,7 +135,7 @@ describe('HudPlayerList', () => {
     });
     expect(rows()).toEqual(['2', '1']);
     const leader = el.querySelector('[data-player-id="2"]')!;
-    expect(leader.textContent).toContain('👑');
+    expect(leader.querySelector('.hud-icon-crown')).not.toBeNull();
     expect(leader.textContent).toContain('9');
 
     // Scores move; the rows must move with them, reusing the same nodes.
@@ -147,7 +147,7 @@ describe('HudPlayerList', () => {
     });
     expect(rows()).toEqual(['1', '2']);
     expect(el.querySelector('[data-player-id="1"]')).toBe(row1);
-    expect(el.querySelector('[data-player-id="2"]')?.textContent).not.toContain('👑');
+    expect(el.querySelector('[data-player-id="2"] .hud-icon-crown')).toBeNull();
   });
 
   it('escapes usernames', () => {
@@ -162,7 +162,7 @@ describe('HudPlayerList', () => {
     list.render(el, [player({ id: -1, isBot: true }), player({ id: -2, isBuddy: true })], {
       localPlayerDead: false,
     });
-    expect(el.querySelector('[data-player-id="-1"]')?.textContent).toContain('🤖');
+    expect(el.querySelector('[data-player-id="-1"] .hud-icon-bot')).not.toBeNull();
     expect(el.querySelector('[data-player-id="-2"]')?.textContent).toContain('[BUDDY]');
   });
 

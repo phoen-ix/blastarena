@@ -25,7 +25,7 @@ import { StyledFx } from '../art/StyledFx';
 import { StylePost, AmbientParticles } from '../art/stylePost';
 import { artStyleManager } from '../art/ArtStyleManager';
 
-import type { World } from '../art/painters/types';
+import type { EyeStyle, World } from '../art/painters/types';
 import { PlayerSpriteRenderer } from '../game/PlayerSprite';
 import { BombSpriteRenderer } from '../game/BombSprite';
 import { ExplosionRenderer } from '../game/ExplosionSprite';
@@ -210,6 +210,11 @@ export class GameScene extends Phaser.Scene {
   /** The current grid with every tile diff applied (seeds the HUD minimap). */
   get liveTiles(): TileType[][] | null {
     return this.storedTiles;
+  }
+
+  /** How a player is drawn (body colour and eyes), for the HUD's portraits. */
+  playerLook(id: number): { color: number; eyes: EyeStyle } | undefined {
+    return this.playerRenderer?.lookOf(id);
   }
 
   /**
@@ -921,7 +926,13 @@ export class GameScene extends Phaser.Scene {
           this.leaveAdminSpectate();
           return;
         }
-        this.registry.set('gameOverData', data);
+        // How each player looked, for the results podium (ids are user ids, bots negative).
+        const looks: Record<number, { color: number; eyes: EyeStyle }> = {};
+        for (const p of data.placements) {
+          const look = this.playerRenderer?.lookOf(p.userId);
+          if (look) looks[p.userId] = look;
+        }
+        this.registry.set('gameOverData', { ...data, looks });
         this.scene.stop('HUDScene');
         this.scene.start('GameOverScene');
       };

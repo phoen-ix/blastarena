@@ -1664,7 +1664,7 @@
     }
 
     .hud-player-item.clickable:hover {
-      background: rgba(255, 107, 53, 0.3);
+      background: color-mix(in srgb, var(--primary) 30%, transparent);
       border-color: var(--primary);
     }
 
@@ -1676,6 +1676,9 @@
     }
 
     .stat-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
       font-size: 14px;
       padding: 3px 8px;
       background: rgba(0, 0, 0, 0.5);
@@ -1686,7 +1689,7 @@
     }
 
     .stat-item.stat-changed {
-      background: rgba(255, 107, 53, 0.5);
+      background: color-mix(in srgb, var(--primary) 50%, transparent);
       animation: statFlash 0.5s ease;
     }
 
@@ -1698,7 +1701,115 @@
       pointer-events: none;
     }
 
+    /* 3-2-1-GO before a match (game/CountdownOverlay.ts) */
+    .countdown-overlay {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      z-index: 110;
+    }
+
+    .countdown-overlay > * {
+      grid-area: 1 / 1;
+    }
+
+    .countdown-ring {
+      width: 180px;
+      height: 180px;
+      overflow: visible;
+      transform: rotate(-90deg);
+    }
+
+    .countdown-ring-track {
+      fill: rgba(8, 8, 16, 0.45);
+      stroke: rgba(255, 255, 255, 0.12);
+      stroke-width: 6;
+    }
+
+    .countdown-ring-fill {
+      fill: none;
+      stroke: var(--primary);
+      stroke-width: 6;
+      stroke-linecap: round;
+      transform-box: fill-box;
+      transform-origin: center;
+      filter: drop-shadow(0 0 6px var(--primary));
+    }
+
+    .countdown-num {
+      font-family: var(--font-display);
+      font-size: 88px;
+      font-weight: 700;
+      line-height: 1;
+      white-space: nowrap;
+      color: var(--primary);
+      text-shadow:
+        0 0 24px color-mix(in srgb, var(--primary) 60%, transparent),
+        0 4px 0 rgba(0, 0, 0, 0.45);
+    }
+
+    .countdown-go .countdown-num {
+      font-size: 60px;
+      color: var(--success);
+      text-shadow:
+        0 0 24px color-mix(in srgb, var(--success) 60%, transparent),
+        0 4px 0 rgba(0, 0, 0, 0.45);
+    }
+
+    .countdown-go .countdown-ring-fill {
+      stroke: var(--success);
+      filter: drop-shadow(0 0 8px var(--success));
+    }
+
+    @media (max-width: 600px) {
+      .countdown-ring {
+        width: 140px;
+        height: 140px;
+      }
+
+      .countdown-num {
+        font-size: 64px;
+      }
+
+      .countdown-go .countdown-num {
+        font-size: 44px;
+      }
+    }
+
+    /* Drawn HUD icons and character portraits (ui/hudIcons.ts, ui/portraits.ts) */
+    .hud-icon {
+      display: inline-block;
+      flex: none;
+      vertical-align: middle;
+    }
+
+    .stat-remote {
+      font-size: 0.75em;
+    }
+
+    .hud-who {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      vertical-align: middle;
+      font-weight: 600;
+    }
+
+    .hud-portrait {
+      display: block;
+      flex: none;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .hud-death-banner .hud-icon {
+      margin-right: 6px;
+    }
+
     .killfeed-entry {
+      line-height: 22px;
       padding: 4px 10px;
       margin-bottom: 3px;
       background: rgba(0, 0, 0, 0.55);
@@ -2490,7 +2601,7 @@
     }
 
     @keyframes statFlash {
-      0% { background: rgba(255, 107, 53, 0.7); color: #fff; }
+      0% { background: color-mix(in srgb, var(--primary) 70%, transparent); color: #fff; }
       100% { background: rgba(0, 0, 0, 0.5); color: var(--text); }
     }
 

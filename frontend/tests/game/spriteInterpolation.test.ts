@@ -141,3 +141,36 @@ describe('player sprites', () => {
     expect(sprite.x).toBeLessThan(width * TILE_SIZE);
   });
 });
+
+describe('player looks and spawn protection (classic)', () => {
+  it('flickers while invulnerable and turns solid when it ends', () => {
+    const scene = makeFakeScene();
+    const renderer = new PlayerSpriteRenderer(scene as never);
+    const p = { ...player(1, 1), invulnerableTicks: 20 } as PlayerState;
+    renderer.update([p]);
+    const sprite = scene.sprites[0];
+    const seen = new Set<number>();
+    for (const now of [0, 90, 180, 270]) {
+      scene.time.now = now;
+      renderer.frame(TICK_MS);
+      seen.add(sprite.alpha);
+    }
+    expect(seen).toEqual(new Set([0.35, 1]));
+
+    renderer.update([{ ...player(1, 1), invulnerableTicks: undefined } as unknown as PlayerState]);
+    scene.time.now = 0;
+    renderer.frame(TICK_MS);
+    expect(sprite.alpha).toBe(1);
+  });
+
+  it('remembers how a player looked after they are knocked out', () => {
+    const scene = makeFakeScene();
+    const renderer = new PlayerSpriteRenderer(scene as never);
+    renderer.update([player(1, 1)]);
+    const look = renderer.lookOf(1);
+    expect(look).toEqual({ color: expect.any(Number), eyes: 'default' });
+    renderer.update([{ ...player(1, 1), alive: false } as PlayerState]);
+    expect(renderer.lookOf(1)).toEqual(look);
+    expect(renderer.lookOf(99)).toBeUndefined();
+  });
+});

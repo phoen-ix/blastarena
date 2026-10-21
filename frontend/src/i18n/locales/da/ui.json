@@ -536,6 +536,8 @@
       "fifo": "1."
     },
     "buddyTag": "[BUDDY]",
+    "livesLeft": "{{count}} af {{max}} liv tilbage",
+    "countdownGo": "KØR!",
     "coopDead": "(død)",
     "coopReady": "(klar)",
     "coopRespawnIn": "({{seconds}}s)",

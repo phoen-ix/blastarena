@@ -76,3 +76,31 @@ describe('EnemySpriteRenderer death animation', () => {
     expect(renderer.isDying(1)).toBe(false);
   });
 });
+
+describe('EnemySpriteRenderer enemy types', () => {
+  const types = [
+    { id: 7, config: { sprite: { bodyShape: 'blob' }, sizeMultiplier: 1 } },
+    { id: 8, config: { sprite: { bodyShape: 'skull' }, sizeMultiplier: 2.5 } },
+    { id: 9, config: { sprite: { bodyShape: 'ghost' } } },
+  ];
+
+  it('draws a boss at its size multiplier, and keeps it when it turns', () => {
+    const scene = makeFakeScene();
+    const renderer = new EnemySpriteRenderer(scene as never);
+    renderer.setEnemyTypes(types);
+    renderer.update([enemy({ id: 1, enemyTypeId: 8, isBoss: true })]);
+    expect(scene.sprites[0].scaleX).toBe(2.5);
+    renderer.update([enemy({ id: 1, enemyTypeId: 8, isBoss: true, direction: 'left' })]);
+    expect(scene.sprites[0].texture.key).toBe('enemy_8_left');
+    expect(scene.sprites[0].scaleX).toBe(2.5);
+  });
+
+  it('shows ghost-bodied enemies translucent and others opaque', () => {
+    const scene = makeFakeScene();
+    const renderer = new EnemySpriteRenderer(scene as never);
+    renderer.setEnemyTypes(types);
+    renderer.update([enemy({ id: 1, enemyTypeId: 9 }), enemy({ id: 2, enemyTypeId: 7 })]);
+    expect(scene.sprites[0].alpha).toBe(0.7);
+    expect(scene.sprites[1].alpha).toBe(1);
+  });
+});

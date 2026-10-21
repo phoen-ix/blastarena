@@ -11,6 +11,8 @@ import {
 } from '@blast-arena/shared';
 import { escapeHtml, setHtml } from '../utils/html';
 import { HudPlayerList } from '../ui/hudPlayerList';
+import { CAUSE_ICON, hudIcon } from '../ui/hudIcons';
+import { portrait } from '../ui/portraits';
 import { SpectatorChat } from '../game/SpectatorChat';
 import { SpectatorActionBar } from '../game/SpectatorActionBar';
 import { MinimapTerrain } from '../game/minimapTerrain';
@@ -79,6 +81,7 @@ export class HUDScene extends Phaser.Scene {
     kick: HTMLElement;
     throw: HTMLElement;
     remoteMode: HTMLElement;
+    remoteLabel: HTMLElement;
   } | null = null;
   // Player list element cache for differential updates
   // Rows are keyed and reused rather than re-rendered at the tick rate; the logic lives outside
@@ -296,7 +299,8 @@ export class HUDScene extends Phaser.Scene {
       if (isNaN(id)) return;
       e.stopPropagation();
       this.registry.set('spectateTargetId', id);
-      (item as HTMLElement).style.background = 'rgba(255, 107, 53, 0.6)';
+      (item as HTMLElement).style.background =
+        'color-mix(in srgb, var(--primary) 60%, transparent)';
       setTimeout(() => {
         (item as HTMLElement).style.background = '';
       }, 300);
@@ -360,7 +364,7 @@ export class HUDScene extends Phaser.Scene {
       this.campaignHudEl = document.createElement('div');
       this.campaignHudEl.className = 'hud-campaign';
       this.campaignHudEl.style.cssText =
-        'position:fixed;top:48px;left:20px;display:flex;gap:16px;align-items:center;font-family:"Chakra Petch",sans-serif;font-size:16px;color:#eae8e4;z-index:100;';
+        'position:fixed;top:48px;left:20px;display:flex;gap:16px;align-items:center;font-family:var(--font-display);font-size:16px;color:var(--text);z-index:100;';
       const isCoopMode = !!this.registry.get('campaignCoopMode');
       setHtml(
         this.campaignHudEl,
@@ -444,16 +448,18 @@ export class HUDScene extends Phaser.Scene {
     this.adminBannerEl = null;
   }
 
-  private static CAUSE_ICONS: Record<string, string> = {
-    bomb: '💣',
-    self: '💀',
-    zone: '🔴',
-    lava: '🌋',
-    quicksand: '⏳',
-    spikes: '⚔️',
-    dark_rift: '🌀',
-    disconnect: '🔌',
-  };
+  private static causeIcon(cause: KillCause | undefined, size = 16): string {
+    return hudIcon(CAUSE_ICON[cause ?? 'bomb'] ?? 'bomb', size);
+  }
+
+  /** A player's name with their character's portrait in front, escaped for the feed. */
+  private feedName(player: PlayerState | null | undefined): string {
+    const name = escapeHtml(player?.username || '???');
+    if (!player) return name;
+    const game = this.scene.get('GameScene') as GameScene | null;
+    const face = portrait(game?.playerLook?.(player.id));
+    return face ? `<span class="hud-who">${face}${name}</span>` : name;
+  }
 
   private onPlayerDied(data: {
     playerId: number;
@@ -466,24 +472,25 @@ export class HUDScene extends Phaser.Scene {
     const victim = this.lastKnownPlayers.find((p) => p.id === data.playerId);
     const killer = data.killerId ? this.lastKnownPlayers.find((p) => p.id === data.killerId) : null;
 
-    const causeIcon = HUDScene.CAUSE_ICONS[data.cause ?? 'bomb'] ?? '💣';
+    const causeIcon = HUDScene.causeIcon(data.cause);
+    const victimName = this.feedName(victim);
 
     let text: string;
     if (killer && killer.id !== data.playerId) {
       text = `${causeIcon} ${t('ui:hud.eliminated', {
-        killer: escapeHtml(killer.username),
-        victim: escapeHtml(victim?.username || '???'),
+        killer: this.feedName(killer),
+        victim: victimName,
       })}`;
     } else if (data.cause === 'self') {
-      text = `${causeIcon} ${t('ui:hud.selfEliminated', { player: escapeHtml(victim?.username || '???') })}`;
+      text = `${causeIcon} ${t('ui:hud.selfEliminated', { player: victimName })}`;
     } else if (data.cause && data.cause !== 'bomb') {
       // Hazard/environment kill
       text = `${causeIcon} ${t('ui:hud.hazardEliminated', {
-        player: escapeHtml(victim?.username || '???'),
+        player: victimName,
         hazard: data.cause,
       })}`;
     } else {
-      text = `${causeIcon} ${t('ui:hud.selfEliminated', { player: escapeHtml(victim?.username || '???') })}`;
+      text = `${causeIcon} ${t('ui:hud.selfEliminated', { player: victimName })}`;
     }
 
     this.killFeedEntries.push({ text, time: Date.now() });
@@ -499,7 +506,7 @@ export class HUDScene extends Phaser.Scene {
   }
 
   private showDeathBanner(killer: PlayerState | null | undefined, cause?: KillCause): void {
-    const causeIcon = HUDScene.CAUSE_ICONS[cause ?? 'bomb'] ?? '💣';
+    const causeIcon = HUDScene.causeIcon(cause, 22);
     let message: string;
     if (killer && killer.id !== this.localPlayerId) {
       message = `${causeIcon} ${t('ui:hud.youWereEliminated', { killer: escapeHtml(killer.username) })}`;
@@ -626,13 +633,13 @@ export class HUDScene extends Phaser.Scene {
         const mins = Math.floor(elapsed / 60);
         const secs = elapsed % 60;
         text = `${mins}:${secs.toString().padStart(2, '0')}`;
-        color = '#fff';
+        color = '';
       } else {
         const remaining = Math.max(0, Math.ceil(state.roundTime - state.timeElapsed));
         const mins = Math.floor(remaining / 60);
         const secs = remaining % 60;
         text = `${mins}:${secs.toString().padStart(2, '0')}`;
-        color = remaining <= 30 ? '#ff3355' : '#fff';
+        color = remaining <= 30 ? 'var(--danger)' : '';
       }
       if (text !== this.lastTimerText) {
         if (this.lastTimerText === '') this.timerEl.style.display = '';
@@ -654,13 +661,13 @@ export class HUDScene extends Phaser.Scene {
           setHtml(
             statsEl,
             `
-            <span class="stat-item">💣 <span id="stat-bombs"></span></span>
-            <span class="stat-item">🔥 <span id="stat-fire"></span></span>
-            <span class="stat-item">⚡ <span id="stat-speed"></span></span>
-            <span class="stat-item" id="stat-shield">🛡️</span>
-            <span class="stat-item" id="stat-kick">👢</span>
-            <span class="stat-item" id="stat-throw" style="opacity:0.3">🎯</span>
-            <span class="stat-item" id="stat-remote-mode" style="display:none; font-size:0.75em;">🎯 ALL</span>
+            <span class="stat-item">${hudIcon('bomb')}<span id="stat-bombs"></span></span>
+            <span class="stat-item">${hudIcon('fire')}<span id="stat-fire"></span></span>
+            <span class="stat-item">${hudIcon('speed')}<span id="stat-speed"></span></span>
+            <span class="stat-item" id="stat-shield">${hudIcon('shield')}</span>
+            <span class="stat-item" id="stat-kick">${hudIcon('kick')}</span>
+            <span class="stat-item" id="stat-throw" style="opacity:0.3">${hudIcon('throw')}</span>
+            <span class="stat-item stat-remote" id="stat-remote-mode" style="display:none">${hudIcon('remote')}<span id="stat-remote-label"></span></span>
           `,
           );
           this.statEls = {
@@ -671,6 +678,7 @@ export class HUDScene extends Phaser.Scene {
             kick: document.getElementById('stat-kick')!,
             throw: document.getElementById('stat-throw')!,
             remoteMode: document.getElementById('stat-remote-mode')!,
+            remoteLabel: document.getElementById('stat-remote-label')!,
           };
         }
 
@@ -702,7 +710,10 @@ export class HUDScene extends Phaser.Scene {
         if (!prev || prev.remoteDetonateMode !== me.remoteDetonateMode) {
           if (me.hasRemoteBomb && me.remoteDetonateMode) {
             els.remoteMode.style.display = '';
-            els.remoteMode.textContent = `🎯 ${me.remoteDetonateMode === 'fifo' ? t('ui:hud.remoteMode.fifo') : t('ui:hud.remoteMode.all')}`;
+            els.remoteLabel.textContent =
+              me.remoteDetonateMode === 'fifo'
+                ? t('ui:hud.remoteMode.fifo')
+                : t('ui:hud.remoteMode.all');
           } else {
             els.remoteMode.style.display = 'none';
           }
@@ -884,9 +895,13 @@ export class HUDScene extends Phaser.Scene {
       if (this.campaignLivesEl) {
         let hearts = '';
         for (let i = 0; i < state.maxLives; i++) {
-          hearts += i < state.lives ? '❤️' : '🖤';
+          hearts += hudIcon(i < state.lives ? 'heart' : 'heartEmpty', 20);
         }
-        this.campaignLivesEl.textContent = hearts;
+        setHtml(this.campaignLivesEl, hearts);
+        this.campaignLivesEl.setAttribute(
+          'aria-label',
+          t('ui:hud.livesLeft', { count: state.lives, max: state.maxLives }),
+        );
       }
     }
 

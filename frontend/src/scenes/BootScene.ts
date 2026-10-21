@@ -3,23 +3,13 @@ import { themeManager } from '../themes/ThemeManager';
 import { POWERUP_ICON_DRAWERS } from '../utils/powerUpIcons';
 import { generateHazardTileTextures } from '../utils/campaignThemes';
 import { t } from '../i18n';
+import { POWERUP_COLORS } from '../utils/powerUpColors';
 
 export const PLAYER_COLORS = [
   0xe94560, 0x44aaff, 0x44ff44, 0xff8800, 0xcc44ff, 0xffff44, 0xff44ff, 0x44ffff,
 ];
 
-/** Accent colour per power-up type: the texture tint here, the pickup burst in EffectSystem. */
-export const POWERUP_COLORS: Record<string, number> = {
-  bomb_up: 0xff4444,
-  fire_up: 0xff8800,
-  speed_up: 0x44aaff,
-  shield: 0x44ff44,
-  kick: 0xcc44ff,
-  pierce_bomb: 0xff2222,
-  remote_bomb: 0x4488ff,
-  line_bomb: 0xffaa44,
-  bomb_throw: 0xff66ff,
-};
+export { POWERUP_COLORS };
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -814,11 +804,19 @@ export class BootScene extends Phaser.Scene {
    * Generate a custom bomb texture for a player's bomb skin.
    * Called at game start for players with bomb skin cosmetics.
    */
+  /**
+   * Texture key of a custom bomb skin. Keyed by its colours: two skins may share a label, and
+   * keying by the label gave both whichever texture was generated first.
+   */
+  static customBombKey(config: { baseColor: number; fuseColor: number }): string {
+    return `bomb_custom_${config.baseColor.toString(16)}_${config.fuseColor.toString(16)}`;
+  }
+
   static generateCustomBombTexture(
     scene: Phaser.Scene,
     config: { baseColor: number; fuseColor: number; label: string },
   ): void {
-    const key = `bomb_custom_${config.label}`;
+    const key = BootScene.customBombKey(config);
     if (scene.textures.exists(key)) return;
 
     const gfx = scene.make.graphics({ x: 0, y: 0 });

@@ -18,11 +18,25 @@ import { t } from '../i18n';
 import { audioManager } from '../game/AudioManager';
 import { AuthManager } from '../network/AuthManager';
 import { enterCoopLevel, clearCampaignRun, localP2StartData } from './coopStart';
+import { getSettings } from '../game/Settings';
+import { PLAYER_COLORS } from './BootScene';
+import { paintPortrait } from '../ui/portraits';
+import type { EyeStyle } from '../art/painters/types';
 
 const DEADZONE = 0.3;
 
 /** Single placement row from the server's `game:over` payload. */
 type GameOverPlacement = Parameters<ServerToClientEvents['game:over']>[0]['placements'][number];
+
+/** How a player was drawn in the match (added to the results by GameScene). */
+type PlayerLook = { color: number; eyes: EyeStyle };
+
+const MEDAL_COLORS = [0xffd700, 0xc0c0c0, 0xcd7f32];
+/** Vertical room the podium takes above the results table. */
+const PODIUM_HEIGHT = 140;
+/** Below this canvas height the podium is left out so the table keeps its room. */
+const PODIUM_MIN_SCREEN = 540;
+const PORTRAIT = 64;
 
 /** Registry `gameOverData` shape set by GameScene for campaign results. */
 interface CampaignGameOverData {
@@ -311,7 +325,10 @@ export class GameOverScene extends Phaser.Scene {
     if (data?.placements) {
       const list: GameOverPlacement[] = data.placements;
       const count = list.length;
-      const startY = 140;
+      const podium = count >= 2 && height >= PODIUM_MIN_SCREEN;
+      const shift = podium ? PODIUM_HEIGHT : 0;
+      if (podium) this.createPodium(list, width, 100, data.looks ?? {});
+      const startY = 140 + shift;
       const endY = height - 70;
       const spacing = Math.min(28, (endY - startY) / Math.max(count, 1));
 
@@ -336,11 +353,12 @@ export class GameOverScene extends Phaser.Scene {
         fontFamily: 'Chakra Petch, sans-serif',
         fontStyle: 'bold',
       } as Phaser.Types.GameObjects.Text.TextStyle;
-      this.add.text(colName, 115, t('ui:gameOver.player'), hs).setOrigin(0.5);
-      if (isTeamMode) this.add.text(colTeam, 115, t('ui:gameOver.team'), hs).setOrigin(0.5);
-      this.add.text(colScore, 115, t('ui:gameOver.score'), hs).setOrigin(0.5);
-      this.add.text(colElo, 115, t('ui:gameOver.elo'), hs).setOrigin(0.5);
-      this.add.text(colXp, 115, t('ui:gameOver.xp'), hs).setOrigin(0.5);
+      const headerY = 115 + shift;
+      this.add.text(colName, headerY, t('ui:gameOver.player'), hs).setOrigin(0.5);
+      if (isTeamMode) this.add.text(colTeam, headerY, t('ui:gameOver.team'), hs).setOrigin(0.5);
+      this.add.text(colScore, headerY, t('ui:gameOver.score'), hs).setOrigin(0.5);
+      this.add.text(colElo, headerY, t('ui:gameOver.elo'), hs).setOrigin(0.5);
+      this.add.text(colXp, headerY, t('ui:gameOver.xp'), hs).setOrigin(0.5);
 
       list.forEach((p, i) => {
         const y = startY + i * spacing;
@@ -380,6 +398,152 @@ export class GameOverScene extends Phaser.Scene {
         }
       });
     }
+  }
+
+  /**
+   * The top three on a podium, drawn as their characters in the current art style, with a crown
+   * for the winner and confetti. `top` is the podium's upper edge; it takes PODIUM_HEIGHT.
+   */
+  private createPodium(
+    list: GameOverPlacement[],
+    width: number,
+    top: number,
+    looks: Record<number, PlayerLook>,
+  ): void {
+    const settings = getSettings();
+    const colors = themeManager.getCanvasColors();
+    const base = top + 124;
+    const blockW = 84;
+    // Display order left to right: 2nd, 1st, 3rd.
+    const slots = [
+      { rank: 1, dx: -blockW - 6, h: 34 },
+      { rank: 0, dx: 0, h: 46 },
+      { rank: 2, dx: blockW + 6, h: 24 },
+    ].filter((s) => s.rank < list.length);
+
+    for (const slot of slots) {
+      const p = list[slot.rank];
+      const cx = width / 2 + slot.dx;
+      const medal = MEDAL_COLORS[slot.rank];
+      const column = this.add.container(0, 0);
+
+      const block = this.add.graphics();
+      const dark = Phaser.Display.Color.IntegerToColor(medal).darken(35).color;
+      block.fillStyle(dark, 1);
+      block.fillRoundedRect(cx - blockW / 2, base - slot.h, blockW, slot.h, 4);
+      block.fillStyle(medal, 1);
+      block.fillRoundedRect(cx - blockW / 2, base - slot.h, blockW, 8, {
+        tl: 4,
+        tr: 4,
+        bl: 0,
+        br: 0,
+      });
+      column.add(block);
+      column.add(
+        this.add
+          .text(cx, base - slot.h / 2 + 3, String(slot.rank + 1), {
+            fontSize: slot.rank === 0 ? '24px' : '20px',
+            color: '#ffffff',
+            fontFamily: 'Chakra Petch, sans-serif',
+            fontStyle: 'bold',
+          })
+          .setOrigin(0.5)
+          .setAlpha(0.9),
+      );
+
+      const look: PlayerLook = looks[p.userId] ?? {
+        color: PLAYER_COLORS[slot.rank % PLAYER_COLORS.length],
+        eyes: 'default',
+      };
+      const key = `gameover_portrait_${slot.rank}`;
+      if (this.textures.exists(key)) this.textures.remove(key);
+      const canvas = paintPortrait(look.color, look.eyes, PORTRAIT, 'full');
+      const faceY = base - slot.h - PORTRAIT / 2 + 4;
+      if (this.textures.addCanvas(key, canvas)) {
+        const face = this.add.image(cx, faceY, key);
+        if (p.alive === false && slot.rank > 0) face.setAlpha(0.75);
+        column.add(face);
+      }
+      if (slot.rank === 0) column.add(this.drawCrown(cx, faceY - PORTRAIT / 2 - 2));
+
+      const name = (p.username || `Player ${p.userId}`).slice(0, 14);
+      column.add(
+        this.add
+          .text(cx, base + 12, name, {
+            fontSize: '13px',
+            color: Phaser.Display.Color.IntegerToColor(medal).rgba,
+            fontFamily: 'DM Sans, sans-serif',
+            fontStyle: 'bold',
+          })
+          .setOrigin(0.5),
+      );
+
+      if (settings.animations) {
+        column.setAlpha(0);
+        column.y = 24;
+        this.tweens.add({
+          targets: column,
+          y: 0,
+          alpha: 1,
+          duration: 420,
+          delay: 150 + (2 - slot.rank) * 160,
+          ease: 'Back.Out',
+        });
+      }
+    }
+
+    if (settings.animations && settings.particles)
+      this.confetti(width, [colors.primary, colors.accent]);
+  }
+
+  private drawCrown(cx: number, bottom: number): Phaser.GameObjects.Graphics {
+    const g = this.add.graphics();
+    const w = 26;
+    const h = 16;
+    const x = cx - w / 2;
+    const y = bottom - h;
+    g.fillStyle(0xffcc33, 1);
+    g.beginPath();
+    g.moveTo(x, y + h);
+    g.lineTo(x - 1, y + 3);
+    g.lineTo(x + w * 0.27, y + h * 0.55);
+    g.lineTo(cx, y - 2);
+    g.lineTo(x + w * 0.73, y + h * 0.55);
+    g.lineTo(x + w + 1, y + 3);
+    g.lineTo(x + w, y + h);
+    g.closePath();
+    g.fillPath();
+    g.fillStyle(0xff4466, 1);
+    g.fillCircle(cx, y + h * 0.62, 2.4);
+    g.lineStyle(1.5, 0xb37a10, 1);
+    g.strokePath();
+    return g;
+  }
+
+  /** A short shower of confetti over the results. */
+  private confetti(width: number, extra: number[]): void {
+    const key = 'gameover_confetti';
+    if (!this.textures.exists(key)) {
+      const g = this.make.graphics({ x: 0, y: 0 });
+      g.fillStyle(0xffffff, 1);
+      g.fillRect(0, 0, 6, 10);
+      g.generateTexture(key, 6, 10);
+      g.destroy();
+    }
+    const emitter = this.add.particles(0, -12, key, {
+      x: { min: 0, max: width },
+      speedY: { min: 90, max: 170 },
+      speedX: { min: -40, max: 40 },
+      gravityY: 40,
+      rotate: { min: 0, max: 360 },
+      scaleX: { start: 1, end: 0.3, ease: 'Sine.InOut' },
+      lifespan: { min: 3000, max: 4500 },
+      tint: [...MEDAL_COLORS, 0x44aaff, 0xe94560, 0x44ff44, ...extra],
+      frequency: 25,
+      quantity: 2,
+      stopAfter: 140,
+    });
+    this.time.delayedCall(7000, () => emitter.destroy());
   }
 
   private createCampaignGameOver(
