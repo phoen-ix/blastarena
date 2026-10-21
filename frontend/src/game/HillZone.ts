@@ -1,5 +1,6 @@
 import { HillZone } from '@blast-arena/shared';
 import { TILE_SIZE } from '@blast-arena/shared';
+import { DEPTH } from '../art/depth';
 
 export class HillZoneRenderer {
   private graphics: Phaser.GameObjects.Graphics;
@@ -7,7 +8,7 @@ export class HillZoneRenderer {
 
   constructor(scene: Phaser.Scene) {
     this.graphics = scene.add.graphics();
-    this.graphics.setDepth(5); // Above tiles, below players/bombs
+    this.graphics.setDepth(DEPTH.HILL); // Above tiles, below players/bombs
   }
 
   update(

@@ -1,5 +1,7 @@
 import { MapEvent, TILE_SIZE } from '@blast-arena/shared';
 import { getSettings } from './Settings';
+import { DEPTH } from '../art/depth';
+import { base } from '../art/scale';
 
 interface TrackedWarning {
   type: 'wall_collapse' | 'freeze_wave';
@@ -235,11 +237,11 @@ export class MapEventRenderer {
 
     // Target reticle graphics
     const targetGraphics = this.scene.add.graphics();
-    targetGraphics.setDepth(7); // Above powerups, below explosions
+    targetGraphics.setDepth(DEPTH.WARNING); // Above powerups, below explosions
 
     // Shadow (grows as meteor approaches)
     const shadowGraphics = this.scene.add.graphics();
-    shadowGraphics.setDepth(1); // Just above floor
+    shadowGraphics.setDepth(DEPTH.METEOR_SHADOW); // Just above floor
 
     // Warning exclamation
     const warningText = this.scene.add.text(px, py - TILE_SIZE * 0.8, '!', {
@@ -251,7 +253,7 @@ export class MapEventRenderer {
       strokeThickness: 4,
     });
     warningText.setOrigin(0.5);
-    warningText.setDepth(16); // Above most things
+    warningText.setDepth(DEPTH.WARNING_TEXT); // Above most things
 
     const settings = getSettings();
     if (settings.animations) {
@@ -349,8 +351,9 @@ export class MapEventRenderer {
     if (settings.animations) {
       // Falling meteor sprite
       const meteorSprite = this.scene.add.sprite(px, py - 400, 'meteor');
-      meteorSprite.setDepth(20);
-      meteorSprite.setScale(1.5);
+      meteorSprite.setDepth(DEPTH.METEOR);
+      const mb = base(meteorSprite);
+      meteorSprite.setScale(1.5 * mb);
       meteorSprite.setAngle(-30);
 
       // Falling tween
@@ -358,14 +361,14 @@ export class MapEventRenderer {
         targets: meteorSprite,
         x: px,
         y: py,
-        scale: 1,
+        scale: mb,
         angle: 15,
         duration: 250,
         ease: 'Quad.In',
         onComplete: () => {
           // Impact flash
           const flash = this.scene.add.graphics();
-          flash.setDepth(18);
+          flash.setDepth(DEPTH.IMPACT);
           flash.fillStyle(0xffaa00, 0.6);
           flash.fillCircle(px, py, TILE_SIZE * 2.5);
           flash.fillStyle(0xffffff, 0.4);
@@ -383,7 +386,7 @@ export class MapEventRenderer {
           this.scene.tweens.add({
             targets: meteorSprite,
             alpha: 0,
-            scale: 0.3,
+            scale: 0.3 * mb,
             duration: 200,
             delay: 100,
             onComplete: () => meteorSprite.destroy(),
@@ -401,7 +404,7 @@ export class MapEventRenderer {
         gravityY: 200,
         emitting: false,
       });
-      debrisEmitter.setDepth(18);
+      debrisEmitter.setDepth(DEPTH.IMPACT);
       debrisEmitter.explode(12);
 
       this.scene.time.delayedCall(700, () => {
@@ -416,7 +419,7 @@ export class MapEventRenderer {
         tint: [0xff4400, 0xff6600, 0xffaa00],
         emitting: false,
       });
-      fireEmitter.setDepth(18);
+      fireEmitter.setDepth(DEPTH.IMPACT);
       fireEmitter.explode(10);
 
       this.scene.time.delayedCall(600, () => {
@@ -430,7 +433,7 @@ export class MapEventRenderer {
         scale: { start: 1.5, end: 0 },
         emitting: false,
       });
-      sparkEmitter.setDepth(18);
+      sparkEmitter.setDepth(DEPTH.IMPACT);
       sparkEmitter.explode(8);
 
       this.scene.time.delayedCall(500, () => {
@@ -450,7 +453,7 @@ export class MapEventRenderer {
     type: 'wall_collapse' | 'freeze_wave',
   ): void {
     const graphics = this.scene.add.graphics();
-    graphics.setDepth(7);
+    graphics.setDepth(DEPTH.WARNING);
 
     let labelX: number, labelY: number;
     if (type === 'wall_collapse' && event.position) {
@@ -472,7 +475,7 @@ export class MapEventRenderer {
       strokeThickness: 3,
     });
     warningText.setOrigin(0.5);
-    warningText.setDepth(16);
+    warningText.setDepth(DEPTH.WARNING_TEXT);
 
     const settings = getSettings();
     if (settings.animations) {
@@ -546,7 +549,7 @@ export class MapEventRenderer {
     const settings = getSettings();
     // Full-screen red/orange pulse overlay
     const flash = this.scene.add.graphics();
-    flash.setDepth(25);
+    flash.setDepth(DEPTH.SURGE);
     flash.setScrollFactor(0); // Fixed to camera
     flash.fillStyle(0xff4400, 0.25);
     flash.fillRect(0, 0, this.scene.scale.width, this.scene.scale.height);
@@ -571,11 +574,11 @@ export class MapEventRenderer {
 
     // UFO saucer above target
     const ufoGraphics = this.scene.add.graphics();
-    ufoGraphics.setDepth(19);
+    ufoGraphics.setDepth(DEPTH.UFO);
 
     // Tractor beam
     const beamGraphics = this.scene.add.graphics();
-    beamGraphics.setDepth(8);
+    beamGraphics.setDepth(DEPTH.UFO_BEAM);
 
     // Warning text
     const warningText = this.scene.add.text(px, py - TILE_SIZE * 1.8, '?!', {
@@ -587,7 +590,7 @@ export class MapEventRenderer {
       strokeThickness: 4,
     });
     warningText.setOrigin(0.5);
-    warningText.setDepth(20);
+    warningText.setDepth(DEPTH.UFO_TEXT);
 
     const settings = getSettings();
     if (settings.animations) {
@@ -674,7 +677,7 @@ export class MapEventRenderer {
     if (settings.animations) {
       // Flash at abduction point
       const flash = this.scene.add.graphics();
-      flash.setDepth(18);
+      flash.setDepth(DEPTH.IMPACT);
       flash.fillStyle(0x44ff88, 0.5);
       flash.fillCircle(px, py, TILE_SIZE * 1.5);
 
@@ -750,7 +753,7 @@ export class MapEventRenderer {
     gfx.fillStyle(color, 0.6);
     gfx.fillCircle(0, 0, TILE_SIZE * 0.6);
     gfx.setPosition(px, py);
-    gfx.setDepth(120);
+    gfx.setDepth(DEPTH.SPECTATOR_FLASH);
     this.flashes.set(key, gfx);
 
     // Animate: pulse then fade

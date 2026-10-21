@@ -74,7 +74,34 @@
     "language": "Dil",
     "languageDesc": "Arayuz dili",
     "theme": "Tema",
+    "artStyle": "Grafik stili",
+    "artStyleDesc": "Arenanın bu cihazda nasıl göründüğü. Diğer oyuncular kendi seçimlerini görür.",
+    "artStyles": {
+      "classic": {
+        "name": "Klasik",
+        "desc": "Orijinal görünüm."
+      },
+      "neon": {
+        "name": "Neon Arena",
+        "desc": "Koyu cam, parlayan kenarlar ve plazma patlamaları."
+      },
+      "toy": {
+        "name": "Toy Diorama",
+        "desc": "Tıknaz bloklar, yumuşak gölgeler ve çizgi film ateşi."
+      },
+      "pixel": {
+        "name": "Crisp Pixel",
+        "desc": "16 bit piksel sanatı, keskin şekilde büyütülmüş."
+      }
+    },
     "visualSettings": "Gorsel Ayarlar",
+    "quality": "Grafik kalitesi",
+    "qualityDesc": "Yeni grafik stillerindeki gölgeler, ışıklandırma, parlama ve ortam efektleri. Oyun takılırsa düşürün.",
+    "qualityLevels": {
+      "low": "Düşük",
+      "medium": "Orta",
+      "high": "Yüksek"
+    },
     "animations": "Animasyonlar",
     "animationsDesc": "Sprite hareket gecisleri ve animasyonlari",
     "screenShake": "Ekran Sarsintisi",

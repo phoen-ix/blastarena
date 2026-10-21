@@ -16,7 +16,9 @@ import {
   THEME_NAMES,
   ROOM_MAP_SIZES,
 } from '@blast-arena/shared';
-import type { ThemeId } from '@blast-arena/shared';
+import type { ThemeId, ArtStyleId } from '@blast-arena/shared';
+import { DEFAULT_ART_STYLE, isArtStyleId } from '@blast-arena/shared';
+import { availableStyles } from '../../art/registry';
 
 const ALL_POWER_UPS = Object.values(POWERUP_DEFINITIONS);
 
@@ -38,6 +40,7 @@ export class DashboardTab {
   private spectatorChatMode: ChatMode = 'everyone';
   private xpMultiplier: number = 1;
   private defaultTheme: ThemeId = 'inferno';
+  private defaultArtStyle: ArtStyleId = DEFAULT_ART_STYLE;
   private displayImprint: boolean = false;
   private imprintText: string = '';
   private displayGithub: boolean = false;
@@ -141,6 +144,12 @@ export class DashboardTab {
       this.displayGithub = githubResp.enabled;
     } catch {
       // Use defaults on failure
+    }
+    try {
+      const artResp = await ApiClient.get<{ style?: unknown }>('/admin/settings/default_art_style');
+      if (isArtStyleId(artResp.style)) this.defaultArtStyle = artResp.style;
+    } catch {
+      // Older server: keep the built-in default
     }
     // Email settings are admin-only; fetch separately to handle non-admin gracefully
     try {
@@ -260,6 +269,22 @@ export class DashboardTab {
           </select>
           <span class="setting-item-desc">${t('admin:dashboard.defaultThemeDesc')}</span>
         </div>
+        ${
+          availableStyles().length > 1
+            ? `<div class="setting-item">
+          <span class="setting-item-label">${t('admin:dashboard.defaultArtStyle')}</span>
+          <select id="select-default-art-style" class="admin-select" aria-label="${t('admin:dashboard.defaultArtStyle')}">
+            ${availableStyles()
+              .map(
+                (id) =>
+                  `<option value="${id}" ${this.defaultArtStyle === id ? 'selected' : ''}>${t(`ui:settings.artStyles.${id}.name`)}</option>`,
+              )
+              .join('')}
+          </select>
+          <span class="setting-item-desc">${t('admin:dashboard.defaultArtStyleDesc')}</span>
+        </div>`
+            : ''
+        }
         <div class="setting-item">
           <label class="setting-item-checkbox">
             <input type="checkbox" id="toggle-display-github" ${this.displayGithub ? 'checked' : ''}>
@@ -510,6 +535,23 @@ export class DashboardTab {
         );
       } catch {
         this.notifications.error(t('admin:dashboard.failedUpdateDefaultTheme'));
+      }
+    });
+
+    const artSelect = card.querySelector('#select-default-art-style') as HTMLSelectElement | null;
+    artSelect?.addEventListener('change', async () => {
+      const val = artSelect.value;
+      if (!isArtStyleId(val)) return;
+      try {
+        await ApiClient.put('/admin/settings/default_art_style', { style: val });
+        this.defaultArtStyle = val;
+        this.notifications.success(
+          t('admin:dashboard.defaultArtStyleSet', {
+            style: t(`ui:settings.artStyles.${val}.name`),
+          }),
+        );
+      } catch {
+        this.notifications.error(t('admin:dashboard.failedUpdateDefaultArtStyle'));
       }
     });
 

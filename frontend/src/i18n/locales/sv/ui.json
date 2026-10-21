@@ -74,7 +74,34 @@
     "language": "Språk",
     "languageDesc": "Gränssnittsspråk",
     "theme": "Tema",
+    "artStyle": "Grafikstil",
+    "artStyleDesc": "Så ser arenan ut på den här enheten. Andra spelare ser sitt eget val.",
+    "artStyles": {
+      "classic": {
+        "name": "Klassisk",
+        "desc": "Det ursprungliga utseendet."
+      },
+      "neon": {
+        "name": "Neon Arena",
+        "desc": "Mörkt glas, glödande kanter och plasmaexplosioner."
+      },
+      "toy": {
+        "name": "Toy Diorama",
+        "desc": "Kraftiga block, mjuka skuggor och tecknad eld."
+      },
+      "pixel": {
+        "name": "Crisp Pixel",
+        "desc": "16-bitars pixelkonst, skarpt uppskalad."
+      }
+    },
     "visualSettings": "Visuella inställningar",
+    "quality": "Grafikkvalitet",
+    "qualityDesc": "Skuggor, ljus, glöd och stämningseffekter i de nya grafikstilarna. Sänk den om spelet hackar.",
+    "qualityLevels": {
+      "low": "Låg",
+      "medium": "Medel",
+      "high": "Hög"
+    },
     "animations": "Animationer",
     "animationsDesc": "Sprite-rörelsetweens och övergångar",
     "screenShake": "Skärmskakning",

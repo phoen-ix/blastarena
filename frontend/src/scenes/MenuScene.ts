@@ -5,6 +5,7 @@ import { AuthUI } from '../ui/AuthUI';
 import { VerificationUI } from '../ui/VerificationUI';
 import { NotificationUI } from '../ui/NotificationUI';
 import { themeManager } from '../themes/ThemeManager';
+import { artStyleManager } from '../art/ArtStyleManager';
 import { API_URL } from '../config';
 import { t } from '../i18n';
 import type { GameState, OpenWorldScoreEntry } from '@blast-arena/shared';
@@ -189,6 +190,10 @@ export class MenuScene extends Phaser.Scene {
 
     const showGuest = owStatus?.enabled && owStatus?.guestAccess;
     const playerCount = owStatus?.playerCount ?? 0;
+
+    // The background arena is drawn in the admin's default art style for visitors who never
+    // picked one, so wait briefly for that default (fetched at boot) before starting it.
+    if (showGuest) await artStyleManager.ready(800);
 
     // Render the live open-world arena behind the menu (auto-join a guest) when open world + guest
     // access are enabled. The DOM menu buttons stay overlaid on top of the game canvas.

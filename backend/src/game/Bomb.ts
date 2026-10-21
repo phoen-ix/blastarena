@@ -52,6 +52,7 @@ export class Bomb {
       fireRange: this.fireRange,
       ticksRemaining: this.ticksRemaining,
       bombType: this.bombType,
+      slideDir: this.sliding ?? undefined,
     };
   }
 }

@@ -298,4 +298,18 @@ describe('Explosion', () => {
       expect(explosion.containsCell(3, 3)).toBe(false);
     });
   });
+
+  describe('pierce flag', () => {
+    it('is only sent for explosions caused by a pierce bomb', () => {
+      const plain = new Explosion([{ x: 1, y: 1 }], 1);
+      expect(plain.toState().pierce).toBeUndefined();
+      expect(plain.toTickState().pierce).toBeUndefined();
+      const pierce = new Explosion([{ x: 1, y: 1 }], 1, true);
+      expect(pierce.toState().pierce).toBe(true);
+      expect(pierce.toTickState().pierce).toBe(true);
+      // the cells go out once, the flag on every tick
+      expect(pierce.toTickState().cells).toEqual([]);
+      expect(pierce.toTickState().pierce).toBe(true);
+    });
+  });
 });

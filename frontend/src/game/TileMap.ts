@@ -4,6 +4,8 @@ import { TILE_SIZE } from '@blast-arena/shared';
 import { getSettings, VisualSettings } from './Settings';
 import { wrapGhostTileSpans } from '../utils/wrapGhosts';
 import { getTileTexture, isConveyorTile, conveyorAnimKey } from '../utils/tileTextures';
+import { DEPTH } from '../art/depth';
+import { base, fit } from '../art/scale';
 
 export class TileMapRenderer {
   private scene: Phaser.Scene;
@@ -53,6 +55,17 @@ export class TileMapRenderer {
     return this.width === width && this.height === height;
   }
 
+  /** A tile sprite centred on its cell, scaled to one tile whatever its texture's bake scale. */
+  private addTileSprite(x: number, y: number, textureKey: string): Phaser.GameObjects.Sprite {
+    return fit(
+      this.scene.add.sprite(
+        x * TILE_SIZE + TILE_SIZE / 2,
+        y * TILE_SIZE + TILE_SIZE / 2,
+        textureKey,
+      ),
+    );
+  }
+
   private createTiles(tiles: TileType[][]): void {
     this.tileSprites = [];
     this.previousTiles = [];
@@ -63,11 +76,7 @@ export class TileMapRenderer {
       for (let x = 0; x < this.width; x++) {
         const tileType = tiles[y][x];
         const textureKey = getTileTexture(tileType, x, y, this.theme);
-        const sprite = this.scene.add.sprite(
-          x * TILE_SIZE + TILE_SIZE / 2,
-          y * TILE_SIZE + TILE_SIZE / 2,
-          textureKey,
-        );
+        const sprite = this.addTileSprite(x, y, textureKey);
         this.tileSprites[y][x] = sprite;
         this.previousTiles[y][x] = tileType;
         if (isConveyorTile(tileType)) {
@@ -130,12 +139,13 @@ export class TileMapRenderer {
             img = this.scene.add.image(0, 0, textureKey);
             // Explicit, because these are added mid-game — after players, bombs and explosions —
             // and would otherwise draw over them.
-            img.setDepth(0);
+            img.setDepth(DEPTH.TILE);
             this.ghostPool[used] = img;
           } else {
             img.setTexture(textureKey);
             img.setVisible(true);
           }
+          fit(img);
           img.setPosition(
             x * TILE_SIZE + TILE_SIZE / 2 + span.ox,
             y * TILE_SIZE + TILE_SIZE / 2 + span.oy,
@@ -168,7 +178,7 @@ export class TileMapRenderer {
   private updateGhostTexture(x: number, y: number, textureKey: string): void {
     const ghosts = this.ghostsByTile.get(y * this.width + x);
     if (!ghosts) return;
-    for (const img of ghosts) img.setTexture(textureKey);
+    for (const img of ghosts) fit(img.setTexture(textureKey));
   }
 
   /**
@@ -235,12 +245,12 @@ export class TileMapRenderer {
         // Animate destruction: scale down and fade out, then replace. The fading sprite goes one
         // depth above the tiles: the replacement is added later at the same depth and used to
         // cover it, so the animation never showed.
-        oldSprite.setDepth(1);
+        oldSprite.setDepth(DEPTH.TILE_DYING);
         this.scene.tweens.add({
           targets: oldSprite,
           alpha: 0,
-          scaleX: 0.3,
-          scaleY: 0.3,
+          scaleX: 0.3 * base(oldSprite),
+          scaleY: 0.3 * base(oldSprite),
           duration: 300,
           ease: 'Power2',
           onComplete: () => {
@@ -250,11 +260,7 @@ export class TileMapRenderer {
 
         // Create the new floor sprite immediately underneath
         const newTexture = getTileTexture(newType, x, y, this.theme);
-        const newSprite = this.scene.add.sprite(
-          x * TILE_SIZE + TILE_SIZE / 2,
-          y * TILE_SIZE + TILE_SIZE / 2,
-          newTexture,
-        );
+        const newSprite = this.addTileSprite(x, y, newTexture);
         this.tileSprites[y][x] = newSprite;
         this.updateGhostTexture(x, y, newTexture);
       } else {
@@ -262,7 +268,7 @@ export class TileMapRenderer {
         const newTexture = getTileTexture(newType, x, y, this.theme);
         this.tileSprites[y][x].setTexture(newTexture);
         this.tileSprites[y][x].setAlpha(1);
-        this.tileSprites[y][x].setScale(1);
+        fit(this.tileSprites[y][x]);
         this.updateGhostTexture(x, y, newTexture);
       }
     } else if (this.isGateOpening(prevType, newType)) {
@@ -270,28 +276,24 @@ export class TileMapRenderer {
       const newTexture = getTileTexture(newType, x, y, this.theme);
       if (settings.animations) {
         const oldSprite = this.tileSprites[y][x];
-        oldSprite.setDepth(1); // above the replacement, see the destruction case
+        oldSprite.setDepth(DEPTH.TILE_DYING); // above the replacement, see the destruction case
         this.scene.tweens.add({
           targets: oldSprite,
           alpha: 0,
-          scaleX: 0.3,
-          scaleY: 0.3,
+          scaleX: 0.3 * base(oldSprite),
+          scaleY: 0.3 * base(oldSprite),
           duration: 200,
           ease: 'Power2',
           onComplete: () => {
             oldSprite.destroy();
           },
         });
-        const newSprite = this.scene.add.sprite(
-          x * TILE_SIZE + TILE_SIZE / 2,
-          y * TILE_SIZE + TILE_SIZE / 2,
-          newTexture,
-        );
+        const newSprite = this.addTileSprite(x, y, newTexture);
         this.tileSprites[y][x] = newSprite;
       } else {
         this.tileSprites[y][x].setTexture(newTexture);
         this.tileSprites[y][x].setAlpha(1);
-        this.tileSprites[y][x].setScale(1);
+        fit(this.tileSprites[y][x]);
       }
       this.updateGhostTexture(x, y, newTexture);
     } else if (this.isGateClosing(prevType, newType)) {
@@ -300,16 +302,13 @@ export class TileMapRenderer {
       if (settings.animations) {
         const oldSprite = this.tileSprites[y][x];
         oldSprite.destroy();
-        const newSprite = this.scene.add.sprite(
-          x * TILE_SIZE + TILE_SIZE / 2,
-          y * TILE_SIZE + TILE_SIZE / 2,
-          newTexture,
-        );
-        newSprite.setScale(0.3);
+        const newSprite = this.addTileSprite(x, y, newTexture);
+        const b = base(newSprite);
+        newSprite.setScale(0.3 * b);
         this.scene.tweens.add({
           targets: newSprite,
-          scaleX: 1,
-          scaleY: 1,
+          scaleX: b,
+          scaleY: b,
           duration: 200,
           ease: 'Power2',
         });
@@ -317,7 +316,7 @@ export class TileMapRenderer {
       } else {
         this.tileSprites[y][x].setTexture(newTexture);
         this.tileSprites[y][x].setAlpha(1);
-        this.tileSprites[y][x].setScale(1);
+        fit(this.tileSprites[y][x]);
       }
       this.updateGhostTexture(x, y, newTexture);
     } else if (prevType === ('crumbling' as TileType) && newType === ('pit' as TileType)) {
@@ -325,28 +324,24 @@ export class TileMapRenderer {
       const newTexture = getTileTexture(newType, x, y, this.theme);
       if (settings.animations) {
         const oldSprite = this.tileSprites[y][x];
-        oldSprite.setDepth(1); // above the replacement, see the destruction case
+        oldSprite.setDepth(DEPTH.TILE_DYING); // above the replacement, see the destruction case
         this.scene.tweens.add({
           targets: oldSprite,
           alpha: 0,
-          scaleX: 0.3,
-          scaleY: 0.3,
+          scaleX: 0.3 * base(oldSprite),
+          scaleY: 0.3 * base(oldSprite),
           duration: 300,
           ease: 'Power2',
           onComplete: () => {
             oldSprite.destroy();
           },
         });
-        const newSprite = this.scene.add.sprite(
-          x * TILE_SIZE + TILE_SIZE / 2,
-          y * TILE_SIZE + TILE_SIZE / 2,
-          newTexture,
-        );
+        const newSprite = this.addTileSprite(x, y, newTexture);
         this.tileSprites[y][x] = newSprite;
       } else {
         this.tileSprites[y][x].setTexture(newTexture);
         this.tileSprites[y][x].setAlpha(1);
-        this.tileSprites[y][x].setScale(1);
+        fit(this.tileSprites[y][x]);
       }
       this.updateGhostTexture(x, y, newTexture);
     } else {
@@ -355,7 +350,7 @@ export class TileMapRenderer {
       const newTexture = getTileTexture(newType, x, y, this.theme);
       const sprite = this.tileSprites[y][x];
       sprite.stop();
-      sprite.setTexture(newTexture);
+      fit(sprite.setTexture(newTexture));
       if (isConveyorTile(newType)) {
         this.playConveyorAnim(sprite, newType);
       }

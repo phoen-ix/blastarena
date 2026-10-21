@@ -2364,7 +2364,7 @@ export class GameStateManager {
       const tile = tilesForCalc[c.y][c.x];
       return tile !== 'destructible' && tile !== 'destructible_cracked';
     });
-    const explosion = new Explosion(damageCells, bomb.ownerId);
+    const explosion = new Explosion(damageCells, bomb.ownerId, bomb.isPierce);
     this.explosions.set(explosion.id, explosion);
     this.tickEvents.explosions.push({ cells: [...damageCells], ownerId: bomb.ownerId });
 

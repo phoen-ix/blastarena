@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { CampaignEnemyState, TILE_SIZE, TICK_MS } from '@blast-arena/shared';
 import { getSettings } from './Settings';
+import { DEPTH } from '../art/depth';
+import { base, fit } from '../art/scale';
 
 /** Fraction of the remaining distance covered per server tick; frame() rescales it per frame. */
 const LERP_PER_TICK = 0.45;
@@ -56,8 +58,8 @@ export class EnemySpriteRenderer {
         const textureKey = `enemy_${enemy.enemyTypeId}_${enemy.direction}`;
         if (!this.scene.textures.exists(textureKey)) continue;
 
-        sprite = this.scene.add.sprite(targetX, targetY, textureKey);
-        sprite.setDepth(9);
+        sprite = fit(this.scene.add.sprite(targetX, targetY, textureKey));
+        sprite.setDepth(DEPTH.ENEMY);
 
         if (enemy.isBoss) {
           // Boss scaling handled via sizeMultiplier on texture, keep sprite at 1x
@@ -69,7 +71,7 @@ export class EnemySpriteRenderer {
       // Update texture for direction changes
       const textureKey = `enemy_${enemy.enemyTypeId}_${enemy.direction}`;
       if (this.scene.textures.exists(textureKey) && sprite.texture.key !== textureKey) {
-        sprite.setTexture(textureKey);
+        fit(sprite.setTexture(textureKey));
       }
 
       if (!enemy.alive) {
@@ -80,8 +82,8 @@ export class EnemySpriteRenderer {
             sprite.setTint(0xff0000);
             this.scene.tweens.add({
               targets: sprite,
-              scaleX: 0.2,
-              scaleY: 0.2,
+              scaleX: 0.2 * base(sprite),
+              scaleY: 0.2 * base(sprite),
               alpha: 0,
               duration: 300,
               onComplete: () => {
@@ -149,7 +151,7 @@ export class EnemySpriteRenderer {
     let bar = this.hpBars.get(enemy.id);
     if (!bar) {
       bar = this.scene.add.graphics();
-      bar.setDepth(11);
+      bar.setDepth(DEPTH.HP_BAR);
       bar.setPosition(x, y);
       this.hpBars.set(enemy.id, bar);
     }

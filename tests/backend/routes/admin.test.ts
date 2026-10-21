@@ -65,6 +65,7 @@ const mockSetGameDefaults = jest.fn<AnyFn>();
 const mockGetSimulationDefaults = jest.fn<AnyFn>();
 const mockSetSimulationDefaults = jest.fn<AnyFn>();
 const mockSetSetting = jest.fn<AnyFn>();
+const mockGetSetting = jest.fn<AnyFn>();
 const mockGetEmailSettings = jest.fn<AnyFn>();
 const mockSetEmailSettings = jest.fn<AnyFn>();
 
@@ -76,6 +77,7 @@ jest.mock('../../../backend/src/services/settings', () => ({
   getSimulationDefaults: mockGetSimulationDefaults,
   setSimulationDefaults: mockSetSimulationDefaults,
   setSetting: mockSetSetting,
+  getSetting: mockGetSetting,
   getEmailSettings: mockGetEmailSettings,
   setEmailSettings: mockSetEmailSettings,
 }));
@@ -450,6 +452,63 @@ describe('GET /admin/announcements/banner (public)', () => {
 // ============================================================================
 // SETTINGS ROUTES (staff + admin-only)
 // ============================================================================
+
+describe('GET /admin/settings/default_art_style (public)', () => {
+  const handler = getHandler('get', '/admin/settings/default_art_style');
+
+  it('returns the stored style', async () => {
+    mockGetSetting.mockResolvedValue('toy');
+    const res = mockRes();
+    await handler(mockReq(), res, jest.fn());
+    expect(mockGetSetting).toHaveBeenCalledWith('default_art_style');
+    expect(res._json).toEqual({ style: 'toy' });
+  });
+
+  it('falls back to classic when unset or unknown', async () => {
+    for (const stored of [null, '', 'vaporwave']) {
+      mockGetSetting.mockResolvedValue(stored);
+      const res = mockRes();
+      await handler(mockReq(), res, jest.fn());
+      expect(res._json).toEqual({ style: 'classic' });
+    }
+  });
+
+  it('is registered before the staff guard', () => {
+    expect(hasAdminOnly('get', '/admin/settings/default_art_style')).toBe(false);
+  });
+});
+
+describe('PUT /admin/settings/default_art_style', () => {
+  const handler = getHandler('put', '/admin/settings/default_art_style');
+
+  it('stores the style, audits it and broadcasts it to everyone', async () => {
+    mockSetSetting.mockResolvedValue(undefined);
+    const res = mockRes();
+    await handler(mockReq({ body: { style: 'neon' } }), res, jest.fn());
+    expect(mockSetSetting).toHaveBeenCalledWith('default_art_style', 'neon');
+    expect(mockExecute).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO admin_actions'),
+      expect.arrayContaining([1, 'update_setting', 'setting', 0]),
+    );
+    expect(mockIOEmit).toHaveBeenCalledWith('admin:settingsChanged', {
+      key: 'default_art_style',
+      value: 'neon',
+    });
+    expect(res._json).toEqual({ message: 'Default art style updated' });
+  });
+
+  it('has adminOnlyMiddleware in route stack', () => {
+    expect(hasAdminOnly('put', '/admin/settings/default_art_style')).toBe(true);
+  });
+
+  it('passes error to next() on failure', async () => {
+    const err = new Error('DB error');
+    mockSetSetting.mockRejectedValue(err);
+    const next = jest.fn();
+    await handler(mockReq({ body: { style: 'pixel' } }), mockRes(), next);
+    expect(next).toHaveBeenCalledWith(err);
+  });
+});
 
 describe('PUT /admin/settings/registration_enabled', () => {
   const handler = getHandler('put', '/admin/settings/registration_enabled');

@@ -125,6 +125,8 @@ export interface PlayerState {
   cosmetics?: PlayerCosmeticData;
   isBuddy?: boolean;
   buddyOwnerId?: number;
+  /** Ticks of spawn/hit protection left; absent when 0 (and in replays recorded before it). */
+  invulnerableTicks?: number;
 }
 
 export interface BombState {
@@ -134,6 +136,8 @@ export interface BombState {
   fireRange: number;
   ticksRemaining: number;
   bombType: 'normal' | 'remote' | 'pierce';
+  /** Direction a kicked bomb is sliding in; absent while it rests. */
+  slideDir?: Direction;
 }
 
 export interface ExplosionState {
@@ -141,6 +145,8 @@ export interface ExplosionState {
   cells: Position[];
   ownerId: number;
   ticksRemaining: number;
+  /** Set when a pierce bomb caused it (it burned through destructible blocks). */
+  pierce?: boolean;
 }
 
 export interface PowerUpState {

@@ -211,6 +211,7 @@ export class Player {
       cosmetics: this.cosmetics,
       isBuddy: this.isBuddy || undefined,
       buddyOwnerId: this.buddyOwnerId ?? undefined,
+      invulnerableTicks: this.invulnerableTicks > 0 ? this.invulnerableTicks : undefined,
     };
   }
 }

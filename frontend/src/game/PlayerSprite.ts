@@ -3,6 +3,8 @@ import { PlayerState, TILE_SIZE, TICK_MS } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 import { PLAYER_COLORS, BootScene } from '../scenes/BootScene';
 import { wrapGhostOffsets } from '../utils/wrapGhosts';
+import { DEPTH } from '../art/depth';
+import { base } from '../art/scale';
 
 // Team color indices: team 0 uses red-ish colors, team 1 uses blue-ish colors
 const TEAM_COLOR_INDICES: Record<number, number[]> = {
@@ -67,6 +69,9 @@ export class PlayerSpriteRenderer {
 
   /** Custom texture key overrides per player (from cosmetics) */
   private customTexturePrefix: Map<number, string> = new Map();
+
+  /** Cosmetic body colour per player, for colorOf(). */
+  private customColor: Map<number, number> = new Map();
 
   /** Trail particle emitters per player */
   private trailEmitters: Map<number, Phaser.GameObjects.Particles.ParticleEmitter> = new Map();
@@ -137,8 +142,8 @@ export class PlayerSpriteRenderer {
             this.scene.tweens.add({
               targets: existing,
               alpha: 0,
-              scaleX: 0.2,
-              scaleY: 0.2,
+              scaleX: 0.2 * base(existing),
+              scaleY: 0.2 * base(existing),
               rotation: existing.rotation + Math.PI * 2,
               duration: 400,
               ease: 'Power2',
@@ -257,6 +262,7 @@ export class PlayerSpriteRenderer {
             ? `${player.cosmetics.colorHex.toString(16)}_${player.cosmetics.eyeStyle}`
             : player.cosmetics.colorHex.toString(16);
           this.customTexturePrefix.set(player.id, `player_custom_${suffix}`);
+          this.customColor.set(player.id, player.cosmetics.colorHex);
           colorIndex = -1; // Sentinel: use custom prefix
         } else if (player.team !== null && player.team !== undefined) {
           const teamColors = TEAM_COLOR_INDICES[player.team] || TEAM_COLOR_INDICES[0];
@@ -275,7 +281,7 @@ export class PlayerSpriteRenderer {
         const customPrefix = this.customTexturePrefix.get(player.id);
         const textureKey = customPrefix ? `${customPrefix}_${dir}` : `player_${colorIndex}_${dir}`;
         sprite = this.scene.add.sprite(targetX, targetY, textureKey);
-        sprite.setDepth(10);
+        sprite.setDepth(DEPTH.PLAYER);
         const isBuddy = player.id === this.buddyPlayerId;
         const displaySize = isBuddy
           ? (TILE_SIZE - 4) * (this.buddySizePercent / 100)
@@ -296,13 +302,13 @@ export class PlayerSpriteRenderer {
             strokeThickness: 2,
           })
           .setOrigin(0.5, 1)
-          .setDepth(11);
+          .setDepth(DEPTH.LABEL);
         this.labels.set(player.id, label);
 
         // Team colored underline indicator (drawn at origin, positioned via setPosition)
         if (isTeamMode) {
           const teamGfx = this.scene.add.graphics();
-          teamGfx.setDepth(9);
+          teamGfx.setDepth(DEPTH.TEAM_BAR);
           const teamColor = player.team === 0 ? 0xe94560 : 0x44aaff;
           teamGfx.fillStyle(teamColor, 0.35);
           teamGfx.fillRoundedRect(-TILE_SIZE / 2 + 1, TILE_SIZE / 2 - 5, TILE_SIZE - 2, 4, 2);
@@ -362,7 +368,7 @@ export class PlayerSpriteRenderer {
               emitting: true,
             },
           );
-          emitter.setDepth(5);
+          emitter.setDepth(DEPTH.TRAIL);
           this.trailEmitters.set(player.id, emitter);
         }
       }
@@ -401,7 +407,7 @@ export class PlayerSpriteRenderer {
               gravityY: -20,
               angle: { min: 160, max: 200 },
             });
-            emitter.setDepth(5);
+            emitter.setDepth(DEPTH.DUST);
             this.dustEmitters.set(player.id, emitter);
           }
           emitter.setPosition(sprite.x, sprite.y + (TILE_SIZE - 4) / 2);
@@ -423,7 +429,7 @@ export class PlayerSpriteRenderer {
       if (player.hasShield) {
         if (!this.shieldGraphics.has(player.id)) {
           const shieldGfx = this.scene.add.graphics();
-          shieldGfx.setDepth(12);
+          shieldGfx.setDepth(DEPTH.SHIELD);
           shieldGfx.setPosition(sprite.x, sprite.y);
           this.shieldGraphics.set(player.id, shieldGfx);
         }
@@ -455,7 +461,7 @@ export class PlayerSpriteRenderer {
       // Buddy glow aura (drawn per frame in frame())
       if (player.id === this.buddyPlayerId && !this.buddyGlowGraphics.has(player.id)) {
         const glowGfx = this.scene.add.graphics();
-        glowGfx.setDepth(8); // Below player (10), above floor
+        glowGfx.setDepth(DEPTH.BUDDY_GLOW); // Below player (10), above floor
         glowGfx.setPosition(sprite.x, sprite.y);
         this.buddyGlowGraphics.set(player.id, glowGfx);
       }
@@ -609,7 +615,7 @@ export class PlayerSpriteRenderer {
     if (!ghosts) {
       ghosts = offsets.map(({ ox, oy }) => {
         const img = this.scene.add.image(px + ox, py + oy, textureKey);
-        img.setDepth(10);
+        img.setDepth(DEPTH.PLAYER);
         img.setDisplaySize(displaySize, displaySize);
         return img;
       });
@@ -632,7 +638,7 @@ export class PlayerSpriteRenderer {
         if (gShields) for (const g of gShields) g.destroy();
         gShields = offsets.map(() => {
           const gfx = this.scene.add.graphics();
-          gfx.setDepth(12);
+          gfx.setDepth(DEPTH.SHIELD);
           return gfx;
         });
         this.ghostShieldGraphics.set(playerId, gShields);
@@ -667,7 +673,7 @@ export class PlayerSpriteRenderer {
               strokeThickness: 2,
             })
             .setOrigin(0.5, 1)
-            .setDepth(11);
+            .setDepth(DEPTH.LABEL);
           return txt;
         });
         this.ghostLabels.set(playerId, gLabels);
@@ -693,7 +699,7 @@ export class PlayerSpriteRenderer {
         const teamColor = team === 0 ? 0xe94560 : 0x44aaff;
         gTeam = offsets.map(() => {
           const gfx = this.scene.add.graphics();
-          gfx.setDepth(9);
+          gfx.setDepth(DEPTH.TEAM_BAR);
           gfx.fillStyle(teamColor, 0.35);
           gfx.fillRoundedRect(-TILE_SIZE / 2 + 1, TILE_SIZE / 2 - 5, TILE_SIZE - 2, 4, 2);
           return gfx;
@@ -735,6 +741,17 @@ export class PlayerSpriteRenderer {
     return this.sprites.get(id);
   }
 
+  /**
+   * The body colour a player is drawn in (cosmetic colour, team colour or index colour), once
+   * they have been seen. Bombs and the minimap use it so an owner's colour matches their sprite.
+   */
+  colorOf(playerId: number): number | undefined {
+    const custom = this.customColor.get(playerId);
+    if (custom !== undefined) return custom;
+    const index = this.playerColorIndex.get(playerId);
+    return index !== undefined && index >= 0 ? PLAYER_COLORS[index] : undefined;
+  }
+
   destroy(): void {
     for (const [id] of this.sprites) {
       this.removePlayer(id);
@@ -768,6 +785,7 @@ export class PlayerSpriteRenderer {
     }
     this.ghostTeamIndicators.clear();
     this.playerColorIndex.clear();
+    this.customColor.clear();
     this.playerTeams.clear();
     this.prevShieldState.clear();
     this.prevPositions.clear();
@@ -832,6 +850,7 @@ export class PlayerSpriteRenderer {
     this.playerColorIndex.delete(id);
     this.playerTeams.delete(id);
     this.customTexturePrefix.delete(id);
+    this.customColor.delete(id);
     this.activeMoveAnim.delete(id);
   }
 }

@@ -22,6 +22,7 @@ describe('Settings', () => {
         sound: true,
         lobbyChat: true,
         minimap: true,
+        quality: 'high',
       });
     });
 
@@ -39,6 +40,7 @@ describe('Settings', () => {
             sound: true,
             lobbyChat: true,
             minimap: true,
+            quality: 'high',
           });
         })
       );
@@ -57,6 +59,7 @@ describe('Settings', () => {
             sound: true,
             lobbyChat: true,
             minimap: true,
+            quality: 'high',
           });
         })
       );
@@ -75,8 +78,58 @@ describe('Settings', () => {
             sound: true,
             lobbyChat: true,
             minimap: true,
+            quality: 'high',
           });
         })
+      );
+    });
+
+    it('replaces an unknown stored quality with the default', () => {
+      localStorage.setItem('blast-arena-settings', JSON.stringify({ quality: 'ultra' }));
+      return (
+        vi.resetModules(),
+        import('../../src/game/Settings').then((mod) => {
+          expect(mod.getSettings().quality).toBe('high');
+        })
+      );
+    });
+
+    it('follows a system reduce-motion preference until the player saves settings', () => {
+      const original = window.matchMedia;
+      window.matchMedia = ((q: string) => ({
+        matches: q === '(prefers-reduced-motion: reduce)',
+      })) as unknown as typeof window.matchMedia;
+      return (
+        vi.resetModules(),
+        import('../../src/game/Settings')
+          .then((mod) => {
+            const s = mod.getSettings();
+            expect(s.animations).toBe(false);
+            expect(s.screenShake).toBe(false);
+            expect(s.quality).toBe('high');
+          })
+          .finally(() => {
+            window.matchMedia = original;
+          })
+      );
+    });
+
+    it('starts touch-first devices at medium quality', () => {
+      const original = window.matchMedia;
+      window.matchMedia = ((q: string) => ({
+        matches: q === '(pointer: coarse)',
+      })) as unknown as typeof window.matchMedia;
+      return (
+        vi.resetModules(),
+        import('../../src/game/Settings')
+          .then((mod) => {
+            expect(mod.getSettings().quality).toBe('medium');
+            expect(mod.qualityAtLeast('medium')).toBe(true);
+            expect(mod.qualityAtLeast('high')).toBe(false);
+          })
+          .finally(() => {
+            window.matchMedia = original;
+          })
       );
     });
 

@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { PowerUpState } from '@blast-arena/shared';
 import { TILE_SIZE } from '@blast-arena/shared';
 import { wrapGhostOffsets } from '../utils/wrapGhosts';
+import { DEPTH } from '../art/depth';
+import { fit } from '../art/scale';
 
 export class PowerUpRenderer {
   private scene: Phaser.Scene;
@@ -41,8 +43,8 @@ export class PowerUpRenderer {
       const py = powerUp.position.y * TILE_SIZE + TILE_SIZE / 2;
 
       if (!this.sprites.has(powerUp.id)) {
-        const sprite = this.scene.add.sprite(px, py, `powerup_${powerUp.type}`);
-        sprite.setDepth(3);
+        const sprite = fit(this.scene.add.sprite(px, py, `powerup_${powerUp.type}`));
+        sprite.setDepth(DEPTH.POWERUP);
 
         // Floating animation
         this.scene.tweens.add({
@@ -91,8 +93,8 @@ export class PowerUpRenderer {
 
     if (!ghosts) {
       ghosts = offsets.map(({ ox, oy }) => {
-        const img = this.scene.add.image(px + ox, py + oy, textureKey);
-        img.setDepth(3);
+        const img = fit(this.scene.add.image(px + ox, py + oy, textureKey));
+        img.setDepth(DEPTH.POWERUP);
         return img;
       });
       this.ghostSprites.set(id, ghosts);

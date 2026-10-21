@@ -74,7 +74,34 @@
     "language": "Language",
     "languageDesc": "Interface language",
     "theme": "Theme",
+    "artStyle": "Art style",
+    "artStyleDesc": "How the arena looks on this device. Other players see their own choice.",
+    "artStyles": {
+      "classic": {
+        "name": "Classic",
+        "desc": "The original look."
+      },
+      "neon": {
+        "name": "Neon Arena",
+        "desc": "Dark glass, glowing edges and plasma blasts."
+      },
+      "toy": {
+        "name": "Toy Diorama",
+        "desc": "Chunky blocks, soft shadows and cartoon fire."
+      },
+      "pixel": {
+        "name": "Crisp Pixel",
+        "desc": "16-bit pixel art, scaled up sharp."
+      }
+    },
     "visualSettings": "Visual Settings",
+    "quality": "Graphics quality",
+    "qualityDesc": "Shadows, lighting, glow and ambient effects in the new art styles. Lower it if the game stutters.",
+    "qualityLevels": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
     "animations": "Animations",
     "animationsDesc": "Sprite movement tweens and transitions",
     "screenShake": "Screen Shake",

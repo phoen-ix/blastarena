@@ -854,4 +854,18 @@ describe('Player', () => {
       expect(player.hasBombThrow).toBe(false);
     });
   });
+
+  describe('invulnerability in state', () => {
+    it('reports the remaining protection ticks while they last', () => {
+      player.invulnerableTicks = 12;
+      expect(player.toState().invulnerableTicks).toBe(12);
+      expect(player.toTickState().invulnerableTicks).toBe(12);
+    });
+
+    it('omits the field once protection has run out', () => {
+      player.invulnerableTicks = 0;
+      expect('invulnerableTicks' in player.toState()).toBe(true);
+      expect(player.toState().invulnerableTicks).toBeUndefined();
+    });
+  });
 });

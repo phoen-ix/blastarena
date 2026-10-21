@@ -10,6 +10,7 @@ import { t } from '../i18n';
 import { setHtml } from '../utils/html';
 import { enterCoopLevel } from './coopStart';
 import { themeManager } from '../themes/ThemeManager';
+import { artStyleManager } from '../art/ArtStyleManager';
 import type { AdminReturn } from '../ui/admin/adminReturn';
 
 export class LobbyScene extends Phaser.Scene {
@@ -203,6 +204,8 @@ export class LobbyScene extends Phaser.Scene {
     this.settingsChangedHandler = (data) => {
       if (data.key === 'default_theme' && typeof data.value === 'string') {
         themeManager.handleAdminSettingChanged(data.key, data.value);
+      } else if (data.key === 'default_art_style') {
+        artStyleManager.handleAdminSettingChanged(data.key, data.value);
       }
     };
     this.socketClient.on('admin:settingsChanged', this.settingsChangedHandler);

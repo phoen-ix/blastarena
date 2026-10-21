@@ -7,6 +7,7 @@ import { GameScene } from './scenes/GameScene';
 import { HUDScene } from './scenes/HUDScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { themeManager } from './themes/ThemeManager';
+import { artStyleManager } from './art/ArtStyleManager';
 import { initI18n } from './i18n';
 import { audioManager } from './game/AudioManager';
 
@@ -56,6 +57,8 @@ async function boot(): Promise<Phaser.Game> {
 
   // Initialize theme manager (async, fetches admin default if no user preference)
   themeManager.initialize();
+  // Same for the arena art style; MenuScene waits for it before starting the landing arena.
+  void artStyleManager.initialize();
 
   // Update canvas background when theme changes
   themeManager.onChange(() => {

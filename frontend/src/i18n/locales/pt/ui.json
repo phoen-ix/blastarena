@@ -74,7 +74,34 @@
     "language": "Idioma",
     "languageDesc": "Idioma da interface",
     "theme": "Tema",
+    "artStyle": "Estilo gráfico",
+    "artStyleDesc": "Como a arena aparece neste dispositivo. Os outros jogadores veem a sua própria escolha.",
+    "artStyles": {
+      "classic": {
+        "name": "Clássico",
+        "desc": "O visual original."
+      },
+      "neon": {
+        "name": "Neon Arena",
+        "desc": "Vidro escuro, contornos brilhantes e explosões de plasma."
+      },
+      "toy": {
+        "name": "Toy Diorama",
+        "desc": "Blocos robustos, sombras suaves e fogo de desenho animado."
+      },
+      "pixel": {
+        "name": "Crisp Pixel",
+        "desc": "Pixel art de 16 bits, ampliada com nitidez."
+      }
+    },
     "visualSettings": "Configurações Visuais",
+    "quality": "Qualidade gráfica",
+    "qualityDesc": "Sombras, iluminação, brilho e efeitos ambientes dos novos estilos gráficos. Reduza se o jogo travar.",
+    "qualityLevels": {
+      "low": "Baixa",
+      "medium": "Média",
+      "high": "Alta"
+    },
     "animations": "Animações",
     "animationsDesc": "Tweens de movimento de sprites e transições",
     "screenShake": "Tremeção de Tela",

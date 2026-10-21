@@ -3,6 +3,12 @@ import { BombState, PlayerCosmeticData, TILE_SIZE } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 import { BootScene } from '../scenes/BootScene';
 import { wrapGhostOffsets } from '../utils/wrapGhosts';
+import { DEPTH } from '../art/depth';
+import { base } from '../art/scale';
+
+/** Where the classic bomb texture's fuse tip sits, relative to the bomb's centre. */
+const FUSE_TIP_DX = 6;
+const FUSE_TIP_DY = -17;
 
 interface PendingThrow {
   from: { x: number; y: number };
@@ -76,7 +82,7 @@ export class BombSpriteRenderer {
           if (settings.particles) {
             const emitter = this.sparkEmitters.get(bomb.id);
             if (emitter) {
-              emitter.setPosition(posX + 6, posY - 17);
+              emitter.setPosition(posX + FUSE_TIP_DX, posY + FUSE_TIP_DY);
               emitter.frequency = Math.max(20, bomb.ticksRemaining * 5);
             }
           }
@@ -87,7 +93,7 @@ export class BombSpriteRenderer {
           if (settings.particles) {
             const emitter = this.sparkEmitters.get(bomb.id);
             if (emitter) {
-              emitter.setPosition(posX + 6, posY - 17);
+              emitter.setPosition(posX + FUSE_TIP_DX, posY + FUSE_TIP_DY);
             }
           }
         }
@@ -117,7 +123,9 @@ export class BombSpriteRenderer {
         const startY = throwData ? throwData.from.y * TILE_SIZE + TILE_SIZE / 2 : posY;
 
         const sprite = this.scene.add.sprite(startX, startY, textureKey);
-        sprite.setDepth(5);
+        sprite.setDepth(DEPTH.BOMB);
+        const b = base(sprite);
+        sprite.setScale(b);
         this.sprites.set(bomb.id, sprite);
 
         if (throwData) {
@@ -142,8 +150,8 @@ export class BombSpriteRenderer {
           const adjStartY = posY - dy;
           sprite.setPosition(adjStartX, adjStartY);
 
-          sprite.setDepth(15); // Above other sprites during flight
-          sprite.setScale(0.8);
+          sprite.setDepth(DEPTH.THROWN_BOMB); // Above other sprites during flight
+          sprite.setScale(0.8 * b);
 
           // Scale duration for long throws (300ms base for 3 tiles, up to 600ms)
           const baseDist = 3 * TILE_SIZE;
@@ -153,7 +161,7 @@ export class BombSpriteRenderer {
             targets: sprite,
             x: posX,
             y: posY,
-            scale: 1,
+            scale: b,
             duration,
             ease: 'Sine.easeOut',
             onUpdate: (tween) => {
@@ -163,7 +171,7 @@ export class BombSpriteRenderer {
               sprite.y = adjStartY + dy * p - arc;
             },
             onComplete: () => {
-              sprite.setDepth(5);
+              sprite.setDepth(DEPTH.BOMB);
             },
           });
         }
@@ -172,8 +180,8 @@ export class BombSpriteRenderer {
           // Remote bombs: pulsing scale + slow alpha blink (blue texture distinguishes them)
           const tween = this.scene.tweens.add({
             targets: sprite,
-            scaleX: 1.15,
-            scaleY: 1.15,
+            scaleX: 1.15 * b,
+            scaleY: 1.15 * b,
             alpha: 0.5,
             duration: 600,
             yoyo: true,
@@ -185,8 +193,8 @@ export class BombSpriteRenderer {
           // Normal/pierce bombs: pulsing scale
           const tween = this.scene.tweens.add({
             targets: sprite,
-            scaleX: 1.15,
-            scaleY: 1.15,
+            scaleX: 1.15 * b,
+            scaleY: 1.15 * b,
             duration: 300,
             yoyo: true,
             repeat: -1,
@@ -196,8 +204,8 @@ export class BombSpriteRenderer {
 
         // Add fuse spark particles (not for remote bombs — they have no fuse)
         if (settings.particles && !isRemote) {
-          const fuseX = posX + 6;
-          const fuseY = posY - 17;
+          const fuseX = posX + FUSE_TIP_DX;
+          const fuseY = posY + FUSE_TIP_DY;
           const emitter = this.scene.add.particles(fuseX, fuseY, 'particle_spark', {
             speed: { min: 15, max: 50 },
             lifespan: 250,
@@ -247,7 +255,7 @@ export class BombSpriteRenderer {
     if (!ghosts) {
       ghosts = offsets.map(({ ox, oy }) => {
         const img = this.scene.add.image(px + ox, py + oy, textureKey);
-        img.setDepth(5);
+        img.setDepth(DEPTH.BOMB);
         return img;
       });
       this.ghostSprites.set(bombId, ghosts);

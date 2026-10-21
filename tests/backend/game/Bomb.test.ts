@@ -95,4 +95,15 @@ describe('Bomb', () => {
       expect(bomb.conveyorCooldown).toBe(0);
     });
   });
+
+  describe('slide direction in state', () => {
+    it('is absent while the bomb rests and set while it slides', () => {
+      const bomb = new Bomb({ x: 3, y: 3 }, 1, 2);
+      expect(bomb.toState().slideDir).toBeUndefined();
+      bomb.sliding = 'left';
+      expect(bomb.toState().slideDir).toBe('left');
+      bomb.sliding = null;
+      expect(bomb.toState().slideDir).toBeUndefined();
+    });
+  });
 });

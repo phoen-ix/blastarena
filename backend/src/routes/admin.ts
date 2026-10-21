@@ -32,6 +32,9 @@ import {
   CosmeticExportData,
   AchievementImportConflict,
   THEME_IDS,
+  ART_STYLE_IDS,
+  DEFAULT_ART_STYLE,
+  isArtStyleId,
   OPENWORLD_MAX_PLAYERS_CAP,
 } from '@blast-arena/shared';
 import multer from 'multer';
@@ -239,6 +242,16 @@ router.get('/admin/settings/default_theme', async (_req, res, next) => {
   try {
     const theme = await settingsService.getSetting('default_theme');
     res.json({ theme: theme || 'inferno' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Public: get default art style (no auth required; the landing arena renders before login)
+router.get('/admin/settings/default_art_style', async (_req, res, next) => {
+  try {
+    const style = await settingsService.getSetting('default_art_style');
+    res.json({ style: isArtStyleId(style) ? style : DEFAULT_ART_STYLE });
   } catch (err) {
     next(err);
   }
@@ -619,6 +632,36 @@ router.put(
         value: req.body.theme,
       });
       res.json({ message: 'Default theme updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+const artStyleSchema = z.object({
+  style: z.enum(ART_STYLE_IDS),
+});
+
+router.put(
+  '/admin/settings/default_art_style',
+  adminOnlyMiddleware,
+  validate(artStyleSchema),
+  async (req, res, next) => {
+    try {
+      await settingsService.setSetting('default_art_style', req.body.style);
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'default_art_style', value: req.body.style }),
+      );
+      const io = getIO();
+      io.emit('admin:settingsChanged', {
+        key: 'default_art_style',
+        value: req.body.style,
+      });
+      res.json({ message: 'Default art style updated' });
     } catch (err) {
       next(err);
     }

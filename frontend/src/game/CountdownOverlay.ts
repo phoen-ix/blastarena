@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { getSettings } from './Settings';
 import { audioManager } from './AudioManager';
+import { DEPTH } from '../art/depth';
 
 export class CountdownOverlay {
   private scene: Phaser.Scene;
@@ -39,7 +40,7 @@ export class CountdownOverlay {
             strokeThickness: 4,
           })
           .setOrigin(0.5)
-          .setDepth(100)
+          .setDepth(DEPTH.COUNTDOWN)
           .setScrollFactor(0);
 
         if (settings.animations) {

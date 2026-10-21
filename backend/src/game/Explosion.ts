@@ -7,14 +7,16 @@ export class Explosion {
   public readonly cells: Position[];
   public readonly ownerId: number;
   public ticksRemaining: number;
+  public readonly pierce: boolean;
   private readonly cellSet: Set<string>;
   /** Set once the cell list has gone out in a tick state — see toTickState(). */
   private cellsSent = false;
 
-  constructor(cells: Position[], ownerId: number) {
+  constructor(cells: Position[], ownerId: number, pierce = false) {
     this.id = randomUUID();
     this.cells = cells.map((c) => ({ ...c }));
     this.ownerId = ownerId;
+    this.pierce = pierce;
     this.ticksRemaining = EXPLOSION_DURATION_TICKS;
     this.cellSet = new Set(this.cells.map((c) => `${c.x},${c.y}`));
   }
@@ -34,6 +36,7 @@ export class Explosion {
       cells: this.cells,
       ownerId: this.ownerId,
       ticksRemaining: this.ticksRemaining,
+      pierce: this.pierce || undefined,
     };
   }
 
@@ -52,6 +55,7 @@ export class Explosion {
       cells,
       ownerId: this.ownerId,
       ticksRemaining: this.ticksRemaining,
+      pierce: this.pierce || undefined,
     };
   }
 }

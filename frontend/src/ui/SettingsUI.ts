@@ -12,7 +12,10 @@ import {
   BuddySettings,
 } from '@blast-arena/shared';
 import type { ThemeId, UserRole } from '@blast-arena/shared';
-import { getSettings, saveSettings, VisualSettings } from '../game/Settings';
+import { getSettings, saveSettings, VisualSettings, GRAPHICS_QUALITIES } from '../game/Settings';
+import type { GraphicsQuality } from '../game/Settings';
+import { artStyleManager } from '../art/ArtStyleManager';
+import { availableStyles, getStyle } from '../art/registry';
 import { i18n, t } from '../i18n';
 import { themeManager } from '../themes/ThemeManager';
 import { THEME_DEFINITIONS } from '../themes/definitions';
@@ -53,6 +56,11 @@ interface UserProfileResponse {
   isProfilePublic: boolean;
   acceptFriendRequests: boolean;
 }
+
+/** Settings stored as on/off switches (bound to the toggle checkboxes by name). */
+type BooleanSettingKey = {
+  [K in keyof VisualSettings]: VisualSettings[K] extends boolean ? K : never;
+}[keyof VisualSettings];
 
 export class SettingsUI {
   private container: HTMLElement;
@@ -648,6 +656,37 @@ export class SettingsUI {
     (modal.querySelector('#delete-password') as HTMLInputElement).focus();
   }
 
+  /** Cards for each art style this build can draw; nothing while only Classic exists. */
+  private renderArtStylePicker(): string {
+    const styles = availableStyles();
+    if (styles.length < 2) return '';
+    const current = artStyleManager.get();
+    return `
+        <h3 class="content-section-title mt-6">${t('settings.artStyle')}</h3>
+        <p class="setting-row-desc art-style-intro">${t('settings.artStyleDesc')}</p>
+        <div class="art-style-picker" id="art-style-picker">
+          ${styles
+            .map(
+              (id) => `
+            <button type="button" class="art-style-card" data-art-style="${id}" aria-pressed="${id === current ? 'true' : 'false'}">
+              <canvas class="art-style-preview" width="160" height="96" aria-hidden="true"></canvas>
+              <span class="art-style-name">${t(`settings.artStyles.${id}.name`)}</span>
+              <span class="art-style-desc">${t(`settings.artStyles.${id}.desc`)}</span>
+            </button>`,
+            )
+            .join('')}
+        </div>`;
+  }
+
+  private drawArtStylePreviews(): void {
+    this.contentEl?.querySelectorAll<HTMLElement>('.art-style-card').forEach((card) => {
+      const id = card.dataset.artStyle;
+      const canvas = card.querySelector('canvas');
+      if (!id || !canvas || !availableStyles().includes(id as never)) return;
+      getStyle(id as never).drawPreview?.(canvas);
+    });
+  }
+
   private renderPreferencesTab(): void {
     if (!this.contentEl) return;
     const settings = getSettings();
@@ -674,6 +713,8 @@ export class SettingsUI {
           }).join('')}
         </div>
 
+        ${this.renderArtStylePicker()}
+
         <h3 class="content-section-title mt-6">${t('settings.language')}</h3>
         <div class="settings-toggle-list">
           <div class="setting-row">
@@ -699,6 +740,18 @@ export class SettingsUI {
 
         <h3 class="content-section-title mt-6">${t('settings.visualSettings')}</h3>
         <div class="settings-toggle-list">
+          <div class="setting-row">
+            <div class="option-chips" id="quality-picker" role="group" aria-label="${t('settings.quality')}">
+              ${GRAPHICS_QUALITIES.map(
+                (q) =>
+                  `<button type="button" class="option-chip" data-quality="${q}" aria-pressed="${settings.quality === q ? 'true' : 'false'}">${t(`settings.qualityLevels.${q}`)}</button>`,
+              ).join('')}
+            </div>
+            <div class="setting-row-info">
+              <div class="setting-row-label">${t('settings.quality')}</div>
+              <div class="setting-row-desc">${t('settings.qualityDesc')}</div>
+            </div>
+          </div>
           <div class="setting-row">
             <label class="toggle-switch">
               <input type="checkbox" name="animations" role="switch" aria-checked="${settings.animations ? 'true' : 'false'}" ${settings.animations ? 'checked' : ''}>
@@ -831,6 +884,31 @@ export class SettingsUI {
       btn.classList.add('active');
     });
 
+    // Art style picker (only rendered when this build can draw more than one style)
+    this.contentEl.querySelector('#art-style-picker')?.addEventListener('click', (e: Event) => {
+      const btn = (e.target as HTMLElement).closest('.art-style-card') as HTMLElement | null;
+      const id = btn?.dataset.artStyle;
+      if (!btn || !id || !availableStyles().includes(id as never)) return;
+      artStyleManager.set(id as never);
+      this.contentEl!.querySelectorAll('.art-style-card').forEach((c) =>
+        c.setAttribute('aria-pressed', String(c === btn)),
+      );
+    });
+    this.drawArtStylePreviews();
+
+    // Graphics quality
+    this.contentEl.querySelector('#quality-picker')?.addEventListener('click', (e: Event) => {
+      const btn = (e.target as HTMLElement).closest('[data-quality]') as HTMLElement | null;
+      const q = btn?.dataset.quality as GraphicsQuality | undefined;
+      if (!btn || !q || !GRAPHICS_QUALITIES.includes(q)) return;
+      const current = getSettings();
+      current.quality = q;
+      saveSettings(current);
+      this.contentEl!.querySelectorAll('#quality-picker [data-quality]').forEach((c) =>
+        c.setAttribute('aria-pressed', String(c === btn)),
+      );
+    });
+
     // Language selector
     const langSelect = this.contentEl.querySelector('#pref-language') as HTMLSelectElement;
     if (langSelect) {
@@ -849,9 +927,9 @@ export class SettingsUI {
       this.prefsChangeHandler = (e: Event) => {
         const target = e.target as HTMLInputElement;
         if (!target || target.type !== 'checkbox') return;
-        const key = target.name as keyof VisualSettings;
-        if (!(key in getSettings())) return;
+        const key = target.name as BooleanSettingKey;
         const current = getSettings();
+        if (!(key in current) || typeof current[key] !== 'boolean') return;
         current[key] = target.checked;
         if (target.hasAttribute('role') && target.getAttribute('role') === 'switch') {
           target.setAttribute('aria-checked', String(target.checked));

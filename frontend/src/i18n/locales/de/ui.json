@@ -74,7 +74,34 @@
     "language": "Sprache",
     "languageDesc": "Sprache der Benutzeroberfläche",
     "theme": "Design",
+    "artStyle": "Grafikstil",
+    "artStyleDesc": "So sieht die Arena auf diesem Gerät aus. Andere Spieler sehen ihre eigene Auswahl.",
+    "artStyles": {
+      "classic": {
+        "name": "Klassisch",
+        "desc": "Der ursprüngliche Look."
+      },
+      "neon": {
+        "name": "Neon Arena",
+        "desc": "Dunkles Glas, leuchtende Kanten und Plasma-Explosionen."
+      },
+      "toy": {
+        "name": "Toy Diorama",
+        "desc": "Klobige Blöcke, weiche Schatten und Comic-Feuer."
+      },
+      "pixel": {
+        "name": "Crisp Pixel",
+        "desc": "16-Bit-Pixelkunst, gestochen scharf vergrößert."
+      }
+    },
     "visualSettings": "Visuelle Einstellungen",
+    "quality": "Grafikqualität",
+    "qualityDesc": "Schatten, Licht, Leuchten und Umgebungseffekte der neuen Grafikstile. Verringern, wenn das Spiel ruckelt.",
+    "qualityLevels": {
+      "low": "Niedrig",
+      "medium": "Mittel",
+      "high": "Hoch"
+    },
     "animations": "Animationen",
     "animationsDesc": "Sprite-Bewegungen und Übergänge",
     "screenShake": "Bildschirmwackeln",

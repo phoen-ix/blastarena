@@ -2,6 +2,8 @@ import { ExplosionState } from '@blast-arena/shared';
 import { TILE_SIZE } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 import { wrapGhostPositions } from '../utils/wrapGhosts';
+import { DEPTH } from '../art/depth';
+import { base } from '../art/scale';
 
 interface TrackedExplosion {
   sprites: Phaser.GameObjects.Sprite[];
@@ -51,7 +53,7 @@ export class ExplosionRenderer {
             this.scene.tweens.add({
               targets: sprite,
               alpha: 0,
-              scale: 1.3,
+              scale: 1.3 * base(sprite),
               duration: 150,
               ease: 'Power2',
             });
@@ -91,23 +93,25 @@ export class ExplosionRenderer {
 
       for (const pos of positions) {
         const sprite = this.scene.add.sprite(pos.x, pos.y, 'explosion');
-        sprite.setDepth(8);
+        sprite.setDepth(DEPTH.EXPLOSION);
         sprite.setAlpha(0.9);
+        const b = base(sprite);
+        sprite.setScale(b);
 
         if (settings.animations) {
           const delay = 30 * distance;
-          sprite.setScale(0.3);
+          sprite.setScale(0.3 * b);
 
           this.scene.tweens.add({
             targets: sprite,
-            scale: 1.0,
+            scale: b,
             duration: 150,
             ease: 'Back.Out',
             delay,
             onComplete: () => {
               this.scene.tweens.add({
                 targets: sprite,
-                scale: { from: 0.95, to: 1.05 },
+                scale: { from: 0.95 * b, to: 1.05 * b },
                 duration: 200,
                 yoyo: true,
                 repeat: 2,
@@ -127,7 +131,7 @@ export class ExplosionRenderer {
             tint: [0xff6600, 0xff4400, 0xffaa00],
             emitting: false,
           });
-          fireEmitter.setDepth(9);
+          fireEmitter.setDepth(DEPTH.EXPLOSION_FX);
           fireEmitter.explode(fireCount);
           emitters.push(fireEmitter);
           this.activeEmitterCount++;
@@ -149,7 +153,7 @@ export class ExplosionRenderer {
               alpha: { start: 0.5, end: 0 },
               emitting: false,
             });
-            smokeEmitter.setDepth(9);
+            smokeEmitter.setDepth(DEPTH.EXPLOSION_FX);
             smokeEmitter.explode(smokeCount);
             emitters.push(smokeEmitter);
             this.activeEmitterCount++;

@@ -5,6 +5,7 @@ import { getSettings } from './Settings';
 import { audioManager } from './AudioManager';
 import { POWERUP_COLORS } from '../scenes/BootScene';
 import { t } from '../i18n';
+import { DEPTH } from '../art/depth';
 
 /**
  * Upper bound on debris bursts per tile-destruction batch. A wall-collapse event or a long pierce
@@ -90,7 +91,7 @@ export class EffectSystem {
         emitting: false,
         maxAliveParticles: MAX_DEBRIS_PARTICLES,
       });
-      this.debrisEmitter.setDepth(9);
+      this.debrisEmitter.setDepth(DEPTH.EXPLOSION_FX);
     }
     return this.debrisEmitter;
   }
@@ -122,7 +123,7 @@ export class EffectSystem {
     ttlMs: number,
   ): void {
     const emitter = this.scene.add.particles(px, py, texture, { ...config, emitting: false });
-    emitter.setDepth(9);
+    emitter.setDepth(DEPTH.EXPLOSION_FX);
     emitter.explode(count);
     this.scene.time.delayedCall(ttlMs, () => {
       if (emitter && emitter.active) emitter.destroy();
@@ -167,7 +168,7 @@ export class EffectSystem {
           fontStyle: 'bold',
         })
         .setOrigin(0.5)
-        .setDepth(20);
+        .setDepth(DEPTH.PICKUP_TEXT);
 
       this.scene.tweens.add({
         targets: text,

@@ -1,12 +1,13 @@
 import Phaser from 'phaser';
 import { EMOTES, EmoteId, EMOTE_DISPLAY_MS, TILE_SIZE } from '@blast-arena/shared';
+import { DEPTH } from '../art/depth';
 
 const FADE_DURATION = 400;
 const FLOAT_DISTANCE = 15;
 const FLOAT_DURATION = 300;
 const BG_COLOR = 0x1a1a2e;
 const BG_ALPHA = 0.85;
-const TEXT_DEPTH = 100;
+const TEXT_DEPTH = DEPTH.EMOTE;
 const BG_PADDING_X = 8;
 const BG_PADDING_Y = 4;
 

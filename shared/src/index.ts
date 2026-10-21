@@ -23,6 +23,7 @@ export * from './constants/campaign';
 export * from './constants/emotes';
 export * from './constants/xp';
 export * from './constants/themes';
+export * from './constants/artStyles';
 export * from './constants/campaignThemes';
 export * from './utils/grid';
 export * from './utils/wrap';

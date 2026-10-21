@@ -74,7 +74,34 @@
     "language": "Taal",
     "languageDesc": "Interfacetaal",
     "theme": "Thema",
+    "artStyle": "Grafische stijl",
+    "artStyleDesc": "Hoe de arena er op dit apparaat uitziet. Andere spelers zien hun eigen keuze.",
+    "artStyles": {
+      "classic": {
+        "name": "Klassiek",
+        "desc": "Het originele uiterlijk."
+      },
+      "neon": {
+        "name": "Neon Arena",
+        "desc": "Donker glas, gloeiende randen en plasma-explosies."
+      },
+      "toy": {
+        "name": "Toy Diorama",
+        "desc": "Stevige blokken, zachte schaduwen en tekenfilmvuur."
+      },
+      "pixel": {
+        "name": "Crisp Pixel",
+        "desc": "16-bit pixelart, scherp vergroot."
+      }
+    },
     "visualSettings": "Visuele instellingen",
+    "quality": "Grafische kwaliteit",
+    "qualityDesc": "Schaduwen, belichting, gloed en sfeereffecten in de nieuwe grafische stijlen. Verlaag dit als het spel hapert.",
+    "qualityLevels": {
+      "low": "Laag",
+      "medium": "Gemiddeld",
+      "high": "Hoog"
+    },
     "animations": "Animaties",
     "animationsDesc": "Sprite-bewegingstweens en overgangen",
     "screenShake": "Schermtrillingen",

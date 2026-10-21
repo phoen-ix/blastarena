@@ -53,6 +53,7 @@ import { audioManager } from '../game/AudioManager';
 import { getSettings } from '../game/Settings';
 import { enterCoopLevel, clearCampaignRun, localP2StartData } from './coopStart';
 import type { AdminReturn } from '../ui/admin/adminReturn';
+import { DEPTH } from '../art/depth';
 
 /** After a reconnect, how long a match waits for the server to re-send its state. */
 const RESYNC_TIMEOUT_MS = 5000;
@@ -1056,7 +1057,7 @@ export class GameScene extends Phaser.Scene {
     const px = tileX * TILE_SIZE + TILE_SIZE / 2;
     const py = tileY * TILE_SIZE + TILE_SIZE / 2;
     const ring = this.add.graphics();
-    ring.setDepth(7);
+    ring.setDepth(DEPTH.PULSE);
     ring.lineStyle(3, 0x44ff88, 0.9);
     ring.strokeRect(-TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
     ring.fillStyle(0x44ff88, 0.25);
@@ -1218,12 +1219,12 @@ export class GameScene extends Phaser.Scene {
     // Partner off-screen indicator arrows
     this.p1PartnerArrow = this.add.graphics();
     this.p1PartnerArrow.setScrollFactor(0);
-    this.p1PartnerArrow.setDepth(9998);
+    this.p1PartnerArrow.setDepth(DEPTH.PARTNER_ARROW);
     this.p2Camera.ignore(this.p1PartnerArrow);
 
     this.p2PartnerArrow = this.add.graphics();
     this.p2PartnerArrow.setScrollFactor(0);
-    this.p2PartnerArrow.setDepth(9998);
+    this.p2PartnerArrow.setDepth(DEPTH.PARTNER_ARROW);
     cam.ignore(this.p2PartnerArrow);
 
     // Bounds + zoom are applied by applyCameraBounds() which is called right after
@@ -1251,7 +1252,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.splitDivider) {
       this.splitDivider = this.add.graphics();
       this.splitDivider.setScrollFactor(0);
-      this.splitDivider.setDepth(9999);
+      this.splitDivider.setDepth(DEPTH.SPLIT_DIVIDER);
     }
     this.splitDivider.clear();
     if (this.coopCameraMode === 'split-h') {

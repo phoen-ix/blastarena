@@ -1,12 +1,13 @@
 import { ZoneState } from '@blast-arena/shared';
 import { TILE_SIZE } from '@blast-arena/shared';
+import { DEPTH } from '../art/depth';
 
 export class ShrinkingZoneRenderer {
   private graphics: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene) {
     this.graphics = scene.add.graphics();
-    this.graphics.setDepth(15);
+    this.graphics.setDepth(DEPTH.ZONE);
   }
 
   update(zone: ZoneState, mapWidth: number, mapHeight: number): void {
