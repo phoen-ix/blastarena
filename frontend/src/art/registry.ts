@@ -3,6 +3,7 @@ import type { ArtStyleId } from '@blast-arena/shared';
 import type { ArtStyle } from './types';
 import { classicStyle } from './styles/classic';
 import { drawnStyle } from './styles/drawn';
+import { neonPainters } from './styles/neon/painters';
 import { toyPainters } from './styles/toy/painters';
 
 /**
@@ -11,6 +12,7 @@ import { toyPainters } from './styles/toy/painters';
  */
 const STYLES: Partial<Record<ArtStyleId, ArtStyle>> = {
   classic: classicStyle,
+  neon: drawnStyle(neonPainters, { bloom: true }),
   toy: drawnStyle(toyPainters),
 };
 

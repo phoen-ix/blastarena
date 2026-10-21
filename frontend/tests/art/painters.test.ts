@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import type { PowerUpType, TileType } from '@blast-arena/shared';
+import { neonPainters } from '../../src/art/styles/neon/painters';
 import { toyPainters } from '../../src/art/styles/toy/painters';
 import { SPECIAL_TILES } from '../../src/art/painters/types';
 import { PU_TYPES, setPaintScale } from '../../src/art/paint';
@@ -96,7 +97,7 @@ function run(name: string, paint: (g: CanvasRenderingContext2D) => void): void {
   if (draws() === 0) throw new Error(`${name} drew nothing`);
 }
 
-const STYLES: StylePainters[] = [toyPainters];
+const STYLES: StylePainters[] = [toyPainters, neonPainters];
 
 beforeAll(() => {
   // jsdom has no 2D canvas; the painters' sprite caches then draw directly.
