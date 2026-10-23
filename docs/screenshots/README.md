@@ -48,7 +48,8 @@ coming back, this view shows the round, its time and the standings.
 <img src="lobby-openworld.png" alt="The Open World view: player count, round, time left, a Join World button and the round leaderboard" width="800">
 
 ### Rooms
-The room list updates live; here it is empty, with the Create Room button in the header.
+The room list updates live; here it is empty, with the New Room button in the header and the
+collapsed Lobby Chat at the bottom right (the other lobby shots hide it).
 
 <img src="lobby-rooms.png" alt="The Rooms view with no open rooms" width="800">
 
@@ -135,19 +136,20 @@ Your recent matches with mode, result, kills, placement and duration.
 <img src="stats-match-history.png" alt="The Match History view with six matches" width="800">
 
 ### Profile
-Rank, level, statistics, achievements and cosmetics of a player.
+Rank, level, statistics, unlocked achievements and progress toward the next ones.
 
-<img src="stats-profile.png" alt="The profile of LenaBlitz: Platinum rank, level, statistics and achievement progress" width="800">
+<img src="stats-profile.png" alt="The profile of LenaBlitz: Platinum rank, level, statistics, unlocked achievements and achievements in progress" width="800">
 
 ## Settings and Help
 
 ### Settings
-Account (email, password, two-factor authentication, account deletion), Preferences (language,
-theme, art style, graphics, sound, controls), Privacy and Cosmetics.
+Account (username, email, password, two-factor authentication, account deletion), Preferences
+(theme, art style, language and graphics first; sound and controls further down the tab), Privacy and
+Cosmetics.
 
-<img src="settings-account.png" alt="Settings, Account tab" width="800">
+<img src="settings-account.png" alt="Settings, Account tab: username, email, password, two-factor authentication and the Danger Zone" width="800">
 
-<img src="settings-preferences.png" alt="Settings, Preferences tab" width="800">
+<img src="settings-preferences.png" alt="Settings, Preferences tab: themes, art styles, language and graphics quality" width="800">
 
 <img src="settings-privacy.png" alt="Settings, Privacy tab" width="800">
 
@@ -161,8 +163,7 @@ The in-game manual: controls and basics, power-ups, game modes, map features and
 
 <img src="help-power-ups.png" alt="Help, Power-Ups tab with the power-up icons" width="800">
 
-<img src="help-map-features.png" alt="Help, Map Features tab with tile previews" width="800">
-
+<img src="help-map-features.png" alt="Help, Map Features tab: reinforced walls, map events, hazard tiles and the campaign theme variants" width="800">
 
 ## Admin
 
@@ -204,7 +205,7 @@ Batches of bot-only games for tuning the AI.
 ### AI
 Built-in and uploaded bot and enemy AIs.
 
-<img src="admin-ai.png" alt="The AI tab with the built-in bot AI and the six built-in enemy AIs" width="800">
+<img src="admin-ai.png" alt="The AI tab with the built-in bot AI and the enemy AI list" width="800">
 
 ### Announcements
 Toast broadcasts and the persistent lobby banner.

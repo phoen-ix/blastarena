@@ -288,6 +288,7 @@ export async function seedDemo(): Promise<Demo> {
   }
 
   // Backdating: stats, a match history and fixed timestamps (no API writes these).
+  const ids = PEOPLE.map((p) => id(p.username)).join(',');
   for (const [name, [elo, matches, wins, kills, deaths, xp, level]] of Object.entries(STATS)) {
     sql(
       `INSERT INTO user_stats (user_id, total_matches, total_wins, total_kills, total_deaths,
@@ -298,7 +299,8 @@ export async function seedDemo(): Promise<Demo> {
        ON DUPLICATE KEY UPDATE total_matches = VALUES(total_matches), total_wins = VALUES(total_wins),
          total_kills = VALUES(total_kills), total_deaths = VALUES(total_deaths),
          total_bombs = VALUES(total_bombs), total_powerups = VALUES(total_powerups),
-         total_playtime = VALUES(total_playtime), elo_rating = VALUES(elo_rating),
+         total_playtime = VALUES(total_playtime), win_streak = VALUES(win_streak),
+         best_win_streak = VALUES(best_win_streak), elo_rating = VALUES(elo_rating),
          peak_elo = VALUES(peak_elo), total_xp = VALUES(total_xp), level = VALUES(level)`,
     );
   }
@@ -329,6 +331,30 @@ export async function seedDemo(): Promise<Demo> {
       });
     });
   }
+  // The achievements the stats and matches above meet count as unlocked (the server checks them
+  // at match end).
+  const cfg = (key: string) => `JSON_VALUE(a.condition_config, '$.${key}')`;
+  const perGame = `CASE ${cfg('stat')} WHEN 'kills' THEN mp.kills WHEN 'deaths' THEN mp.deaths
+    WHEN 'placement' THEN mp.placement WHEN 'bombs_placed' THEN mp.bombs_placed
+    WHEN 'survived_seconds' THEN mp.survived_seconds END`;
+  sql(
+    `INSERT IGNORE INTO user_achievements (user_id, achievement_id, unlocked_at)
+     SELECT s.user_id, a.id, '2026-06-01 18:00:00' + INTERVAL a.id HOUR
+     FROM achievements a JOIN user_stats s ON s.user_id IN (${ids})
+     WHERE a.is_active AND (
+       (a.condition_type = 'cumulative'
+         AND CASE ${cfg('stat')}
+           WHEN 'total_matches' THEN s.total_matches WHEN 'total_wins' THEN s.total_wins
+           WHEN 'total_kills' THEN s.total_kills WHEN 'total_bombs' THEN s.total_bombs
+           WHEN 'total_powerups' THEN s.total_powerups WHEN 'total_playtime' THEN s.total_playtime
+           WHEN 'best_win_streak' THEN s.best_win_streak END >= ${cfg('threshold')})
+       OR (a.condition_type = 'per_game' AND EXISTS (
+         SELECT 1 FROM match_players mp WHERE mp.user_id = s.user_id
+           AND CASE ${cfg('operator')}
+             WHEN '>=' THEN ${perGame} >= ${cfg('threshold')}
+             WHEN '==' THEN ${perGame} = ${cfg('threshold')}
+             WHEN '<=' THEN ${perGame} <= ${cfg('threshold')} END)))`,
+  );
   for (const [name, wins, kills, games] of [
     [HERO.username, 4, 11, 6],
     ['JonasKeller', 3, 9, 7],
@@ -345,7 +371,6 @@ export async function seedDemo(): Promise<Demo> {
     `UPDATE custom_maps SET play_count = 3 + id * 4, created_at = '2026-05-28 17:00:00' + INTERVAL id DAY,
        updated_at = '2026-06-08 17:00:00' + INTERVAL id DAY`,
   );
-  const ids = PEOPLE.map((p) => id(p.username)).join(',');
   sql(
     `UPDATE users SET created_at = '2026-03-02 18:00:00' + INTERVAL id DAY,
        last_login = '2026-06-15 09:30:00' - INTERVAL id HOUR WHERE id IN (${ids})`,

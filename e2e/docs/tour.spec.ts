@@ -45,21 +45,27 @@ test.afterEach(() => {
 
 /** `tall`: grow the viewport to the scrolling lobby panel's full height (capped) first - the
  * lobby is a fixed-height layout, so a plain full-page shot would only show the first screen.
- * `freezeTimers`: the lobby's open-world round clock shows a fixed time. */
+ * `freezeTimers`: the lobby's open-world round clock shows a fixed time.
+ * `chat`: keep the collapsed Lobby Chat dock, which is hidden otherwise (it covers buttons). */
 async function shoot(
   page: Page,
   name: string,
-  opts: { tall?: boolean; freezeTimers?: boolean } = {},
+  opts: { tall?: boolean; freezeTimers?: boolean; chat?: boolean } = {},
 ): Promise<void> {
   await page.evaluate(() => document.fonts.ready);
   await expect(page.locator('#toast-container .toast')).toHaveCount(0, { timeout: 15_000 });
   await page.mouse.move(0, 0);
   const vp = page.viewportSize()!;
   if (opts.tall) {
-    const extra = await page.evaluate(() => {
-      const body = document.querySelector('.main-body');
-      return body ? body.scrollHeight - body.clientHeight : 0;
-    });
+    // The view scrolls in .main-body or in a panel inside it (settings, help, profile).
+    const extra = await page.evaluate(() =>
+      Math.max(
+        0,
+        ...[...document.querySelectorAll('.main-body, .main-body *')]
+          .filter((el) => getComputedStyle(el).overflowY === 'auto')
+          .map((el) => el.scrollHeight - el.clientHeight),
+      ),
+    );
     if (extra > 0) {
       await page.setViewportSize({
         width: vp.width,
@@ -74,6 +80,9 @@ async function shoot(
       el.removeAttribute('id');
     });
   }
+  const hideChat = opts.chat
+    ? null
+    : await page.addStyleTag({ content: '.lobby-chat { display: none !important; }' });
   // A beat for layout and the canvas to settle.
   await page.waitForTimeout(500);
   await page.screenshot({
@@ -81,6 +90,7 @@ async function shoot(
     animations: 'disabled',
     caret: 'hide',
   });
+  await hideChat?.evaluate((el) => el.remove());
   if (opts.tall) await page.setViewportSize(vp);
 }
 
@@ -171,7 +181,7 @@ test('lobby: open world and rooms', async ({ page }) => {
   await shoot(page, 'lobby-openworld', { freezeTimers: true });
   await openView(page, 'rooms');
   await expect(page.locator('#room-list')).toBeVisible();
-  await shoot(page, 'lobby-rooms');
+  await shoot(page, 'lobby-rooms', { chat: true });
 });
 
 test('campaign, maps and challenge', async ({ page }) => {
@@ -188,7 +198,7 @@ test('campaign, maps and challenge', async ({ page }) => {
 
   await openView(page, 'challenge');
   await expect(page.getByText(CHALLENGE)).toBeVisible();
-  await shoot(page, 'lobby-challenge', { tall: true });
+  await shoot(page, 'lobby-challenge');
 });
 
 test('social views', async ({ page }) => {
@@ -226,7 +236,7 @@ test('progress views', async ({ page }) => {
 
   await page.click('#sidebar-user-profile');
   await expect(page.getByText('Platinum').first()).toBeVisible();
-  await shoot(page, 'stats-profile', { tall: true });
+  await shoot(page, 'stats-profile');
 });
 
 test('settings and help', async ({ page }) => {
@@ -236,14 +246,14 @@ test('settings and help', async ({ page }) => {
     await page.click(`#settings-tab-bar [data-tab="${tab}"]`);
     await expect(page.locator(`#settings-tab-bar [data-tab="${tab}"]`)).toHaveClass(/active/);
     await page.waitForTimeout(800);
-    await shoot(page, `settings-${tab}`, { tall: true });
+    await shoot(page, `settings-${tab}`, { tall: tab === 'account' });
   }
   await openView(page, 'help');
   for (const tab of ['getting-started', 'power-ups', 'map-features']) {
     await page.click(`.admin-tab[data-tab="${tab}"]`);
     await expect(page.locator(`.admin-tab[data-tab="${tab}"]`)).toHaveClass(/active/);
     await page.waitForTimeout(800);
-    await shoot(page, `help-${tab}`, { tall: true });
+    await shoot(page, `help-${tab}`);
   }
 });
 
