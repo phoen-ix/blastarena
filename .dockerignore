@@ -12,3 +12,6 @@ data-dev
 tests
 coverage
 .nyc_output
+# The docs tour and its screenshots are not part of any image (docs/*.md are, for the in-game Help).
+e2e
+docs/screenshots

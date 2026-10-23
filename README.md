@@ -2,7 +2,18 @@
 
 A multiplayer online grid-based explosive arena game built with Phaser and Node.js. Navigate a destructible grid, place bombs strategically, collect power-ups, and compete across six distinct game modes. Supports 2-8 players with AI bots, real-time spectating, team play, a campaign with a level editor, and full admin tools.
 
+<img src="docs/screenshots/menu-landing.png" alt="The landing page: the BlastArena title and the Play as Guest, Login and Register buttons over the live open-world arena" width="800">
+
 **Status:** in production at [www.blastarena.at](https://www.blastarena.at/) and actively developed; Open World mode is still a work in progress.
+
+<p>
+  <img src="docs/screenshots/game-match.png" alt="A Free for All match against three bots on a custom map, with the player list, timer, power-up bar and minimap" width="400">
+  <img src="docs/screenshots/lobby-create-room.png" alt="The Create Room view: game mode, players, match time, a custom map with its preview, bots and map feature options" width="400">
+  <img src="docs/screenshots/campaign-worlds.png" alt="The campaign view: the Training Grounds world expanded, its first level selected with a map preview and the start buttons" width="400">
+  <img src="docs/screenshots/admin-dashboard.png" alt="The admin dashboard: server statistics, server settings and open-world settings" width="400">
+</p>
+
+Every screen, with a sentence each: [screenshot gallery](docs/screenshots/README.md). The landing page in German: [menu-landing.de.png](docs/screenshots/menu-landing.de.png).
 
 ## Quick Start
 
@@ -305,9 +316,12 @@ blastarena/
 │       ├── art/             # Art styles (Canvas 2D painters), sharp rendering
 │       ├── game/            # Client renderers, effects, replay, gamepad
 │       └── network/         # ApiClient, SocketClient, AuthManager
+├── e2e/                     # Playwright docs tour (own npm package)
+├── scripts/                 # docs-screenshots.sh
 ├── docs/                    # Detailed documentation (see below)
 ├── docker-compose.yml       # Production orchestration
-└── docker-compose.dev.yml   # Development overrides
+├── docker-compose.dev.yml   # Development overrides
+└── docker-compose.e2e.yml   # Throwaway stack for the docs tour
 ```
 
 ## Testing & Linting
@@ -319,6 +333,17 @@ npm run format:check        # Prettier format check
 ```
 
 Jest covers the backend and shared code (game logic, services, routes, socket handlers, middleware, database, simulation, utilities), Vitest the frontend. One suite, `tests/backend/db/migrationLock.test.ts`, needs a real MariaDB and runs only with `REQUIRE_DB_TESTS=1`. See [docs/testing.md](docs/testing.md) for the test inventory, mocking patterns, and a guide for writing new tests.
+
+## Screenshots
+
+The images in this README and the [gallery](docs/screenshots/README.md) come from a Playwright tour of a seeded demo (fictional players on `*.example` addresses):
+
+```bash
+bash scripts/docs-screenshots.sh            # writes docs/screenshots/*.png
+bash scripts/docs-screenshots.sh /tmp/shots # or anywhere else
+```
+
+It builds the production images, starts a throwaway stack (`docker-compose.yml` + `docker-compose.e2e.yml`, project `blastarena_docs`, nginx on `127.0.0.1:${PORT_BASE:-24200}`, no host data directories), seeds it through the API (`e2e/docs/seed.ts`), runs `e2e/docs/tour.spec.ts` and tears everything down. Needs Docker and Node 26; run `npx playwright install chromium` in `e2e/` once. The tour asserts each screen before it shoots, so it doubles as a render check. On GitHub, the manual **Docs screenshots** workflow produces the same PNGs as an artifact.
 
 ## Documentation
 
@@ -333,6 +358,7 @@ Jest covers the backend and shared code (game logic, services, routes, socket ha
 - [Infrastructure & Security](docs/infrastructure.md) — security, resilience, Docker, migrations
 - [Testing](docs/testing.md) — test inventory, mocking patterns, writing new tests
 - [API Reference](docs/openapi.yaml) — OpenAPI 3.0.3 specification for all REST endpoints
+- [Screenshot gallery](docs/screenshots/README.md) — every screen, with a sentence each
 
 ## License
 

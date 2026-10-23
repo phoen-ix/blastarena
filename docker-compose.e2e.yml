@@ -1,0 +1,29 @@
+# Throwaway e2e / docs-tour stack: the production images with nothing on the host but one
+# loopback port. Used by scripts/docs-screenshots.sh, which sets the project name and secrets:
+#
+#   COMPOSE_PROJECT_NAME=blastarena_docs docker compose -p blastarena_docs \
+#     -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait
+#
+# - No ./data bind mounts: MariaDB runs on a tmpfs, Redis without AOF, the backend writes logs,
+#   replays and AI uploads inside its container. `down -v` leaves nothing behind.
+# - container_name comes from the base file (${COMPOSE_PROJECT_NAME}-<svc>), so the project name
+#   must be exported as well as passed with -p. Never use blast-arena / blast-arena-dev here.
+services:
+  db:
+    volumes: !override
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    tmpfs:
+      - /var/lib/mysql
+
+  redis:
+    command: redis-server --maxmemory 256mb --maxmemory-policy volatile-lru
+    volumes: !reset []
+
+  backend:
+    volumes: !reset []
+    healthcheck:
+      interval: 5s
+
+  nginx:
+    ports: !override
+      - "127.0.0.1:${PORT_BASE:-24200}:80"
