@@ -15,19 +15,19 @@
   },
   "dependencies": {
     "@blast-arena/shared": "*",
-    "dompurify": "^3.4.16",
-    "i18next": "^26.4.3",
+    "dompurify": "^3.4.17",
+    "i18next": "^26.5.6",
     "i18next-browser-languagedetector": "^8.2.1",
-    "i18next-http-backend": "^4.0.2",
-    "marked": "^18.1.0",
+    "i18next-http-backend": "^4.0.4",
+    "marked": "^18.1.1",
     "phaser": "^4.2.1",
     "socket.io-client": "^4.8.4"
   },
   "devDependencies": {
-    "jsdom": "^30.1.2",
+    "jsdom": "^30.1.3",
     "terser": "^5.51.2",
     "typescript": "~6.0.3",
-    "vite": "^8.3.4",
-    "vitest": "^5.0.3"
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
   }
 }
