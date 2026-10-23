@@ -1,6 +1,8 @@
 # BlastArena
 
-A multiplayer online grid-based explosive arena game built with Phaser.js and Node.js. Navigate a destructible grid, place bombs strategically, collect power-ups, and compete across six distinct game modes. Supports 2-8 players with AI bots, real-time spectating, team play, and full admin tools.
+A multiplayer online grid-based explosive arena game built with Phaser and Node.js. Navigate a destructible grid, place bombs strategically, collect power-ups, and compete across six distinct game modes. Supports 2-8 players with AI bots, real-time spectating, team play, a campaign with a level editor, and full admin tools.
+
+**Status:** in production at [www.blastarena.at](https://www.blastarena.at/) and actively developed; Open World mode is still a work in progress.
 
 ## Quick Start
 
@@ -10,6 +12,12 @@ cp .env.example .env
 # Edit .env — production requires DB_PASSWORD, DB_ROOT_PASSWORD, JWT_SECRET,
 # EMAIL_PEPPER (each >=32 chars) and TOTP_ENCRYPTION_KEY (exactly 64 hex chars,
 # because it is an aes-256-gcm key). Generate any of them with: openssl rand -hex 32
+
+# The backend runs as uid 1000 and writes to five bind-mounted directories. Create them
+# owned by that uid (Docker would create them as root). Never chown all of data/:
+# data/db and data/redis belong to the database containers (uid 999).
+mkdir -p data/gamelogs data/simulations data/replays data/ai data/enemy-ai
+sudo chown -R 1000:1000 data/gamelogs data/simulations data/replays data/ai data/enemy-ai
 
 # Production (default)
 docker compose up --build -d
@@ -22,6 +30,15 @@ docker compose -p blast-arena-dev -f docker-compose.yml -f docker-compose.dev.ym
 The dev stack is fully isolated from production — its own Compose project, container names, host ports (nginx `8285`, Vite `5183`, DB `3317`, Redis `6390`) and data directory (`./data-dev`) — so the two can run side by side.
 
 In production, Nginx binds to `127.0.0.1:8280` (loopback only) and is expected to sit behind a host-level reverse proxy that terminates TLS and forwards traffic to it. For local/dev use, open the app on the proxied port (or forward `127.0.0.1:8280`). See `.env.example` for all configuration options.
+
+There is no default account. Register through the app; without SMTP settings the verification email is only logged, not sent, so the first admin is verified and promoted in the database:
+
+```bash
+docker compose exec db mariadb -u blast_user -p blast_arena \
+  -e "UPDATE users SET email_verified = TRUE, role = 'admin' WHERE username = 'yourname'"
+```
+
+Admins can then create further (already verified) accounts in Admin → Users.
 
 **Upgrading an existing install to a newer MariaDB major:** the `db` service sets `MARIADB_AUTO_UPGRADE=1`, so the container upgrades `data/db` in place on its first start. Take a verified dump first (`docker compose exec db mariadb-dump ...`) — a major-version upgrade cannot be rolled back.
 
@@ -111,15 +128,15 @@ Admin-configurable achievement system with four condition types: cumulative stat
 
 | Tab | Access | Key Features |
 |-----|--------|-------------|
-| Dashboard | Admin | Stats, server settings (recordings, registration, email/SMTP, chat modes, XP multiplier, default theme, GitHub/imprint display), game/simulation defaults (incl. puzzle tiles, spectator actions), revoke all sessions |
+| Dashboard | Admin | Stats, server settings (recordings, registration, email/SMTP, chat modes, XP multiplier, default theme and art style, open world, GitHub/imprint display), game/simulation defaults (incl. puzzle tiles, spectator actions), revoke all sessions |
 | Users | Staff | Search, roles, deactivate, delete (simple confirmation), password reset, revoke sessions, 2FA status & reset, bulk account cleanup (unverified/inactive/deactivated) |
 | Matches | Staff | History, per-player stats, replay viewer, delete |
 | Rooms | Staff | Live rooms, spectate, kick, force close |
 | Logs | Admin | Audit trail with filters, click-to-expand detail rows |
 | Simulations | Admin | Batch bot-only games (1-1000), fast/realtime, queue |
 | AI | Admin | Upload/manage custom bot AI and enemy AI implementations |
-| Campaign | Admin | Worlds, levels (visual editor), enemy types, JSON export/import |
 | Announcements | Staff | Toast broadcasts, persistent banners |
+| Campaign | Admin | Worlds, levels (visual editor), enemy types, JSON export/import, campaign replays |
 | Seasons | Admin | Season CRUD, activate, end the active season (hard/soft Elo reset), rank tier config with color pickers |
 | Achievements | Admin | Achievement CRUD (4 condition types), cosmetic CRUD (4 types), reward linking, JSON export/import |
 | Challenges | Admin | Map challenge CRUD, activate/deactivate, global toggle, published map selection |
@@ -129,7 +146,7 @@ All actions audit-logged. See [docs/admin-and-systems.md](docs/admin-and-systems
 ## Social Features
 
 - **Theme System**: 11 color themes — 5 dark (Inferno, Arctic, Toxic, Crimson, Midnight), 3 vivid light (Daylight, Sakura, Sand), 3 pastel light (Frost, Blossom, Dune). User selects in Settings > Preferences; admin sets global default in Dashboard. Themes affect all UI and Phaser canvas colors.
-- **Sidebar Navigation**: Persistent collapsible left sidebar with "ear" toggle tab. All lobby views (Rooms, Campaign, My Maps, Friends, Messages, Party, Leaderboard, Settings, Help, Admin, Create Room, Profile) render inline in the main content area — no overlays or slide-out panels.
+- **Sidebar Navigation**: Persistent collapsible left sidebar with "ear" toggle tab. All lobby views (Open World, Rooms, Create Room, Campaign, My Maps, Challenge, Friends, Messages, Party, Leaderboard, Match History, Profile, Settings, Help, Admin) render inline in the main content area — no overlays or slide-out panels.
 - **Friends**: Full-page view with tabs (Friends/Requests/Blocked), search, friend cards with online status indicators.
 - **Online Presence**: See friends' real-time status (online, in lobby, in game, in campaign). Presence tracked via Redis with 120s TTL.
 - **Parties**: Full-page view with two states: empty (create party) / active (member cards, chat, invites). When the party leader joins a room, all members auto-follow.
@@ -159,9 +176,9 @@ Full-page Help view accessible from the lobby sidebar. Seven tabs with role-base
 | Power-Ups | All | All 9 power-ups with Canvas2D inline sprites matching in-game textures |
 | Game Modes | All | 6 modes with player counts, rules, win conditions |
 | Map Features | All | Reinforced walls, dynamic events, hazard tiles with Canvas2D tile previews, theme variant showcase (all 9 campaign themes) |
-| Guides | All | Rendered markdown docs: Campaign, Replays, Bot AI (collapsible sections) |
+| Guides | All | Rendered markdown docs: Campaign, Replays, Bot AI, Enemy AI (collapsible sections) |
 | Level Editor | Staff | Visual tile reference (27 tile types with Canvas2D icons) + campaign system docs |
-| Admin Docs | Staff | Admin systems, infrastructure, testing, performance, API reference |
+| Admin Docs | Staff | Admin systems, infrastructure, testing, performance, bot AI internals, API reference |
 
 Documentation served via backend API from `docs/` directory (bind-mounted in dev, baked into image for prod). Markdown rendered client-side with `marked`.
 
@@ -234,7 +251,7 @@ Full i18n support via [i18next](https://www.i18next.com/). UI strings live in JS
 | Danish     | `da` | Complete |
 
 - **Language selection**: Flag dropdown on login screen + Settings > Preferences dropdown. Auto-detects browser language on first visit
-- **11 namespaces** organize translations: shared (`common`, `game`), frontend-only (`ui`, `auth`, `admin`, `campaign`, `help`, `editor`, `errors`), backend-only (`server`, `email`)
+- **Namespaces** organize translations: shared (`common`, `game`), frontend-only (`ui`, `auth`, `admin`, `campaign`, `help`, `editor`, `errors`), backend-only (`server`, `email`)
 - **Email i18n**: All transactional emails (verification, password reset, email change, warnings, test) sent in the user's preferred language
 - **Adding a new language**: Create translated JSON files in `frontend/src/i18n/locales/{code}/`, `shared/src/i18n/locales/{code}/`, and `backend/src/i18n/locales/{code}/`, then register the language code in the i18n config files
 - **RTL ready**: Document direction attribute set dynamically for RTL languages
@@ -267,23 +284,25 @@ Full i18n support via [i18next](https://www.i18next.com/). UI strings live in JS
 ## Project Structure
 
 ```
-blast-arena/
+blastarena/
 ├── shared/                  # Shared types, constants, utilities
 ├── backend/
 │   └── src/
-│       ├── routes/          # REST endpoints (auth, lobby, user, admin, campaign, custom-maps, friends, messages, leaderboard, cosmetics, docs)
-│       ├── game/            # Server game logic (GameLoop, GameState, BotAI, etc.)
+│       ├── routes/          # REST endpoints, one router per area
+│       ├── handlers/        # Socket.io handlers (lobby, friends, party, DMs)
+│       ├── game/            # Server game logic (GameLoop, GameState, BotAI, OpenWorldManager, …)
 │       ├── simulation/      # Bot simulation system
 │       ├── db/              # MariaDB connection, migrations, redis
-│       ├── services/        # Auth, user, admin, lobby, email, replay, settings, friends, party, presence, messages, elo, season, leaderboard, achievements, cosmetics, buddy, custom-maps
-│       └── middleware/       # Auth, rate limiting, staff checks
+│       ├── services/        # Business logic per feature
+│       └── middleware/      # Auth, rate limiting, staff checks
 ├── frontend/
 │   ├── index.html           # HTML shell, @font-face and the theme bootstrap script
 │   ├── public/              # Static assets (favicon, fonts, robots.txt, sitemap, manifest)
 │   └── src/
 │       ├── styles.css       # Full CSS design system (11 themes)
-│       ├── scenes/          # Phaser scenes (Boot, Menu, Lobby, Game, HUD, GameOver)
-│       ├── ui/              # DOM-based UI (Auth, Lobby, Room, Campaign, Admin, Views)
+│       ├── scenes/          # Phaser scenes (Boot, Menu, Lobby, Game, HUD, GameOver, LevelEditor)
+│       ├── ui/              # DOM-based UI (Auth, Lobby views, Room, Campaign, Admin tabs, Help)
+│       ├── art/             # Art styles (Canvas 2D painters), sharp rendering
 │       ├── game/            # Client renderers, effects, replay, gamepad
 │       └── network/         # ApiClient, SocketClient, AuthManager
 ├── docs/                    # Detailed documentation (see below)
@@ -294,12 +313,12 @@ blast-arena/
 ## Testing & Linting
 
 ```bash
-npm test                    # Run all test suites (3508 tests)
+npm test                    # Run all test suites (backend + shared via Jest, frontend via Vitest)
 npm run lint                # ESLint across all workspaces
 npm run format:check        # Prettier format check
 ```
 
-3508 tests in 153 files: 3242 backend and shared tests in 116 Jest suites (game logic, services, routes, socket handlers, middleware, database, simulation, utilities) and 266 frontend tests in 37 Vitest files. See [docs/testing.md](docs/testing.md) for full test inventory, mocking patterns, and a guide for writing new tests.
+Jest covers the backend and shared code (game logic, services, routes, socket handlers, middleware, database, simulation, utilities), Vitest the frontend. One suite, `tests/backend/db/migrationLock.test.ts`, needs a real MariaDB and runs only with `REQUIRE_DB_TESTS=1`. See [docs/testing.md](docs/testing.md) for the test inventory, mocking patterns, and a guide for writing new tests.
 
 ## Documentation
 
@@ -309,7 +328,7 @@ npm run format:check        # Prettier format check
 - [Campaign System](docs/campaign.md) — enemies, levels, editor, progress
 - [Admin Panel & Systems](docs/admin-and-systems.md) — admin tabs, simulations, accounts
 - [Replay System](docs/replay-system.md) — recording, playback, controls
-- [Socket.io Events](docs/socket-events.md) — real-time event reference (101 events)
+- [Socket.io Events](docs/socket-events.md) — real-time event reference
 - [Performance & Internals](docs/performance-and-internals.md) — optimizations, game logging
 - [Infrastructure & Security](docs/infrastructure.md) — security, resilience, Docker, migrations
 - [Testing](docs/testing.md) — test inventory, mocking patterns, writing new tests

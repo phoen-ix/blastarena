@@ -1,211 +1,85 @@
 # BlastArena
 
-Multiplayer online grid-based explosive arena game.
+Multiplayer online grid-based explosive arena game. Monorepo with npm workspaces `shared/`, `backend/` (Node 26, Express 5, Socket.io), `frontend/` (Phaser 4 + DOM UI, Vite); MariaDB 12.3 + Redis 8; Docker Compose (db, redis, backend, nginx).
 
-## Project Structure
-- Monorepo with npm workspaces: `shared/`, `backend/`, `frontend/`
-- Docker Compose for orchestration (MariaDB, Redis, Node.js backend, Nginx)
-
-## Running
-Production is the canonical run mode for this deployment (plain `docker compose up` = prod; nginx on `127.0.0.1:8280` behind a host-level TLS proxy).
+## Commands
 ```bash
-cp .env.example .env  # prod requires DB passwords, JWT_SECRET + EMAIL_PEPPER (>=32 chars each),
-                      # and TOTP_ENCRYPTION_KEY (exactly 64 hex chars — it is an aes-256-gcm key).
-                      # openssl rand -hex 32 produces a valid value for any of them.
-
-# The backend container runs as the unprivileged `node` user (uid 1000). Its five bind-mounted
-# directories must be owned by that uid or the backend cannot write logs, replays or AI uploads.
-# Required once, on an existing deployment that previously ran the container as root.
-# NOTE: name the five explicitly — do NOT chown all of data/. data/db and data/redis belong to
-# uid 999 (mysql / redis) and chowning them breaks both containers.
-sudo chown -R 1000:1000 data/gamelogs data/simulations data/replays data/ai data/enemy-ai
-
-# Production (default)
-docker compose up --build -d
-
-# Development (hot reload) — or just `npm run dev`, which passes the same flags.
-# The `-p` is MANDATORY. Without it Compose resolves to the production project name (.env sets
-# COMPOSE_PROJECT_NAME=blast-arena, which outranks the `name:` in the dev file), adopts the running
-# production containers and replaces them — silently, with no port clash to stop it.
-# Dev is isolated: nginx on 127.0.0.1:8285, Vite 5183, DB 3317, Redis 6390, data under ./data-dev.
-docker compose -p blast-arena-dev -f docker-compose.yml -f docker-compose.dev.yml up --build
+npm ci                                          # install all workspaces
+npm test                                        # all tests (backend + shared via Jest, frontend via Vitest)
+npx jest --config tests/backend/jest.config.ts  # backend + shared only (from the repo root)
+cd frontend && npx vitest run                   # frontend only
+npm run lint && npm run format:check            # ESLint, Prettier
+docker compose up --build -d                    # production (nginx on 127.0.0.1:8280)
+npm run dev                                     # dev stack, hot reload (see Invariants: -p)
+bash scripts/docs-screenshots.sh [outdir]       # docs tour: stack -> seed -> PNGs (default docs/screenshots)
 ```
+- `tests/backend/db/migrationLock.test.ts` is the one suite that needs a real MariaDB; CI and fleet set `REQUIRE_DB_TESTS=1` plus `DB_*` (it skips otherwise).
+- Docs tour: `e2e/` is its own npm package (Playwright, not a workspace). `scripts/docs-screenshots.sh` builds the prod images, starts `docker-compose.yml` + `docker-compose.e2e.yml` as project `blastarena_docs` on `127.0.0.1:${PORT_BASE:-24200}`, seeds through the API (`e2e/docs/seed.ts`; SQL only to verify/promote the first admin and to backdate rows) and runs `e2e/docs/tour.spec.ts`. Fleet: `fleet check blastarena --with docs`.
+- More: [docs/testing.md](docs/testing.md) (inventory, mocking patterns).
 
-## Tech Stack
-- Backend: Node.js 26 + Express 5 + TypeScript + Socket.io
-- Frontend: Phaser 4 + TypeScript + Vite
-- Database: MariaDB 12.3 + Redis 8
-- Shared types between frontend/backend via workspace
+## Invariants
+**Stacks and ports**
+- Production is the canonical run mode on the server (project `blast-arena`, nginx `127.0.0.1:8280` behind a host TLS proxy). Never use the project names `blast-arena` or `blast-arena-dev` for anything but those stacks.
+- Dev needs `-p blast-arena-dev` (`npm run dev` passes it). `.env` sets `COMPOSE_PROJECT_NAME=blast-arena`, which outranks `name:` in `docker-compose.dev.yml`; without `-p` Compose adopts and replaces the production containers silently. Dev is isolated: nginx 8285, Vite 5183, DB 3317, Redis 6390, data in `./data-dev` (`tests/backend/utils/composeIsolation.test.ts`).
+- Docs/e2e stacks: project `blastarena_docs` / `blastarena_e2e` (the script refuses names not starting with `blastarena_`), ports from the fleet block 24200–24209 only, teardown `down -v --remove-orphans --rmi local`. `container_name` is `${COMPOSE_PROJECT_NAME}-<svc>`, so export the name as well as passing `-p`.
+- The backend runs as uid 1000; its five bind mounts (`data/gamelogs simulations replays ai enemy-ai`) must be owned by 1000. Never chown all of `data/`: `data/db` and `data/redis` belong to uid 999.
+- Keep all five Node stages (`docker/backend/Dockerfile`, `Dockerfile.dev`, two in `docker/nginx/Dockerfile`) and `.nvmrc` on the same exact `node:<patch>-alpine` tag (`tests/backend/utils/nodeVersion.test.ts`); isolated-vm needs a prebuilt binary for that ABI.
 
-## Key Patterns
-- Server-authoritative game logic; client only renders + sends inputs
-- Grid-based movement: players occupy exactly one tile at a time
-- Movement cooldown system (MOVE_COOLDOWN_BASE ticks, reduced by speed power-ups). Enemy speed uses divisor formula: `Math.round(MOVE_COOLDOWN_BASE / speed)`
-- JWT (access token in memory) + httpOnly cookie (refresh token) auth. Cookie `secure` flag derived from APP_URL (not NODE_ENV)
-- ApiClient 401 interceptor auto-refreshes via `fetchWithAuth()`; auth endpoints use `skipAuthRetry` to avoid infinite loops. Cached `refreshPromise` prevents concurrent refresh calls
-- Zod for request validation; `ApiClient` appends field-level `details` from validation errors
-- Redis room mutations use atomic inline Lua scripts in `services/lobby.ts` (`JOIN_ROOM_LUA`, `LEAVE_ROOM_LUA`, `SET_READY_LUA`, `SET_TEAM_LUA`, `START_ROOM_LUA`). `ROOM_TTL_SECONDS = 3600`
-- All game constants in `shared/src/constants/`
-- Bot players use negative IDs (-(i+1)) to avoid DB conflicts; skipped in DB writes
-- LobbyScene's `game:start` listeners are one-shot (no leaks across scene transitions) and only accept a state that includes the user — staff spectating a room receive it too. GameScene keeps one for the match's lifetime (removed in `shutdown()`) to take the server's resync after a reconnect
-- Singleplayer: 1 human + 1+ bots is enough to start a game
-- Friendly fire config: when OFF, same-team explosions don't damage teammates (self-damage still applies)
-- Map dimensions should be odd numbers for proper indestructible wall grid pattern
-- Branding: "BLAST" in white, "ARENA" in primary (`--primary`). In sidebar: `<span>BLAST</span>ARENA` where parent is primary and span is text color. In Phaser: two separate text objects via `themeManager.getCanvasColors()`
-- All modals use `trapFocus()` from `utils/html.ts`; its disposer hands focus back to the element that opened the modal. Game overlays (pause/leave) disable Phaser keyboard captures while open so keys reach DOM buttons
+**Files you must not edit in place**
+- `backend/src/db/redis.ts` and `backend/src/utils/logger.ts` carry `fleet-copy:` markers (copied from other repos). Report needed changes instead.
+- `docs/*.md` are rendered by the in-game Help (`backend/src/routes/docs.ts` allow-lists them): no images there. Screenshots live only in `README.md` and `docs/screenshots/README.md`.
 
-## Frontend Architecture
-- **Themes**: 11 palettes in `frontend/src/themes/definitions.ts`. `ThemeManager` reads localStorage → admin default → 'inferno'. `[data-theme]` on `<html>`. Inline `<script>` in `<head>` prevents a flash for a stored choice (the admin default is fetched after boot); admin default-theme changes arrive live via `admin:settingsChanged` (applied in LobbyScene)
-- **Art styles**: Classic, Neon Arena, Toy Diorama, Crisp Pixel (`ART_STYLE_IDS`, `shared/src/constants/artStyles.ts`). `ArtStyleManager` reads localStorage `blast-arena-art-style` → admin `default_art_style` → `classic`; picker in Settings, admin default in the Dashboard, live via `admin:settingsChanged`. Code in `frontend/src/art/`: each drawn style is a set of pure Canvas 2D painters (`art/painters/types.ts` contract) that `StyleArt` bakes into atlases; `activeStyleArt(scene)` returns null for Classic. Renderers take an optional `StyledFx` — null keeps the Classic code path, which draws today's look. Drawn styles use `StyledTileMap` (raised, y-sorted blocks) instead of `TileMap`. Size sprites with `fit()`/`base()` from `art/scale.ts`, never absolute scales (textures carry their bake scale); depths come from `art/depth.ts` bands. The level editor always uses Classic tiles
-- **Sharp rendering** (`art/hidpi.ts`): the canvas is in device pixels (CSS size × `renderRatio()`, ≤2; 1 when the setting is off or quality is Low) and shown at CSS size. GameScene multiplies every camera zoom by the ratio; UI scenes lay out in CSS pixels via `uiCamera(scene)`; pointer → world goes through `cam.getWorldPoint()` (pointer coords are device pixels). Bake new textures with `hiResGraphics()`/`bakeGraphics()` (Classic) or at `textureRatio()`. Phaser Text gets the ratio automatically (patched factories). `?dpr=2` forces 2× on an ordinary monitor
-- **Player colours**: always from `game/playerPalette.ts` (`playerColor()`, `teamColor()`, `teamColorIndices()`), never hard-coded hex — the colour-blind setting swaps the palette and adds a shape marker per player
-- **Graphics settings** (`game/Settings.ts`): `quality` low/medium/high gates the drawn styles' extras (`qualityAtLeast()`), `sharpRendering`, `colorBlind`; `onSettingsChange()` fires after every save
-- **CSS**: All styles in `frontend/src/styles.css`, imported by `main.ts` so Vite emits a hashed, cacheable `/assets/*.css` (nginx serves `index.html` with `no-store`, so inline CSS was re-downloaded on every navigation). Only two things stay inline in `frontend/index.html`: the `@font-face` block, and the theme `<script>` that sets `[data-theme]` before first paint — its sha256 is pinned in the CSP, so editing it means regenerating that hash in `docker/nginx/security-headers.conf`. Always use CSS variables (e.g. `var(--primary)` not hardcoded hex). Typography: Chakra Petch (headings) + DM Sans (body). Fonts self-hosted woff2 — no external CDN
-- **Sidebar & Views**: `.app-layout` with collapsible sidebar + `.main-content`. `ILobbyView` with `render()`/`destroy()`. Each lobby view renders into its own `.view-root` (`display: contents`) inside `.main-body`, so its container listeners and late async writes go with it. Views with own sub-header hide `.main-header`
-- **UI conventions**: Unified CSS classes: `.panel-header`/`.panel-content`, `.tab-bar`/`.tab-item`, `.data-table`, `.form-grid`/`.form-group`/`.input`/`.select`, `.toggle-switch`, `.setting-row`, `.option-chip`, `.mini-stat`, `.modal-header`/`.modal-body`/`.modal-footer`, `.btn`/`.btn-primary`/`.btn-secondary`/`.btn-ghost`/`.btn-sm`
-- **Gamepad UI nav**: `UIGamepadNavigator` spatial navigation over a context stack. The lobby context (`LobbyUI.updateGamepadContext`) lists what is reachable: `.sidebar-nav-item`, and inside `.main-body` inputs, buttons, `.btn`, `.room-card`, `.tab-item`, `.messages-conv-item`, `.log-row`, campaign cards, help links — a new interactive element must match that list (or extend it). `createModal()` pushes and pops its own context
-- **Rendering**: All sprites procedurally generated — Classic in `BootScene.generateTextures()`, drawn styles by their painters — no external image assets. `activeMoveAnim` Set on PlayerSprite prevents tween stacking. Players and enemies move toward their tick targets once per rendered frame (`frame(delta)` from `GameScene.update`); a target that moves more than 3 tiles between states (teleporter, round start, replay seek) is a jump and the sprite is put there. Power-up icons are procedural Canvas2D (`powerUpIcons.ts`) — no emoji `fillText`
-- **Audio**: Web Audio API procedural SFX via `AudioManager` singleton + `SoundGenerator`. No external audio files. Phaser runs with `noAudio: true`. Lazy `AudioContext` init on first user gesture (browser autoplay policy). `ensureResumed()` gates all sound playback
-- **HUD**: DOM-based overlay in HUDScene.ts. Icons are drawn (`ui/hudIcons.ts`), not emoji; kill-feed portraits (`ui/portraits.ts`) use `GameScene.playerLook(id)`, which survives a knockout. The countdown and split-screen divider/arrows are DOM overlays too. `#ui-overlay > *` turns pointer events on, so a full-screen overlay that must not catch clicks needs `#ui-overlay > .its-class { pointer-events: none }`. Minimap keeps its own copy of the grid, seeded in `create()` from GameScene's live grid (`liveTiles`, falling back to the `initialGameState` registry) and updated via `tileDiffs` — GameScene emits `stateUpdate` before HUDScene registers its listener. The HUD follows GameScene's `localId` (open-world ids are per join). Kill feed shows cause icons via `KillCause` type
-- **Phaser lifecycle**: `shutdown()` must be registered via `this.events.once('shutdown', this.shutdown, this)` — Phaser does NOT auto-call. Phaser reuses scene instances — constructor runs once, `create()` runs on every scene start. ALL session-specific properties MUST be reset at top of `create()`
-- **Real-time lobby**: Room list auto-updates via `room:list` socket broadcast on every room mutation
-- **Scene hand-off**: scenes pass state through `this.registry`: `initialGameState` (every game start); `openWorldMode` + `openWorldPlayerId` (open world — the id is per join and cleared when the world is left); `campaignMode`, `campaignCoopMode`, `localCoopMode`, `localCoopConfig`, `localCoopP2Identity`, `buddyMode`, `buddyConfig`, `campaignTheme`, `campaignEnemyTypes` (a campaign run — `clearCampaignRun()` drops them together); `replayMode`/`replayData`; `simulationSpectate`; `adminSpectate`; `gameOverData`; `currentRoom`, `openCampaign`, `returnToAdmin` (where LobbyScene lands). Shared services live there too: `socketClient`, `authManager`, `notifications`
-- **Reconnect**: `SocketClient.onReconnect()` fires after every reconnect (not the first connect). The server keeps no socket rooms across one, so each scene re-joins what it shows (see docs/socket-events.md, Reconnection)
+**Frontend**
+- CSP is `'self'` with Trusted Types: all HTML goes through `setHtml()`/`insertHtml()` in `frontend/src/utils/html.ts` (raw `innerHTML` is an ESLint error elsewhere). The inline theme `<script>` in `frontend/index.html` is hash-pinned in `docker/nginx/security-headers.conf`: editing it means regenerating that hash. Nothing from external CDNs (fonts are self-hosted woff2).
+- Styles live in `frontend/src/styles.css` (imported by `main.ts`); only `@font-face` and the theme script stay inline. Always CSS variables (`var(--primary)`), never hard-coded hex.
+- Player colours always from `game/playerPalette.ts` (`playerColor()`, `teamColor()`, `teamColorIndices()`); the colour-blind setting swaps the palette.
+- Phaser: register `shutdown()` with `this.events.once('shutdown', this.shutdown, this)` (Phaser does not call it). Scene instances are reused: reset ALL session state at the top of `create()`.
+- `SocketClient.off(event)` without a handler removes every listener: always pass the handler reference.
+- HUDScene gets campaign state from the Phaser event `campaignStateUpdate`, never from the socket `campaign:state`.
+- Drawn art styles: size sprites with `fit()`/`base()` (`art/scale.ts`), never absolute scales; depths from `art/depth.ts`. New textures via `hiResGraphics()`/`bakeGraphics()` (Classic) or at `textureRatio()`. Pointer → world through `cam.getWorldPoint()` (pointer coords are device pixels).
+- A full-screen overlay that must not catch clicks needs `#ui-overlay > .its-class { pointer-events: none }` (`#ui-overlay > *` turns them on).
+- New interactive lobby elements must match the gamepad navigator's selector list (`LobbyUI.updateGamepadContext`) or extend it. Modals use `trapFocus()`, `role="dialog"`, `aria-modal`, `aria-label`, close on Escape; toggles are `role="switch"` + `aria-checked`.
+- Open-world standings: `openworld:info` is authoritative (replace, don't merge); `getLeaderboard()` returns FULL standings (clients rank by index).
+- Campaign retry must keep `buddyMode`: check buddy before localCoop in the if/else chain.
 
-## Campaign System
-Campaign with hand-crafted levels, enemies, and bosses. Solo, online co-op (2 players via party), and local co-op. 9 world themes with per-theme color palettes and themed tile textures.
-- `CampaignGame` wraps `GameStateManager` with `customMap`. Enemy-explosion collision runs BEFORE enemy AI movement in `campaignTick()` to prevent enemies dodging same-tick explosions
-- Editor supports dual mode: `editorMode: 'campaign' | 'custom_map'`. Custom map mode hides campaign-only tools and uses `/maps` API
-- **Co-Op**: Online (party-based, 2 members) or local (guest or logged-in P2, 3 camera modes). Shared life pool, auto-respawn, sequential lock-in
-- **Buddy Mode**: P2 is smaller, invulnerable support character. `isBuddy` flag, passes through walls/bombs. `isCoopMode` is false for buddy mode. Campaign retry must preserve `buddyMode` flag — check buddy before localCoop in if/else chain. Buddy ID: `-(2000 + (Date.now() % 10000))`
-- **Puzzle Tiles**: Switches (toggle/pressure/oneshot, 4 colors), gates (linked by color, OR logic), crumbling floors. `PuzzleTileProcessor` shared between campaign and multiplayer. Rising-edge: reacts only on first tick of explosion via `prevSwitchBlasted`. Buddy blocked by closed gates and pits
+**Backend and shared**
+- Server-authoritative: the client only renders and sends inputs. All game constants in `shared/src/constants/`.
+- Bot players have negative ids (`-(i+1)`), guests from `OPENWORLD_GUEST_ID_START` (-3000), buddies `-(2000 + …)`; negative ids are never written to the DB.
+- Map dimensions are odd (pillar grid); custom maps: odd 9–51, border walls, 2–8 spawns, paired teleporters (`shared/src/utils/mapValidation.ts`).
+- `admin_actions.target_id` is `INT NOT NULL`: use `0` for bulk actions. Every admin action is audit-logged.
+- Socket.io types are fully parameterised (no `as any`); `getErrorMessage(err: unknown)` in every catch.
+- Socket middleware reads the role from the DB, not from the JWT.
+- Migrations: `backend/src/db/migrations/NNN_description.sql` + `down/NNN_description.down.sql`. MariaDB DDL auto-commits, so write them re-runnable (`IF [NOT] EXISTS`, repeat-safe data changes); from 042 on `tests/backend/db/migrationParity.test.ts` rejects unguarded schema changes.
 
-## Custom Maps
-User-created maps for multiplayer via `LevelEditorScene` (a lazy chunk: `await ensureLevelEditorScene(game)` from `scenes/levelEditorLoader.ts` before `scene.start('LevelEditorScene')`). CRUD API at `/maps/`, validation in `shared/src/utils/mapValidation.ts` (odd dims 9-51, border walls, 2-8 spawns, teleporter pairing). `MatchConfig.customMapId` for room integration. Star ratings (1-5) on published maps.
+**i18n**
+- New keys go into all 12 locales (`tests/shared/localeParity.test.ts`). Dots are key separators: never decimal numbers as keys (`"low30"`, not `"0.3"`).
+- Module-level constants using `t()` must be functions/getters (`t()` returns the key before init); view titles are getters. Rename lambda parameters called `t` where `t` is imported.
 
-## Spectator Game Master
-Dead players accumulate energy to interact: place_wall, trigger_meteor, drop_powerup, speed_zone. Admin global toggle + per-room `MatchConfig.enableSpectatorActions`. Anti-griefing: rate limited, spawn protection, no targeting allies/occupied tiles.
-
-## Community Map Challenges
-Weekly featured community maps with competitive leaderboards. Only one active challenge at a time. `recordChallengeResult()` called after match finish. Map deletion blocked if linked to active/upcoming challenge.
-
-## Progression & Rewards
-- **Elo**: K-factor varies by games played. FFA pairwise, Teams average per team
-- **Seasons**: Admin-defined, per-user per-season Elo. Hard/soft reset
-- **Achievements**: `cumulative`, `per_game`, `mode_specific`, `campaign` conditions. Can reward cosmetics
-- **Cosmetics**: `color`, `eyes`, `trail`, `bomb_skin`. Static per game: in every full `toState()`, and in `toTickState()` only on a player's first tick (`Player.cosmeticsSent`). Explosion `cells` likewise go out once per explosion (empty array afterwards) and tick states carry no `spawnPoints`. `GameScene.hydrateState()` fills the gaps from per-id caches before anything renders a state; `ReplayRecorder` does the same so replay frames stay self-contained for seeking. Color priority: cosmetic → team → index-based
-- **Rematch voting**: >50% threshold. `humanPlayerIds` filters `id > 0`; solo with bots shows "Play Again"
-
-## Social Features
-Friendships (reciprocal, DB-backed), presence (Redis, 120s TTL), parties (Redis, Lua atomic join, leader-follows), DMs (DB, friends only), 12 emotes with radial wheel. All social chat features admin-configurable via `ChatMode`. Each socket joins `user:{userId}` room on connect.
-
-## Admin Panel
-Lobby view (sidebar → Admin) for admin/moderator roles. `staffMiddleware` and `adminOnlyMiddleware` for route protection. All actions audit-logged. `admin_actions.target_id` is `INT NOT NULL` — use `0` for bulk operations. Features: session revocation, account cleanup, TOTP reset, registration toggle. See [docs/admin-and-systems.md](docs/admin-and-systems.md)
-
-## AI Systems
-- **Bot AI**: Source scan + esbuild bundle at upload time, then execution. **Untrusted** (admin-uploaded) AIs run in an `isolated-vm` isolate per instance with a memory cap and a hard invoke timeout (`IsolatedAIRunner`); only trusted seeded AIs are loaded in-process via `vm.runInContext()` with a 5s timeout, and that context is given no host objects and has code generation disabled. Crash recovery falls back to built-in. Team-aware. Bot decisions are seeded per bot from the map seed, so matches with bots replay deterministically. See [docs/bot-ai-guide.md](docs/bot-ai-guide.md)
-- **Enemy AI**: Same sandbox pipeline. `IEnemyAI.decide(context)` returns `{ direction, placeBomb }`. See [docs/enemy-ai-guide.md](docs/enemy-ai-guide.md)
-- **Simulations**: Admin-only batch runner. See [docs/admin-and-systems.md](docs/admin-and-systems.md#bot-simulation-system)
-
-## Game Architecture
-- 20 tick/sec server game loop. processTick order: bot AI → inputs → movement → conveyors → hazard slowdown (vine/mud/quicksand) → bomb timers/slide → detonations → explosion timers → collisions → power-ups → hazard damage (lava/spikes/etc) → puzzle tiles → KOTH → map events → spectator actions → zone → deathmatch respawns → time → win check
-- Chain reaction tile snapshot: tiles snapshotted before processing detonations so chained bombs use original wall layout. Chain reactions always propagate regardless of remote detonate mode. `detonateBomb()` guards against stale references with `this.bombs.has()` check
-- Explosion damage cells exclude wall tiles — blast destroys walls but fire doesn't linger. Pierce bombs still damage through/beyond
-- `SocketClient.off()` without a handler removes ALL listeners for that event. Always pass specific handler references
-- HUDScene listens for campaign state via Phaser event (`campaignStateUpdate`) — never register HUDScene on socket for `campaign:state`
-- Self-kills subtract 1 from kill score. Power-up drop on kill: weighted random from collected stack
-- Grace period: 30 ticks after win condition before status='finished'. Mid-game leave: `room:leave` kills immediately, disconnect uses 10s grace
-- Game start: `room:start` uses atomic `START_ROOM_LUA` to prevent TOCTOU race
-
-## Open World Mode (WIP)
-Persistent bomb arena as default landing experience. Players auto-join on page load.
-- **Toroidal map**: Wrapping 51x41 grid (no border walls). `wrapX`/`wrapY` from `shared/src/utils/wrap.ts`. For odd-dimension wrapping maps, last even col/row skipped in wall grid to avoid double-walls at seam
-- **Ghost rendering**: 8 offset copies for seamless visual wrapping. Entity renderers create ghost sprites near edges
-- **Guest access**: Unauthenticated players via `SocketClient.connectAsGuest()`. Guest IDs start at `OPENWORLD_GUEST_ID_START` (-3000)
-- **Backend**: `OpenWorldManager` singleton. Round cycle with configurable duration, freeze period, map regeneration
-- **AFK timeout**: Configurable inactivity kick (default 60s, 0 = disabled). Hot-reloadable admin setting
-- **Guest auth bar**: HUDScene mounts a bottom-center Login/Register bar for open-world guests (`.hud-auth-bar`). Auth form opens OVER the live game (`GameScene.setInputBlocked`, registry `authOverlayOpen`); closable via ✕/Escape. Teardown only on successful login → fresh MenuScene auto-login → lobby → auto-rejoin as account
-- **Landing docks on first input**: the arena is interactive behind the landing — first game key/gamepad press calls `MenuScene.dockLanding()` (`.menu-landing--docked`): title fades, buttons slide into a compact bottom bar. Gated on a live arena; Play-as-Guest handoff to the HUD bar is seamless (`authBarNoAnim` registry flag)
-- **Constants**: `shared/src/constants/openworld.ts`. Settings in `server_settings` (keys prefixed `open_world_`)
-- **HUD scoreboard**: open world hides `.hud-players` and mounts `.hud-ow-board` (rank/name/K-D/score, own row pinned when below the cut-off) plus a `.hud-round` chip under the timer. Fed by `openworld:info` (authoritative full standings — replace, don't merge) and `openworld:scoreUpdate` (per-kill delta), both registered on the socket by HUDScene with handler refs removed in `shutdown()`. Round transitions come via GameScene's `openWorldRoundEnd`/`openWorldRoundStart` Phaser events → `.hud-ow-roundend` overlay with next-round countdown
-- **Leaderboard data**: `OpenWorldManager.getLeaderboard()` returns FULL standings (clients rank by array index — truncating would fake positions). Pushed on join (from `socket.ts`, after `socket.join('openworld')`), on leave, on round start, and every `OPENWORLD_INFO_BROADCAST_TICKS`. The lobby `OpenWorldView` is outside the socket room, so it polls `/admin/settings/open_world/status` (which carries the same `leaderboard`) every 10s
-
-## Game Reference
-
-### Game Modes
-FFA (2-8, last standing), Teams (4-8, 2 teams, friendly fire toggle), Battle Royale (4-8, shrinking zone), Sudden Death (2-8, maxed stats, one hit), Deathmatch (2-8, respawn, first to 15 kills), King of the Hill (2-8, control zone, hill moves every 30s — the picker tolerates a wall only at the window's centre cell, i.e. the pillar grid, and re-arms the timer when no spot exists)
-
-### Power-Ups (9 types)
-bomb_up, fire_up, speed_up, shield, kick, pierce_bomb, remote_bomb (E to detonate, FIFO/ALL toggle), line_bomb, bomb_throw (Q to throw, weight 4 rare)
-
-### Map Features
-- **Reinforced walls**: 2 hits — `destructible_cracked` → destroyed
-- **Dynamic map events** (individually selectable): meteor, power_up_rain, wall_collapse, freeze_wave, bomb_surge, ufo_abduction
-- **Hazard tiles** (individually selectable): teleporters, conveyors, vine/mud, quicksand, ice, lava, spikes, dark_rift. Types in `shared/src/utils/hazard.ts`
-- **Covered tiles**: Special tiles hidden under destructible walls via `coveredTiles` array
-
-## Replay System
-Gzipped JSON replays with tile diffs. Campaign replays in `campaign_replays` table. Admin tabs start them via `startReplay()` (`ui/admin/replayLauncher.ts`); closing a replay, a spectated simulation or a spectated room reopens the admin tab it came from (registry `returnToAdmin`: `AdminReturn { tab, view }`, handed to the tab's `restore()`). See [docs/replay-system.md](docs/replay-system.md)
-
-## SEO & Static Assets
-All resources self-hosted — no external CDN. Meta tags (OG, Twitter Card, JSON-LD). CSP: `'self'` only, with Trusted Types enforced — all HTML goes through `setHtml()`/`insertHtml()` in `frontend/src/utils/html.ts` (DOMPurify + node insertion); raw `innerHTML` is an ESLint error outside that file.
-
-## Security
-- **Email hashing**: HMAC-SHA256 with `EMAIL_PEPPER`. DB stores `email_hash` + `email_hint`. `backfill-emails.ts` migrates legacy rows on startup
-- **Email verification**: Required before game access. Socket + REST middleware enforce. Max 3 resends per account
-- **Email enumeration prevention**: Existing email returns generic error + warning email to owner
-- **TOTP 2FA**: AES-256-GCM encrypted secrets. Two-step login (challenge token → verify). 10 backup codes
-- **Rate limiting**: Nginx (API 30r/s, Socket.io 10r/s, auth 5r/s) + Express middleware + per-socket sliding window limiters. The nginx zones are per-IP only via the `real_ip` block in `docker/nginx/nginx.conf`, which depends on Traefik stripping inbound `X-Forwarded-*` — see [docs/infrastructure.md](docs/infrastructure.md#nginx-rate-limiting) before changing either
-- **Atomic operations**: Refresh token rotation (compare-and-swap), password reset (single UPDATE with token check), room start (Lua script)
-- **Socket.io role from DB**: Socket middleware reads role from database (not JWT) on each connection
-- **Socket validation**: Zod schemas for room/admin events, manual validation for hot-path `game:input`
-- See [docs/infrastructure.md](docs/infrastructure.md)
-
-## Performance
-See [docs/performance-and-internals.md](docs/performance-and-internals.md). Key: explosion batching (audio + screen shake coalesced per frame), particle budget caps, cached serialization with dirty flags.
-
-## Internationalization (i18n)
-Full-stack i18n via **i18next**. `t('namespace:section.key')` with `{{variable}}` interpolation.
-- **Namespaces**: shared (`common`, `game`), frontend-only (`ui`, `auth`, `admin`, `campaign`, `errors` at boot; `help` and `editor` are loaded on demand via `i18n.loadNamespaces()` by `LobbyUI.createView` / `scenes/levelEditorLoader.ts`), backend-only (`server`, `email`). New keys go into all 12 locales (`tests/shared/localeParity.test.ts`)
-- **Locale files**: `{workspace}/src/i18n/locales/{lng}/*.json`
-- **Key conventions**: Dots are key separators — never use decimal numbers as JSON keys (use `"low30"` not `"0.3"`)
-- **Variable shadowing**: When importing `{ t }` from i18n, lambda parameters named `t` must be renamed
-- **Lazy evaluation**: Module-level constants using `t()` must be functions/getters — `t()` returns key before i18n initializes
-- **View titles**: Use getter `get title() { return t('ui:...'); }` (not static)
-- **Email i18n**: Templates use `getFixedT(language)`. Language threaded from user DB record through services. All 12 languages preloaded at startup
-
-## Code Quality & Tooling
-- ESLint v10 + `@typescript-eslint/recommended`; `no-explicit-any` warning, `no-unused-vars` error
-- Prettier: single quotes, trailing commas, 100 char width
-- Husky + lint-staged pre-commit: ESLint `--fix` + Prettier on staged `.ts`
-- All Socket.io types fully parameterized — no `as any` casts
-- `getErrorMessage(err: unknown)` from `shared/src/utils/error.ts` in all catch blocks
-- Modals: `role="dialog"`, `aria-modal="true"`, `aria-label`, Escape closes. Toggle switches: `role="switch"` + `aria-checked`
-
-## Database Migrations
-- Forward: `backend/src/db/migrations/*.sql`, numbered `NNN_description.sql`
-- Rollback: `backend/src/db/migrations/down/*.down.sql`
-- Runner: `runMigrations()` (auto on startup), `rollbackMigration(steps)`, `getAppliedMigrations()`
-- `runMigrations()` holds a MariaDB advisory lock (`GET_LOCK('blast_arena_migrations_<DB_NAME>')`) while it reads `_migrations` and applies what is pending, so backends starting together apply each file exactly once (`tests/backend/db/migrationLock.test.ts`, the one suite that runs against a real MariaDB: CI and fleet set `REQUIRE_DB_TESTS=1`)
-- MariaDB DDL auto-commits: a migration that fails halfway keeps the statements before the failure while `_migrations` does not record it. Write up and down scripts so they can run again — `IF [NOT] EXISTS`, and data changes that are safe to repeat (from 042 on, `tests/backend/db/migrationParity.test.ts` rejects an unguarded schema change)
-
-## Testing
-```bash
-npm test                    # Run all workspace tests (backend + frontend)
-npx jest --config tests/backend/jest.config.ts  # Backend only (from project root)
-cd frontend && npx vitest run                   # Frontend only
-```
-- See [docs/testing.md](docs/testing.md) for full inventory, mocking patterns, and guide
+## Architecture notes
+- **Auth**: JWT access token in memory + httpOnly refresh cookie (`path=/api/auth`, `secure` derived from `APP_URL`, not `NODE_ENV`). `ApiClient.fetchWithAuth()` refreshes on 401 (one cached `refreshPromise`; auth endpoints use `skipAuthRetry`). Email verification is required before game access (REST + socket); emails are stored as HMAC-SHA256 hash + hint (`EMAIL_PEPPER`). Optional TOTP 2FA (AES-256-GCM secrets, `TOTP_ENCRYPTION_KEY` = 64 hex chars, required in production). Without SMTP, emails are only logged (subject/recipient, never the body).
+- **Rate limits**: nginx zones (API 30r/s, Socket.io 10r/s, auth 5r/s) are per-IP only via the `real_ip` block in `docker/nginx/nginx.conf`, which relies on Traefik replacing inbound `X-Forwarded-*` ([docs/infrastructure.md](docs/infrastructure.md#nginx-rate-limiting)). Express limiters key `ratelimit:<ip>:<route>` in Redis (login 10, register 3 per 15 min).
+- **Lobby rooms**: Redis, mutated by atomic Lua scripts in `services/lobby.ts` (`JOIN_ROOM_LUA`, …, `START_ROOM_LUA`), `ROOM_TTL_SECONDS = 3600`; `room:list` is broadcast on every mutation. LobbyScene's `game:start` listeners are one-shot and only accept a state that includes the user; GameScene keeps one for the match (reconnect resync).
+- **Game loop**: 20 ticks/s. processTick order: bot AI → inputs → movement → conveyors → hazard slowdown → bomb timers/slide → detonations → explosion timers → collisions → power-ups → hazard damage → puzzle tiles → KOTH → map events → spectator actions → zone → deathmatch respawns → time → win check. Tiles are snapshotted before detonations (chains use the original layout); explosion damage cells exclude walls. Grace period 30 ticks after a win; `room:leave` kills at once, a disconnect gets 10 s. Self-kills subtract a kill.
+- **State size**: cosmetics go out in full `toState()` and only on a player's first `toTickState()`; explosion `cells` once per explosion; tick states carry no `spawnPoints`. `GameScene.hydrateState()` and `ReplayRecorder` fill the gaps from per-id caches.
+- **Scenes**: Boot, Menu, Lobby, Game, HUD, GameOver, LevelEditor (a lazy chunk: `await ensureLevelEditorScene(game)` from `scenes/levelEditorLoader.ts` before `scene.start('LevelEditorScene')`). State is handed over through `this.registry`: `initialGameState`; `openWorldMode` + `openWorldPlayerId`; campaign run keys (`campaignMode`, `campaignCoopMode`, `localCoopMode`, `localCoopConfig`, `localCoopP2Identity`, `buddyMode`, `buddyConfig`, `campaignTheme`, `campaignEnemyTypes`; `clearCampaignRun()` drops them together); `replayMode`/`replayData`; `simulationSpectate`; `adminSpectate`; `gameOverData`; `currentRoom`, `openCampaign`, `returnToAdmin`; shared services `socketClient`, `authManager`, `notifications`.
+- **Lobby UI**: `.app-layout` with a collapsible sidebar; 15 views (`ui/views/`, `ILobbyView` with `render()`/`destroy()`), each in its own `.view-root` inside `.main-body`. After login the lobby opens the Open World view, which auto-joins the world once per page load. Admin is a view with 12 tabs (`ui/AdminUI.ts`, `ui/admin/`); staff see Users, Matches, Rooms, Announcements, admins all. Shared CSS classes: `.panel-header`/`.panel-content`, `.tab-bar`/`.tab-item`, `.data-table`, `.form-grid`/`.form-group`/`.input`/`.select`, `.toggle-switch`, `.setting-row`, `.option-chip`, `.mini-stat`, `.modal-*`, `.btn*`.
+- **Themes and art styles**: 11 palettes (`themes/definitions.ts`; localStorage → admin default → `inferno`, `[data-theme]` on `<html>`). Art styles Classic, Neon Arena, Toy Diorama, Crisp Pixel (`shared/src/constants/artStyles.ts`; localStorage `blast-arena-art-style` → admin `default_art_style` → `classic`); drawn styles are Canvas 2D painters (`art/painters/types.ts`) baked into atlases by `StyleArt` and use `StyledTileMap`; `activeStyleArt(scene)` is null for Classic. The level editor always uses Classic tiles. Admin default changes arrive live via `admin:settingsChanged`.
+- **Sharp rendering** (`art/hidpi.ts`): the canvas is CSS size × `renderRatio()` (≤2; 1 when off or quality Low); GameScene multiplies camera zoom by it, UI scenes lay out in CSS pixels via `uiCamera(scene)`. `?dpr=2` forces 2×. Graphics settings in `game/Settings.ts` (`quality`, `sharpRendering`, `colorBlind`, `onSettingsChange()`).
+- **Rendering and audio**: no external image or audio assets. Classic sprites in `BootScene.generateTextures()`, power-up icons in `powerUpIcons.ts`, HUD icons in `ui/hudIcons.ts`, kill-feed portraits in `ui/portraits.ts`. Sprites move toward tick targets in `frame(delta)`; a jump of more than 3 tiles is placed directly. SFX are synthesised (`AudioManager`, `SoundGenerator`; Phaser `noAudio: true`; `AudioContext` on first gesture, `ensureResumed()`).
+- **HUD**: DOM overlay in `HUDScene.ts`. The minimap keeps its own grid (seeded from GameScene's `liveTiles` or `initialGameState`, updated by `tileDiffs`). Open world swaps `.hud-players` for `.hud-ow-board` + `.hud-round`; guests get the `.hud-auth-bar` login/register bar over the live game.
+- **Open world** (WIP): persistent toroidal 51×41 arena, the default landing (guests auto-join behind the menu; the first game key docks the landing, `MenuScene.dockLanding()`). `OpenWorldManager` singleton, round cycle, AFK kick, settings `open_world_*` in `server_settings`, constants in `shared/src/constants/openworld.ts`, wrapping helpers in `shared/src/utils/wrap.ts`. The lobby `OpenWorldView` polls `/admin/settings/open_world/status` every 10 s.
+- **Campaign**: `CampaignGame` wraps `GameStateManager` with a `customMap`; enemy/explosion collision runs before enemy AI movement. Solo, online co-op (party of 2), local co-op (3 camera modes), buddy mode (`isBuddy`, invulnerable, `isCoopMode` false). Puzzle tiles (`PuzzleTileProcessor`, shared with multiplayer) react on the rising edge (`prevSwitchBlasted`). Editor `editorMode: 'campaign' | 'custom_map'`; custom maps via `/maps` and `MatchConfig.customMapId`. See [docs/campaign.md](docs/campaign.md).
+- **AI**: admin-uploaded bot/enemy AIs are scanned, bundled with esbuild and run in an `isolated-vm` isolate per instance (`IsolatedAIRunner`); only trusted built-ins run via `vm.runInContext()`. Bot decisions are seeded from the map seed, so bot matches replay deterministically. See [docs/bot-ai-guide.md](docs/bot-ai-guide.md), [docs/enemy-ai-guide.md](docs/enemy-ai-guide.md).
+- **Progression**: Elo (K by games played; FFA pairwise, teams by average), seasons (per-season Elo, hard/soft reset), achievements (`cumulative`, `per_game`, `mode_specific`, `campaign`), cosmetics (`color`, `eyes`, `trail`, `bomb_skin`; colour priority cosmetic → team → index), rematch vote >50% (solo with bots shows "Play Again").
+- **Social**: friendships (DB), presence (Redis, 120 s TTL), parties (Redis, Lua join, leader-follows), DMs (DB, friends only), 12 emotes; every chat feature has an admin `ChatMode`. Each socket joins `user:{userId}`. `SocketClient.onReconnect()` fires after every reconnect and each scene re-joins what it shows ([docs/socket-events.md](docs/socket-events.md#reconnection-to-active-games)).
+- **Spectator game master**: dead players spend energy on place_wall, trigger_meteor, drop_powerup, speed_zone (admin toggle + `MatchConfig.enableSpectatorActions`).
+- **Replays**: gzipped JSON with tile diffs; campaign replays in `campaign_replays`. Admin tabs start them via `startReplay()` (`ui/admin/replayLauncher.ts`); closing returns to the tab via registry `returnToAdmin`. See [docs/replay-system.md](docs/replay-system.md).
+- **i18n**: i18next, namespaces `common`, `game` (shared), `ui`, `auth`, `admin`, `campaign`, `errors` (frontend, at boot), `help`, `editor` (loaded on demand), `server`, `email` (backend). Locale files `{workspace}/src/i18n/locales/{lng}/*.json`; emails use `getFixedT(language)`.
+- **Migrations**: `runMigrations()` runs on startup under the advisory lock `GET_LOCK('blast_arena_migrations_<DB_NAME>')`.
+- **Tooling**: ESLint 10 + typescript-eslint (`no-explicit-any` warn, `no-unused-vars` error), Prettier (single quotes, trailing commas, width 100), Husky + lint-staged on staged `.ts`.
 
 ## Documentation
-- [Bot AI Developer Guide](docs/bot-ai-guide.md) — writing custom bot AIs
-- [Bot AI Internals](docs/bot-ai-internals.md) — built-in BotAI decision engine
-- [Enemy AI Developer Guide](docs/enemy-ai-guide.md) — custom campaign enemy AIs
-- [Campaign System](docs/campaign.md) — enemies, levels, editor, progress
-- [Admin Panel & Systems](docs/admin-and-systems.md) — admin tabs, simulations, accounts
-- [Replay System](docs/replay-system.md) — recording, playback, controls, API
-- [Socket.io Events](docs/socket-events.md) — real-time event reference
-- [Performance & Internals](docs/performance-and-internals.md) — optimizations, game logging
-- [Infrastructure & Security](docs/infrastructure.md) — security, resilience, Docker
-- [Testing](docs/testing.md) — test inventory, mocking, writing new tests
-- [API Reference](docs/openapi.yaml) — OpenAPI 3.0.3 specification
+- [docs/campaign.md](docs/campaign.md), [docs/replay-system.md](docs/replay-system.md), [docs/bot-ai-guide.md](docs/bot-ai-guide.md), [docs/enemy-ai-guide.md](docs/enemy-ai-guide.md) — player/creator guides (also shown in-game)
+- [docs/admin-and-systems.md](docs/admin-and-systems.md), [docs/infrastructure.md](docs/infrastructure.md), [docs/testing.md](docs/testing.md), [docs/performance-and-internals.md](docs/performance-and-internals.md), [docs/bot-ai-internals.md](docs/bot-ai-internals.md), [docs/openapi.yaml](docs/openapi.yaml) — staff docs (also shown in-game)
+- [docs/socket-events.md](docs/socket-events.md) — Socket.io event reference
+- [docs/screenshots/README.md](docs/screenshots/README.md) — screenshot gallery (generated by the docs tour)
