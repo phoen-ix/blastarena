@@ -17,6 +17,9 @@ RUN npm ci --workspace=shared --workspace=frontend
 COPY shared/ ./shared/
 COPY frontend/ ./frontend/
 
+# 1 only in the e2e stack (docker-compose.e2e.yml via scripts/e2e.sh): see main.ts.
+ARG VITE_E2E_HOOKS=
+ENV VITE_E2E_HOOKS=$VITE_E2E_HOOKS
 RUN npm run build --workspace=frontend
 
 # Stage 2: Dev frontend (for docker-compose.dev.yml)

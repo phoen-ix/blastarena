@@ -45,6 +45,13 @@ async function boot(): Promise<Phaser.Game> {
   installHiDpi(game);
   // Dev builds only: a handle for poking at the running game from the console or test tooling.
   if (import.meta.env.DEV) Object.assign(window, { __blastArenaGame: game });
+  // e2e builds only (VITE_E2E_HOOKS=1; dropped from every other build): the keys of the running
+  // scenes, so the specs can tell canvas-only screens such as GameOverScene apart.
+  if (import.meta.env.VITE_E2E_HOOKS === '1') {
+    Object.assign(window, {
+      __e2eScenes: () => game.scene.getScenes(true).map((s) => s.scene.key),
+    });
+  }
 
   // Initialize audio on first user interaction (required by browser autoplay policy)
   const initAudio = () => {

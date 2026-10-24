@@ -4,6 +4,9 @@
 #   COMPOSE_PROJECT_NAME=blastarena_docs docker compose -p blastarena_docs \
 #     -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait
 #
+# scripts/e2e.sh adds `--profile mail`: a Mailpit SMTP sink (UI/API on MAILPIT_PORT) that the
+# backend sends to, so the e2e specs can open verification, reset and email-change links.
+#
 # - No ./data bind mounts: MariaDB runs on a tmpfs, Redis without AOF, the backend writes logs,
 #   replays and AI uploads inside its container. `down -v` leaves nothing behind.
 # - container_name comes from the base file (${COMPOSE_PROJECT_NAME}-<svc>), so the project name
@@ -25,5 +28,20 @@ services:
       interval: 5s
 
   nginx:
+    build:
+      args:
+        VITE_E2E_HOOKS: ${VITE_E2E_HOOKS:-}
     ports: !override
       - "127.0.0.1:${PORT_BASE:-24200}:80"
+
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    profiles: [mail]
+    container_name: ${COMPOSE_PROJECT_NAME}-mailpit
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    ports:
+      - "127.0.0.1:${MAILPIT_PORT:-24205}:8025"
+    networks:
+      - internal
