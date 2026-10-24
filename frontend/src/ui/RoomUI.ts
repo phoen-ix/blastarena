@@ -298,6 +298,8 @@ export class RoomUI {
     const canStart = isHost && allReady && (this.room.players.length >= 2 || botCount >= 1);
 
     const modeLabel = t(`game:modes.${this.room.config.gameMode}.name`);
+    // A custom map brings its own size and walls; the generator's settings do not apply.
+    const customMap = !!this.room.config.customMapId;
 
     setHtml(
       this.container,
@@ -356,18 +358,32 @@ export class RoomUI {
               <span style="color:var(--text-dim);">${t('ui:room.maxPlayers')}</span>
               <span style="color:var(--text);">${this.room.config.maxPlayers}</span>
             </div>
+            ${
+              customMap
+                ? `
+            <div style="display:flex;justify-content:space-between;gap:12px;">
+              <span style="color:var(--text-dim);">${t('ui:createRoom.map')}</span>
+              <span style="color:var(--text);text-align:right;">${escapeHtml(this.room.customMapName ?? '')}</span>
+            </div>`
+                : `
             <div style="display:flex;justify-content:space-between;">
               <span style="color:var(--text-dim);">${t('ui:room.mapSize')}</span>
               <span style="color:var(--text);">${t('ui:room.mapSizeValue', { width: this.room.config.mapWidth, height: this.room.config.mapHeight })}</span>
-            </div>
+            </div>`
+            }
             <div style="display:flex;justify-content:space-between;">
               <span style="color:var(--text-dim);">${t('ui:room.roundTime')}</span>
               <span style="color:var(--text);">${Math.floor(this.room.config.roundTime / 60)}:${(this.room.config.roundTime % 60).toString().padStart(2, '0')}</span>
             </div>
+            ${
+              customMap
+                ? ''
+                : `
             <div style="display:flex;justify-content:space-between;">
               <span style="color:var(--text-dim);">${t('ui:room.wallDensity')}</span>
               <span style="color:var(--text);">${t('ui:room.wallDensityValue', { percent: Math.round((this.room.config.wallDensity ?? 0.65) * 100) })}</span>
-            </div>
+            </div>`
+            }
             <div style="display:flex;justify-content:space-between;">
               <span style="color:var(--text-dim);">${t('ui:room.powerUpRate')}</span>
               <span style="color:var(--text);">${t('ui:room.powerUpRateValue', { percent: Math.round((this.room.config.powerUpDropRate ?? 0.3) * 100) })}</span>
