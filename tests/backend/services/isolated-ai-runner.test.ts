@@ -297,7 +297,14 @@ describe('IsolatedAIRunner — lifecycle', () => {
     const { self, state } = makeState(tiles, width, height);
     for (let i = 0; i < 25; i++) {
       const ai = new IsolatedBotAI(BOT_FIRST_MOVE, 'normal');
-      ai.generateInput(self, state);
+      try {
+        ai.generateInput(self, state);
+      } catch (err) {
+        // A cold isolate's first call can overrun the 20 ms wall-clock budget on a loaded machine
+        // (it did, under a parallel Docker build). That is the timeout doing its job, and the
+        // runner has disposed itself; this test is about creating and disposing many runners.
+        if (!/timed out/i.test(String(err))) throw err;
+      }
       ai.dispose();
     }
     expect(true).toBe(true);
