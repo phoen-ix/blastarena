@@ -112,13 +112,35 @@ function makeState(tiles: TileType[][], width: number, height: number, pos = { x
   };
 }
 
+/**
+ * Make a fresh AI's first call. A cold isolate's first call can overrun the 20 ms wall-clock
+ * budget on a loaded machine, and the runner then disposes itself; only that error gets a fresh
+ * isolate (up to 3 in all). Any other error, or a third timeout, fails the test.
+ */
+function firstCall<A extends { dispose(): void }, R>(
+  make: () => A,
+  call: (ai: A) => R,
+): { ai: A; out: R } {
+  for (let attempt = 1; ; attempt++) {
+    const ai = make();
+    try {
+      return { ai, out: call(ai) };
+    } catch (err) {
+      ai.dispose();
+      if (attempt === 3 || !/timed out/i.test(String(err))) throw err;
+    }
+  }
+}
+
 describe('IsolatedAIRunner — security', () => {
   it('blocks the constructor-walk escape (process unreachable)', () => {
     const { tiles, width, height } = makeMap();
     const { self, state } = makeState(tiles, width, height);
-    const ai = new IsolatedBotAI(BOT_ESCAPE, 'normal');
+    const { ai, out } = firstCall(
+      () => new IsolatedBotAI(BOT_ESCAPE, 'normal'),
+      (a) => a.generateInput(self, state),
+    );
     try {
-      const out = ai.generateInput(self, state);
       // process was unreachable in the isolate, so the escape produced no usable input at all
       expect(out?.action ?? null).toBeNull();
     } finally {
@@ -195,8 +217,10 @@ describe('IsolatedAIRunner — API fidelity', () => {
       sliding: null,
       bombType: 'pierce',
     });
-    const ai = new IsolatedBotAI(BOT_LIVE_API, 'normal', { width, height });
-    const out = ai.generateInput(self, state);
+    const { ai, out } = firstCall(
+      () => new IsolatedBotAI(BOT_LIVE_API, 'normal', { width, height }),
+      (a) => a.generateInput(self, state),
+    );
     expect(out).not.toBeNull();
     expect(out!.seq).toBe(1); // one player in the Map
     expect(out!.direction).toBe('up'); // getTileAt(0,0) === 'wall'
@@ -220,9 +244,11 @@ describe('IsolatedAIRunner — API fidelity', () => {
     for (const pos of probes) {
       const expected = dirs.find((d) => host.canMoveTo(pos.x, pos.y, d, [], [])) ?? null;
       const { self, state } = makeState(tiles, width, height, pos);
-      const ai = new IsolatedBotAI(BOT_FIRST_MOVE, 'normal');
+      const { ai, out } = firstCall(
+        () => new IsolatedBotAI(BOT_FIRST_MOVE, 'normal'),
+        (a) => a.generateInput(self, state),
+      );
       try {
-        const out = ai.generateInput(self, state);
         expect(out!.direction).toBe(expected);
       } finally {
         ai.dispose();
@@ -268,10 +294,16 @@ describe('IsolatedAIRunner — enemy rng determinism', () => {
       };
     }
     const runOnce = () => {
-      const ai = new IsolatedEnemyAI(ENEMY_RNG, 'normal', typeConfig as any);
-      const rng = seeded();
-      const results = [];
-      for (let i = 0; i < 5; i++) results.push(ai.decide({ ...baseCtx(), rng } as any));
+      let rng = seeded();
+      const { ai, out } = firstCall(
+        () => {
+          rng = seeded(); // a retried first call starts the sequence again
+          return new IsolatedEnemyAI(ENEMY_RNG, 'normal', typeConfig as any);
+        },
+        (a) => a.decide({ ...baseCtx(), rng } as any),
+      );
+      const results = [out];
+      for (let i = 1; i < 5; i++) results.push(ai.decide({ ...baseCtx(), rng } as any));
       ai.dispose();
       return results;
     };
@@ -283,8 +315,10 @@ describe('IsolatedAIRunner — lifecycle', () => {
   it('disposes the isolate (subsequent invoke throws) and disposeAI is a no-op on built-ins', () => {
     const { tiles, width, height } = makeMap();
     const { self, state } = makeState(tiles, width, height);
-    const ai = new IsolatedBotAI(BOT_FIRST_MOVE, 'normal');
-    ai.generateInput(self, state); // works
+    const { ai } = firstCall(
+      () => new IsolatedBotAI(BOT_FIRST_MOVE, 'normal'),
+      (a) => a.generateInput(self, state), // works
+    );
     ai.dispose();
     expect(() => ai.generateInput(self, state)).toThrow(/disposed/i);
     // disposeAI tolerates built-ins (no dispose method) and undefined
@@ -296,15 +330,10 @@ describe('IsolatedAIRunner — lifecycle', () => {
     const { tiles, width, height } = makeMap();
     const { self, state } = makeState(tiles, width, height);
     for (let i = 0; i < 25; i++) {
-      const ai = new IsolatedBotAI(BOT_FIRST_MOVE, 'normal');
-      try {
-        ai.generateInput(self, state);
-      } catch (err) {
-        // A cold isolate's first call can overrun the 20 ms wall-clock budget on a loaded machine
-        // (it did, under a parallel Docker build). That is the timeout doing its job, and the
-        // runner has disposed itself; this test is about creating and disposing many runners.
-        if (!/timed out/i.test(String(err))) throw err;
-      }
+      const { ai } = firstCall(
+        () => new IsolatedBotAI(BOT_FIRST_MOVE, 'normal'),
+        (a) => a.generateInput(self, state),
+      );
       ai.dispose();
     }
     expect(true).toBe(true);
@@ -336,9 +365,12 @@ describe('IsolatedAIRunner — incremental tile sync', () => {
     });
     const self = gs.addPlayer(1, 'a');
     gs.setTileTracked(3, 3, 'wall');
-    const ai = new IsolatedBotAI(BOT_READ_TILE, 'normal', { width: 9, height: 9 });
+    const { ai, out } = firstCall(
+      () => new IsolatedBotAI(BOT_READ_TILE, 'normal', { width: 9, height: 9 }),
+      (a) => a.generateInput(self, gs),
+    );
     try {
-      expect(ai.generateInput(self, gs)!.direction).toBe('up');
+      expect(out!.direction).toBe('up');
       // Guest scribbling on state.map.tiles must not stick (rows are frozen)…
       expect(ai.generateInput(self, gs)!.direction).toBe('up');
       // …but a tracked host change arrives as a diff
