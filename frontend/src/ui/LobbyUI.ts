@@ -23,6 +23,7 @@ export class LobbyUI {
   private roomListHandler: ((rooms: RoomListItem[]) => void) | null = null;
   private lobbyChatToggleHandler: (() => void) | null = null;
   private languageChangedHandler: (() => void) | null = null;
+  private authUnsub: (() => void) | null = null;
   private partyBar!: PartyBar;
   private lobbyChatPanel!: LobbyChatPanel;
   private panelsDestroyed = false;
@@ -107,6 +108,16 @@ export class LobbyUI {
     };
     window.addEventListener('language-changed', this.languageChangedHandler);
 
+    // A rename in Settings shows in the sidebar footer at once (it kept the old name until reload)
+    this.authUnsub?.();
+    this.authUnsub = this.authManager.onChange((user) => {
+      if (!user) return;
+      const name = this.container.querySelector('.sidebar-user-name');
+      const avatar = this.container.querySelector('.sidebar-user-avatar');
+      if (name) name.textContent = user.username;
+      if (avatar) avatar.textContent = user.username.charAt(0).toUpperCase();
+    });
+
     // Navigate to initial view
     this.navigateTo(this.initialView || 'rooms', this.initialViewOptions || undefined);
   }
@@ -133,6 +144,8 @@ export class LobbyUI {
       window.removeEventListener('language-changed', this.languageChangedHandler);
       this.languageChangedHandler = null;
     }
+    this.authUnsub?.();
+    this.authUnsub = null;
     UIGamepadNavigator.getInstance().popContext('lobby');
     this.container.remove();
     // The panels' socket handlers (6 on PartyBar plus its reconnect hook, 2 on LobbyChatPanel)

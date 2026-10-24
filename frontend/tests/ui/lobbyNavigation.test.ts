@@ -85,11 +85,16 @@ function fakeSocket() {
 
 const notifications = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
 
+const authListeners = new Set<(user: { username: string } | null) => void>();
 function authManager(guest: boolean, token: string | null): AuthManager {
   return {
     getUser: () => ({ id: guest ? -3001 : 1, username: guest ? 'Guest1' : 'me', role: 'user' }),
     getAccessToken: () => token,
     isGuest: guest,
+    onChange: (cb: (user: { username: string } | null) => void) => {
+      authListeners.add(cb);
+      return () => authListeners.delete(cb);
+    },
   } as unknown as AuthManager;
 }
 
@@ -146,6 +151,26 @@ describe('LobbyUI guests (item 6)', () => {
     await flush();
     expect(apiGet.mock.calls.map((c) => c[0])).toContain('/user/rank');
     lobby.hide();
+  });
+});
+
+describe('LobbyUI sidebar user', () => {
+  it('shows a new username at once and stops listening when hidden', async () => {
+    const { LobbyUI } = await import('../../src/ui/LobbyUI');
+    const lobby = new LobbyUI(
+      fakeSocket() as unknown as SocketClient,
+      authManager(false, 'token'),
+      notifications as unknown as NotificationUI,
+      () => {},
+    );
+    lobby.show('rooms');
+    await flush();
+    expect(document.querySelector('.sidebar-user-name')!.textContent).toBe('me');
+    for (const cb of authListeners) cb({ username: 'renamed' });
+    expect(document.querySelector('.sidebar-user-name')!.textContent).toBe('renamed');
+    expect(document.querySelector('.sidebar-user-avatar')!.textContent).toBe('R');
+    lobby.hide();
+    expect(authListeners.size).toBe(0);
   });
 });
 
