@@ -608,10 +608,11 @@ export async function getAchievementProgress(userId: number): Promise<Achievemen
         }
         case 'per_game': {
           const stat = config.stat as string;
-          // Only a ">=" condition has a best-so-far to show. For "<=", "==" and the rest a single
-          // game either met it (then it is unlocked) or not: the capped best (e.g. 180 s against
-          // "<= 60") read as complete while still locked.
-          if (((config.operator as string) ?? '>=') !== '>=') break;
+          // "<=", "==" and "<" have no best-so-far: a single game either met them (then the
+          // achievement is unlocked) or not, and the capped best (e.g. 180 s against "<= 60")
+          // read as complete while still locked. Unknown operators evaluate as ">=".
+          const operator = (config.operator as string) ?? '>=';
+          if (operator === '<=' || operator === '==' || operator === '<') break;
           type BestColumn =
             | 'best_kills'
             | 'best_deaths'
@@ -638,6 +639,8 @@ export async function getAchievementProgress(userId: number): Promise<Achievemen
           if (stat === 'is_winner') {
             current = current === 1 ? 1 : 0;
           }
+          // A best equal to the threshold has not met "> threshold" yet.
+          if (operator === '>') current = Math.min(current, threshold - 1);
           break;
         }
         case 'mode_specific': {

@@ -189,6 +189,26 @@ describe('getAchievementProgress (audit E2)', () => {
     expect(progress.map((p) => p.current)).toEqual([0, 0, 3]);
   });
 
+  it('shows the best so far for a locked ">" goal, never the threshold itself', async () => {
+    routeQueries([
+      [
+        /FROM achievements/,
+        [
+          achievementRow(1, 'per_game', { stat: 'kills', operator: '>', threshold: 5 }),
+          achievementRow(2, 'per_game', { stat: 'kills', operator: '>', threshold: 3 }),
+        ],
+      ],
+      [/FROM user_achievements/, []],
+      [/FROM user_stats/, []],
+      [/MAX\(kills\)/, [{ best_kills: 3 }]],
+    ]);
+
+    const progress = await getAchievementProgress(9);
+
+    // 3 kills against "> 5" is 3/5; against "> 3" it is not met, so 2/3 rather than 3/3.
+    expect(progress.map((p) => p.current)).toEqual([3, 2]);
+  });
+
   it('skips the aggregates for achievements that are already unlocked', async () => {
     routeQueries([
       [
