@@ -57,18 +57,22 @@ export function createModal(options: ModalOptions): ModalResult {
       cleanupFocus = null;
     }
     UIGamepadNavigator.getInstance().popContext(gamepadContextId);
+    document.removeEventListener('keydown', onKeyDown);
     overlay.remove();
     options.onClose?.();
   };
 
-  // Close on Escape
+  // Close on Escape. Listened for on the document, not the overlay: a button that disables
+  // itself when clicked (Invite -> Sent) drops focus to <body>, and Escape then never reached
+  // the overlay. Only the topmost modal closes.
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.stopPropagation();
-      close();
-    }
+    if (e.key !== 'Escape') return;
+    const open = document.querySelectorAll('.modal-overlay');
+    if (open[open.length - 1] !== overlay) return;
+    e.stopPropagation();
+    close();
   };
-  overlay.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keydown', onKeyDown);
 
   // Close on backdrop click
   overlay.addEventListener('click', (e) => {

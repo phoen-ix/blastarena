@@ -132,6 +132,32 @@ describe('createModal gamepad context', () => {
   });
 });
 
+describe('createModal Escape', () => {
+  it('closes the modal when focus has dropped to the page (a disabled button lost it)', () => {
+    const onClose = vi.fn();
+    const { content } = createModal({ ariaLabel: 'Test', onClose });
+    const btn = document.createElement('button');
+    content.appendChild(btn);
+    btn.focus();
+    btn.disabled = true;
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.modal-overlay')).toBeNull();
+  });
+
+  it('closes only the topmost of two modals', () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    createModal({ ariaLabel: 'First', onClose: first });
+    createModal({ ariaLabel: 'Second', onClose: second });
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(first).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('focus goes back to the opener', () => {
   function opener() {
     const button = document.createElement('button');
