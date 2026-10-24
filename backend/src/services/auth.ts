@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import type { ResultSetHeader } from 'mysql2';
 import { getConfig } from '../config';
-import { query, execute, withTransaction } from '../db/connection';
+import { query, execute, withTransaction, isDuplicateKeyError } from '../db/connection';
 import {
   hashPassword,
   comparePassword,
@@ -193,10 +193,28 @@ export async function register(
   const verifyToken = generateToken();
   const verifyExpires = new Date(Date.now() + EMAIL_VERIFY_TTL_MS);
 
-  const result = await execute(
-    `INSERT INTO users (username, email_hash, email_hint, password_hash, email_verify_token, email_verify_expires, language) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [username, emailHash, emailHint, passwordHash, hashToken(verifyToken), verifyExpires, language],
-  );
+  let result: ResultSetHeader;
+  try {
+    result = await execute(
+      `INSERT INTO users (username, email_hash, email_hint, password_hash, email_verify_token, email_verify_expires, language) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        username,
+        emailHash,
+        emailHint,
+        passwordHash,
+        hashToken(verifyToken),
+        verifyExpires,
+        language,
+      ],
+    );
+  } catch (err) {
+    // A concurrent registration took the name (or the email) between the checks above and this
+    // INSERT: answer as those checks would have, not with the driver's 500. (cf. audit B13)
+    if (!isDuplicateKeyError(err)) throw err;
+    const taken = await query<IdRow[]>('SELECT id FROM users WHERE username = ?', [username]);
+    if (taken.length > 0) throw new AppError('Username already taken', 409, 'CONFLICT');
+    return { emailVerificationRequired: true };
+  }
 
   // Create user_stats row
   await execute('INSERT INTO user_stats (user_id) VALUES (?)', [result.insertId]);
