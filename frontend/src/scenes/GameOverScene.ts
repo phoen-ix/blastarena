@@ -138,12 +138,10 @@ export class GameOverScene extends Phaser.Scene {
     };
     socketClient.on('rematch:update', rematchUpdateHandler);
 
-    // Listen for rematch triggered (auto-restart)
-    const rematchTriggeredHandler = () => {
-      socketClient.off('room:state', roomStateHandler);
-      // The room:state 'waiting' event will follow — navigate on that
-    };
-    socketClient.on('rematch:triggered', rematchTriggeredHandler);
+    // A passed rematch vote needs no handler of its own: the server follows `rematch:triggered`
+    // with room:state 'waiting', which roomStateHandler above turns into the waiting room. (A
+    // handler here used to unsubscribe roomStateHandler first, so every player stayed on this
+    // screen under "2/2 voted rematch".)
 
     // Co-op partner: the leader picked Next Level / Retry from their results screen
     const coopStartHandler = (coopData: CoopStartData) => {
@@ -171,7 +169,6 @@ export class GameOverScene extends Phaser.Scene {
       socketClient.off('game:xpUpdate', xpHandler);
       socketClient.off('achievement:unlocked', achievementHandler);
       socketClient.off('rematch:update', rematchUpdateHandler);
-      socketClient.off('rematch:triggered', rematchTriggeredHandler);
       socketClient.off('campaign:coopStart', coopStartHandler);
     });
 
