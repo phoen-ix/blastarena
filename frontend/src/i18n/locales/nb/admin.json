@@ -541,6 +541,7 @@
     "fromEmailPlaceholder": "noreply@eksempel.no",
     "fromNamePlaceholder": "BlastArena",
     "testEmailPlaceholder": "test@eksempel.no",
+    "testEmailAddress": "E-postadresse for test",
     "showPassword": "Vis",
     "hidePassword": "Skjul",
     "emailSettingsSaved": "E-postinnstillinger lagret",

@@ -439,7 +439,7 @@ export class SettingsUI {
 
         <p style="margin:var(--sp-2) 0;color:var(--text-dim);">${t('settings.account.twoFactor.confirmCode')}</p>
         <div class="form-group">
-          <input type="text" class="input" id="totp-confirm-code" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
+          <input type="text" class="input" id="totp-confirm-code" aria-label="${t('auth:totp.codePlaceholder')}" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
         </div>
         <div id="totp-setup-status" class="settings-status" style="margin-bottom:var(--sp-2);"></div>
         <div class="modal-actions">
@@ -527,8 +527,8 @@ export class SettingsUI {
         <h2>${t('settings.account.twoFactor.disableTitle')}</h2>
         <p style="margin:var(--sp-3) 0;color:var(--text-dim);">${t('settings.account.twoFactor.disableDescription')}</p>
         <div class="form-group settings-field-stack">
-          <input type="password" class="input" id="disable-2fa-password" placeholder="${t('settings.account.twoFactor.disablePassword')}" autocomplete="current-password">
-          <input type="text" class="input" id="disable-2fa-code" placeholder="${t('settings.account.twoFactor.disableCode')}" inputmode="numeric" autocomplete="one-time-code" maxlength="10">
+          <input type="password" class="input" id="disable-2fa-password" aria-label="${t('settings.account.twoFactor.disablePassword')}" placeholder="${t('settings.account.twoFactor.disablePassword')}" autocomplete="current-password">
+          <input type="text" class="input" id="disable-2fa-code" aria-label="${t('settings.account.twoFactor.disableCode')}" placeholder="${t('settings.account.twoFactor.disableCode')}" inputmode="numeric" autocomplete="one-time-code" maxlength="10">
         </div>
         <div id="disable-2fa-status" class="settings-status" style="margin-bottom:var(--sp-2);"></div>
         <div class="modal-actions">
@@ -867,7 +867,7 @@ export class SettingsUI {
         <h3 class="content-section-title mt-6">${t('settings.buddyMode')}</h3>
         <div id="buddy-settings-section" style="display:flex;flex-direction:column;gap:14px;">
           <div class="form-group">
-            <label style="font-size:13px;color:var(--text-dim);display:block;margin-bottom:4px;">${t('settings.buddyName')}</label>
+            <label style="font-size:13px;color:var(--text-dim);display:block;margin-bottom:4px;" for="buddy-name-input">${t('settings.buddyName')}</label>
             <input class="input" type="text" id="buddy-name-input" maxlength="20" placeholder="Buddy" style="width:100%;max-width:260px;">
           </div>
           <div class="form-group">
@@ -875,7 +875,7 @@ export class SettingsUI {
             <div id="buddy-color-swatches" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
           </div>
           <div class="form-group">
-            <label id="buddy-size-label" style="font-size:13px;color:var(--text-dim);display:block;margin-bottom:4px;">${t('settings.buddySize', { percent: '60' })}</label>
+            <label id="buddy-size-label" style="font-size:13px;color:var(--text-dim);display:block;margin-bottom:4px;" for="buddy-size-slider">${t('settings.buddySize', { percent: '60' })}</label>
             <input type="range" id="buddy-size-slider" min="40" max="80" step="5" value="60" style="width:100%;max-width:260px;accent-color:var(--primary);">
           </div>
           <div>

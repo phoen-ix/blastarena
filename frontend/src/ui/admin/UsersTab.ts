@@ -64,7 +64,7 @@ export class UsersTab {
       `
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">
         <div class="admin-search" style="flex:1;margin-bottom:0;">
-          <input type="text" placeholder="${escapeAttr(t('admin:users.searchPlaceholder'))}" id="admin-user-search" value="${escapeAttr(this.search)}">
+          <input type="text" placeholder="${escapeAttr(t('admin:users.searchPlaceholder'))}" aria-label="${escapeAttr(t('admin:users.searchPlaceholder'))}" id="admin-user-search" value="${escapeAttr(this.search)}">
         </div>
         ${isAdmin ? `<button class="btn btn-primary" id="admin-create-user" style="flex-shrink:0;white-space:nowrap;">${t('admin:users.createUser')}</button>` : ''}
         ${isAdmin ? `<button class="btn btn-secondary" id="admin-cleanup" style="flex-shrink:0;white-space:nowrap;">${t('admin:users.cleanup.button')}</button>` : ''}
@@ -298,19 +298,19 @@ export class UsersTab {
       <h2 style="margin-bottom:16px;">${t('admin:users.createModal.title')}</h2>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <div>
-          <label style="color:var(--text-dim);font-size:13px;">${t('admin:users.createModal.usernameLabel')}</label>
+          <label for="cu-username" style="color:var(--text-dim);font-size:13px;">${t('admin:users.createModal.usernameLabel')}</label>
           <input type="text" class="admin-input" id="cu-username" placeholder="${escapeAttr(t('admin:users.createModal.usernamePlaceholder'))}" style="margin-top:4px;">
         </div>
         <div>
-          <label style="color:var(--text-dim);font-size:13px;">${t('admin:users.createModal.emailLabel')}</label>
+          <label for="cu-email" style="color:var(--text-dim);font-size:13px;">${t('admin:users.createModal.emailLabel')}</label>
           <input type="email" class="admin-input" id="cu-email" placeholder="${escapeAttr(t('admin:users.createModal.emailPlaceholder'))}" style="margin-top:4px;">
         </div>
         <div>
-          <label style="color:var(--text-dim);font-size:13px;">${t('admin:users.createModal.passwordLabel')}</label>
+          <label for="cu-password" style="color:var(--text-dim);font-size:13px;">${t('admin:users.createModal.passwordLabel')}</label>
           <input type="password" class="admin-input" id="cu-password" placeholder="${escapeAttr(t('admin:users.createModal.passwordPlaceholder'))}" style="margin-top:4px;">
         </div>
         <div>
-          <label style="color:var(--text-dim);font-size:13px;">${t('admin:users.createModal.roleLabel')}</label>
+          <label for="cu-role" style="color:var(--text-dim);font-size:13px;">${t('admin:users.createModal.roleLabel')}</label>
           <select class="admin-select" id="cu-role" style="margin-top:4px;width:100%;padding:8px 12px;font-size:14px;">
             <option value="user" selected>${t('admin:users.roles.user')}</option>
             <option value="moderator">${t('admin:users.roles.moderator')}</option>
@@ -374,11 +374,11 @@ export class UsersTab {
       <h2 style="margin-bottom:12px;">${t('admin:users.resetPasswordModal.title')}</h2>
       <p style="color:var(--text-dim);font-size:14px;">${t('admin:users.resetPasswordModal.description', { username: escapeHtml(username) })}</p>
       <div style="margin-top:12px;">
-        <label style="color:var(--text-dim);font-size:13px;">${t('admin:users.resetPasswordModal.newPasswordLabel')}</label>
+        <label for="rp-password" style="color:var(--text-dim);font-size:13px;">${t('admin:users.resetPasswordModal.newPasswordLabel')}</label>
         <input type="password" class="admin-input" id="rp-password" placeholder="${escapeAttr(t('admin:users.resetPasswordModal.newPasswordPlaceholder'))}" style="margin-top:4px;">
       </div>
       <div style="margin-top:8px;">
-        <label style="color:var(--text-dim);font-size:13px;">${t('admin:users.resetPasswordModal.confirmPasswordLabel')}</label>
+        <label for="rp-confirm" style="color:var(--text-dim);font-size:13px;">${t('admin:users.resetPasswordModal.confirmPasswordLabel')}</label>
         <input type="password" class="admin-input" id="rp-confirm" placeholder="${escapeAttr(t('admin:users.resetPasswordModal.confirmPasswordPlaceholder'))}" style="margin-top:4px;">
       </div>
       <div id="rp-error" style="color:var(--danger);font-size:13px;margin-top:8px;display:none;"></div>
@@ -450,7 +450,7 @@ export class UsersTab {
           </div>
         </div>
         <div style="margin-bottom:12px;${needsDays ? '' : 'display:none;'}">
-          <label style="color:var(--text-dim);font-size:13px;">${t('admin:users.cleanup.daysLabel')}</label>
+          <label for="cleanup-days" style="color:var(--text-dim);font-size:13px;">${t('admin:users.cleanup.daysLabel')}</label>
           <input type="number" class="admin-input" id="cleanup-days" min="1" placeholder="${escapeAttr(t('admin:users.cleanup.daysPlaceholder'))}" style="margin-top:4px;width:120px;">
         </div>
         <div style="margin-bottom:12px;">
@@ -467,7 +467,7 @@ export class UsersTab {
           previewCount && previewCount > 0
             ? `
           <div style="margin-bottom:12px;">
-            <label style="color:var(--text-dim);font-size:13px;">${t('admin:users.cleanup.confirmPrompt')}</label>
+            <label style="color:var(--text-dim);font-size:13px;" for="cleanup-confirm-input">${t('admin:users.cleanup.confirmPrompt')}</label>
             <input type="text" class="admin-input" id="cleanup-confirm-input" placeholder="${escapeAttr(t('admin:users.cleanup.confirmPlaceholder'))}" aria-label="${escapeAttr(t('admin:users.cleanup.confirmAriaLabel'))}" style="margin-top:4px;width:160px;">
           </div>
         `

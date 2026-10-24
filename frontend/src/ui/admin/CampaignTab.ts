@@ -232,9 +232,9 @@ export class CampaignTab {
         <td>${publishBadge}</td>
         <td>
           <div class="camp-order-cell">
-            <button class="btn-sm btn-ghost camp-order-up" data-id="${world.id}" title="${t('admin:campaign.worlds.moveUp')}">&#9650;</button>
+            <button class="btn-sm btn-ghost camp-order-up" data-id="${world.id}" title="${t('admin:campaign.worlds.moveUp')}" aria-label="${t('admin:campaign.worlds.moveUp')}">&#9650;</button>
             <span class="camp-order-value">${world.sortOrder}</span>
-            <button class="btn-sm btn-ghost camp-order-down" data-id="${world.id}" title="${t('admin:campaign.worlds.moveDown')}">&#9660;</button>
+            <button class="btn-sm btn-ghost camp-order-down" data-id="${world.id}" title="${t('admin:campaign.worlds.moveDown')}" aria-label="${t('admin:campaign.worlds.moveDown')}">&#9660;</button>
           </div>
         </td>
         <td>
@@ -311,9 +311,9 @@ export class CampaignTab {
       <tr data-level-id="${level.id}">
         <td>
           <div class="camp-level-order-cell">
-            <button class="btn-sm btn-ghost camp-level-order-up camp-level-order-btn" data-id="${level.id}" title="${t('admin:campaign.worlds.moveUp')}">&#9650;</button>
+            <button class="btn-sm btn-ghost camp-level-order-up camp-level-order-btn" data-id="${level.id}" title="${t('admin:campaign.worlds.moveUp')}" aria-label="${t('admin:campaign.worlds.moveUp')}">&#9650;</button>
             <span class="camp-level-order-value">${level.sortOrder}</span>
-            <button class="btn-sm btn-ghost camp-level-order-down camp-level-order-btn" data-id="${level.id}" title="${t('admin:campaign.worlds.moveDown')}">&#9660;</button>
+            <button class="btn-sm btn-ghost camp-level-order-down camp-level-order-btn" data-id="${level.id}" title="${t('admin:campaign.worlds.moveDown')}" aria-label="${t('admin:campaign.worlds.moveDown')}">&#9660;</button>
           </div>
         </td>
         <td>${escapeHtml(level.name)}</td>
@@ -635,15 +635,15 @@ export class CampaignTab {
       <h3 class="camp-modal-title">${isEdit ? t('admin:campaign.worldModal.editTitle') : t('admin:campaign.worldModal.createTitle')}</h3>
       <div class="camp-modal-form">
         <div class="form-group">
-          <label class="camp-form-label">${t('admin:campaign.worldModal.nameLabel')}</label>
+          <label class="camp-form-label" for="world-name">${t('admin:campaign.worldModal.nameLabel')}</label>
           <input type="text" id="world-name" class="admin-input w-full" value="${escapeAttr(existing?.name || '')}" placeholder="${t('admin:campaign.worldModal.namePlaceholder')}" maxlength="100">
         </div>
         <div class="form-group">
-          <label class="camp-form-label">${t('admin:campaign.worldModal.descriptionLabel')}</label>
+          <label class="camp-form-label" for="world-desc">${t('admin:campaign.worldModal.descriptionLabel')}</label>
           <textarea id="world-desc" class="admin-textarea" placeholder="${t('admin:campaign.worldModal.descriptionPlaceholder')}" maxlength="500" rows="2">${escapeHtml(existing?.description || '')}</textarea>
         </div>
         <div class="form-group">
-          <label class="camp-form-label">${t('admin:campaign.worldModal.themeLabel')}</label>
+          <label class="camp-form-label" for="world-theme">${t('admin:campaign.worldModal.themeLabel')}</label>
           <select id="world-theme" class="admin-input w-full">
             ${themeOptions}
           </select>
@@ -858,44 +858,44 @@ export class CampaignTab {
         <!-- Left column: fields -->
         <div class="camp-enemy-left">
           <div class="form-group">
-            <label class="camp-form-label">${t('admin:campaign.enemyModal.nameLabel')}</label>
+            <label class="camp-form-label" for="enemy-name">${t('admin:campaign.enemyModal.nameLabel')}</label>
             <input type="text" id="enemy-name" class="admin-input w-full" value="${escapeAttr(existing?.name || '')}" placeholder="${t('admin:campaign.enemyModal.namePlaceholder')}" maxlength="100">
           </div>
           <div class="form-group">
-            <label class="camp-form-label">${t('admin:campaign.enemyModal.descriptionLabel')}</label>
+            <label class="camp-form-label" for="enemy-desc">${t('admin:campaign.enemyModal.descriptionLabel')}</label>
             <input type="text" id="enemy-desc" class="admin-input w-full" value="${escapeAttr(existing?.description || '')}" placeholder="${t('admin:campaign.enemyModal.descriptionPlaceholder')}" maxlength="200">
           </div>
 
           <div class="camp-form-row">
             <div class="camp-form-col">
-              <label class="camp-form-label">${t('admin:campaign.enemyModal.hpLabel')}</label>
+              <label class="camp-form-label" for="enemy-hp">${t('admin:campaign.enemyModal.hpLabel')}</label>
               <input type="number" id="enemy-hp" class="admin-input w-full" value="${config.hp}" min="1" max="100">
             </div>
             <div class="camp-form-col">
-              <label class="camp-form-label">${t('admin:campaign.enemyModal.speedLabel')}</label>
+              <label class="camp-form-label" for="enemy-speed">${t('admin:campaign.enemyModal.speedLabel')}</label>
               <input type="number" id="enemy-speed" class="admin-input w-full" value="${config.speed}" min="0.1" max="5" step="0.1">
             </div>
             <div class="camp-form-col">
-              <label class="camp-form-label">${t('admin:campaign.enemyModal.sizeLabel')}</label>
+              <label class="camp-form-label" for="enemy-size">${t('admin:campaign.enemyModal.sizeLabel')}</label>
               <input type="number" id="enemy-size" class="admin-input w-full" value="${config.sizeMultiplier}" min="1" max="3" step="0.1">
             </div>
           </div>
 
           <div class="form-group">
-            <label class="camp-form-label">${t('admin:campaign.enemyModal.movementPatternLabel')}</label>
+            <label class="camp-form-label" for="enemy-movement">${t('admin:campaign.enemyModal.movementPatternLabel')}</label>
             <select id="enemy-movement" class="admin-input w-full">
               ${movementOptions}
             </select>
           </div>
 
           <div class="form-group">
-            <label class="camp-form-label">${t('admin:campaign.enemyModal.customAiLabel')}</label>
+            <label class="camp-form-label" for="enemy-ai-select">${t('admin:campaign.enemyModal.customAiLabel')}</label>
             <select id="enemy-ai-select" class="admin-input w-full">
               <option value="">${t('admin:campaign.enemyModal.customAiNone')}</option>
             </select>
           </div>
           <div class="form-group" id="enemy-difficulty-group" style="display:none">
-            <label class="camp-form-label">${t('admin:campaign.enemyModal.aiDifficultyLabel')}</label>
+            <label class="camp-form-label" for="enemy-difficulty">${t('admin:campaign.enemyModal.aiDifficultyLabel')}</label>
             <select id="enemy-difficulty" class="admin-input w-full">
               <option value="easy">${t('admin:campaign.enemyModal.difficultyEasy')}</option>
               <option value="normal" selected>${t('admin:campaign.enemyModal.difficultyNormal')}</option>
@@ -923,7 +923,7 @@ export class CampaignTab {
 
           <div class="camp-form-row">
             <div class="camp-form-col">
-              <label class="camp-form-label">${t('admin:campaign.enemyModal.dropChanceLabel')}</label>
+              <label class="camp-form-label" for="enemy-drop-chance">${t('admin:campaign.enemyModal.dropChanceLabel')}</label>
               <input type="number" id="enemy-drop-chance" class="admin-input w-full" value="${config.dropChance}" min="0" max="1" step="0.05">
             </div>
           </div>
@@ -936,24 +936,24 @@ export class CampaignTab {
           </div>
 
           <div class="form-group">
-            <label class="camp-form-label sm">${t('admin:campaign.enemyModal.bodyShapeLabel')}</label>
+            <label class="camp-form-label sm" for="enemy-body-shape">${t('admin:campaign.enemyModal.bodyShapeLabel')}</label>
             <select id="enemy-body-shape" class="admin-input w-full text-xs">
               ${bodyShapeOptions}
             </select>
           </div>
           <div class="form-group">
-            <label class="camp-form-label sm">${t('admin:campaign.enemyModal.eyeStyleLabel')}</label>
+            <label class="camp-form-label sm" for="enemy-eye-style">${t('admin:campaign.enemyModal.eyeStyleLabel')}</label>
             <select id="enemy-eye-style" class="admin-input w-full text-xs">
               ${eyeStyleOptions}
             </select>
           </div>
           <div class="camp-color-row">
             <div class="camp-form-col">
-              <label class="camp-form-label sm">${t('admin:campaign.enemyModal.primaryColorLabel')}</label>
+              <label class="camp-form-label sm" for="enemy-primary-color">${t('admin:campaign.enemyModal.primaryColorLabel')}</label>
               <input type="color" id="enemy-primary-color" value="${sprite.primaryColor}" class="camp-color-input">
             </div>
             <div class="camp-form-col">
-              <label class="camp-form-label sm">${t('admin:campaign.enemyModal.secondaryColorLabel')}</label>
+              <label class="camp-form-label sm" for="enemy-secondary-color">${t('admin:campaign.enemyModal.secondaryColorLabel')}</label>
               <input type="color" id="enemy-secondary-color" value="${sprite.secondaryColor}" class="camp-color-input">
             </div>
           </div>
@@ -983,7 +983,7 @@ export class CampaignTab {
             </label>
           </div>
           <div class="form-group">
-            <label class="camp-form-label sm">${t('admin:campaign.enemyModal.accessoryLabel')}</label>
+            <label class="camp-form-label sm" for="enemy-accessory">${t('admin:campaign.enemyModal.accessoryLabel')}</label>
             <select id="enemy-accessory" class="admin-input w-full text-xs">
               ${accessoryOptions}
             </select>

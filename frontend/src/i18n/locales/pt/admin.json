@@ -541,6 +541,7 @@
     "fromEmailPlaceholder": "naoresponda@exemplo.com",
     "fromNamePlaceholder": "BlastArena",
     "testEmailPlaceholder": "teste@exemplo.com",
+    "testEmailAddress": "Endereço de e-mail de teste",
     "showPassword": "Mostrar",
     "hidePassword": "Ocultar",
     "emailSettingsSaved": "Configurações de email salvas",

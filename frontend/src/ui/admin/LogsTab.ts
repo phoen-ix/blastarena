@@ -77,7 +77,7 @@ export class LogsTab {
         this.container,
         `
         <div class="admin-filters">
-          <label style="color:var(--text-dim);font-size:13px;">${t('admin:logs.filterByAction')}</label>
+          <label style="color:var(--text-dim);font-size:13px;" for="action-filter">${t('admin:logs.filterByAction')}</label>
           <select id="action-filter" aria-label="${t('admin:logs.filterByAction')}">
             <option value="">${t('admin:logs.filterAll')}</option>
             <option value="role_change" ${this.actionFilter === 'role_change' ? 'selected' : ''}>${t('admin:logs.filterRoleChange')}</option>

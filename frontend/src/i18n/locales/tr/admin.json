@@ -541,6 +541,7 @@
     "fromEmailPlaceholder": "yanitlanmasin@ornek.com",
     "fromNamePlaceholder": "BlastArena",
     "testEmailPlaceholder": "test@ornek.com",
+    "testEmailAddress": "Test e-posta adresi",
     "showPassword": "Göster",
     "hidePassword": "Gizle",
     "emailSettingsSaved": "E-posta ayarları kaydedildi",

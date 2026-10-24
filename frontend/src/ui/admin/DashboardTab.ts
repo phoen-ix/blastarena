@@ -322,31 +322,31 @@ export class DashboardTab {
         </div>
         <div class="setting-item">
           <span class="setting-item-label">${t('admin:dashboard.openWorld.maxPlayers')}</span>
-          <input id="ow-max-players" type="number" min="2" max="50" value="${this.owSettings.maxPlayers}" class="admin-select" style="width:70px;">
+          <input id="ow-max-players" aria-label="${escapeAttr(t('admin:dashboard.openWorld.maxPlayers'))}" type="number" min="2" max="50" value="${this.owSettings.maxPlayers}" class="admin-select" style="width:70px;">
         </div>
         <div class="setting-item">
           <span class="setting-item-label">${t('admin:dashboard.openWorld.roundTime')}</span>
-          <input id="ow-round-time" type="number" min="60" max="3600" value="${this.owSettings.roundTime}" class="admin-select" style="width:80px;">
+          <input id="ow-round-time" aria-label="${escapeAttr(t('admin:dashboard.openWorld.roundTime'))}" type="number" min="60" max="3600" value="${this.owSettings.roundTime}" class="admin-select" style="width:80px;">
         </div>
         <div class="setting-item">
           <span class="setting-item-label">${t('admin:dashboard.openWorld.mapWidth')}</span>
-          <input id="ow-map-width" type="number" min="21" max="101" step="2" value="${this.owSettings.mapWidth}" class="admin-select" style="width:70px;">
+          <input id="ow-map-width" aria-label="${escapeAttr(t('admin:dashboard.openWorld.mapWidth'))}" type="number" min="21" max="101" step="2" value="${this.owSettings.mapWidth}" class="admin-select" style="width:70px;">
         </div>
         <div class="setting-item">
           <span class="setting-item-label">${t('admin:dashboard.openWorld.mapHeight')}</span>
-          <input id="ow-map-height" type="number" min="21" max="101" step="2" value="${this.owSettings.mapHeight}" class="admin-select" style="width:70px;">
+          <input id="ow-map-height" aria-label="${escapeAttr(t('admin:dashboard.openWorld.mapHeight'))}" type="number" min="21" max="101" step="2" value="${this.owSettings.mapHeight}" class="admin-select" style="width:70px;">
         </div>
         <div class="setting-item">
           <span class="setting-item-label">${t('admin:dashboard.openWorld.wallDensity')}</span>
-          <input id="ow-wall-density" type="number" min="0.1" max="0.9" step="0.1" value="${this.owSettings.wallDensity}" class="admin-select" style="width:70px;">
+          <input id="ow-wall-density" aria-label="${escapeAttr(t('admin:dashboard.openWorld.wallDensity'))}" type="number" min="0.1" max="0.9" step="0.1" value="${this.owSettings.wallDensity}" class="admin-select" style="width:70px;">
         </div>
         <div class="setting-item">
           <span class="setting-item-label">${t('admin:dashboard.openWorld.respawnDelay')}</span>
-          <input id="ow-respawn-delay" type="number" min="1" max="30" value="${this.owSettings.respawnDelay}" class="admin-select" style="width:70px;">
+          <input id="ow-respawn-delay" aria-label="${escapeAttr(t('admin:dashboard.openWorld.respawnDelay'))}" type="number" min="1" max="30" value="${this.owSettings.respawnDelay}" class="admin-select" style="width:70px;">
         </div>
         <div class="setting-item">
           <span class="setting-item-label">${t('admin:dashboard.openWorld.afkTimeout')}</span>
-          <input id="ow-afk-timeout" type="number" min="0" max="600" value="${this.owSettings.afkTimeoutSeconds}" class="admin-select" style="width:70px;" title="${escapeAttr(t('admin:dashboard.openWorld.afkTimeoutHint'))}">
+          <input id="ow-afk-timeout" aria-label="${escapeAttr(t('admin:dashboard.openWorld.afkTimeout'))}" type="number" min="0" max="600" value="${this.owSettings.afkTimeoutSeconds}" class="admin-select" style="width:70px;" title="${escapeAttr(t('admin:dashboard.openWorld.afkTimeoutHint'))}">
         </div>
         <div class="setting-item">
           <button id="ow-save-btn" class="btn btn-primary" style="padding:6px 16px;font-size:13px;">${t('admin:dashboard.openWorld.save')}</button>
@@ -698,30 +698,30 @@ export class DashboardTab {
         <div id="email-body" class="collapsible-body">
           <div class="form-grid-2col">
             <div class="form-group">
-              <label>${t('admin:dashboard.smtpHost')}</label>
+              <label for="email-smtpHost">${t('admin:dashboard.smtpHost')}</label>
               <input type="text" id="email-smtpHost" value="${escapeAttr(s.smtpHost ?? '')}" placeholder="${escapeAttr(t('admin:dashboard.smtpHostPlaceholder'))}">
             </div>
             <div class="form-group">
-              <label>${t('admin:dashboard.smtpPort')}</label>
+              <label for="email-smtpPort">${t('admin:dashboard.smtpPort')}</label>
               <input type="number" id="email-smtpPort" value="${s.smtpPort ?? ''}" placeholder="587" min="1" max="65535">
             </div>
             <div class="form-group">
-              <label>${t('admin:dashboard.smtpUser')}</label>
+              <label for="email-smtpUser">${t('admin:dashboard.smtpUser')}</label>
               <input type="text" id="email-smtpUser" value="${escapeAttr(s.smtpUser ?? '')}" placeholder="${escapeAttr(t('admin:dashboard.smtpUserPlaceholder'))}">
             </div>
             <div class="form-group">
-              <label>${t('admin:dashboard.smtpPassword')}</label>
+              <label for="email-smtpPassword">${t('admin:dashboard.smtpPassword')}</label>
               <div class="pw-field">
                 <input type="password" id="email-smtpPassword" value="${escapeAttr(s.smtpPassword ?? '')}" placeholder="${escapeAttr(t('admin:dashboard.noPasswordSet'))}">
                 <button id="email-togglePw" type="button" class="pw-toggle">${t('admin:dashboard.showPassword')}</button>
               </div>
             </div>
             <div class="form-group">
-              <label>${t('admin:dashboard.fromEmail')}</label>
+              <label for="email-fromEmail">${t('admin:dashboard.fromEmail')}</label>
               <input type="text" id="email-fromEmail" value="${escapeAttr(s.fromEmail ?? '')}" placeholder="${escapeAttr(t('admin:dashboard.fromEmailPlaceholder'))}">
             </div>
             <div class="form-group">
-              <label>${t('admin:dashboard.fromName')}</label>
+              <label for="email-fromName">${t('admin:dashboard.fromName')}</label>
               <input type="text" id="email-fromName" value="${escapeAttr(s.fromName ?? '')}" placeholder="${escapeAttr(t('admin:dashboard.fromNamePlaceholder'))}">
             </div>
           </div>
@@ -730,7 +730,7 @@ export class DashboardTab {
             <button id="email-save" class="btn btn-primary btn-sm">${t('admin:dashboard.save')}</button>
             <button id="email-reset" class="btn btn-secondary btn-sm">${t('admin:dashboard.resetToDefaults')}</button>
             <div class="flex-row ml-auto flex-gap-sm">
-              <input type="email" id="email-testAddr" placeholder="${escapeAttr(t('admin:dashboard.testEmailPlaceholder'))}" class="admin-select" style="width:180px;">
+              <input type="email" id="email-testAddr" aria-label="${escapeAttr(t('admin:dashboard.testEmailAddress'))}" placeholder="${escapeAttr(t('admin:dashboard.testEmailPlaceholder'))}" class="admin-select" style="width:180px;">
               <button id="email-test" class="btn btn-secondary btn-sm nowrap">${t('admin:dashboard.sendTest')}</button>
             </div>
           </div>
@@ -935,16 +935,16 @@ export class DashboardTab {
       ];
       simExtra = `
         <div class="form-group">
-          <label>${t('admin:dashboard.totalGames')}</label>
+          <label for="${prefix}-totalGames">${t('admin:dashboard.totalGames')}</label>
           <input type="number" id="${prefix}-totalGames" value="${sd.totalGames ?? ''}" min="1" max="1000" placeholder="${escapeAttr(t('admin:dashboard.totalGamesPlaceholder'))}"
             class="admin-select w-full">
         </div>
         <div class="form-group">
-          <label>${t('admin:dashboard.speed')}</label>
+          <label for="${prefix}-speed">${t('admin:dashboard.speed')}</label>
           ${sel(`${prefix}-speed`, speedOpts, sd.speed)}
         </div>
         <div class="form-group">
-          <label>${t('admin:dashboard.logVerbosity')}</label>
+          <label for="${prefix}-logVerbosity">${t('admin:dashboard.logVerbosity')}</label>
           ${sel(`${prefix}-logVerbosity`, verbOpts, sd.logVerbosity)}
         </div>
       `;
@@ -955,45 +955,45 @@ export class DashboardTab {
     return `
       <div class="form-grid">
         <div class="form-group">
-          <label>${t('admin:dashboard.gameMode')}</label>
+          <label for="${prefix}-gameMode">${t('admin:dashboard.gameMode')}</label>
           ${sel(`${prefix}-gameMode`, gameModes, defaults.gameMode)}
         </div>
         ${
           type === 'game'
             ? `<div class="form-group">
-          <label>${t('admin:dashboard.maxPlayers')}</label>
+          <label for="${prefix}-maxPlayers">${t('admin:dashboard.maxPlayers')}</label>
           ${sel(`${prefix}-maxPlayers`, maxPlayersOpts, defaults.maxPlayers)}
         </div>`
             : ''
         }
         <div class="form-group">
-          <label>${t('admin:dashboard.matchTime')}</label>
+          <label for="${prefix}-roundTime">${t('admin:dashboard.matchTime')}</label>
           ${sel(`${prefix}-roundTime`, roundTimeOpts, defaults.roundTime)}
         </div>
         <div class="form-group">
-          <label>${t('admin:dashboard.mapSize')}</label>
+          <label for="${prefix}-mapWidth">${t('admin:dashboard.mapSize')}</label>
           ${sel(`${prefix}-mapWidth`, mapSizeOpts, defaults.mapWidth)}
         </div>
         <div class="form-group">
-          <label>${t('admin:dashboard.wallDensity')}</label>
+          <label for="${prefix}-wallDensity">${t('admin:dashboard.wallDensity')}</label>
           ${sel(`${prefix}-wallDensity`, wallDensityOpts, defaults.wallDensity)}
         </div>
         <div class="form-group">
-          <label>${t('admin:dashboard.powerUpRate')}</label>
+          <label for="${prefix}-powerUpDropRate">${t('admin:dashboard.powerUpRate')}</label>
           ${sel(`${prefix}-powerUpDropRate`, powerUpRateOpts, defaults.powerUpDropRate)}
         </div>
         <div class="form-group">
-          <label>${t('admin:dashboard.bots')}</label>
+          <label for="${prefix}-botCount">${t('admin:dashboard.bots')}</label>
           ${sel(`${prefix}-botCount`, botCountOpts, defaults.botCount)}
         </div>
         <div class="form-group">
-          <label>${t('admin:dashboard.botDifficulty')}</label>
+          <label for="${prefix}-botDifficulty">${t('admin:dashboard.botDifficulty')}</label>
           ${sel(`${prefix}-botDifficulty`, botDiffOpts, defaults.botDifficulty)}
         </div>
         ${
           activeAIs.length > 1
             ? `<div class="form-group">
-          <label>${t('admin:dashboard.botAi')}</label>
+          <label for="${prefix}-botAiId">${t('admin:dashboard.botAi')}</label>
           ${sel(
             `${prefix}-botAiId`,
             activeAIs.map((ai) => ({ value: ai.id, label: ai.name })),

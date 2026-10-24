@@ -293,25 +293,25 @@ export class AchievementsTab {
         <h2>${isEdit ? t('admin:achievements.editAchievement') : t('admin:achievements.createAchievementTitle')}</h2>
         <div class="form-stack">
           <div>
-            <label class="field-label">${t('admin:achievements.nameLabel')}</label>
+            <label class="field-label" for="am-name">${t('admin:achievements.nameLabel')}</label>
             <input type="text" class="admin-input mt-label" id="am-name" value="${escapeAttr(existing?.name || '')}" placeholder="${t('admin:achievements.namePlaceholder')}">
           </div>
           <div>
-            <label class="field-label">${t('admin:achievements.descriptionLabel')}</label>
+            <label class="field-label" for="am-desc">${t('admin:achievements.descriptionLabel')}</label>
             <input type="text" class="admin-input mt-label" id="am-desc" value="${escapeAttr(existing?.description || '')}" placeholder="${t('admin:achievements.descriptionPlaceholder')}">
           </div>
           <div class="form-row">
             <div>
-              <label class="field-label">${t('admin:achievements.iconLabel')}</label>
+              <label class="field-label" for="am-icon">${t('admin:achievements.iconLabel')}</label>
               <input type="text" class="admin-input mt-label" id="am-icon" value="${escapeAttr(existing?.icon || '')}" placeholder="${t('admin:achievements.iconPlaceholder')}">
             </div>
             <div>
-              <label class="field-label">${t('admin:achievements.categoryLabel')}</label>
+              <label class="field-label" for="am-category">${t('admin:achievements.categoryLabel')}</label>
               <input type="text" class="admin-input mt-label" id="am-category" value="${escapeAttr(existing?.category || '')}" placeholder="${t('admin:achievements.categoryPlaceholder')}">
             </div>
           </div>
           <div>
-            <label class="field-label">${t('admin:achievements.conditionTypeLabel')}</label>
+            <label class="field-label" for="am-condType">${t('admin:achievements.conditionTypeLabel')}</label>
             <select class="admin-select w-full mt-label" id="am-condType">
               ${CONDITION_TYPES.map((ct) => `<option value="${ct}" ${currentCondType === ct ? 'selected' : ''}>${getConditionLabel(ct)}</option>`).join('')}
             </select>
@@ -319,7 +319,7 @@ export class AchievementsTab {
           <div id="am-cond-fields"></div>
           <div class="form-row">
             <div>
-              <label class="field-label">${t('admin:achievements.rewardTypeLabel')}</label>
+              <label class="field-label" for="am-rewardType">${t('admin:achievements.rewardTypeLabel')}</label>
               <select class="admin-select w-full mt-label" id="am-rewardType">
                 <option value="none" ${!existing || existing.rewardType === 'none' ? 'selected' : ''}>${t('admin:achievements.rewardTypes.none')}</option>
                 <option value="cosmetic" ${existing?.rewardType === 'cosmetic' ? 'selected' : ''}>${t('admin:achievements.rewardTypes.cosmetic')}</option>
@@ -327,12 +327,12 @@ export class AchievementsTab {
               </select>
             </div>
             <div id="am-reward-id-wrap">
-              <label class="field-label">${t('admin:achievements.rewardCosmeticIdLabel')}</label>
+              <label class="field-label" for="am-rewardId">${t('admin:achievements.rewardCosmeticIdLabel')}</label>
               <input type="number" class="admin-input mt-label" id="am-rewardId" value="${existing?.rewardId ?? ''}" placeholder="${t('admin:achievements.rewardCosmeticIdPlaceholder')}" min="0">
             </div>
           </div>
           <div>
-            <label class="field-label">${t('admin:achievements.sortOrderLabel')}</label>
+            <label class="field-label" for="am-sortOrder">${t('admin:achievements.sortOrderLabel')}</label>
             <input type="number" class="admin-input mt-label" id="am-sortOrder" value="${existing?.sortOrder ?? 0}" min="0">
           </div>
         </div>
@@ -430,13 +430,13 @@ export class AchievementsTab {
         `
         <div class="form-row">
           <div>
-            <label class="field-label">${t('admin:achievements.conditionFields.stat')}</label>
+            <label class="field-label" for="am-cond-stat">${t('admin:achievements.conditionFields.stat')}</label>
             <select class="admin-select w-full mt-label" id="am-cond-stat">
               ${CUMULATIVE_STATS.map((s) => `<option value="${s}" ${cfg.stat === s ? 'selected' : ''}>${s}</option>`).join('')}
             </select>
           </div>
           <div>
-            <label class="field-label">${t('admin:achievements.conditionFields.threshold')}</label>
+            <label class="field-label" for="am-cond-threshold">${t('admin:achievements.conditionFields.threshold')}</label>
             <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfg.threshold ?? 1}" min="1">
           </div>
         </div>
@@ -448,19 +448,19 @@ export class AchievementsTab {
         `
         <div class="form-row">
           <div>
-            <label class="field-label">${t('admin:achievements.conditionFields.stat')}</label>
+            <label class="field-label" for="am-cond-stat">${t('admin:achievements.conditionFields.stat')}</label>
             <select class="admin-select w-full mt-label" id="am-cond-stat">
               ${PER_GAME_STATS.map((s) => `<option value="${s}" ${cfg.stat === s ? 'selected' : ''}>${s}</option>`).join('')}
             </select>
           </div>
           <div class="form-row-half">
-            <label class="field-label">${t('admin:achievements.conditionFields.operator')}</label>
+            <label class="field-label" for="am-cond-operator">${t('admin:achievements.conditionFields.operator')}</label>
             <select class="admin-select w-full mt-label" id="am-cond-operator">
               ${PER_GAME_OPERATORS.map((o) => `<option value="${escapeAttr(o)}" ${cfg.operator === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('')}
             </select>
           </div>
           <div class="form-row-half">
-            <label class="field-label">${t('admin:achievements.conditionFields.threshold')}</label>
+            <label class="field-label" for="am-cond-threshold">${t('admin:achievements.conditionFields.threshold')}</label>
             <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfg.threshold ?? 1}" min="0">
           </div>
         </div>
@@ -472,19 +472,19 @@ export class AchievementsTab {
         `
         <div class="form-row">
           <div>
-            <label class="field-label">${t('admin:achievements.conditionFields.gameMode')}</label>
+            <label class="field-label" for="am-cond-mode">${t('admin:achievements.conditionFields.gameMode')}</label>
             <select class="admin-select w-full mt-label" id="am-cond-mode">
               ${GAME_MODES.map((m) => `<option value="${m}" ${cfg.mode === m || (cfg.mode === 'koth' && m === 'king_of_the_hill') ? 'selected' : ''}>${escapeHtml(t(gameModeName(m)))}</option>`).join('')}
             </select>
           </div>
           <div>
-            <label class="field-label">${t('admin:achievements.conditionFields.stat')}</label>
+            <label class="field-label" for="am-cond-stat">${t('admin:achievements.conditionFields.stat')}</label>
             <select class="admin-select w-full mt-label" id="am-cond-stat">
               ${MODE_SPECIFIC_STATS.map((s) => `<option value="${s}" ${cfg.stat === s ? 'selected' : ''}>${s}</option>`).join('')}
             </select>
           </div>
           <div class="form-row-half">
-            <label class="field-label">${t('admin:achievements.conditionFields.threshold')}</label>
+            <label class="field-label" for="am-cond-threshold">${t('admin:achievements.conditionFields.threshold')}</label>
             <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfg.threshold ?? 1}" min="1">
           </div>
         </div>
@@ -496,13 +496,13 @@ export class AchievementsTab {
         `
         <div class="form-row">
           <div>
-            <label class="field-label">${t('admin:achievements.conditionFields.subType')}</label>
+            <label class="field-label" for="am-cond-subType">${t('admin:achievements.conditionFields.subType')}</label>
             <select class="admin-select w-full mt-label" id="am-cond-subType">
               ${CAMPAIGN_SUBTYPES.map((s) => `<option value="${s}" ${cfg.subType === s ? 'selected' : ''}>${s}</option>`).join('')}
             </select>
           </div>
           <div>
-            <label class="field-label">${t('admin:achievements.conditionFields.threshold')}</label>
+            <label class="field-label" for="am-cond-threshold">${t('admin:achievements.conditionFields.threshold')}</label>
             <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfg.threshold ?? 1}" min="1">
           </div>
         </div>
@@ -676,18 +676,18 @@ export class AchievementsTab {
         <h2>${isEdit ? t('admin:achievements.editCosmetic') : t('admin:achievements.createCosmeticTitle')}</h2>
         <div class="form-stack">
           <div>
-            <label class="field-label">${t('admin:achievements.cosmeticNameLabel')}</label>
+            <label class="field-label" for="cm-name">${t('admin:achievements.cosmeticNameLabel')}</label>
             <input type="text" class="admin-input mt-label" id="cm-name" value="${escapeAttr(existing?.name || '')}" placeholder="${t('admin:achievements.cosmeticNamePlaceholder')}">
           </div>
           <div class="form-row">
             <div>
-              <label class="field-label">${t('admin:achievements.cosmeticTypeLabel')}</label>
+              <label class="field-label" for="cm-type">${t('admin:achievements.cosmeticTypeLabel')}</label>
               <select class="admin-select w-full mt-label" id="cm-type">
                 ${COSMETIC_TYPES.map((ct) => `<option value="${ct}" ${currentType === ct ? 'selected' : ''}>${ct}</option>`).join('')}
               </select>
             </div>
             <div>
-              <label class="field-label">${t('admin:achievements.rarityLabel')}</label>
+              <label class="field-label" for="cm-rarity">${t('admin:achievements.rarityLabel')}</label>
               <select class="admin-select w-full mt-label" id="cm-rarity">
                 ${RARITY_OPTIONS.map((r) => `<option value="${r}" ${existing?.rarity === r ? 'selected' : ''}>${r}</option>`).join('')}
               </select>
@@ -696,18 +696,18 @@ export class AchievementsTab {
           <div id="cm-config-fields"></div>
           <div class="form-row">
             <div>
-              <label class="field-label">${t('admin:achievements.unlockTypeLabel')}</label>
+              <label class="field-label" for="cm-unlockType">${t('admin:achievements.unlockTypeLabel')}</label>
               <select class="admin-select w-full mt-label" id="cm-unlockType">
                 ${UNLOCK_TYPES.map((u) => `<option value="${u}" ${existing?.unlockType === u ? 'selected' : ''}>${u}</option>`).join('')}
               </select>
             </div>
             <div id="cm-unlock-req-wrap">
-              <label class="field-label">${t('admin:achievements.unlockRequirementLabel')}</label>
+              <label class="field-label" for="cm-unlockReq">${t('admin:achievements.unlockRequirementLabel')}</label>
               <textarea class="admin-input admin-textarea-mono" id="cm-unlockReq" rows="2" placeholder='{"threshold": 50}'>${existing?.unlockRequirement ? JSON.stringify(existing.unlockRequirement, null, 2) : ''}</textarea>
             </div>
           </div>
           <div>
-            <label class="field-label">${t('admin:achievements.sortOrderLabel')}</label>
+            <label class="field-label" for="cm-sortOrder">${t('admin:achievements.sortOrderLabel')}</label>
             <input type="number" class="admin-input mt-label" id="cm-sortOrder" value="${existing?.sortOrder ?? 0}" min="0">
           </div>
         </div>
@@ -839,7 +839,7 @@ export class AchievementsTab {
         container,
         `
         <div>
-          <label class="field-label">${t('admin:achievements.configFields.eyeStyle')}</label>
+          <label class="field-label" for="cm-cfg-style">${t('admin:achievements.configFields.eyeStyle')}</label>
           <input type="text" class="admin-input mt-label" id="cm-cfg-style" value="${escapeAttr(style)}" placeholder="${t('admin:achievements.configFields.eyeStylePlaceholder')}">
         </div>
       `,
@@ -850,16 +850,16 @@ export class AchievementsTab {
         `
         <div class="form-row">
           <div>
-            <label class="field-label">${t('admin:achievements.configFields.particleKey')}</label>
+            <label class="field-label" for="cm-cfg-particleKey">${t('admin:achievements.configFields.particleKey')}</label>
             <input type="text" class="admin-input mt-label" id="cm-cfg-particleKey" value="${escapeAttr(String(cfg.particleKey || 'particle_fire'))}" placeholder="particle_fire">
           </div>
           <div>
-            <label class="field-label">${t('admin:achievements.configFields.tintHex')}</label>
+            <label class="field-label" for="cm-cfg-tint">${t('admin:achievements.configFields.tintHex')}</label>
             <input type="text" class="admin-input mt-label" id="cm-cfg-tint" value="${cfg.tint != null ? '0x' + (Number(cfg.tint) >>> 0).toString(16).padStart(6, '0') : '0xff6b35'}" placeholder="0xff6b35">
           </div>
         </div>
         <div>
-          <label class="field-label">${t('admin:achievements.configFields.frequency')}</label>
+          <label class="field-label" for="cm-cfg-frequency">${t('admin:achievements.configFields.frequency')}</label>
           <input type="number" class="admin-input mt-label" id="cm-cfg-frequency" value="${cfg.frequency ?? 100}" min="1" max="1000">
         </div>
       `,
@@ -870,16 +870,16 @@ export class AchievementsTab {
         `
         <div class="form-row">
           <div>
-            <label class="field-label">${t('admin:achievements.configFields.baseColor')}</label>
+            <label class="field-label" for="cm-cfg-baseColor">${t('admin:achievements.configFields.baseColor')}</label>
             <input type="text" class="admin-input mt-label" id="cm-cfg-baseColor" value="${cfg.baseColor != null ? '0x' + (Number(cfg.baseColor) >>> 0).toString(16).padStart(6, '0') : '0x333333'}" placeholder="0x333333">
           </div>
           <div>
-            <label class="field-label">${t('admin:achievements.configFields.fuseColor')}</label>
+            <label class="field-label" for="cm-cfg-fuseColor">${t('admin:achievements.configFields.fuseColor')}</label>
             <input type="text" class="admin-input mt-label" id="cm-cfg-fuseColor" value="${cfg.fuseColor != null ? '0x' + (Number(cfg.fuseColor) >>> 0).toString(16).padStart(6, '0') : '0xff4400'}" placeholder="0xff4400">
           </div>
         </div>
         <div>
-          <label class="field-label">${t('admin:achievements.configFields.label')}</label>
+          <label class="field-label" for="cm-cfg-label">${t('admin:achievements.configFields.label')}</label>
           <input type="text" class="admin-input mt-label" id="cm-cfg-label" value="${escapeAttr(String(cfg.label || ''))}" placeholder="${t('admin:achievements.configFields.labelPlaceholder')}">
         </div>
       `,

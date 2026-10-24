@@ -57,7 +57,7 @@ export class VerificationUI {
           </p>
           <div style="display:flex;flex-direction:column;gap:var(--sp-3);align-items:center;">
             <div style="display:flex;gap:var(--sp-2);width:100%;">
-              <input type="email" id="verify-email-input" class="input" style="flex:1;"
+              <input type="email" id="verify-email-input" class="input" style="flex:1;" aria-label="${t('auth:register.email')}"
                 placeholder="${t('auth:verification.emailPlaceholder')}" />
               <button id="resend-btn" class="btn btn-secondary">
                 ${t('auth:verification.resend')}

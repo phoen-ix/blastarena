@@ -108,15 +108,15 @@ export class SeasonsTab {
       <div style="background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
           <div>
-            <label style="display:block;color:var(--text-dim);font-size:12px;margin-bottom:4px;">${t('admin:seasons.form.nameLabel')}</label>
+            <label style="display:block;color:var(--text-dim);font-size:12px;margin-bottom:4px;" for="season-name">${t('admin:seasons.form.nameLabel')}</label>
             <input type="text" class="admin-input" id="season-name" placeholder="${escapeAttr(t('admin:seasons.form.namePlaceholder'))}" style="width:100%;">
           </div>
           <div>
-            <label style="display:block;color:var(--text-dim);font-size:12px;margin-bottom:4px;">${t('admin:seasons.form.startDateLabel')}</label>
+            <label style="display:block;color:var(--text-dim);font-size:12px;margin-bottom:4px;" for="season-start">${t('admin:seasons.form.startDateLabel')}</label>
             <input type="date" class="admin-input" id="season-start" style="width:100%;">
           </div>
           <div>
-            <label style="display:block;color:var(--text-dim);font-size:12px;margin-bottom:4px;">${t('admin:seasons.form.endDateLabel')}</label>
+            <label style="display:block;color:var(--text-dim);font-size:12px;margin-bottom:4px;" for="season-end">${t('admin:seasons.form.endDateLabel')}</label>
             <input type="date" class="admin-input" id="season-end" style="width:100%;">
           </div>
         </div>
@@ -365,7 +365,7 @@ export class SeasonsTab {
             <input type="number" class="admin-input tier-min" value="${tier.minElo}" placeholder="${escapeAttr(t('admin:seasons.rankTiers.minPlaceholder'))}" style="width:100%;">
             <input type="number" class="admin-input tier-max" value="${tier.maxElo}" placeholder="${escapeAttr(t('admin:seasons.rankTiers.maxPlaceholder'))}" style="width:100%;">
             <input type="color" class="tier-color" value="${escapeAttr(tier.color)}" style="width:40px;height:36px;border:none;background:none;cursor:pointer;">
-            <button class="btn btn-danger tier-remove" data-index="${i}" style="font-size:12px;padding:4px 8px;" title="${escapeAttr(t('admin:seasons.rankTiers.removeTier'))}">&times;</button>
+            <button class="btn btn-danger tier-remove" data-index="${i}" style="font-size:12px;padding:4px 8px;" title="${escapeAttr(t('admin:seasons.rankTiers.removeTier'))}" aria-label="${escapeAttr(t('admin:seasons.rankTiers.removeTier'))}">&times;</button>
           </div>
         `,
           )

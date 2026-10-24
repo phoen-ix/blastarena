@@ -685,7 +685,7 @@ export class SimulationsTab {
 
         <div class="sim-modal-grid">
           <div class="form-group mb-0">
-            <label>${t('admin:simulations.modal.gameMode')}</label>
+            <label for="sim-mode">${t('admin:simulations.modal.gameMode')}</label>
             <select id="sim-mode">
               <option value="ffa">${t('admin:simulations.modal.modes.ffa')}</option>
               <option value="teams">${t('admin:simulations.modal.modes.teams')}</option>
@@ -696,7 +696,7 @@ export class SimulationsTab {
             </select>
           </div>
           <div class="form-group mb-0">
-            <label>${t('admin:simulations.modal.botCount')}</label>
+            <label for="sim-bot-count">${t('admin:simulations.modal.botCount')}</label>
             <select id="sim-bot-count">
               <option value="2">${t('admin:simulations.modal.nBots', { count: 2 })}</option>
               <option value="3">${t('admin:simulations.modal.nBots', { count: 3 })}</option>
@@ -708,7 +708,7 @@ export class SimulationsTab {
             </select>
           </div>
           <div class="form-group mb-0">
-            <label>${t('admin:simulations.modal.botDifficulty')}</label>
+            <label for="sim-difficulty">${t('admin:simulations.modal.botDifficulty')}</label>
             <select id="sim-difficulty">
               <option value="easy">${t('admin:simulations.modal.difficulties.easy')}</option>
               <option value="normal" selected>${t('admin:simulations.modal.difficulties.normal')}</option>
@@ -719,7 +719,7 @@ export class SimulationsTab {
             activeAIs.length > 1
               ? `
           <div class="form-group mb-0">
-            <label>${t('admin:simulations.modal.botAI')}</label>
+            <label for="sim-bot-ai">${t('admin:simulations.modal.botAI')}</label>
             <select id="sim-bot-ai">
               ${activeAIs.map((ai) => `<option value="${ai.id}"${ai.isBuiltin ? ' selected' : ''}>${escapeHtml(ai.name)}</option>`).join('')}
             </select>
@@ -728,7 +728,7 @@ export class SimulationsTab {
               : ''
           }
           <div class="form-group mb-0">
-            <label>${t('admin:simulations.modal.mapSize')}</label>
+            <label for="sim-map-size">${t('admin:simulations.modal.mapSize')}</label>
             <select id="sim-map-size">
               <option value="21">${t('admin:simulations.modal.mapSizes.small')}</option>
               <option value="31" selected>${t('admin:simulations.modal.mapSizes.normal')}</option>
@@ -738,7 +738,7 @@ export class SimulationsTab {
             </select>
           </div>
           <div class="form-group mb-0">
-            <label>${t('admin:simulations.modal.matchTime')}</label>
+            <label for="sim-round-time">${t('admin:simulations.modal.matchTime')}</label>
             <select id="sim-round-time">
               <option value="60">${t('admin:simulations.modal.timeOptions.1min')}</option>
               <option value="120">${t('admin:simulations.modal.timeOptions.2min')}</option>
@@ -748,7 +748,7 @@ export class SimulationsTab {
             </select>
           </div>
           <div class="form-group mb-0">
-            <label>${t('admin:simulations.modal.wallDensity')}</label>
+            <label for="sim-wall-density">${t('admin:simulations.modal.wallDensity')}</label>
             <select id="sim-wall-density">
               <option value="0.3">${t('admin:simulations.modal.densities.low')}</option>
               <option value="0.5">${t('admin:simulations.modal.densities.medium')}</option>
@@ -757,7 +757,7 @@ export class SimulationsTab {
             </select>
           </div>
           <div class="form-group mb-0">
-            <label>${t('admin:simulations.modal.powerUpRate')}</label>
+            <label for="sim-powerup-rate">${t('admin:simulations.modal.powerUpRate')}</label>
             <select id="sim-powerup-rate">
               <option value="0">${t('admin:simulations.modal.rates.none')}</option>
               <option value="0.15">${t('admin:simulations.modal.rates.low')}</option>
@@ -767,11 +767,11 @@ export class SimulationsTab {
             </select>
           </div>
           <div class="form-group mb-0">
-            <label>${t('admin:simulations.modal.totalGames')}</label>
+            <label for="sim-total-games">${t('admin:simulations.modal.totalGames')}</label>
             <input type="number" id="sim-total-games" value="10" min="1" max="1000" class="w-full">
           </div>
           <div class="form-group mb-0">
-            <label>${t('admin:simulations.modal.speed')}</label>
+            <label for="sim-speed">${t('admin:simulations.modal.speed')}</label>
             <select id="sim-speed">
               <option value="fast" selected>${t('admin:simulations.modal.speedOptions.fast')}</option>
               <option value="realtime">${t('admin:simulations.modal.speedOptions.realtime')}</option>
@@ -781,7 +781,7 @@ export class SimulationsTab {
 
         <div class="sim-modal-grid mt-sm">
           <div class="form-group mb-0">
-            <label>${t('admin:simulations.modal.logVerbosity')}</label>
+            <label for="sim-verbosity">${t('admin:simulations.modal.logVerbosity')}</label>
             <select id="sim-verbosity">
               <option value="normal" selected>${t('admin:simulations.modal.verbosityOptions.normal')}</option>
               <option value="detailed">${t('admin:simulations.modal.verbosityOptions.detailed')}</option>

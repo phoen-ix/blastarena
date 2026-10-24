@@ -545,6 +545,7 @@
     "fromEmailPlaceholder": "noreply@przyklad.pl",
     "fromNamePlaceholder": "BlastArena",
     "testEmailPlaceholder": "test@przyklad.pl",
+    "testEmailAddress": "Adres e-mail do testu",
     "showPassword": "Pokaż",
     "hidePassword": "Ukryj",
     "emailSettingsSaved": "Ustawienia e-mail zapisane",

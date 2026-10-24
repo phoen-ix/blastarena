@@ -90,7 +90,7 @@ export class ChallengesTab {
           <span>${t('admin:challenges.enabled')}</span>
           <label class="toggle-switch">
             <input type="checkbox" id="challenges-enabled-toggle" ${this.challengesEnabled ? 'checked' : ''}
-              role="switch" aria-checked="${this.challengesEnabled}">
+              role="switch" aria-checked="${this.challengesEnabled}" aria-label="${escapeAttr(t('admin:challenges.enabled'))}">
             <span class="toggle-slider"></span>
           </label>
         </div>`
@@ -276,8 +276,8 @@ export class ChallengesTab {
               <td style="display:flex; gap:0.25rem;">
                 ${
                   c.isActive
-                    ? `<button class="btn btn-sm btn-ghost" data-action="deactivate" data-id="${c.id}" title="${escapeAttr(t('admin:challenges.deactivate'))}">&times;</button>`
-                    : `<button class="btn btn-sm btn-primary" data-action="activate" data-id="${c.id}" title="${escapeAttr(t('admin:challenges.activate'))}">&#10003;</button>`
+                    ? `<button class="btn btn-sm btn-ghost" data-action="deactivate" data-id="${c.id}" title="${escapeAttr(t('admin:challenges.deactivate'))}" aria-label="${escapeAttr(t('admin:challenges.deactivate'))}">&times;</button>`
+                    : `<button class="btn btn-sm btn-primary" data-action="activate" data-id="${c.id}" title="${escapeAttr(t('admin:challenges.activate'))}" aria-label="${escapeAttr(t('admin:challenges.activate'))}">&#10003;</button>`
                 }
                 <button class="btn btn-sm btn-ghost" style="color:var(--danger);" data-action="delete" data-id="${c.id}" title="${escapeAttr(t('admin:challenges.deleteBtn'))}">&minus;</button>
               </td>

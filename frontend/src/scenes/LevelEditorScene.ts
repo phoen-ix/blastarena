@@ -1640,7 +1640,7 @@ export class LevelEditorScene extends Phaser.Scene {
 
     const inputStyle =
       'width:100%;padding:3px 5px;background:var(--bg-surface);border:1px solid var(--bg-hover);color:var(--text);font-size:11px;border-radius:3px;box-sizing:border-box;';
-    const labelStyle = 'font-size:10px;color:var(--text-dim);margin:4px 0 2px 0;';
+    const labelStyle = 'display:block;font-size:10px;color:var(--text-dim);margin:4px 0 2px 0;';
 
     // Map dimensions
     const dimRow = document.createElement('div');
@@ -1648,11 +1648,13 @@ export class LevelEditorScene extends Phaser.Scene {
 
     const wCol = document.createElement('div');
     wCol.style.cssText = 'flex:1;';
-    const wLabel = document.createElement('div');
+    const wLabel = document.createElement('label');
+    wLabel.htmlFor = 'editor-width';
     wLabel.textContent = t('editor:settings.width');
     wLabel.style.cssText = labelStyle;
     wCol.appendChild(wLabel);
     this.widthInput = document.createElement('input');
+    this.widthInput.id = 'editor-width';
     this.widthInput.type = 'number';
     this.widthInput.min = String(this.minMapSize);
     this.widthInput.max = '51';
@@ -1667,11 +1669,13 @@ export class LevelEditorScene extends Phaser.Scene {
 
     const hCol = document.createElement('div');
     hCol.style.cssText = 'flex:1;';
-    const hLabel = document.createElement('div');
+    const hLabel = document.createElement('label');
+    hLabel.htmlFor = 'editor-height';
     hLabel.textContent = t('editor:settings.height');
     hLabel.style.cssText = labelStyle;
     hCol.appendChild(hLabel);
     this.heightInput = document.createElement('input');
+    this.heightInput.id = 'editor-height';
     this.heightInput.type = 'number';
     this.heightInput.min = String(this.minMapSize);
     this.heightInput.max = '51';
@@ -1691,11 +1695,13 @@ export class LevelEditorScene extends Phaser.Scene {
     section.appendChild(dimHint);
 
     // Name
-    const nameLabel = document.createElement('div');
+    const nameLabel = document.createElement('label');
+    nameLabel.htmlFor = 'editor-name';
     nameLabel.textContent = t('editor:settings.name');
     nameLabel.style.cssText = labelStyle;
     section.appendChild(nameLabel);
     const nameInput = document.createElement('input');
+    nameInput.id = 'editor-name';
     nameInput.type = 'text';
     nameInput.value = this.levelName;
     nameInput.style.cssText = inputStyle;
@@ -1707,11 +1713,13 @@ export class LevelEditorScene extends Phaser.Scene {
 
     // Description (custom map mode only)
     if (this.editorMode === 'custom_map') {
-      const descLabel = document.createElement('div');
+      const descLabel = document.createElement('label');
+      descLabel.htmlFor = 'editor-description';
       descLabel.textContent = t('editor:settings.description');
       descLabel.style.cssText = labelStyle;
       section.appendChild(descLabel);
       const descInput = document.createElement('textarea');
+      descInput.id = 'editor-description';
       descInput.value = this.customMapDescription;
       descInput.maxLength = 500;
       descInput.rows = 2;
@@ -1726,11 +1734,13 @@ export class LevelEditorScene extends Phaser.Scene {
     // Campaign-only settings
     if (this.editorMode === 'campaign') {
       // Lives
-      const livesLabel = document.createElement('div');
+      const livesLabel = document.createElement('label');
+      livesLabel.htmlFor = 'editor-lives';
       livesLabel.textContent = t('editor:settings.lives');
       livesLabel.style.cssText = labelStyle;
       section.appendChild(livesLabel);
       const livesInput = document.createElement('input');
+      livesInput.id = 'editor-lives';
       livesInput.type = 'number';
       livesInput.min = '1';
       livesInput.max = '99';
@@ -1743,11 +1753,13 @@ export class LevelEditorScene extends Phaser.Scene {
       section.appendChild(livesInput);
 
       // Time Limit
-      const timeLabel = document.createElement('div');
+      const timeLabel = document.createElement('label');
+      timeLabel.htmlFor = 'editor-time-limit';
       timeLabel.textContent = t('editor:settings.timeLimit');
       timeLabel.style.cssText = labelStyle;
       section.appendChild(timeLabel);
       const timeInput = document.createElement('input');
+      timeInput.id = 'editor-time-limit';
       timeInput.type = 'number';
       timeInput.min = '0';
       timeInput.max = '3600';
@@ -1760,11 +1772,13 @@ export class LevelEditorScene extends Phaser.Scene {
       section.appendChild(timeInput);
 
       // Par Time
-      const parLabel = document.createElement('div');
+      const parLabel = document.createElement('label');
+      parLabel.htmlFor = 'editor-par-time';
       parLabel.textContent = t('editor:settings.parTime');
       parLabel.style.cssText = labelStyle;
       section.appendChild(parLabel);
       const parInput = document.createElement('input');
+      parInput.id = 'editor-par-time';
       parInput.type = 'number';
       parInput.min = '0';
       parInput.max = '3600';
@@ -1781,11 +1795,13 @@ export class LevelEditorScene extends Phaser.Scene {
       section.appendChild(parHint);
 
       // Win Condition
-      const winLabel = document.createElement('div');
+      const winLabel = document.createElement('label');
+      winLabel.htmlFor = 'editor-win-condition';
       winLabel.textContent = t('editor:settings.winCondition');
       winLabel.style.cssText = labelStyle;
       section.appendChild(winLabel);
       const winSelect = document.createElement('select');
+      winSelect.id = 'editor-win-condition';
       winSelect.style.cssText = inputStyle;
       const conditions = [
         { value: 'kill_all', label: t('editor:settings.winConditions.killAll') },
@@ -1818,7 +1834,9 @@ export class LevelEditorScene extends Phaser.Scene {
       this.markDirty();
     });
     pubRow.appendChild(pubCheck);
-    const pubLabel = document.createElement('span');
+    pubCheck.id = 'editor-published';
+    const pubLabel = document.createElement('label');
+    pubLabel.htmlFor = 'editor-published';
     pubLabel.textContent = t('editor:settings.published');
     pubLabel.style.cssText = 'font-size:11px;';
     pubRow.appendChild(pubLabel);

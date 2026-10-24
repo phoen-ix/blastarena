@@ -234,9 +234,9 @@ export class RoomsTab {
       content,
       `
       <h2 style="margin-bottom:12px;">${t('admin:rooms.kickPlayerTitle', { code: escapeHtml(code) })}</h2>
-      <label style="color:var(--text-dim);font-size:13px;">${t('admin:rooms.playerUserIdLabel')}</label>
+      <label for="kick-user-id" style="color:var(--text-dim);font-size:13px;">${t('admin:rooms.playerUserIdLabel')}</label>
       <input type="number" class="admin-input" id="kick-user-id" placeholder="${escapeAttr(t('admin:rooms.enterUserIdPlaceholder'))}" style="margin-top:6px;">
-      <label style="color:var(--text-dim);font-size:13px;margin-top:8px;display:block;">${t('admin:rooms.reasonLabel')}</label>
+      <label for="kick-reason" style="color:var(--text-dim);font-size:13px;margin-top:8px;display:block;">${t('admin:rooms.reasonLabel')}</label>
       <input type="text" class="admin-input" id="kick-reason" placeholder="${escapeAttr(t('admin:rooms.reasonPlaceholder'))}" style="margin-top:6px;">
       <div class="modal-actions" style="margin-top:16px;">
         <button class="btn btn-secondary" id="kick-cancel">${t('admin:rooms.cancelBtn')}</button>

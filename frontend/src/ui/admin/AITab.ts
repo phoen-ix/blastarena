@@ -320,15 +320,15 @@ export class AITab {
         <h3 style="margin:0 0 16px;color:var(--primary);">${title}</h3>
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div>
-            <label style="display:block;margin-bottom:4px;color:var(--text-dim);font-size:13px;">${t('admin:ai.nameLabel')}</label>
+            <label style="display:block;margin-bottom:4px;color:var(--text-dim);font-size:13px;" for="ai-upload-name">${t('admin:ai.nameLabel')}</label>
             <input type="text" id="ai-upload-name" class="admin-input" placeholder="${t('admin:ai.namePlaceholder')}" maxlength="100" style="width:100%;box-sizing:border-box;">
           </div>
           <div>
-            <label style="display:block;margin-bottom:4px;color:var(--text-dim);font-size:13px;">${t('admin:ai.descriptionLabel')}</label>
+            <label style="display:block;margin-bottom:4px;color:var(--text-dim);font-size:13px;" for="ai-upload-desc">${t('admin:ai.descriptionLabel')}</label>
             <textarea id="ai-upload-desc" class="admin-input" placeholder="${t('admin:ai.descriptionPlaceholder')}" maxlength="500" rows="3" style="width:100%;box-sizing:border-box;resize:vertical;font-family:inherit;"></textarea>
           </div>
           <div>
-            <label style="display:block;margin-bottom:4px;color:var(--text-dim);font-size:13px;">${t('admin:ai.fileLabel')}</label>
+            <label style="display:block;margin-bottom:4px;color:var(--text-dim);font-size:13px;" for="ai-upload-file">${t('admin:ai.fileLabel')}</label>
             <input type="file" id="ai-upload-file" accept=".ts" style="color:var(--text);">
           </div>
           ${isEnemy ? `<p style="color:var(--text-dim);font-size:12px;margin:0;">${t('admin:ai.enemyClassHint')}</p>` : ''}
@@ -410,7 +410,7 @@ export class AITab {
         <h3 style="margin:0 0 16px;color:var(--primary);">${title}</h3>
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div>
-            <label style="display:block;margin-bottom:4px;color:var(--text-dim);font-size:13px;">${t('admin:ai.fileLabel')}</label>
+            <label style="display:block;margin-bottom:4px;color:var(--text-dim);font-size:13px;" for="ai-reupload-file">${t('admin:ai.fileLabel')}</label>
             <input type="file" id="ai-reupload-file" accept=".ts" style="color:var(--text);">
           </div>
           <div id="ai-reupload-errors" style="display:none;background:var(--bg-deep);border:1px solid var(--danger);border-radius:8px;padding:12px;max-height:200px;overflow-y:auto;"></div>
@@ -482,11 +482,11 @@ export class AITab {
         <h3 style="margin:0 0 16px;color:var(--primary);">${title}</h3>
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div>
-            <label style="display:block;margin-bottom:4px;color:var(--text-dim);font-size:13px;">${t('admin:ai.nameLabel')}</label>
+            <label style="display:block;margin-bottom:4px;color:var(--text-dim);font-size:13px;" for="ai-edit-name">${t('admin:ai.nameLabel')}</label>
             <input type="text" id="ai-edit-name" class="admin-input" value="${escapeAttr(ai.name)}" maxlength="100" style="width:100%;box-sizing:border-box;">
           </div>
           <div>
-            <label style="display:block;margin-bottom:4px;color:var(--text-dim);font-size:13px;">${t('admin:ai.descriptionLabel')}</label>
+            <label style="display:block;margin-bottom:4px;color:var(--text-dim);font-size:13px;" for="ai-edit-desc">${t('admin:ai.descriptionLabel')}</label>
             <textarea id="ai-edit-desc" class="admin-input" maxlength="500" rows="3" style="width:100%;box-sizing:border-box;resize:vertical;font-family:inherit;">${escapeHtml(ai.description)}</textarea>
           </div>
           <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px;">
