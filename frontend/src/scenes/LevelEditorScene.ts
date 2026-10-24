@@ -204,7 +204,10 @@ export class LevelEditorScene extends Phaser.Scene {
     this.level = null;
     this.mapWidth = 15;
     this.mapHeight = 13;
-    this.levelName = t('editor:defaults.untitledLevel');
+    this.levelName =
+      this.editorMode === 'custom_map'
+        ? t('editor:defaults.untitledMap')
+        : t('editor:defaults.untitledLevel');
     this.levelLives = 3;
     this.levelTimeLimit = 0;
     this.levelParTime = 0;
