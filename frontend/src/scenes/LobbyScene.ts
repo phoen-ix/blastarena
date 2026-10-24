@@ -95,6 +95,8 @@ export class LobbyScene extends Phaser.Scene {
     const currentRoom = this.registry.get('currentRoom') as Room | undefined;
     const openCampaign = this.registry.get('openCampaign');
     this.registry.remove('openCampaign');
+    const openMaps = this.registry.get('openMaps');
+    this.registry.remove('openMaps');
     const returnToAdmin = this.registry.get('returnToAdmin') as AdminReturn | undefined;
     this.registry.remove('returnToAdmin');
     if (currentRoom && currentRoom.status === 'waiting') {
@@ -103,6 +105,9 @@ export class LobbyScene extends Phaser.Scene {
     } else if (openCampaign) {
       this.registry.remove('currentRoom');
       this.showLobby('campaign');
+    } else if (openMaps) {
+      this.registry.remove('currentRoom');
+      this.showLobby('maps');
     } else if (returnToAdmin) {
       this.registry.remove('currentRoom');
       this.showLobby('admin', { initialTab: returnToAdmin.tab, initialView: returnToAdmin.view });

@@ -1048,6 +1048,8 @@ export class LevelEditorScene extends Phaser.Scene {
   }
 
   private doNavigateBack(): void {
+    // A map editor session goes back to My Maps (campaign levels return via `returnToAdmin`).
+    if (this.editorMode === 'custom_map') this.registry.set('openMaps', true);
     this.registry.remove('editorLevelId');
     this.registry.remove('editorWorldId');
     this.registry.remove('editorMode');
