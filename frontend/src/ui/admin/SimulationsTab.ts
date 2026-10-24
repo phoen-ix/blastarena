@@ -101,7 +101,10 @@ export class SimulationsTab {
   };
 
   private handleGameResult = (data: { batchId: string; result: SimulationGameResult }) => {
-    if (this.detailBatchId === data.batchId) {
+    if (
+      this.detailBatchId === data.batchId &&
+      !this.detailResults.some((r) => r.gameIndex === data.result.gameIndex)
+    ) {
       this.detailResults.push(data.result);
       if (this.activeBatch) {
         this.renderDetailView(this.activeBatch);
@@ -123,7 +126,8 @@ export class SimulationsTab {
     if (this.viewMode === 'list') {
       this.loadBatchList();
     } else if (this.detailBatchId === data.batchId) {
-      this.renderDetailView(data.status);
+      // Reload: results of games that ended before this view subscribed are only on the server.
+      this.showBatchDetail(data.batchId);
     }
   };
 
@@ -352,13 +356,21 @@ export class SimulationsTab {
     if (!this.container) return;
     this.viewMode = 'detail';
     this.detailBatchId = batchId;
+    this.detailResults = [];
 
     try {
       const data = await ApiClient.get<{
         results: SimulationGameResult[];
         summary: SimulationBatchStatus;
       }>(`/admin/simulations/${batchId}`);
-      this.detailResults = data.results || [];
+      // Games that finished while this was loading arrived through sim:gameResult: keep them
+      // (the bare assignment dropped them, so a fast batch showed only its later games).
+      const fetched = data.results || [];
+      const known = new Set(fetched.map((r) => r.gameIndex));
+      this.detailResults = [
+        ...fetched,
+        ...this.detailResults.filter((r) => !known.has(r.gameIndex)),
+      ].sort((a, b) => a.gameIndex - b.gameIndex);
 
       const status: SimulationBatchStatus =
         this.activeBatch?.batchId === batchId ? this.activeBatch : data.summary;
