@@ -5911,6 +5911,11 @@
       .main-content {
         margin-left: 64px;
       }
+      /* The drawer toggle is a thumb target (WCAG 2.5.8: 24 x 24 px at least; it was 14 x 40) */
+      .sidebar-ear {
+        width: 24px;
+        height: 44px;
+      }
       .main-header,
       .view-content .admin-tabs,
       .view-content .tab-bar {

@@ -312,6 +312,10 @@ test('lobby on a phone', async ({ page }) => {
   // The sidebar is a drawer on a phone, closed to its icon rail.
   await expect(page.locator('.sidebar')).toHaveClass(/collapsed/);
   await expect(page.locator('#ow-join-btn')).toBeInViewport({ ratio: 1 });
+  // The drawer toggle is a usable tap target (WCAG 2.5.8: 24 x 24 px at least).
+  const ear = await page.locator('#sidebar-toggle').boundingBox();
+  expect(ear!.width).toBeGreaterThanOrEqual(24);
+  expect(ear!.height).toBeGreaterThanOrEqual(24);
   await shoot(page, 'lobby-openworld.mobile', { freezeTimers: true });
 });
 
