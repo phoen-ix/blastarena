@@ -135,12 +135,12 @@ Business logic layer — DB/Redis-backed services are tested with mocked databas
 | `services/enemyai-compiler.test.ts` | compileEnemyAI with decide() validation, DUMMY_TYPE_CONFIG passed to the constructor, export patterns, scan errors propagated |
 | `services/lua-interpolation.test.ts` | Source scan: no `*_LUA` script in `services/` contains an un-interpolated TS constant (one test per script + a non-vacuity check) |
 | `services/pagination-total-order.test.ts` | Source scan: every `LIMIT ? OFFSET ?` query in `services/` ends its ORDER BY on a unique key (one test per query + a non-vacuity check) |
-| `services/isolated-ai-runner.test.ts` | IsolatedAIRunner: constructor-walk escape blocked, infinite loops time out (bot + enemy), live-object API fidelity + canMoveTo parity, seeded enemy RNG, disposal, incremental tile sync |
+| `services/isolated-ai-runner.test.ts` | IsolatedAIRunner: constructor-walk escape blocked, infinite loops time out (bot + enemy), live-object API fidelity + canMoveTo parity, seeded enemy RNG, disposal (the many-runners smoke test tolerates a cold-call timeout on a loaded machine), incremental tile sync |
 | `services/buddy.test.ts` | getBuddySettings defaults, saveBuddySettings UPSERT with partial merge |
 | `services/presence.test.ts` | Set with TTL, get (corrupt data → null), getBatch via MGET (skipped for empty input), remove |
 | `services/challenges.test.ts` | Admin challenges: unknown ids → 404 with nothing changed (activate/update/delete/deactivate), activate switches the others off, update applies a new map and checks a partial date change against the stored end, missing/unpublished map → 400 |
 | `services/enemyaiBuiltins.test.ts` | Every built-in enemy AI source through the real compiler and sandbox, loaded by the registry (`module.exports = Class` shape) and deciding at each difficulty |
-| `services/achievements-progress.test.ts` | getAchievementProgress: one GROUP BY query for mode-specific stats, one for campaign totals, aggregates skipped when unneeded or already unlocked, bounded query count |
+| `services/achievements-progress.test.ts` | getAchievementProgress: one GROUP BY query for mode-specific stats, one for campaign totals, aggregates skipped when unneeded or already unlocked, bounded query count, locked per-game goals other than `>=` show no progress |
 | `services/ServiceAuditFixes.test.ts` | canUserPlayMap (owner, published, unpublished, missing), refresh-token reaping as two indexed deletes |
 | `services/auth-refresh-reaper.test.ts` | cleanupExpiredRefreshTokens: two indexed deletes (no OR), chunked loop until a short chunk, missing affectedRows → 0, driver errors propagate |
 | `services/aiGuideExamples.test.ts` | Every example class in `docs/bot-ai-guide.md` and `docs/enemy-ai-guide.md` compiles through the real upload compilers (compileBotAI/compileEnemyAI) |
@@ -242,7 +242,7 @@ All frontend tests run on Vitest + jsdom. Paths are relative to `frontend/`.
 
 | File | Coverage |
 |------|----------|
-| `tests/utils/colors.test.ts` | toCssHex (number/string → #rrggbb, malformed or out-of-range → null), safeCssColor strict-hex fallback |
+| `tests/utils/colors.test.ts` | toCssHex (number/string → #rrggbb, malformed or out-of-range → null), safeCssColor strict-hex fallback, contrastText picks black or white text for a rank colour |
 | `tests/utils/html.test.ts` | escapeHtml, escapeAttr — XSS prevention |
 | `tests/utils/trapFocus.test.ts` | Arrow-key focus movement (text fields and radios keep their arrows), Tab wrap, cleanup; createModal gamepad context push/pop, Back closes, confirmModal result; focus returns to the opener on close (never taken from an element outside the modal) |
 | `tests/ui/hudPlayerList.test.ts` | HUD player list: keyed DOM reuse (no writes when unchanged), alive-first order, click-to-spectate only while dead, team headers, live KOTH reorder + crown icon, username escaping, bot/buddy tags, colour-blind shape markers, reset() |
@@ -257,7 +257,7 @@ All frontend tests run on Vitest + jsdom. Paths are relative to `frontend/`.
 | `tests/network/apiClient.test.ts` | ApiError code/status + validation details, 401 handling (guest not logged out, one retry after refresh, logout when refresh fails, wrong-password 401 not retried), authenticated download |
 | `tests/utils/reconcileChildren.test.ts` | Keyed DOM reorder without recreating nodes: append, no-op, removal, adoption, node state preserved, arbitrary permutations |
 | `tests/network/socketClientConnect.test.ts` | connect/connectAsGuest open exactly one socket while one is in flight, replace stale sockets, no token → no connect, disconnect then connect opens a fresh socket |
-| `tests/ui/lobbyNavigation.test.ts` | No /user/rank request for guests, navigation token discards superseded views, destroyed views stop writing to `.main-body` (ChallengeView, OpenWorldView), each view renders into its own root (late renders and container listeners go with it) |
+| `tests/ui/lobbyNavigation.test.ts` | No /user/rank request for guests, navigation token discards superseded views, destroyed views stop writing to `.main-body` (ChallengeView, OpenWorldView), each view renders into its own root (late renders and container listeners go with it), on a phone the sidebar drawer starts closed and closes after a pick |
 | `tests/ui/adminTabContracts.test.ts` | Dashboard, Users, Rooms, Matches, Announcements, Achievements/cosmetics, Campaign and Simulations tabs render fixtures shaped like their backend handlers' responses, with no error |
 | `tests/game/spriteInterpolation.test.ts` | Enemies move per rendered frame at a frame-rate-independent speed, HP bar follows and redraws only on HP change; enemies and players jump (not slide) when the target moves further than a step, never while walking fast; short way over the open-world seam; Classic spawn-protection flicker; a player's look is kept through a knockout |
 | `tests/scenes/replayAndSpectatorExits.test.ts` | Closing a replay reopens its admin tab/view, leaving a spectated simulation sends sim:unspectate and reopens the batch, replay deaths (with cause) feed the HUD kill feed, a seek clears it, listeners removed on shutdown |
@@ -285,6 +285,8 @@ All frontend tests run on Vitest + jsdom. Paths are relative to `frontend/`.
 | `tests/ui/lobbyPanels.test.ts` | Panel handlers registered once across room↔lobby cycles, one toast per party invite, idempotent destroyPanels() |
 | `tests/ui/profileAddFriend.test.ts` | ProfileView Add Friend over the socket (success, retry after failure), hostile rank colour/achievement icon kept out of the markup |
 | `tests/scenes/openWorldMapResize.test.ts` | A new open-world round with a different map size rebuilds the tile renderer and wrap sizes; the same size keeps the renderer |
+| `tests/scenes/landingCamera.test.ts` | Behind the landing title the camera keeps the background guest a quarter screen above the centre; centred once the landing docks |
+| `tests/ui/roomSettingsPanel.test.ts` | The waiting room's Room Settings name a custom map instead of the generator's size and wall density |
 | `tests/game/soundNoise.test.ts` | Noise bursts share one cached buffer and each plays a random slice as long as the burst |
 | `tests/game/explosionEmitters.test.ts` | Classic explosion particle emitters are counted down once, also when the explosion ends before an emitter's own timer |
 | `tests/game/splitScreenOverlay.test.ts` | Split-screen divider per mode, partner arrows shown only when placed, overlay removed on destroy |

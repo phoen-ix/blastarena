@@ -2,18 +2,20 @@
 
 A multiplayer online grid-based explosive arena game built with Phaser and Node.js. Navigate a destructible grid, place bombs strategically, collect power-ups, and compete across six distinct game modes. Supports 2-8 players with AI bots, real-time spectating, team play, a campaign with a level editor, and full admin tools.
 
-<img src="docs/screenshots/game-match.png" alt="A Free for All match against three bots on a custom map, with the player list, timer, power-up bar and minimap" width="800">
+<img src="docs/screenshots/menu-landing.png" alt="The landing page: the BlastArena title and the Play as Guest, Login and Register buttons over the live open-world arena, with the visitor's guest character above the title" width="800">
 
 **Status:** in production at [www.blastarena.at](https://www.blastarena.at/) and actively developed; Open World mode is still a work in progress.
 
 <p>
+  <img src="docs/screenshots/game-match.png" alt="A Free for All match against three bots on a custom map, with the player list, timer, power-up bar and minimap" width="400">
+  <img src="docs/screenshots/stats-leaderboard.png" alt="The leaderboard: players ranked by Elo with level, rank tier, wins and kills" width="400">
   <img src="docs/screenshots/stats-profile.png" alt="A player profile: rank, level, statistics, unlocked achievements and achievements in progress" width="400">
   <img src="docs/screenshots/lobby-create-room.png" alt="The Create Room view: game mode, players, match time, a custom map with its preview, bots and map feature options" width="400">
   <img src="docs/screenshots/campaign-worlds.png" alt="The campaign view: the Training Grounds world expanded, its first level selected with a map preview and the start buttons" width="400">
   <img src="docs/screenshots/admin-dashboard.png" alt="The admin dashboard: server statistics, server settings and open-world settings" width="400">
 </p>
 
-Every screen, with a sentence each: [screenshot gallery](docs/screenshots/README.md). The landing page: [English](docs/screenshots/menu-landing.png), [German](docs/screenshots/menu-landing.de.png).
+Every screen, with a sentence each: [screenshot gallery](docs/screenshots/README.md). The landing page [in German](docs/screenshots/menu-landing.de.png); the lobby [on a phone](docs/screenshots/lobby-openworld.mobile.png).
 
 ## Quick Start
 

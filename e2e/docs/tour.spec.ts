@@ -174,6 +174,9 @@ test('login and register forms', async ({ page }) => {
 
 test('open world as a guest', async ({ page }) => {
   await landing(page);
+  // Phaser tweens run on Date.now(): with the clock fixed, the title's fade-out on Play as
+  // Guest never finished and the shot kept BLAST ARENA over the arena. Let time run from here.
+  await page.clock.setSystemTime(new Date('2026-06-15T10:00:00+02:00'));
   await page.click('#menu-guest-btn');
   await expect(page.locator('.hud-auth-bar')).toBeVisible();
   await expect(page.locator('.hud-ow-board')).toBeVisible();
