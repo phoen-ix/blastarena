@@ -129,3 +129,27 @@ describe('locale parity', () => {
     });
   }
 });
+
+/**
+ * The Turkish locale was largely written without Turkish letters ("Kullanicilar", "Basarimlar",
+ * "Yukleniyor" for Kullanıcılar, Başarımlar, Yükleniyor); help.json had none at all.
+ */
+describe('tr locale uses Turkish letters', () => {
+  // Case-sensitive: lower-case "iptal" is Turkish; "kullanici@ornek.com" is an e-mail placeholder.
+  const ASCII_FOLDED =
+    /\b(Kullanici\w*|kullanici\w+|[Bb]asari\w*|[Yy]ukle\w*|Iptal|[Ss]ifre\w*|[Dd]uzenle\w*|[Gg]onder\w*|[Oo]lustur\w*|[Yy]onetici\w*|[Dd]usman\w*|[Bb]olum\w*|icin|degil|Guc)\b/g;
+
+  for (const workspace of WORKSPACES) {
+    const dir = localesDir(workspace);
+    if (!dir || !fs.existsSync(path.join(dir, 'tr'))) continue;
+    for (const ns of fs.readdirSync(path.join(dir, 'tr')).filter((f) => f.endsWith('.json'))) {
+      it(`${workspace} tr/${ns}`, () => {
+        const values = Object.values(
+          flatten(JSON.parse(fs.readFileSync(path.join(dir, 'tr', ns), 'utf-8'))),
+        );
+        const folded = values.flatMap((v) => v.match(ASCII_FOLDED) ?? []);
+        expect(folded).toEqual([]);
+      });
+    }
+  }
+});

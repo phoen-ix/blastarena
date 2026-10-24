@@ -1,23 +1,23 @@
 {
   "validation": {
-    "usernameMinLength": "Kullanici adi en az {{min}} karakter olmalidir",
-    "usernameMaxLength": "Kullanici adi en fazla {{max}} karakter olmalidir",
-    "usernameInvalidChars": "Kullanici adi yalnizca harf, rakam, alt cizgi ve tire icerebilir",
-    "passwordMinLength": "Sifre en az {{min}} karakter olmalidir",
-    "passwordMaxLength": "Sifre en fazla {{max}} karakter olmalidir",
-    "emailInvalid": "Gecersiz e-posta adresi",
-    "emailMaxLength": "E-posta en fazla {{max}} karakter olmalidir"
+    "usernameMinLength": "Kullanıcı adı en az {{min}} karakter olmalıdır",
+    "usernameMaxLength": "Kullanıcı adı en fazla {{max}} karakter olmalıdır",
+    "usernameInvalidChars": "Kullanıcı adı yalnızca harf, rakam, alt çizgi ve tire içerebilir",
+    "passwordMinLength": "Şifre en az {{min}} karakter olmalıdır",
+    "passwordMaxLength": "Şifre en fazla {{max}} karakter olmalıdır",
+    "emailInvalid": "Geçersiz e-posta adresi",
+    "emailMaxLength": "E-posta en fazla {{max}} karakter olmalıdır"
   },
   "actions": {
-    "cancel": "Iptal",
+    "cancel": "İptal",
     "delete": "Sil",
     "close": "Kapat",
     "confirm": "Onayla",
-    "loading": "Yukleniyor..."
+    "loading": "Yükleniyor..."
   },
   "roles": {
-    "user": "Kullanici",
-    "moderator": "Moderator",
-    "admin": "Yonetici"
+    "user": "Kullanıcı",
+    "moderator": "Moderatör",
+    "admin": "Yönetici"
   }
 }

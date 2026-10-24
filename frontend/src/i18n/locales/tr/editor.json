@@ -1,43 +1,43 @@
 {
   "title": {
-    "mapEditor": "Harita Duzenleyici",
-    "levelEditor": "Bolum Duzenleyici"
+    "mapEditor": "Harita Düzenleyici",
+    "levelEditor": "Bölüm Düzenleyici"
   },
   "tools": {
     "tiles": "Kareler",
-    "empty": "Bos",
+    "empty": "Boş",
     "wall": "Duvar",
-    "destructible": "Yikilabilir",
-    "spawn": "Dogma Noktasi",
-    "exit": "Cikis",
+    "destructible": "Yıkılabilir",
+    "spawn": "Doğma Noktası",
+    "exit": "Çıkış",
     "goal": "Hedef",
     "eraser": "Silgi",
     "mechanics": "Mekanikler",
-    "teleporterA": "Isinlayici A",
-    "teleporterB": "Isinlayici B",
-    "conveyorUp": "Konveyor ↑",
-    "conveyorDown": "Konveyor ↓",
-    "conveyorLeft": "Konveyor ←",
-    "conveyorRight": "Konveyor →",
+    "teleporterA": "Işınlayıcı A",
+    "teleporterB": "Işınlayıcı B",
+    "conveyorUp": "Konveyör ↑",
+    "conveyorDown": "Konveyör ↓",
+    "conveyorLeft": "Konveyör ←",
+    "conveyorRight": "Konveyör →",
     "puzzle": "Bulmaca",
     "switch": "Anahtar",
-    "gate": "Kapi",
-    "crumblingFloor": "Cirpinan Zemin",
+    "gate": "Kapı",
+    "crumblingFloor": "Çöken Zemin",
     "themeHazards": "Tema Tehlikeleri",
-    "noHazardsTheme": "Bu tema icin tehlike karesi yok",
-    "noHazardsAvailable": "Tehlike karesi mevcut degil",
-    "showAllThemes": "Tum temalari goster",
-    "enemies": "Dusmanlar",
-    "powerUps": "Guc-upler",
+    "noHazardsTheme": "Bu tema için tehlike karesi yok",
+    "noHazardsAvailable": "Tehlike karesi mevcut değil",
+    "showAllThemes": "Tüm temaları göster",
+    "enemies": "Düşmanlar",
+    "powerUps": "Güç-upler",
     "variants": {
-      "toggle": "Acma-Kapama",
-      "pressure": "Basinc",
-      "oneshot": "Tek Kullanimlik"
+      "toggle": "Açma-Kapama",
+      "pressure": "Basınç",
+      "oneshot": "Tek Kullanımlık"
     },
     "powerUpNames": {
-      "bomb_up": "bomba artisi",
-      "fire_up": "ates artisi",
-      "speed_up": "hiz artisi",
+      "bomb_up": "bomba artışı",
+      "fire_up": "ateş artışı",
+      "speed_up": "hız artışı",
       "shield": "kalkan",
       "kick": "tekme",
       "pierce_bomb": "delici bomba",
@@ -47,47 +47,47 @@
     }
   },
   "settings": {
-    "mapSettings": "Harita Ayarlari",
-    "levelSettings": "Bolum Ayarlari",
-    "width": "Genislik",
-    "height": "Yukseklik",
-    "dimensionHint": "Tek sayilar, {{min}}-51",
+    "mapSettings": "Harita Ayarları",
+    "levelSettings": "Bölüm Ayarları",
+    "width": "Genişlik",
+    "height": "Yükseklik",
+    "dimensionHint": "Tek sayılar, {{min}}-51",
     "name": "Ad",
-    "description": "Aciklama",
+    "description": "Açıklama",
     "lives": "Can",
-    "timeLimit": "Sure Siniri (saniye, 0=yok)",
-    "parTime": "Par Suresi (saniye, 0=yok)",
-    "parTimeHint": "Par suresinin altinda tamamlarsan 2 yildiz",
-    "winCondition": "Kazanma Kosulu",
+    "timeLimit": "Süre Sınırı (saniye, 0=yok)",
+    "parTime": "Par Süresi (saniye, 0=yok)",
+    "parTimeHint": "Par süresinin altında tamamlarsan 2 yıldız",
+    "winCondition": "Kazanma Koşulu",
     "winConditions": {
-      "killAll": "Tum Dusmanlari Oldur",
-      "findExit": "Cikisi Bul",
-      "reachGoal": "Hedefe Ulas",
-      "surviveTime": "Sureyi Atlatir"
+      "killAll": "Tüm Düşmanları Öldür",
+      "findExit": "Çıkışı Bul",
+      "reachGoal": "Hedefe Ulaş",
+      "surviveTime": "Süreyi Atlat"
     },
-    "published": "Yayinda"
+    "published": "Yayında"
   },
   "actions": {
     "save": "Kaydet",
-    "export": "Disa Aktar",
+    "export": "Dışa Aktar",
     "back": "Geri"
   },
   "modals": {
-    "unsavedChanges": "Kaydedilmemis Degisiklikler",
-    "unsavedDescription": "Kaydedilmemis degisiklikleriniz var. Ayrilmadan once kaydetmek ister misiniz?",
-    "cancel": "Iptal",
-    "discard": "Vazgec",
-    "saveAndExit": "Kaydet ve Cik"
+    "unsavedChanges": "Kaydedilmemiş Değişiklikler",
+    "unsavedDescription": "Kaydedilmemiş değişiklikleriniz var. Ayrılmadan önce kaydetmek ister misiniz?",
+    "cancel": "İptal",
+    "discard": "Vazgeç",
+    "saveAndExit": "Kaydet ve Çık"
   },
   "toasts": {
-    "needSpawns": "En az 2 dogma noktasi gerekli",
+    "needSpawns": "En az 2 doğma noktası gerekli",
     "mapSaved": "Harita kaydedildi!",
-    "levelSaved": "Bolum kaydedildi!",
-    "saveFailed": "Kaydetme basarisiz: {{error}}",
+    "levelSaved": "Bölüm kaydedildi!",
+    "saveFailed": "Kaydetme başarısız: {{error}}",
     "noWorld": "Kaydedilemiyor: bu bölüm bir kampanya dünyasına bağlı değil. Yönetim panelindeki Kampanya sekmesinden oluşturun."
   },
   "defaults": {
-    "untitledLevel": "Isimsiz Bolum",
-    "untitledMap": "Isimsiz Harita"
+    "untitledLevel": "İsimsiz Bölüm",
+    "untitledMap": "İsimsiz Harita"
   }
 }

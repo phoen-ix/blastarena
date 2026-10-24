@@ -1,14 +1,14 @@
 {
-  "CONFLICT": "Kullanici adi veya e-posta zaten kullaniliyor",
-  "INVALID_CREDENTIALS": "Gecersiz kullanici adi veya sifre",
-  "DEACTIVATED": "Hesap devre disi birakilmis",
-  "INVALID_TOKEN": "Gecersiz veya suresi dolmus token",
-  "TOKEN_EXPIRED": "Oturum suresi doldu — lutfen tekrar giris yapin",
-  "TOKEN_REUSE": "Guvenlik nedeniyle oturum gecersiz kilinmis — lutfen tekrar giris yapin",
-  "VALIDATION_FAILED": "Dogrulama basarisiz",
-  "REGISTRATION_DISABLED": "Kayit su anda devre disi",
-  "FORBIDDEN": "Bu islemi gerceklestirme yetkiniz yok",
-  "NOT_FOUND": "Kaynak bulunamadi",
-  "INTERNAL_ERROR": "Beklenmeyen bir hata olustu",
-  "BAD_REQUEST": "Gecersiz istek"
+  "CONFLICT": "Kullanıcı adı veya e-posta zaten kullanılıyor",
+  "INVALID_CREDENTIALS": "Geçersiz kullanıcı adı veya şifre",
+  "DEACTIVATED": "Hesap devre dışı bırakılmış",
+  "INVALID_TOKEN": "Geçersiz veya süresi dolmuş token",
+  "TOKEN_EXPIRED": "Oturum süresi doldu — lütfen tekrar giriş yapın",
+  "TOKEN_REUSE": "Güvenlik nedeniyle oturum geçersiz kılınmış — lütfen tekrar giriş yapın",
+  "VALIDATION_FAILED": "Doğrulama başarısız",
+  "REGISTRATION_DISABLED": "Kayıt şu anda devre dışı",
+  "FORBIDDEN": "Bu işlemi gerçekleştirme yetkiniz yok",
+  "NOT_FOUND": "Kaynak bulunamadı",
+  "INTERNAL_ERROR": "Beklenmeyen bir hata oluştu",
+  "BAD_REQUEST": "Geçersiz istek"
 }

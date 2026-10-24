@@ -1,46 +1,46 @@
 {
   "modes": {
     "ffa": {
-      "name": "Herkese Karsi",
-      "description": "Ayakta kalan son oyuncu kazanir"
+      "name": "Herkese Karşı",
+      "description": "Ayakta kalan son oyuncu kazanır"
     },
     "teams": {
-      "name": "Takimlar",
-      "description": "Iki takim yarisir — ayakta kalan son takim kazanir"
+      "name": "Takımlar",
+      "description": "İki takım yarışır — ayakta kalan son takım kazanır"
     },
     "battle_royale": {
       "name": "Battle Royale",
-      "description": "Daralan bolge oyunculari bir araya zorlar"
+      "description": "Daralan bölge oyuncuları bir araya zorlar"
     },
     "sudden_death": {
-      "name": "Ani Olum",
-      "description": "Hersey tam kapasite, tek vurusla olum — saf beceri"
+      "name": "Ani Ölüm",
+      "description": "Her şey tam kapasite, tek vuruşla ölüm — saf beceri"
     },
     "deathmatch": {
-      "name": "Olum Maci",
-      "description": "En cok olduren kazanir — olumden sonra yeniden dogma"
+      "name": "Ölüm Maçı",
+      "description": "En çok öldüren kazanır — ölümden sonra yeniden doğma"
     },
     "king_of_the_hill": {
-      "name": "Tepenin Krali",
-      "description": "Merkez bolgeyi kontrol ederek puan kazan"
+      "name": "Tepenin Kralı",
+      "description": "Merkez bölgeyi kontrol ederek puan kazan"
     }
   },
   "powerups": {
     "bomb_up": {
-      "name": "Bomba Artisi",
-      "description": "Maksimum bomba sayisini 1 arttirir"
+      "name": "Bomba Artışı",
+      "description": "Maksimum bomba sayısını 1 arttırır"
     },
     "fire_up": {
-      "name": "Ates Artisi",
-      "description": "Patlama menzilini 1 arttirir"
+      "name": "Ateş Artışı",
+      "description": "Patlama menzilini 1 arttırır"
     },
     "speed_up": {
-      "name": "Hiz Artisi",
-      "description": "Hareket hizini arttirir"
+      "name": "Hız Artışı",
+      "description": "Hareket hızını arttırır"
     },
     "shield": {
       "name": "Kalkan",
-      "description": "Koruyucu bir aura olusturur"
+      "description": "Koruyucu bir aura oluşturur"
     },
     "kick": {
       "name": "Tekme",
@@ -48,23 +48,23 @@
     },
     "pierce_bomb": {
       "name": "Delici Bomba",
-      "description": "Patlamalar yikilabilir duvarlari gecer"
+      "description": "Patlamalar yıkılabilir duvarları geçer"
     },
     "remote_bomb": {
       "name": "Uzaktan Bomba",
-      "description": "Bombalar otomatik patlamaz — E tusuna basin"
+      "description": "Bombalar otomatik patlamaz — E tuşuna basın"
     },
     "line_bomb": {
       "name": "Seri Bomba",
-      "description": "Baktiginiz yonde bir sira bomba yerlestirir"
+      "description": "Baktığınız yönde bir sıra bomba yerleştirir"
     },
     "bomb_throw": {
-      "name": "Bomba Atisi",
-      "description": "Q tusuna basarak 3 kare oteye bomba atin"
+      "name": "Bomba Atışı",
+      "description": "Q tuşuna basarak 3 kare öteye bomba atın"
     }
   },
   "teams": {
-    "red": "Kirmizi Takim",
-    "blue": "Mavi Takim"
+    "red": "Kırmızı Takım",
+    "blue": "Mavi Takım"
   }
 }

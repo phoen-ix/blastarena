@@ -1,93 +1,93 @@
 {
-  "title": "Yardim",
+  "title": "Yardım",
   "github": "GitHub",
-  "loading": "Yukleniyor...",
+  "loading": "Yükleniyor...",
   "retry": "Tekrar Dene",
-  "failedToLoad": "Yuklenemedi.",
-  "failedToLoadDoc": "{{title}} yuklenemedi.",
-  "failedToLoadLevelEditor": "Bolum Duzenleyici dokumantasyonu yuklenemedi.",
+  "failedToLoad": "Yüklenemedi.",
+  "failedToLoadDoc": "{{title}} yüklenemedi.",
+  "failedToLoadLevelEditor": "Bölüm Düzenleyici dokümantasyonu yüklenemedi.",
 
   "tabs": {
-    "gettingStarted": "Baslangic",
-    "powerUps": "Guc-upler",
-    "gameModes": "Oyun Modlari",
-    "mapFeatures": "Harita Ozellikleri",
+    "gettingStarted": "Başlangıç",
+    "powerUps": "Güç-upler",
+    "gameModes": "Oyun Modları",
+    "mapFeatures": "Harita Özellikleri",
     "guides": "Rehberler",
-    "levelEditor": "Bolum Duzenleyici",
-    "adminDocs": "Yonetici Dokumanlari"
+    "levelEditor": "Bölüm Düzenleyici",
+    "adminDocs": "Yönetici Dokümanları"
   },
 
   "keyboard": {
     "heading": "Klavye Kontrolleri",
-    "arrowKeys": "Yon Tuslari",
-    "space": "Bosluk",
+    "arrowKeys": "Yön Tuşları",
+    "space": "Boşluk",
     "move": "Karakterinizi hareket ettirin",
-    "placeBomb": "Bulundugunuz konuma bomba yerlestirin",
-    "detonateRemote": "Tum uzaktan bombalarinizi patlatin",
-    "throwBomb": "Baktiginiz yone bomba atin",
-    "sendEmote": "Hizli ifade gonderin (GG, Yardim!, Guzel!, Ups, Alaya, Tesekkurler)",
-    "spectateNth": "N. oyuncuyu izleyin (oldugunde)"
+    "placeBomb": "Bulunduğunuz konuma bomba yerleştirin",
+    "detonateRemote": "Tüm uzaktan bombalarınızı patlatın",
+    "throwBomb": "Baktığınız yöne bomba atın",
+    "sendEmote": "Hızlı ifade gönderin (GG, Yardım!, Güzel!, Ups, Alay, Teşekkürler)",
+    "spectateNth": "N. oyuncuyu izleyin (öldüğünde)"
   },
 
   "gamepad": {
     "heading": "Oyun Kolu Kontrolleri (Xbox / Standart)",
-    "tip": "Herhangi bir standart kontrolcu calisir. Sadece takin ve oyna.",
+    "tip": "Herhangi bir standart kontrolcü çalışır. Sadece takın ve oyna.",
     "dpad": "D-Pad",
     "leftStick": "Sol Analog",
-    "placeBomb": "Bomba yerlestir",
-    "detonateRemote": "Uzaktan bombalari patlat",
+    "placeBomb": "Bomba yerleştir",
+    "detonateRemote": "Uzaktan bombaları patlat",
     "throwBomb": "Bomba at",
-    "cycleSpectate": "Izleme hedefini degistir (oldugunde)",
-    "menuNavHeading": "Menu Navigasyonu",
-    "navigateMenus": "Menulerde gezin",
-    "confirm": "Onayla / Sec",
+    "cycleSpectate": "İzleme hedefini değiştir (öldüğünde)",
+    "menuNavHeading": "Menü Navigasyonu",
+    "navigateMenus": "Menülerde gezin",
+    "confirm": "Onayla / Seç",
     "back": "Geri / Kapat"
   },
 
   "mechanics": {
     "heading": "Temel Mekanikler",
     "bombs": "Bombalar",
-    "bombsDesc": "3 saniye sonra 4 ana yonde ates menzilleri kadar patlar",
+    "bombsDesc": "3 saniye sonra 4 ana yönde ateş menzilleri kadar patlar",
     "chainReactions": "Zincirleme reaksiyonlar",
-    "chainReactionsDesc": "patlamaya yakalanan bombalar aninda patlar, yikici kombinasyonlar olusturur",
+    "chainReactionsDesc": "patlamaya yakalanan bombalar anında patlar, yıkıcı kombinasyonlar oluşturur",
     "kickedBombs": "Tekmelenen bombalar",
-    "kickedBombsDesc": "duvara, bombaya veya oyuncuya carpana kadar kayar",
-    "shieldBreak": "Kalkan kirigi",
-    "shieldBreakDesc": "kalkaniniz bir darbeyi emdiginde, kacmak icin 10 tiklik dokunulmazlik kazanirsiniz",
-    "spawnInvuln": "Dogma dokunulmazligi",
-    "spawnInvulnDesc": "dogduktan veya yeniden dogduktan sonra 2 saniyelik koruma",
-    "selfKills": "Intiharlar",
-    "selfKillsDesc": "olum puaninizdan 1 duser",
-    "gracePeriod": "Ek sure",
-    "gracePeriodDesc": "kazanma kosulundan sonra oyun bitmeden once 1,5 saniye; kazanan dokunulmazdir"
+    "kickedBombsDesc": "duvara, bombaya veya oyuncuya çarpana kadar kayar",
+    "shieldBreak": "Kalkan kırığı",
+    "shieldBreakDesc": "kalkanınız bir darbeyi emdiğinde, kaçmak için 10 tiklik dokunulmazlık kazanırsınız",
+    "spawnInvuln": "Doğma dokunulmazlığı",
+    "spawnInvulnDesc": "doğduktan veya yeniden doğduktan sonra 2 saniyelik koruma",
+    "selfKills": "İntiharlar",
+    "selfKillsDesc": "ölüm puanınızdan 1 düşer",
+    "gracePeriod": "Ek süre",
+    "gracePeriodDesc": "kazanma koşulundan sonra oyun bitmeden önce 1,5 saniye; kazanan dokunulmazdır"
   },
 
   "spectator": {
-    "heading": "Izleyici Modu",
-    "tip": "Oldugunde, kalan oyunculari izlemek icin izleyici moduna girersiniz.",
-    "arrows": "Yon Tuslari",
-    "mouseDrag": "Fare Surukle",
-    "freeCam": "Serbest kamera kaydirma",
-    "click": "Tikla",
-    "followPlayer": "takip etmek icin bir oyuncuya tiklayin",
+    "heading": "İzleyici Modu",
+    "tip": "Öldüğünde, kalan oyuncuları izlemek için izleyici moduna girersiniz.",
+    "arrows": "Yön Tuşları",
+    "mouseDrag": "Fare Sürükle",
+    "freeCam": "Serbest kamera kaydırma",
+    "click": "Tıkla",
+    "followPlayer": "takip etmek için bir oyuncuya tıklayın",
     "jumpToNth": "N. oyuncuya atla",
-    "breakFollow": "Takibi kirmak ve serbest kameraya donmek icin herhangi bir hareket tusuna basin veya surukleyin"
+    "breakFollow": "Takibi kırmak ve serbest kameraya dönmek için herhangi bir hareket tuşuna basın veya sürükleyin"
   },
 
   "powerUps": {
-    "tip": "Kirilabilir duvarlar yikildiginda duser. Toplamak icin yuzene karelerin uzerinden yuruyun. HUD'unuz (sol alt) mevcut istatistiklerinizi gosterir."
+    "tip": "Kırılabilir duvarlar yıkıldığında düşer. Toplamak için yüzene karelerin üzerinden yürüyün. HUD'unuz (sol alt) mevcut istatistiklerinizi gösterir."
   },
 
   "powerUpDetails": {
-    "bomb_up": "Maksimum bomba sayinizi 1 arttirir (en fazla 8). Dusmanlari tuzaga dusurmek ve zincirleme reaksiyonlar olusturmak icin ayni anda daha fazla bomba yerlestirin.",
-    "fire_up": "Patlama menzilinizi her yonde 1 kare arttirir (en fazla 8). Daha uzun menzil, daha fazla alan kontrolu ve daha kolay oldurmeler demektir.",
-    "speed_up": "Hareket hizinizi arttirir (en fazla 5 seviye). Patlamalardan kacmak, dusmanlari kovalamak ve guc-upleri ilk kapmak icin daha hizli hareket edin.",
-    "shield": "Bir patlama darbesi emen koruyucu bir aura olusturur, sonra kirilir. Kirildiktan sonra kacmak icin kisa dokunulmazlik alirsiniz. Biriktirilemez — ek toplamalar etkisiz tuketilir. Sure siniri yoktur.",
-    "kick": "Bir bombaya dokunarak harita boyunca kaydirin. Tekmelenen bombalar duvara, baska bir bombaya veya oyuncuya carpana kadar ilerler. Tekmeledikten sonra kisa bir hareket bekleme suresi uygular.",
-    "pierce_bomb": "Patlamalariniz durmak yerine yikilabilir duvarlari gecer. Duvarlar yine de yikilir, ancak patlama otesinde devam eder. Genis alanlari temizlemek icin yikici.",
-    "remote_bomb": "Bombalariniz artik zamanlayici ile otomatik patlamaz. Patlatmak icin <span class=\"help-key\">E</span> (veya oyun kolunda <span class=\"help-key\">B</span>) tusuna basin. 10 saniye sonra guvenlik otomatik patlamasi. Bombalar yanip sonen mavi gorunur. Bomba yerlestirilmemisken <span class=\"help-key\">E</span> tusuna basarak <b>TUMUNU</b> (hepsini ayni anda patlat) ve <b>SIRAYLA</b> (en eskisini patlat) modu arasinda gecis yapin. Mevcut modunuz HUD'da gosterilir.",
-    "line_bomb": "Baktiginiz yonde, kalan bomba kapasitenize kadar bir sira bomba yerlestirir. Kacis yollarini kesmek veya buyuk zincirleme reaksiyonlar tetiklemek icin harika.",
-    "bomb_throw": "Baktiginiz yonde 3 kare oteye bomba atmak icin <span class=\"help-key\">Q</span> (veya oyun kolunda <span class=\"help-key\">Y</span>) tusuna basin, duvarlar ve engellerin uzerinden ucar. Bomba en uzak gecerli kareye duser. Delici/uzaktan bomba turleriyle birlesir."
+    "bomb_up": "Maksimum bomba sayınızı 1 arttırır (en fazla 8). Düşmanları tuzağa düşürmek ve zincirleme reaksiyonlar oluşturmak için aynı anda daha fazla bomba yerleştirin.",
+    "fire_up": "Patlama menzilinizi her yönde 1 kare arttırır (en fazla 8). Daha uzun menzil, daha fazla alan kontrolü ve daha kolay öldürmeler demektir.",
+    "speed_up": "Hareket hızınızı arttırır (en fazla 5 seviye). Patlamalardan kaçmak, düşmanları kovalamak ve güç-upleri ilk kapmak için daha hızlı hareket edin.",
+    "shield": "Bir patlama darbesi emen koruyucu bir aura oluşturur, sonra kırılır. Kırıldıktan sonra kaçmak için kısa dokunulmazlık alırsınız. Biriktirilemez — ek toplamalar etkisiz tüketilir. Süre sınırı yoktur.",
+    "kick": "Bir bombaya dokunarak harita boyunca kaydırın. Tekmelenen bombalar duvara, başka bir bombaya veya oyuncuya çarpana kadar ilerler. Tekmeledikten sonra kısa bir hareket bekleme süresi uygular.",
+    "pierce_bomb": "Patlamalarınız durmak yerine yıkılabilir duvarları geçer. Duvarlar yine de yıkılır, ancak patlama ötesinde devam eder. Geniş alanları temizlemek için yıkıcı.",
+    "remote_bomb": "Bombalarınız artık zamanlayıcı ile otomatik patlamaz. Patlatmak için <span class=\"help-key\">E</span> (veya oyun kolunda <span class=\"help-key\">B</span>) tuşuna basın. 10 saniye sonra güvenlik otomatik patlaması. Bombalar yanıp sönen mavi görünür. Bomba yerleştirilmemişken <span class=\"help-key\">E</span> tuşuna basarak <b>TÜMÜNÜ</b> (hepsini aynı anda patlat) ve <b>SIRAYLA</b> (en eskisini patlat) modu arasında geçiş yapın. Mevcut modunuz HUD'da gösterilir.",
+    "line_bomb": "Baktığınız yönde, kalan bomba kapasitenize kadar bir sıra bomba yerleştirir. Kaçış yollarını kesmek veya büyük zincirleme reaksiyonlar tetiklemek için harika.",
+    "bomb_throw": "Baktığınız yönde 3 kare öteye bomba atmak için <span class=\"help-key\">Q</span> (veya oyun kolunda <span class=\"help-key\">Y</span>) tuşuna basın, duvarlar ve engellerin üzerinden uçar. Bomba en uzak geçerli kareye düşer. Delici/uzaktan bomba türleriyle birleşir."
   },
 
   "gameModes": {
@@ -95,104 +95,104 @@
   },
 
   "modeTags": {
-    "shrinkingZone": "Daralan Bolge",
-    "respawn": "Yeniden Dogma",
-    "zoneControl": "Bolge Kontrolu",
-    "teams": "{{count}} Takim"
+    "shrinkingZone": "Daralan Bölge",
+    "respawn": "Yeniden Doğma",
+    "zoneControl": "Bölge Kontrolü",
+    "teams": "{{count}} Takım"
   },
 
   "modeDetails": {
-    "ffa": "2\u20138 oyuncu. Klasik eleme — ayakta kalan son kisi kazanir. 3 dakikalik turlar.",
-    "teams": "4\u20138 oyuncu Kirmizi Takim ve Mavi Takim olarak ayrilir. Hayatta kalan uyesi olan son takim kazanir. Dost atesi sunucu tarafindan ayarlanabilir. 4 dakikalik turlar.",
-    "battle_royale": "4\u20138 oyuncu. Dairesel bir tehlike bolgesi zamanla kenarlardan daralir. Bolge disinda durmak her tikte hasar verir. Icinde kal ve herkesten fazla dayan. 5 dakikalik turlar.",
-    "sudden_death": "2\u20138 oyuncu. Herkes tam donanimli baslar (8 bomba, 8 menzil, maksimum hiz, tekme). Guc-up cikmaz. Tek vurusla olum — saf beceri. 2 dakikalik turlar.",
-    "deathmatch": "2\u20138 oyuncu. Olumden 3 saniye sonra sifirlanan istatistiklerle yeniden dogma. Ilk 10 oldurmeye ulasan veya sure bittiginde en cok oldureni olan kazanir. 5 dakikalik turlar.",
-    "king_of_the_hill": "2\u20138 oyuncu. Haritada parlayan 3\u00d73 bir bolge belirir. Icinde durarak puan kazan. Ilk 100 puana ulasan kazanir. Tepe her 30 saniyede hareket eder — kaymadan 5 saniye once hayalet bir ana hat sonraki konumu gosterir. 4 dakikalik turlar."
+    "ffa": "2\u20138 oyuncu. Klasik eleme — ayakta kalan son kişi kazanır. 3 dakikalık turlar.",
+    "teams": "4\u20138 oyuncu Kırmızı Takım ve Mavi Takım olarak ayrılır. Hayatta kalan üyesi olan son takım kazanır. Dost ateşi sunucu tarafından ayarlanabilir. 4 dakikalık turlar.",
+    "battle_royale": "4\u20138 oyuncu. Dairesel bir tehlike bölgesi zamanla kenarlardan daralır. Bölge dışında durmak her tikte hasar verir. İçinde kal ve herkesten fazla dayan. 5 dakikalık turlar.",
+    "sudden_death": "2\u20138 oyuncu. Herkes tam donanımlı başlar (8 bomba, 8 menzil, maksimum hız, tekme). Güç-up çıkmaz. Tek vuruşla ölüm — saf beceri. 2 dakikalık turlar.",
+    "deathmatch": "2\u20138 oyuncu. Ölümden 3 saniye sonra sıfırlanan istatistiklerle yeniden doğma. İlk 10 öldürmeye ulaşan veya süre bittiğinde en çok öldüreni olan kazanır. 5 dakikalık turlar.",
+    "king_of_the_hill": "2\u20138 oyuncu. Haritada parlayan 3\u00d73 bir bölge belirir. İçinde durarak puan kazan. İlk 100 puana ulaşan kazanır. Tepe her 30 saniyede hareket eder — kaymadan 5 saniye önce hayalet bir ana hat sonraki konumu gösterir. 4 dakikalık turlar."
   },
 
   "mapFeatures": {
     "reinforcedWalls": {
-      "heading": "Guclendirilmis Duvarlar",
-      "tip": "Istege bagli — oda olustururken acilir/kapanir.",
-      "desc": "Kirilabilir duvarlar yikilmak icin <b>2 darbe</b> gerektirir. Ilk patlama catlatir (gorunur hasar), ikincisi tamamen yikar. Bomba yerlestiriminizi buna gore planlayin."
+      "heading": "Güçlendirilmiş Duvarlar",
+      "tip": "İsteğe bağlı — oda oluştururken açılır/kapanır.",
+      "desc": "Kırılabilir duvarlar yıkılmak için <b>2 darbe</b> gerektirir. İlk patlama çatlatır (görünür hasar), ikincisi tamamen yıkar. Bomba yerleştiriminizi buna göre planlayın."
     },
     "dynamicEvents": {
-      "heading": "Dinamik Harita Olaylari",
-      "tip": "Istege bagli — oda olustururken acilir/kapanir. Maclari heyecanli tutmak icin rastgele kaos ekler.",
-      "meteorStrikes": "Meteor Carpmalari",
-      "meteorStrikesDesc": "Her 30\u201345 saniyede rastgele kareler hedef alinir. Carpmadan 2 saniye once zeminde bir uyari nisangahi belirir. Meteorlar duvarlari yikar ve patlama bolgesindeki oyunculari oldurur.",
-      "powerUpRain": "Guc-up Yagmuru",
-      "powerUpRainDesc": "Her 60 saniyede haritadaki rastgele acik karelere guc-upler duser. Oyun ortasinda guclenmek icin harika bir yol.",
-      "wallCollapse": "Duvar Cokmu",
-      "wallCollapseDesc": "Her 45\u201360 saniyede, 2 saniyelik bir uyaridan sonra 3\u00d73 alandaki yikilabilir duvarlar coker. Haritayi acar ve sizi hazirliksiz yakalayabilir.",
-      "freezeWave": "Dondurma Dalgasi",
-      "freezeWaveDesc": "Her 50\u201370 saniyede, bir satir veya sutun kare 6 saniye boyunca buza donusur. Buzun uzerinde yururken momentum ile kayarsiniz. Dondurmadan 1 saniye once uyari belirir.",
-      "bombSurge": "Bomba Dalgasi",
-      "bombSurgeDesc": "Her 40\u201355 saniyede, haritadaki tum bombalar aninda 1 saniyelik fitil suresi kaybeder ve beklenenden erken patlar. Kirmizi ekran titremesi dalganin sinyalini verir."
+      "heading": "Dinamik Harita Olayları",
+      "tip": "İsteğe bağlı — oda oluştururken açılır/kapanır. Maçları heyecanlı tutmak için rastgele kaos ekler.",
+      "meteorStrikes": "Meteor Çarpmaları",
+      "meteorStrikesDesc": "Her 30\u201345 saniyede rastgele kareler hedef alınır. Çarpmadan 2 saniye önce zeminde bir uyarı nişangahı belirir. Meteorlar duvarları yıkar ve patlama bölgesindeki oyuncuları öldürür.",
+      "powerUpRain": "Güç-up Yağmuru",
+      "powerUpRainDesc": "Her 60 saniyede haritadaki rastgele açık karelere güç-upler düşer. Oyun ortasında güçlenmek için harika bir yol.",
+      "wallCollapse": "Duvar Çökmesi",
+      "wallCollapseDesc": "Her 45\u201360 saniyede, 2 saniyelik bir uyarıdan sonra 3\u00d73 alandaki yıkılabilir duvarlar çöker. Haritayı açar ve sizi hazırlıksız yakalayabilir.",
+      "freezeWave": "Dondurma Dalgası",
+      "freezeWaveDesc": "Her 50\u201370 saniyede, bir satır veya sütun kare 6 saniye boyunca buza dönüşür. Buzun üzerinde yürürken momentum ile kayarsınız. Dondurmadan 1 saniye önce uyarı belirir.",
+      "bombSurge": "Bomba Dalgası",
+      "bombSurgeDesc": "Her 40\u201355 saniyede, haritadaki tüm bombalar anında 1 saniyelik fitil süresi kaybeder ve beklenenden erken patlar. Kırmızı ekran titremesi dalganın sinyalini verir."
     },
     "hazardTiles": {
       "heading": "Tehlike Kareleri",
-      "tip": "Istege bagli — oda olustururken acilir/kapanir. Haritada sabit konumlara yerlestirilir.",
-      "teleporters": "Isinlayicilar",
-      "teleportersDesc": "Mavi/turuncu ciftler halinde parlayan platformlar. Birine basin ve aninda digerine isinlanin. Surpriz saldirilar veya hizli kacislar icin kullanin.",
-      "conveyorBelts": "Konveyor Bantlari",
-      "conveyorBeltsDesc": "Yonlu oklari olan koyu kareler. Ustune bastiginizda sizi otomatik olarak ok yonunde iter. Stratejik olarak kullanilabilir veya sizi tehlikeye dusturebilir."
+      "tip": "İsteğe bağlı — oda oluştururken açılır/kapanır. Haritada sabit konumlara yerleştirilir.",
+      "teleporters": "Işınlayıcılar",
+      "teleportersDesc": "Mavi/turuncu çiftler halinde parlayan platformlar. Birine basın ve anında diğerine ışınlanın. Sürpriz saldırılar veya hızlı kaçışlar için kullanın.",
+      "conveyorBelts": "Konveyör Bantları",
+      "conveyorBeltsDesc": "Yönlü okları olan koyu kareler. Üstüne bastığınızda sizi otomatik olarak ok yönünde iter. Stratejik olarak kullanılabilir veya sizi tehlikeye düşürebilir."
     },
     "themeVariants": {
-      "heading": "Tema Varyantlari",
-      "tip": "Kampanya modunda her dunyanin kendi gorsel temasi vardir. Duvarlar ve yikilabilir bloklar temaya uygun gorunum degistirir."
+      "heading": "Tema Varyantları",
+      "tip": "Kampanya modunda her dünyanın kendi görsel teması vardır. Duvarlar ve yıkılabilir bloklar temaya uygun görünüm değiştirir."
     }
   },
 
   "levelEditor": {
-    "tileReference": "Kare Referansi",
-    "tileRefTip": "Bunlar bolum duzenleyicide kullanilabilir karelerdir. Kampanya modu kareleri ek ozel turler icerir.",
+    "tileReference": "Kare Referansı",
+    "tileRefTip": "Bunlar bölüm düzenleyicide kullanılabilir karelerdir. Kampanya modu kareleri ek özel türler içerir.",
     "basicTiles": "Temel Kareler",
-    "wall": "Duvar — yikilmaz, hareketi ve patlamalari engeller",
-    "destructible": "Yikilabilir — kirilabilir duvar, yikildiginda guc-up dusurabilir",
-    "destructibleCracked": "Catlamis — hasarli yikilabilir duvar, yikilmasi icin bir darbe daha (guclendirilmis mod)",
+    "wall": "Duvar — yıkılmaz, hareketi ve patlamaları engeller",
+    "destructible": "Yıkılabilir — kırılabilir duvar, yıkıldığında güç-up düşürebilir",
+    "destructibleCracked": "Çatlamış — hasarlı yıkılabilir duvar, yıkılması için bir darbe daha (güçlendirilmiş mod)",
     "mechanics": "Mekanikler",
-    "teleporter": "Isinlayicilar — mavi/turuncu ciftler, birine basin digerine isinlanin",
-    "conveyor": "Konveyorler — oyunculari, bombalari ve dusmanlari ok yonunde iter",
-    "campaignTiles": "Yalnizca Kampanya Kareleri",
-    "exit": "Cikis — tuzak kapisi dokusu, kosullu yurunebilir (on sart oldurmelerden sonra acilir)",
-    "goal": "Hedef — yildiz isaretleyici, ustune yuruyerek bolum hedefini tamamlayin",
+    "teleporter": "Işınlayıcılar — mavi/turuncu çiftler, birine basın diğerine ışınlanın",
+    "conveyor": "Konveyörler — oyuncuları, bombaları ve düşmanları ok yönünde iter",
+    "campaignTiles": "Yalnızca Kampanya Kareleri",
+    "exit": "Çıkış — tuzak kapısı dokusu, koşullu yürünebilir (ön şart öldürmelerden sonra açılır)",
+    "goal": "Hedef — yıldız işaretleyici, üstüne yürüyerek bölüm hedefini tamamlayın",
     "puzzleTiles": "Bulmaca Kareleri",
-    "switch": "Anahtar — bagli kapilari acip kapatan basinc plakasi (4 renk: kirmizi, mavi, yesil, sari)",
-    "gate": "Kapi — renk bazinda anahtarlara bagli, gecisi engelleyen parmaklik cubuklar",
-    "crumbling": "Cirpinan Zemin — oyuncu veya dusman basip ciktiktan 10 tik sonra cukura donusur",
-    "hazardTiles": "Tehlike Kareleri (Temaya Ozel)",
-    "vine": "Sarmasik — hareketi yavaslatir (Orman temasi)",
-    "quicksand": "Bataklikkum — hareketi yavaslatir, 2 saniye sonra oldurur (Col temasi)",
-    "ice": "Buz — kayma momentumu olusturur (Buz temasi)",
-    "lava": "Lav — temasta aninda olum (Yanardagi temasi)",
-    "mud": "Camur — hareketi yavaslatir (Bataklik temasi)",
-    "spikes": "Dikenler — guvenli/olumcul fazlari degisen donguler, 2s guvenli sonra 1s olumcul (Kale temasi)",
-    "darkRift": "Karanlik Yarik — rastgele bos bir kareye isinlar (Bosluk temasi)",
-    "fullDocs": "Tam Dokumantasyon",
-    "fullDocsDesc": "Dusmanlar, patronlar, kazanma kosullari ve daha fazlasi hakkinda ayrintili bilgi icin asagidaki kampanya sistemi dokumantasyonuna bakin."
+    "switch": "Anahtar — bağlı kapıları açıp kapatan basınç plakası (4 renk: kırmızı, mavi, yeşil, sarı)",
+    "gate": "Kapı — renk bazında anahtarlara bağlı, geçişi engelleyen parmaklık çubuklar",
+    "crumbling": "Çöken Zemin — oyuncu veya düşman basıp çıktıktan 10 tik sonra çukura dönüşür",
+    "hazardTiles": "Tehlike Kareleri (Temaya Özel)",
+    "vine": "Sarmaşık — hareketi yavaşlatır (Orman teması)",
+    "quicksand": "Bataklık kumu — hareketi yavaşlatır, 2 saniye sonra öldürür (Çöl teması)",
+    "ice": "Buz — kayma momentumu oluşturur (Buz teması)",
+    "lava": "Lav — temasta anında ölüm (Yanardağ teması)",
+    "mud": "Çamur — hareketi yavaşlatır (Bataklık teması)",
+    "spikes": "Dikenler — güvenli/ölümcül fazları değişen döngüler, 2s güvenli sonra 1s ölümcül (Kale teması)",
+    "darkRift": "Karanlık Yarık — rastgele boş bir kareye ışınlar (Boşluk teması)",
+    "fullDocs": "Tam Dokümantasyon",
+    "fullDocsDesc": "Düşmanlar, patronlar, kazanma koşulları ve daha fazlası hakkında ayrıntılı bilgi için aşağıdaki kampanya sistemi dokümantasyonuna bakın."
   },
 
   "guides": {
     "campaign": "Kampanya Rehberi",
     "replaySystem": "Tekrar Sistemi",
     "botAi": "Bot Yapay Zeka Rehberi",
-    "enemyAi": "Dusman Yapay Zeka Rehberi"
+    "enemyAi": "Düşman Yapay Zeka Rehberi"
   },
 
   "staffDocs": {
-    "adminSystems": "Yonetici Paneli ve Sistemler",
-    "infrastructure": "Altyapi ve Guvenlik",
+    "adminSystems": "Yönetici Paneli ve Sistemler",
+    "infrastructure": "Altyapı ve Güvenlik",
     "testing": "Test",
-    "performance": "Performans ve Ic Yapilar",
-    "botAiInternals": "Bot Yapay Zeka Ic Yapisi",
-    "apiReference": "API Referansi (OpenAPI)"
+    "performance": "Performans ve İç Yapılar",
+    "botAiInternals": "Bot Yapay Zeka İç Yapısı",
+    "apiReference": "API Referansı (OpenAPI)"
   },
 
   "imprint": {
-    "tab": "Kunye",
-    "loading": "Kunye yukleniyor...",
-    "noInfo": "Kunye bilgisi mevcut degil.",
-    "failedToLoad": "Kunye yuklenemedi."
+    "tab": "Künye",
+    "loading": "Künye yükleniyor...",
+    "noInfo": "Künye bilgisi mevcut değil.",
+    "failedToLoad": "Künye yüklenemedi."
   }
 }
