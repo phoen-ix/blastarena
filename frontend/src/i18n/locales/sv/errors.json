@@ -5,10 +5,11 @@
   "INVALID_TOKEN": "Ogiltig eller utgången token",
   "TOKEN_EXPIRED": "Sessionen har gått ut — logga in igen",
   "TOKEN_REUSE": "Sessionen ogiltigförklarad av säkerhetsskäl — logga in igen",
-  "VALIDATION_FAILED": "Validering misslyckades",
+  "VALIDATION_ERROR": "Validering misslyckades",
   "REGISTRATION_DISABLED": "Registrering är för närvarande inaktiverad",
   "FORBIDDEN": "Du har inte behörighet att utföra denna åtgärd",
   "NOT_FOUND": "Resursen hittades inte",
   "INTERNAL_ERROR": "Ett oväntat fel uppstod",
-  "BAD_REQUEST": "Ogiltig förfrågan"
+  "BAD_REQUEST": "Ogiltig förfrågan",
+  "INVALID_TOTP_CODE": "Ogiltig verifieringskod. Försök igen."
 }

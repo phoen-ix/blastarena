@@ -1,14 +1,15 @@
 {
-  "CONFLICT": "Nom d'utilisateur ou adresse e-mail d\u00e9j\u00e0 utilis\u00e9(e)",
+  "CONFLICT": "Nom d'utilisateur ou adresse e-mail déjà utilisé(e)",
   "INVALID_CREDENTIALS": "Nom d'utilisateur ou mot de passe invalide",
-  "DEACTIVATED": "Le compte a \u00e9t\u00e9 d\u00e9sactiv\u00e9",
-  "INVALID_TOKEN": "Jeton invalide ou expir\u00e9",
-  "TOKEN_EXPIRED": "Session expir\u00e9e \u2014 veuillez vous reconnecter",
-  "TOKEN_REUSE": "Session invalid\u00e9e pour des raisons de s\u00e9curit\u00e9 \u2014 veuillez vous reconnecter",
-  "VALIDATION_FAILED": "\u00c9chec de la validation",
-  "REGISTRATION_DISABLED": "L'inscription est actuellement d\u00e9sactiv\u00e9e",
+  "DEACTIVATED": "Le compte a été désactivé",
+  "INVALID_TOKEN": "Jeton invalide ou expiré",
+  "TOKEN_EXPIRED": "Session expirée — veuillez vous reconnecter",
+  "TOKEN_REUSE": "Session invalidée pour des raisons de sécurité — veuillez vous reconnecter",
+  "VALIDATION_ERROR": "Échec de la validation",
+  "REGISTRATION_DISABLED": "L'inscription est actuellement désactivée",
   "FORBIDDEN": "Vous n'avez pas la permission d'effectuer cette action",
   "NOT_FOUND": "Ressource introuvable",
   "INTERNAL_ERROR": "Une erreur inattendue s'est produite",
-  "BAD_REQUEST": "Requ\u00eate invalide"
+  "BAD_REQUEST": "Requête invalide",
+  "INVALID_TOTP_CODE": "Code de vérification invalide. Veuillez réessayer."
 }

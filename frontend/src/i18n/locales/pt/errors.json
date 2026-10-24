@@ -1,14 +1,15 @@
 {
-  "CONFLICT": "Nome de usu\u00e1rio ou email j\u00e1 em uso",
-  "INVALID_CREDENTIALS": "Nome de usu\u00e1rio ou senha inv\u00e1lidos",
+  "CONFLICT": "Nome de usuário ou email já em uso",
+  "INVALID_CREDENTIALS": "Nome de usuário ou senha inválidos",
   "DEACTIVATED": "A conta foi desativada",
-  "INVALID_TOKEN": "Token inv\u00e1lido ou expirado",
-  "TOKEN_EXPIRED": "Sess\u00e3o expirada \u2014 fa\u00e7a login novamente",
-  "TOKEN_REUSE": "Sess\u00e3o invalidada por seguran\u00e7a \u2014 fa\u00e7a login novamente",
-  "VALIDATION_FAILED": "Falha na valida\u00e7\u00e3o",
-  "REGISTRATION_DISABLED": "O cadastro est\u00e1 desativado no momento",
-  "FORBIDDEN": "Voc\u00ea n\u00e3o tem permiss\u00e3o para realizar esta a\u00e7\u00e3o",
-  "NOT_FOUND": "Recurso n\u00e3o encontrado",
+  "INVALID_TOKEN": "Token inválido ou expirado",
+  "TOKEN_EXPIRED": "Sessão expirada — faça login novamente",
+  "TOKEN_REUSE": "Sessão invalidada por segurança — faça login novamente",
+  "VALIDATION_ERROR": "Falha na validação",
+  "REGISTRATION_DISABLED": "O cadastro está desativado no momento",
+  "FORBIDDEN": "Você não tem permissão para realizar esta ação",
+  "NOT_FOUND": "Recurso não encontrado",
   "INTERNAL_ERROR": "Ocorreu um erro inesperado",
-  "BAD_REQUEST": "Requisi\u00e7\u00e3o inv\u00e1lida"
+  "BAD_REQUEST": "Requisição inválida",
+  "INVALID_TOTP_CODE": "Código de verificação inválido. Tente novamente."
 }

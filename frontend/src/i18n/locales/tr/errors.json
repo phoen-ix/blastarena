@@ -5,10 +5,11 @@
   "INVALID_TOKEN": "Geçersiz veya süresi dolmuş token",
   "TOKEN_EXPIRED": "Oturum süresi doldu — lütfen tekrar giriş yapın",
   "TOKEN_REUSE": "Güvenlik nedeniyle oturum geçersiz kılınmış — lütfen tekrar giriş yapın",
-  "VALIDATION_FAILED": "Doğrulama başarısız",
+  "VALIDATION_ERROR": "Doğrulama başarısız",
   "REGISTRATION_DISABLED": "Kayıt şu anda devre dışı",
   "FORBIDDEN": "Bu işlemi gerçekleştirme yetkiniz yok",
   "NOT_FOUND": "Kaynak bulunamadı",
   "INTERNAL_ERROR": "Beklenmeyen bir hata oluştu",
-  "BAD_REQUEST": "Geçersiz istek"
+  "BAD_REQUEST": "Geçersiz istek",
+  "INVALID_TOTP_CODE": "Geçersiz doğrulama kodu. Lütfen tekrar dene."
 }

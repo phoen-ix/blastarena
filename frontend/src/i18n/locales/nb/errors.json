@@ -2,13 +2,14 @@
   "CONFLICT": "Brukernavn eller e-post er allerede i bruk",
   "INVALID_CREDENTIALS": "Ugyldig brukernavn eller passord",
   "DEACTIVATED": "Kontoen er deaktivert",
-  "INVALID_TOKEN": "Ugyldig eller utl\u00f8pt token",
-  "TOKEN_EXPIRED": "\u00d8kten er utl\u00f8pt \u2014 vennligst logg inn igjen",
-  "TOKEN_REUSE": "\u00d8kten er ugyldiggjort av sikkerhetsgrunner \u2014 vennligst logg inn igjen",
-  "VALIDATION_FAILED": "Validering mislyktes",
+  "INVALID_TOKEN": "Ugyldig eller utløpt token",
+  "TOKEN_EXPIRED": "Økten er utløpt — vennligst logg inn igjen",
+  "TOKEN_REUSE": "Økten er ugyldiggjort av sikkerhetsgrunner — vennligst logg inn igjen",
+  "VALIDATION_ERROR": "Validering mislyktes",
   "REGISTRATION_DISABLED": "Registrering er for tiden deaktivert",
-  "FORBIDDEN": "Du har ikke tillatelse til \u00e5 utf\u00f8re denne handlingen",
+  "FORBIDDEN": "Du har ikke tillatelse til å utføre denne handlingen",
   "NOT_FOUND": "Ressursen ble ikke funnet",
   "INTERNAL_ERROR": "En uventet feil oppstod",
-  "BAD_REQUEST": "Ugyldig foresp\u00f8rsel"
+  "BAD_REQUEST": "Ugyldig forespørsel",
+  "INVALID_TOTP_CODE": "Ugyldig verifiseringskode. Prøv igjen."
 }

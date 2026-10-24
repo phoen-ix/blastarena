@@ -1,14 +1,15 @@
 {
-  "CONFLICT": "Nazwa u\u017cytkownika lub adres e-mail jest ju\u017c zaj\u0119ty",
-  "INVALID_CREDENTIALS": "Nieprawid\u0142owa nazwa u\u017cytkownika lub has\u0142o",
-  "DEACTIVATED": "Konto zosta\u0142o dezaktywowane",
-  "INVALID_TOKEN": "Nieprawid\u0142owy lub wygas\u0142y token",
-  "TOKEN_EXPIRED": "Sesja wygas\u0142a \u2014 zaloguj si\u0119 ponownie",
-  "TOKEN_REUSE": "Sesja uniewa\u017cniona ze wzgl\u0119d\u00f3w bezpiecze\u0144stwa \u2014 zaloguj si\u0119 ponownie",
-  "VALIDATION_FAILED": "Walidacja nie powiod\u0142a si\u0119",
-  "REGISTRATION_DISABLED": "Rejestracja jest obecnie wy\u0142\u0105czona",
-  "FORBIDDEN": "Nie masz uprawnie\u0144 do wykonania tej akcji",
+  "CONFLICT": "Nazwa użytkownika lub adres e-mail jest już zajęty",
+  "INVALID_CREDENTIALS": "Nieprawidłowa nazwa użytkownika lub hasło",
+  "DEACTIVATED": "Konto zostało dezaktywowane",
+  "INVALID_TOKEN": "Nieprawidłowy lub wygasły token",
+  "TOKEN_EXPIRED": "Sesja wygasła — zaloguj się ponownie",
+  "TOKEN_REUSE": "Sesja unieważniona ze względów bezpieczeństwa — zaloguj się ponownie",
+  "VALIDATION_ERROR": "Walidacja nie powiodła się",
+  "REGISTRATION_DISABLED": "Rejestracja jest obecnie wyłączona",
+  "FORBIDDEN": "Nie masz uprawnień do wykonania tej akcji",
   "NOT_FOUND": "Nie znaleziono zasobu",
-  "INTERNAL_ERROR": "Wyst\u0105pi\u0142 nieoczekiwany b\u0142\u0105d",
-  "BAD_REQUEST": "Nieprawid\u0142owe \u017c\u0105danie"
+  "INTERNAL_ERROR": "Wystąpił nieoczekiwany błąd",
+  "BAD_REQUEST": "Nieprawidłowe żądanie",
+  "INVALID_TOTP_CODE": "Nieprawidłowy kod weryfikacyjny. Spróbuj ponownie."
 }

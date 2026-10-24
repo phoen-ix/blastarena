@@ -5,10 +5,11 @@
   "INVALID_TOKEN": "Ongeldig of verlopen token",
   "TOKEN_EXPIRED": "Sessie verlopen — log opnieuw in",
   "TOKEN_REUSE": "Sessie ongeldig gemaakt voor de veiligheid — log opnieuw in",
-  "VALIDATION_FAILED": "Validatie mislukt",
+  "VALIDATION_ERROR": "Validatie mislukt",
   "REGISTRATION_DISABLED": "Registratie is momenteel uitgeschakeld",
   "FORBIDDEN": "Je hebt geen toestemming om deze actie uit te voeren",
   "NOT_FOUND": "Bron niet gevonden",
   "INTERNAL_ERROR": "Er is een onverwachte fout opgetreden",
-  "BAD_REQUEST": "Ongeldig verzoek"
+  "BAD_REQUEST": "Ongeldig verzoek",
+  "INVALID_TOTP_CODE": "Ongeldige verificatiecode. Probeer het opnieuw."
 }

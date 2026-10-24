@@ -5,10 +5,11 @@
   "INVALID_TOKEN": "Ungültiger oder abgelaufener Token",
   "TOKEN_EXPIRED": "Sitzung abgelaufen — bitte erneut anmelden",
   "TOKEN_REUSE": "Sitzung aus Sicherheitsgründen ungültig — bitte erneut anmelden",
-  "VALIDATION_FAILED": "Validierung fehlgeschlagen",
+  "VALIDATION_ERROR": "Validierung fehlgeschlagen",
   "REGISTRATION_DISABLED": "Registrierung ist derzeit deaktiviert",
   "FORBIDDEN": "Sie haben keine Berechtigung für diese Aktion",
   "NOT_FOUND": "Ressource nicht gefunden",
   "INTERNAL_ERROR": "Ein unerwarteter Fehler ist aufgetreten",
-  "BAD_REQUEST": "Ungültige Anfrage"
+  "BAD_REQUEST": "Ungültige Anfrage",
+  "INVALID_TOTP_CODE": "Ungültiger Bestätigungscode. Bitte versuche es erneut."
 }

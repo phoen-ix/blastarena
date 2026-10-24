@@ -2,13 +2,14 @@
   "CONFLICT": "Brugernavn eller email er allerede i brug",
   "INVALID_CREDENTIALS": "Ugyldigt brugernavn eller adgangskode",
   "DEACTIVATED": "Kontoen er blevet deaktiveret",
-  "INVALID_TOKEN": "Ugyldig eller udl\u00f8bet token",
-  "TOKEN_EXPIRED": "Session udl\u00f8bet \u2014 log venligst ind igen",
-  "TOKEN_REUSE": "Session ugyldiggjort af sikkerhedshensyn \u2014 log venligst ind igen",
-  "VALIDATION_FAILED": "Validering mislykkedes",
-  "REGISTRATION_DISABLED": "Registrering er i \u00f8jeblikket deaktiveret",
-  "FORBIDDEN": "Du har ikke tilladelse til at udf\u00f8re denne handling",
+  "INVALID_TOKEN": "Ugyldig eller udløbet token",
+  "TOKEN_EXPIRED": "Session udløbet — log venligst ind igen",
+  "TOKEN_REUSE": "Session ugyldiggjort af sikkerhedshensyn — log venligst ind igen",
+  "VALIDATION_ERROR": "Validering mislykkedes",
+  "REGISTRATION_DISABLED": "Registrering er i øjeblikket deaktiveret",
+  "FORBIDDEN": "Du har ikke tilladelse til at udføre denne handling",
   "NOT_FOUND": "Ressource ikke fundet",
   "INTERNAL_ERROR": "Der opstod en uventet fejl",
-  "BAD_REQUEST": "Ugyldig foresp\u00f8rgsel"
+  "BAD_REQUEST": "Ugyldig forespørgsel",
+  "INVALID_TOTP_CODE": "Ugyldig bekræftelseskode. Prøv igen."
 }

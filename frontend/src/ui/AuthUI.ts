@@ -2,7 +2,12 @@ import { AuthManager } from '../network/AuthManager';
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
-import { getErrorMessage, validatePasswordI18n } from '@blast-arena/shared';
+import {
+  getErrorMessage,
+  validateEmailI18n,
+  validatePasswordI18n,
+  validateUsernameI18n,
+} from '@blast-arena/shared';
 import { i18n, t } from '../i18n';
 import { setHtml } from '../utils/html';
 import { createModal } from '../utils/modal';
@@ -507,6 +512,13 @@ export class AuthUI {
       errorEl.textContent = t('auth:register.fillAllFields');
       return;
     }
+    // Same rules the server enforces; its answer to a bad field is only a generic code.
+    const invalid =
+      validateUsernameI18n(username) ?? validateEmailI18n(email) ?? validatePasswordI18n(password);
+    if (invalid) {
+      errorEl.textContent = t(invalid.key, invalid.params);
+      return;
+    }
 
     btn.disabled = true;
     btn.textContent = t('auth:register.submitting');
@@ -675,9 +687,10 @@ export class AuthUI {
   private translateError(err: unknown): string {
     // ApiClient's ApiError carries the server's code (INVALID_CREDENTIALS, TOKEN_EXPIRED, ...).
     const code = (err as { code?: unknown } | null)?.code;
-    if (typeof code === 'string' && code) {
-      const translated = t(`errors:${code}`, { defaultValue: '' });
-      if (translated) return translated;
+    // Ask first: with returnEmptyString off, t() with an empty default returned the key itself,
+    // so an untranslated code reached the form as "INVALID_TOTP_CODE" or "VALIDATION_ERROR".
+    if (typeof code === 'string' && code && i18n.exists(`errors:${code}`)) {
+      return t(`errors:${code}`);
     }
     return getErrorMessage(err);
   }

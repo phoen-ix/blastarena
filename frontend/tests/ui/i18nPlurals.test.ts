@@ -65,12 +65,18 @@ describe('plural keys resolve with the real i18next', () => {
   });
 });
 
+// Like the app's i18next (returnEmptyString: false): a missing key comes back as the key itself,
+// even with an empty defaultValue.
 vi.mock('../../src/i18n', () => ({
   t: (key: string, opts?: { defaultValue?: string }) =>
     key === 'errors:INVALID_CREDENTIALS'
       ? 'Falscher Benutzername oder Passwort'
-      : (opts?.defaultValue ?? key),
-  i18n: { language: 'en', changeLanguage: vi.fn() },
+      : opts?.defaultValue || key,
+  i18n: {
+    language: 'en',
+    changeLanguage: vi.fn(),
+    exists: (key: string) => key === 'errors:INVALID_CREDENTIALS',
+  },
 }));
 vi.mock('../../src/game/UIGamepadNavigator', () => ({
   UIGamepadNavigator: {
