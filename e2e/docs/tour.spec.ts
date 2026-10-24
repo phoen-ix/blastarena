@@ -126,6 +126,14 @@ async function openView(page: Page, id: string): Promise<void> {
   await expect(page.locator(`#nav-${id}`)).toHaveClass(/active/);
 }
 
+/** The whole sidebar nav fits at 1280x800 (Help used to hide half behind the user footer). */
+async function expectNavFits(page: Page): Promise<void> {
+  const overflow = await page
+    .locator('.sidebar-nav')
+    .evaluate((el) => el.scrollHeight - el.clientHeight);
+  expect(overflow).toBeLessThanOrEqual(0);
+}
+
 /** Clicks a button the fixed lobby-chat panel may cover. */
 async function press(page: Page, selector: string): Promise<void> {
   await page.locator(selector).evaluate((el: HTMLElement) => el.click());
@@ -178,6 +186,7 @@ test('open world as a guest', async ({ page }) => {
 test('lobby: open world and rooms', async ({ page }) => {
   await lobby(page, HERO.username);
   await expect(page.locator('#ow-join-btn')).toBeVisible();
+  await expectNavFits(page);
   await shoot(page, 'lobby-openworld', { freezeTimers: true });
   await openView(page, 'rooms');
   await expect(page.locator('#room-list')).toBeVisible();
@@ -263,6 +272,9 @@ test('admin tabs', async ({ page }) => {
   await openView(page, 'admin');
   const tabs = page.locator('#admin-tab-bar [data-tab]');
   await expect(tabs).toHaveCount(12);
+  await expectNavFits(page);
+  // All twelve tabs in view: the bar wraps instead of scrolling the last ones out of sight.
+  for (const tab of await tabs.all()) await expect(tab).toBeInViewport({ ratio: 1 });
   for (const id of await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('data-tab')!))) {
     await page.click(`#admin-tab-bar [data-tab="${id}"]`);
     await expect(page.locator(`#admin-tab-bar [data-tab="${id}"]`)).toHaveClass(/active/);

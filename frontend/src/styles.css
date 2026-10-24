@@ -3650,6 +3650,19 @@
       left: 64px;
     }
 
+    /* Up to ~900px tall (1280x800 and smaller laptops) the full nav, admin included, fits
+       without scrolling; at the roomier size Help was half hidden behind the user footer. */
+    @media (max-height: 900px) {
+      .sidebar-nav-item,
+      .sidebar.collapsed .sidebar-nav-item {
+        padding-top: 7px;
+        padding-bottom: 7px;
+      }
+      .sidebar-section-label {
+        padding-top: var(--sp-2);
+      }
+    }
+
     .main-content {
       flex: 1;
       display: flex;
@@ -3692,15 +3705,17 @@
       padding: 0 var(--sp-6);
       margin-bottom: 0;
       border-bottom: 1px solid var(--border);
-      overflow-x: auto;
-      overflow-y: hidden;
-      height: 60px;
+      min-height: 60px;
       box-sizing: border-box;
       display: flex;
+      /* The admin panel's twelve tabs do not fit one row at 1280px (or in longer languages):
+         wrap instead of hiding the last ones behind a horizontal scroll. */
+      flex-wrap: wrap;
       align-items: stretch;
     }
 
     .view-content .admin-tab {
+      min-height: 44px;
       padding: 0 18px;
       font-size: 13px;
       border-bottom-width: 2px;
