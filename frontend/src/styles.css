@@ -78,6 +78,8 @@
       --shadow-glow-primary: 0 0 16px rgba(255, 107, 53, 0.15);
       --shadow-glow-accent: 0 0 16px rgba(0, 212, 170, 0.15);
       --primary-contrast: #000;
+      /* Even rows of .data-table */
+      --row-stripe: rgba(20, 20, 42, 0.3);
 
       /* Native controls (scrollbars, pickers, date inputs) follow the theme. This was a
          hard-coded <meta name="color-scheme" content="dark">, dark in the light themes too. */
@@ -288,7 +290,7 @@
     [data-theme="sand"],
     [data-theme="frost"],
     [data-theme="blossom"],
-    [data-theme="dune"] { color-scheme: light; }
+    [data-theme="dune"] { color-scheme: light; --row-stripe: rgba(15, 23, 42, 0.03); }
 
     /* Light theme overrides for hardcoded dark overlays */
     [data-theme="daylight"] .connection-overlay,
@@ -2601,7 +2603,8 @@
 
     .lb-rank-pill {
       display: inline-block;
-      color: #fff;
+      background: var(--primary);
+      color: var(--primary-contrast);
       padding: 2px 8px;
       border-radius: 10px;
       font-size: 12px;
@@ -3869,7 +3872,7 @@
     }
 
     .data-table tbody tr:nth-child(even) {
-      background: rgba(20, 20, 42, 0.3);
+      background: var(--row-stripe);
     }
 
     .data-table tbody tr:hover {

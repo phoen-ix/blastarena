@@ -115,6 +115,18 @@ export function safeCssColor(value: unknown, fallback: string): string {
   return typeof value === 'string' && STRICT_HEX_COLOR.test(value) ? value : fallback;
 }
 
+/** Black or white text, whichever contrasts more with a `#hex` background (WCAG luminance). */
+export function contrastText(hex: string): '#000' | '#fff' {
+  let h = hex.slice(1);
+  if (h.length <= 4) h = [...h].map((c) => c + c).join('');
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const c = parseInt(h.slice(i, i + 2), 16) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return (l + 0.05) / 0.05 >= 1.05 / (l + 0.05) ? '#000' : '#fff';
+}
+
 /**
  * `#rrggbb` for a colour stored as a `#rrggbb` / `0xrrggbb` string or a 0xRRGGBB number (cosmetic
  * configs hold both), or null when it is neither.

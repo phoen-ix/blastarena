@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toCssHex, safeCssColor } from '../../src/utils/html';
+import { toCssHex, safeCssColor, contrastText } from '../../src/utils/html';
 
 /**
  * Colour values from the server placed into markup.
@@ -43,5 +43,22 @@ describe('safeCssColor', () => {
     for (const bad of ['red', 'red;background:url(x)', '#ffd70', '', null, 42, 'var(--x)']) {
       expect(safeCssColor(bad, 'var(--primary)')).toBe('var(--primary)');
     }
+  });
+});
+
+describe('contrastText', () => {
+  // The leaderboard's rank pills had white text on every tier colour: Silver (#c0c0c0) and Gold
+  // (#ffd700) were close to unreadable.
+  it.each([
+    ['#c0c0c0', '#000'], // Silver
+    ['#ffd700', '#000'], // Gold
+    ['#00d4aa', '#000'], // Platinum
+    ['#cd7f32', '#000'], // Bronze
+    ['#fff', '#000'],
+    ['#1a1a2e', '#fff'],
+    ['#333', '#fff'],
+    ['#2563ebcc', '#fff'],
+  ])('%s -> %s', (bg, text) => {
+    expect(contrastText(bg)).toBe(text);
   });
 });

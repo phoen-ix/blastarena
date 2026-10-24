@@ -1,6 +1,6 @@
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
-import { escapeHtml, safeCssColor, setHtml } from '../utils/html';
+import { contrastText, escapeHtml, safeCssColor, setHtml } from '../utils/html';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { t } from '../i18n';
 import {
@@ -213,7 +213,10 @@ export class LeaderboardUI {
   }
 
   private renderRow(entry: LeaderboardEntry): string {
-    const rankBadge = `<span class="lb-rank-pill" style="background:${safeCssColor(entry.rankColor, 'var(--primary)')}">${escapeHtml(entry.rankTier)}</span>`;
+    // Tier colours run from silver and gold to dark custom ones: pick the text colour that reads.
+    const rankBg = safeCssColor(entry.rankColor, '');
+    const rankStyle = rankBg ? ` style="background:${rankBg};color:${contrastText(rankBg)}"` : '';
+    const rankBadge = `<span class="lb-rank-pill"${rankStyle}>${escapeHtml(entry.rankTier)}</span>`;
 
     return `
       <tr>
