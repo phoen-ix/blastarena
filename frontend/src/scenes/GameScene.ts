@@ -1533,8 +1533,11 @@ export class GameScene extends Phaser.Scene {
     const sprite = this.playerRenderer?.getSprite(this.localPlayerId);
     if (!sprite) return;
 
+    // Behind the landing menu its title and tagline sit at the screen centre: keep the guest a
+    // quarter of the screen above them until the landing docks or the guest takes over.
+    const liftY = this.registry.get('landingTitle') ? (cam.height * 0.25) / cam.zoom : 0;
     const targetX = sprite.x - cam.width / 2;
-    const targetY = sprite.y - cam.height / 2;
+    const targetY = sprite.y + liftY - cam.height / 2;
 
     if (this.openWorldMode && this.lastGameState?.map?.wrapping) {
       const worldW = this.lastGameState.map.width * TILE_SIZE;

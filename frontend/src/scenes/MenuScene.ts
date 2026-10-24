@@ -281,6 +281,7 @@ export class MenuScene extends Phaser.Scene {
     // The listener stays armed for the join-in-flight case.
     if (!this.bgArenaStarted || !this.scene.isActive('GameScene')) return;
     this.landingDocked = true;
+    this.registry.remove('landingTitle');
     this.removePlayInputListener();
     this.landingContainer.classList.add('menu-landing--docked');
     // The canvas title/tagline hand off to the compact brand inside the docked bar.
@@ -353,6 +354,8 @@ export class MenuScene extends Phaser.Scene {
         this.registry.set('openWorldBackground', true);
         // Launch the arena as a live background and keep this menu (title) on top. The DOM landing
         // buttons in #ui-overlay already sit above the game canvas. HUD is launched later, on reveal.
+        // The title covers the screen centre until the landing docks (see GameScene.updateCamera).
+        this.registry.set('landingTitle', true);
         this.scene.launch('GameScene');
         this.scene.bringToTop('MenuScene');
         this.bgArenaStarted = true;
@@ -369,6 +372,7 @@ export class MenuScene extends Phaser.Scene {
   private revealArena(): void {
     if (this.revealed) return;
     this.revealed = true;
+    this.registry.remove('landingTitle');
     // No longer a background arena — restore normal foreground AFK behavior (kick → lobby).
     this.registry.remove('openWorldBackground');
     // If the landing already docked, HUD's auth bar takes over in place — skip its fly-in.
@@ -407,6 +411,7 @@ export class MenuScene extends Phaser.Scene {
     this.bgJoinInFlight = false;
     this.pendingReveal = false;
     this.registry.remove('openWorldBackground');
+    this.registry.remove('landingTitle');
     // Drop the idle guest socket + identity; the server removes the guest player on disconnect.
     this.socketClient.disconnect();
     this.authManager.clearGuest();
@@ -451,6 +456,7 @@ export class MenuScene extends Phaser.Scene {
    * we transition into the revealed arena, GameScene keeps using the same (guest) socket.
    */
   private shutdown(): void {
+    this.registry.remove('landingTitle');
     this.hideLanding();
     this.authUI?.hide();
     this.verificationUI?.destroy();
