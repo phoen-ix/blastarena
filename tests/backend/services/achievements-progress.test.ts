@@ -164,6 +164,31 @@ describe('getAchievementProgress (audit E2)', () => {
     expect(mockQuery.mock.calls.some(([sql]) => /total_stars/.test(sql))).toBe(false);
   });
 
+  it('shows no progress for a locked per-game condition that is not ">="', async () => {
+    routeQueries([
+      [
+        /FROM achievements/,
+        [
+          achievementRow(1, 'per_game', {
+            stat: 'survived_seconds',
+            operator: '<=',
+            threshold: 60,
+          }),
+          achievementRow(2, 'per_game', { stat: 'placement', operator: '==', threshold: 1 }),
+          achievementRow(3, 'per_game', { stat: 'kills', operator: '>=', threshold: 5 }),
+        ],
+      ],
+      [/FROM user_achievements/, []],
+      [/FROM user_stats/, []],
+      [/MAX\(kills\)/, [{ best_kills: 3, best_placement: 2, best_survived_seconds: 180 }]],
+    ]);
+
+    const progress = await getAchievementProgress(9);
+
+    // Speed Demon used to read 60/60 and Sole Survivor 1/1 while both were locked.
+    expect(progress.map((p) => p.current)).toEqual([0, 0, 3]);
+  });
+
   it('skips the aggregates for achievements that are already unlocked', async () => {
     routeQueries([
       [

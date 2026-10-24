@@ -608,6 +608,10 @@ export async function getAchievementProgress(userId: number): Promise<Achievemen
         }
         case 'per_game': {
           const stat = config.stat as string;
+          // Only a ">=" condition has a best-so-far to show. For "<=", "==" and the rest a single
+          // game either met it (then it is unlocked) or not: the capped best (e.g. 180 s against
+          // "<= 60") read as complete while still locked.
+          if (((config.operator as string) ?? '>=') !== '>=') break;
           type BestColumn =
             | 'best_kills'
             | 'best_deaths'
