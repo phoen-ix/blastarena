@@ -943,6 +943,12 @@
     "speedFast": "Veloce",
     "speedRealtime": "Tempo reale",
     "statusQueued": "In coda (#{{position}})",
+    "statuses": {
+      "running": "In corso",
+      "completed": "Completato",
+      "cancelled": "Annullato",
+      "error": "Errore"
+    },
     "batchCompleted": "Batch di simulazione completato ({{count}} partite)",
     "confirmDelete": "Eliminare il batch di simulazione e tutti i relativi log?",
     "winDistribution": "Distribuzione vittorie",

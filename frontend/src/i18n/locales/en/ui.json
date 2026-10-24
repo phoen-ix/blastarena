@@ -164,6 +164,7 @@
       "newEmailPlaceholder": "New email address",
       "emailEmpty": "Enter a new email address.",
       "sendConfirmation": "Send Confirmation",
+      "emailConfirmationSent": "Confirmation email sent to your new address. The link expires in 24 hours.",
       "changeEmail": "Change Email",
       "changePassword": "Change Password",
       "currentPassword": "Current password",
@@ -172,6 +173,7 @@
       "passwordFieldsRequired": "Please fill in both password fields.",
       "passwordTooShort": "New password must be at least 8 characters.",
       "passwordMismatch": "New passwords do not match.",
+      "passwordChanged": "Password changed!",
       "twoFactor": {
         "title": "Two-Factor Authentication",
         "description": "Add an extra layer of security to your account using an authenticator app like Google Authenticator, Authy, or 1Password.",

@@ -943,6 +943,12 @@
     "speedFast": "Snel",
     "speedRealtime": "Realtime",
     "statusQueued": "In wachtrij (#{{position}})",
+    "statuses": {
+      "running": "Bezig",
+      "completed": "Voltooid",
+      "cancelled": "Geannuleerd",
+      "error": "Fout"
+    },
     "batchCompleted": "Simulatiebatch voltooid ({{count}} spellen)",
     "confirmDelete": "Simulatiebatch en alle logboeken verwijderen?",
     "winDistribution": "Winstverdeling",

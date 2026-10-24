@@ -1067,7 +1067,8 @@ export class AchievementsTab {
         } else {
           // No conflicts, or no cosmetics — all imported directly
           close();
-          this.notifications.success(result.message || t('admin:achievements.importSuccess'));
+          // Not result.message: the server's text is English.
+          this.notifications.success(t('admin:achievements.importSuccess'));
           await this.loadAchievements();
         }
       } catch (err: unknown) {

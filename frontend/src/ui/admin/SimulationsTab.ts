@@ -218,7 +218,7 @@ export class SimulationsTab {
           </div>
         </td>
         <td>${b.config.speed === 'fast' ? t('admin:simulations.speedFast') : t('admin:simulations.speedRealtime')}</td>
-        <td><span class="sim-status ${statusClass}">${b.status === 'queued' ? t('admin:simulations.statusQueued', { position: b.queuePosition }) : b.status}</span></td>
+        <td><span class="sim-status ${statusClass}">${this.statusLabel(b)}</span></td>
         <td class="sim-td-actions">
           ${
             b.status === 'queued'
@@ -405,7 +405,7 @@ export class SimulationsTab {
       <div class="sim-info-card">
         <div class="sim-detail-header">
           <h3>${t('admin:simulations.simulationLabel', { mode: escapeHtml(modeLabel) })}</h3>
-          <span class="sim-status ${detailStatusClass}">${status.status}</span>
+          <span class="sim-status ${detailStatusClass}">${this.statusLabel(status)}</span>
         </div>
         <div class="sim-info-grid">
           <div>${t('admin:simulations.detail.bots')}: <strong>${status.config.botCount} (${status.config.botDifficulty})</strong></div>
@@ -976,5 +976,12 @@ export class SimulationsTab {
         input.checked = enabled.has(input.value as PowerUpType);
       });
     }
+  }
+
+  /** The batch status in the UI's language (the server sends the raw state). */
+  private statusLabel(b: SimulationBatchStatus): string {
+    return b.status === 'queued'
+      ? t('admin:simulations.statusQueued', { position: b.queuePosition })
+      : t(`admin:simulations.statuses.${b.status}`);
   }
 }

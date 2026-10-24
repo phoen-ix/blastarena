@@ -943,6 +943,12 @@
     "speedFast": "Fast",
     "speedRealtime": "Real-time",
     "statusQueued": "Queued (#{{position}})",
+    "statuses": {
+      "running": "Running",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "error": "Error"
+    },
     "batchCompleted": "Simulation batch completed ({{count}} games)",
     "confirmDelete": "Delete simulation batch and all its logs?",
     "winDistribution": "Win Distribution",

@@ -943,6 +943,12 @@
     "speedFast": "Rápido",
     "speedRealtime": "Tiempo real",
     "statusQueued": "En cola (#{{position}})",
+    "statuses": {
+      "running": "En curso",
+      "completed": "Completado",
+      "cancelled": "Cancelado",
+      "error": "Error"
+    },
     "batchCompleted": "Lote de simulación completado ({{count}} partidas)",
     "confirmDelete": "¿Eliminar lote de simulación y todos sus registros?",
     "winDistribution": "Distribución de Victorias",

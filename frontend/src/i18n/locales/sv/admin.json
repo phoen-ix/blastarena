@@ -943,6 +943,12 @@
     "speedFast": "Snabb",
     "speedRealtime": "Realtid",
     "statusQueued": "I kö (#{{position}})",
+    "statuses": {
+      "running": "Pågår",
+      "completed": "Klar",
+      "cancelled": "Avbruten",
+      "error": "Fel"
+    },
     "batchCompleted": "Simuleringsbatch avslutad ({{count}} spel)",
     "confirmDelete": "Ta bort simuleringsbatch och alla dess loggar?",
     "winDistribution": "Vinstfördelning",

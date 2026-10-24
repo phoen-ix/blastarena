@@ -943,6 +943,12 @@
     "speedFast": "Hurtig",
     "speedRealtime": "Realtid",
     "statusQueued": "I kø (#{{position}})",
+    "statuses": {
+      "running": "Kører",
+      "completed": "Fuldført",
+      "cancelled": "Annulleret",
+      "error": "Fejl"
+    },
     "batchCompleted": "Simuleringsbatch gennemført ({{count}} spil)",
     "confirmDelete": "Slet simuleringsbatch og alle dens logfiler?",
     "winDistribution": "Sejrfordeling",

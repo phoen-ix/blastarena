@@ -949,6 +949,12 @@
     "speedFast": "Szybka",
     "speedRealtime": "Czas rzeczywisty",
     "statusQueued": "W kolejce (#{{position}})",
+    "statuses": {
+      "running": "W toku",
+      "completed": "Zakończono",
+      "cancelled": "Anulowano",
+      "error": "Błąd"
+    },
     "batchCompleted": "Paczka symulacji ukończona ({{count}} gier)",
     "confirmDelete": "Usunąć paczkę symulacji i wszystkie jej logi?",
     "winDistribution": "Rozkład wygranych",

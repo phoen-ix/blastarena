@@ -943,6 +943,12 @@
     "speedFast": "Hızlı",
     "speedRealtime": "Gerçek zamanlı",
     "statusQueued": "Sırada (#{{position}})",
+    "statuses": {
+      "running": "Çalışıyor",
+      "completed": "Tamamlandı",
+      "cancelled": "İptal edildi",
+      "error": "Hata"
+    },
     "batchCompleted": "Simülasyon paketi tamamlandı ({{count}} oyun)",
     "confirmDelete": "Simülasyon paketi ve tüm kayıtları silinsin mi?",
     "winDistribution": "Galibiyet Dağılımı",

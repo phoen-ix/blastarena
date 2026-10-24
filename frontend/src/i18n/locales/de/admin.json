@@ -943,6 +943,12 @@
     "speedFast": "Schnell",
     "speedRealtime": "Echtzeit",
     "statusQueued": "In Warteschlange (#{{position}})",
+    "statuses": {
+      "running": "Läuft",
+      "completed": "Abgeschlossen",
+      "cancelled": "Abgebrochen",
+      "error": "Fehler"
+    },
     "batchCompleted": "Simulationsdurchlauf abgeschlossen ({{count}} Spiele)",
     "confirmDelete": "Simulationsdurchlauf und alle Protokolle löschen?",
     "winDistribution": "Siegverteilung",

@@ -943,6 +943,12 @@
     "speedFast": "Rask",
     "speedRealtime": "Sanntid",
     "statusQueued": "I kø (#{{position}})",
+    "statuses": {
+      "running": "Kjører",
+      "completed": "Fullført",
+      "cancelled": "Avbrutt",
+      "error": "Feil"
+    },
     "batchCompleted": "Simuleringsserie fullført ({{count}} spill)",
     "confirmDelete": "Slette simuleringsserie og alle dens logger?",
     "winDistribution": "Seierfordeling",

@@ -304,11 +304,13 @@ export class SettingsUI {
       }
 
       try {
-        const result = await ApiClient.post<{ message: string }>('/user/email', {
-          email: newEmail,
-        });
+        await ApiClient.post('/user/email', { email: newEmail });
         this.profileCache = null; // pendingEmailHint / emailHint changed server-side
-        setHtml(statusEl, `<span class="text-success">${escapeHtml(result.message)}</span>`);
+        // The server's message is English; say it in the UI's language.
+        const done = isAdmin
+          ? t('auth:verification.emailChanged')
+          : t('settings.account.emailConfirmationSent');
+        setHtml(statusEl, `<span class="text-success">${done}</span>`);
         (this.contentEl!.querySelector('#acct-new-email') as HTMLInputElement).value = '';
       } catch (err: unknown) {
         setHtml(statusEl, `<span class="text-danger">${escapeHtml(getErrorMessage(err))}</span>`);
@@ -350,11 +352,11 @@ export class SettingsUI {
       }
 
       try {
-        const result = await ApiClient.post<{ message: string }>('/user/password', {
-          currentPassword,
-          newPassword,
-        });
-        setHtml(statusEl, `<span class="text-success">${escapeHtml(result.message)}</span>`);
+        await ApiClient.post('/user/password', { currentPassword, newPassword });
+        setHtml(
+          statusEl,
+          `<span class="text-success">${t('settings.account.passwordChanged')}</span>`,
+        );
         (this.contentEl!.querySelector('#acct-current-password') as HTMLInputElement).value = '';
         (this.contentEl!.querySelector('#acct-new-password') as HTMLInputElement).value = '';
         (this.contentEl!.querySelector('#acct-confirm-password') as HTMLInputElement).value = '';
