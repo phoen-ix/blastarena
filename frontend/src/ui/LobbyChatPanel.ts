@@ -93,6 +93,9 @@ export class LobbyChatPanel {
   private render(): void {
     this.container.className = 'lobby-chat';
     setHtml(this.container, '');
+    // The lobby keeps a strip free at the bottom for the dock, which used to sit over the
+    // views' bottom-right buttons (Messages' Send, Create Room) and swallow their clicks.
+    this.container.parentElement?.classList.toggle('has-lobby-chat', getSettings().lobbyChat);
 
     // User-level disable
     if (!getSettings().lobbyChat) {

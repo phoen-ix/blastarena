@@ -3294,6 +3294,10 @@
       background: var(--bg-surface);
       box-shadow: var(--shadow-lg);
     }
+    /* Room for the collapsed dock (bottom 16px + ~40px toggle) under every view */
+    .has-lobby-chat .main-body {
+      padding-bottom: 64px;
+    }
     .lobby-chat-toggle {
       display: flex;
       align-items: center;

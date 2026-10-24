@@ -90,6 +90,7 @@ const authManager = {
   getUser: () => ({ id: 1, username: 'me', role: 'user' }),
   getAccessToken: () => 'access-token',
   isGuest: false,
+  onChange: () => () => {},
 } as unknown as AuthManager;
 const notifications = {
   success: vi.fn(),
@@ -111,6 +112,21 @@ beforeEach(async () => {
   localStorage.clear();
   socket = countingSocket();
   ({ LobbyUI } = await import('../../src/ui/LobbyUI'));
+});
+
+describe('Lobby Chat dock', () => {
+  it('reserves room under the views while it is shown, none when switched off', async () => {
+    const { saveSettings, getSettings } = await import('../../src/game/Settings');
+    const lobby = makeLobby();
+    lobby.show('rooms');
+    await flush();
+    const layout = document.querySelector('.app-layout')!;
+    expect(layout.classList.contains('has-lobby-chat')).toBe(true);
+    saveSettings({ ...getSettings(), lobbyChat: false });
+    window.dispatchEvent(new Event('lobbychat-toggle'));
+    expect(layout.classList.contains('has-lobby-chat')).toBe(false);
+    lobby.hide();
+  });
 });
 
 describe('LobbyUI panels', () => {

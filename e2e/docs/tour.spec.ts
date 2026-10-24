@@ -82,7 +82,11 @@ async function shoot(
   }
   const hideChat = opts.chat
     ? null
-    : await page.addStyleTag({ content: '.lobby-chat { display: none !important; }' });
+    : await page.addStyleTag({
+        // The dock and the strip the lobby keeps free for it.
+        content:
+          '.lobby-chat { display: none !important; } .has-lobby-chat .main-body { padding-bottom: 0 !important; }',
+      });
   // A beat for layout and the canvas to settle.
   await page.waitForTimeout(500);
   await page.screenshot({
