@@ -84,11 +84,11 @@ export class CreateRoomView implements ILobbyView {
             <h3 class="create-room-section-title">${t('ui:createRoom.general')}</h3>
             <div class="create-room-grid">
               <div class="form-group">
-                <label>${t('ui:createRoom.roomName')}</label>
+                <label for="cr-name">${t('ui:createRoom.roomName')}</label>
                 <input type="text" class="input" id="cr-name" placeholder="${t('ui:createRoom.roomNamePlaceholder')}" maxlength="30">
               </div>
               <div class="form-group">
-                <label>${t('ui:createRoom.gameMode')}</label>
+                <label for="cr-mode">${t('ui:createRoom.gameMode')}</label>
                 <select class="select" id="cr-mode">
                   <option value="ffa">${t('game:modes.ffa.name')}</option>
                   <option value="teams">${t('game:modes.teams.name')}</option>
@@ -99,7 +99,7 @@ export class CreateRoomView implements ILobbyView {
                 </select>
               </div>
               <div class="form-group">
-                <label>${t('ui:createRoom.maxPlayers')}</label>
+                <label for="cr-max-players">${t('ui:createRoom.maxPlayers')}</label>
                 <select class="select" id="cr-max-players">
                   <option value="2">2</option>
                   <option value="4" selected>4</option>
@@ -108,7 +108,7 @@ export class CreateRoomView implements ILobbyView {
                 </select>
               </div>
               <div class="form-group">
-                <label>${t('ui:createRoom.matchTime')}</label>
+                <label for="cr-round-time">${t('ui:createRoom.matchTime')}</label>
                 <select class="select" id="cr-round-time">
                   <option value="60">${t('ui:createRoom.matchTimes.60')}</option>
                   <option value="120">${t('ui:createRoom.matchTimes.120')}</option>
@@ -125,7 +125,7 @@ export class CreateRoomView implements ILobbyView {
             <div class="create-room-grid">
               <div class="form-group" style="grid-column:1/-1;">
                 <div style="display:flex;align-items:center;gap:6px;">
-                  <label style="flex:1;">${t('ui:createRoom.map')}</label>
+                  <label for="cr-custom-map" style="flex:1;">${t('ui:createRoom.map')}</label>
                   <button class="btn btn-sm btn-ghost" id="cr-new-map" style="font-size:11px;padding:2px 8px;">${t('ui:createRoom.newMap')}</button>
                 </div>
                 <select class="select" id="cr-custom-map">
@@ -136,7 +136,7 @@ export class CreateRoomView implements ILobbyView {
                 <div id="cr-map-preview" style="margin-top:8px;display:none;"></div>
               </div>
               <div class="form-group">
-                <label>${t('ui:createRoom.mapSize')}</label>
+                <label for="cr-map-size">${t('ui:createRoom.mapSize')}</label>
                 <select class="select" id="cr-map-size">
                   ${ROOM_MAP_SIZES.map(
                     (size) =>
@@ -145,7 +145,7 @@ export class CreateRoomView implements ILobbyView {
                 </select>
               </div>
               <div class="form-group">
-                <label>${t('ui:createRoom.wallDensity')}</label>
+                <label for="cr-wall-density">${t('ui:createRoom.wallDensity')}</label>
                 <select class="select" id="cr-wall-density">
                   <option value="0.3">${t('ui:createRoom.wallDensities.low30')}</option>
                   <option value="0.5">${t('ui:createRoom.wallDensities.med50')}</option>
@@ -154,7 +154,7 @@ export class CreateRoomView implements ILobbyView {
                 </select>
               </div>
               <div class="form-group">
-                <label>${t('ui:createRoom.powerUpRate')}</label>
+                <label for="cr-powerup-rate">${t('ui:createRoom.powerUpRate')}</label>
                 <select class="select" id="cr-powerup-rate">
                   <option value="0">${t('ui:createRoom.puRates.none0')}</option>
                   <option value="0.15">${t('ui:createRoom.puRates.low15')}</option>
@@ -170,7 +170,7 @@ export class CreateRoomView implements ILobbyView {
             <h3 class="create-room-section-title">${t('ui:createRoom.bots')}</h3>
             <div class="create-room-grid">
               <div class="form-group">
-                <label>${t('ui:createRoom.botCount')}</label>
+                <label for="cr-bots">${t('ui:createRoom.botCount')}</label>
                 <select class="select" id="cr-bots">
                   <option value="0" selected>${t('ui:createRoom.none')}</option>
                   <option value="1">${t('ui:createRoom.nBots', { count: 1 })}</option>
@@ -183,7 +183,7 @@ export class CreateRoomView implements ILobbyView {
                 </select>
               </div>
               <div class="form-group">
-                <label>${t('ui:createRoom.botDifficulty')}</label>
+                <label for="cr-bot-difficulty">${t('ui:createRoom.botDifficulty')}</label>
                 <select class="select" id="cr-bot-difficulty" disabled>
                   <option value="easy">${t('ui:createRoom.difficulty.easy')}</option>
                   <option value="normal" selected>${t('ui:createRoom.difficulty.normal')}</option>
@@ -194,7 +194,7 @@ export class CreateRoomView implements ILobbyView {
                 hasMultipleAIs
                   ? `
               <div class="form-group">
-                <label>${t('ui:createRoom.botAI')}</label>
+                <label for="cr-bot-ai">${t('ui:createRoom.botAI')}</label>
                 <select class="select" id="cr-bot-ai" disabled>
                   ${this.activeAIs.map((ai) => `<option value="${escapeAttr(ai.id)}"${ai.isBuiltin ? ' selected' : ''}>${escapeHtml(ai.name)}</option>`).join('')}
                 </select>

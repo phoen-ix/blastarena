@@ -173,7 +173,7 @@ export class SettingsUI {
         <div class="content-section">
           <h3 class="settings-section-title">${t('settings.account.profile')}</h3>
           <div class="form-group">
-            <label>${t('settings.account.username')}</label>
+            <label for="acct-username">${t('settings.account.username')}</label>
             <input type="text" class="input" id="acct-username" value="${escapeAttr(profile.username)}" maxlength="20">
             <div class="settings-hint">${t('settings.account.usernameHint')}</div>
           </div>
@@ -718,7 +718,7 @@ export class SettingsUI {
         <h3 class="content-section-title mt-6">${t('settings.language')}</h3>
         <div class="settings-toggle-list">
           <div class="setting-row">
-            <select class="select" id="pref-language" style="width:180px;">
+            <select class="select" id="pref-language" style="width:180px;" aria-label="${t('settings.language')}">
               <option value="en" ${i18n.language === 'en' ? 'selected' : ''}>English</option>
               <option value="de" ${i18n.language === 'de' ? 'selected' : ''}>Deutsch</option>
               <option value="fr" ${i18n.language === 'fr' ? 'selected' : ''}>Français</option>
@@ -754,7 +754,7 @@ export class SettingsUI {
           </div>
           <div class="setting-row">
             <label class="toggle-switch">
-              <input type="checkbox" name="animations" role="switch" aria-checked="${settings.animations ? 'true' : 'false'}" ${settings.animations ? 'checked' : ''}>
+              <input type="checkbox" name="animations" role="switch" aria-label="${t('settings.animations')}" aria-checked="${settings.animations ? 'true' : 'false'}" ${settings.animations ? 'checked' : ''}>
               <span class="toggle-slider"></span>
             </label>
             <div class="setting-row-info">
@@ -764,7 +764,7 @@ export class SettingsUI {
           </div>
           <div class="setting-row">
             <label class="toggle-switch">
-              <input type="checkbox" name="screenShake" role="switch" aria-checked="${settings.screenShake ? 'true' : 'false'}" ${settings.screenShake ? 'checked' : ''}>
+              <input type="checkbox" name="screenShake" role="switch" aria-label="${t('settings.screenShake')}" aria-checked="${settings.screenShake ? 'true' : 'false'}" ${settings.screenShake ? 'checked' : ''}>
               <span class="toggle-slider"></span>
             </label>
             <div class="setting-row-info">
@@ -774,7 +774,7 @@ export class SettingsUI {
           </div>
           <div class="setting-row">
             <label class="toggle-switch">
-              <input type="checkbox" name="particles" role="switch" aria-checked="${settings.particles ? 'true' : 'false'}" ${settings.particles ? 'checked' : ''}>
+              <input type="checkbox" name="particles" role="switch" aria-label="${t('settings.particles')}" aria-checked="${settings.particles ? 'true' : 'false'}" ${settings.particles ? 'checked' : ''}>
               <span class="toggle-slider"></span>
             </label>
             <div class="setting-row-info">
@@ -784,7 +784,7 @@ export class SettingsUI {
           </div>
           <div class="setting-row">
             <label class="toggle-switch">
-              <input type="checkbox" name="minimap" role="switch" aria-checked="${settings.minimap ? 'true' : 'false'}" ${settings.minimap ? 'checked' : ''}>
+              <input type="checkbox" name="minimap" role="switch" aria-label="${t('settings.minimap')}" aria-checked="${settings.minimap ? 'true' : 'false'}" ${settings.minimap ? 'checked' : ''}>
               <span class="toggle-slider"></span>
             </label>
             <div class="setting-row-info">
@@ -794,7 +794,7 @@ export class SettingsUI {
           </div>
           <div class="setting-row">
             <label class="toggle-switch">
-              <input type="checkbox" name="sharpRendering" role="switch" aria-checked="${settings.sharpRendering ? 'true' : 'false'}" ${settings.sharpRendering ? 'checked' : ''}>
+              <input type="checkbox" name="sharpRendering" role="switch" aria-label="${t('settings.sharpRendering')}" aria-checked="${settings.sharpRendering ? 'true' : 'false'}" ${settings.sharpRendering ? 'checked' : ''}>
               <span class="toggle-slider"></span>
             </label>
             <div class="setting-row-info">
@@ -804,7 +804,7 @@ export class SettingsUI {
           </div>
           <div class="setting-row">
             <label class="toggle-switch">
-              <input type="checkbox" name="colorBlind" role="switch" aria-checked="${settings.colorBlind ? 'true' : 'false'}" ${settings.colorBlind ? 'checked' : ''}>
+              <input type="checkbox" name="colorBlind" role="switch" aria-label="${t('settings.colorBlind')}" aria-checked="${settings.colorBlind ? 'true' : 'false'}" ${settings.colorBlind ? 'checked' : ''}>
               <span class="toggle-slider"></span>
             </label>
             <div class="setting-row-info">
@@ -814,7 +814,7 @@ export class SettingsUI {
           </div>
           <div class="setting-row">
             <label class="toggle-switch">
-              <input type="checkbox" name="sound" role="switch" aria-checked="${settings.sound ? 'true' : 'false'}" ${settings.sound ? 'checked' : ''}>
+              <input type="checkbox" name="sound" role="switch" aria-label="${t('settings.sound')}" aria-checked="${settings.sound ? 'true' : 'false'}" ${settings.sound ? 'checked' : ''}>
               <span class="toggle-slider"></span>
             </label>
             <div class="setting-row-info">
@@ -828,7 +828,7 @@ export class SettingsUI {
         <div class="settings-toggle-list">
           <div class="setting-row">
             <label class="toggle-switch">
-              <input type="checkbox" id="audio-mute" role="switch" aria-checked="${audioManager.isMuted() ? 'true' : 'false'}" ${audioManager.isMuted() ? 'checked' : ''}>
+              <input type="checkbox" id="audio-mute" role="switch" aria-label="${t('settings.mute')}" aria-checked="${audioManager.isMuted() ? 'true' : 'false'}" ${audioManager.isMuted() ? 'checked' : ''}>
               <span class="toggle-slider"></span>
             </label>
             <div class="setting-row-info">
@@ -837,13 +837,13 @@ export class SettingsUI {
             </div>
           </div>
           <div class="setting-row">
-            <input type="range" id="audio-master" min="0" max="100" step="5" value="${Math.round(audioManager.getMasterVolume() * 100)}" style="width:120px;accent-color:var(--primary);">
+            <input type="range" id="audio-master" aria-label="${t('settings.masterVolume')}" min="0" max="100" step="5" value="${Math.round(audioManager.getMasterVolume() * 100)}" style="width:120px;accent-color:var(--primary);">
             <div class="setting-row-info">
               <div class="setting-row-label">${t('settings.masterVolume')}</div>
             </div>
           </div>
           <div class="setting-row">
-            <input type="range" id="audio-sfx" min="0" max="100" step="5" value="${Math.round(audioManager.getSfxVolume() * 100)}" style="width:120px;accent-color:var(--primary);">
+            <input type="range" id="audio-sfx" aria-label="${t('settings.sfxVolume')}" min="0" max="100" step="5" value="${Math.round(audioManager.getSfxVolume() * 100)}" style="width:120px;accent-color:var(--primary);">
             <div class="setting-row-info">
               <div class="setting-row-label">${t('settings.sfxVolume')}</div>
             </div>
@@ -854,7 +854,7 @@ export class SettingsUI {
         <div class="settings-toggle-list">
           <div class="setting-row">
             <label class="toggle-switch">
-              <input type="checkbox" name="lobbyChat" role="switch" aria-checked="${settings.lobbyChat ? 'true' : 'false'}" ${settings.lobbyChat ? 'checked' : ''}>
+              <input type="checkbox" name="lobbyChat" role="switch" aria-label="${t('settings.lobbyChat')}" aria-checked="${settings.lobbyChat ? 'true' : 'false'}" ${settings.lobbyChat ? 'checked' : ''}>
               <span class="toggle-slider"></span>
             </label>
             <div class="setting-row-info">
