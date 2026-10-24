@@ -1251,7 +1251,7 @@ export class HUDScene extends Phaser.Scene {
       `
       <div class="hud-auth-brand"><span>${t('auth:login.title')}</span>${t('auth:login.titleAccent')}</div>
       <button class="btn btn-secondary" id="hud-login-btn">${t('ui:menu.login')}</button>
-      <button class="btn btn-ghost" id="hud-register-btn">${t('ui:menu.register')}</button>
+      ${this.registry.get('registrationOpen') === false ? '' : `<button class="btn btn-ghost" id="hud-register-btn">${t('ui:menu.register')}</button>`}
     `,
     );
     // Seamless takeover from an already-docked landing bar: same spot, no fly-in replay.
@@ -1263,8 +1263,8 @@ export class HUDScene extends Phaser.Scene {
       .querySelector('#hud-login-btn')!
       .addEventListener('click', () => this.openAuthOverlay('login'));
     this.authBarEl
-      .querySelector('#hud-register-btn')!
-      .addEventListener('click', () => this.openAuthOverlay('register'));
+      .querySelector('#hud-register-btn')
+      ?.addEventListener('click', () => this.openAuthOverlay('register'));
     // Keep keystrokes on the focused bar buttons (Tab + Space/Enter) out of the game input —
     // otherwise Space drops a bomb instead of activating the button (same pattern as
     // SpectatorChat's input handler).

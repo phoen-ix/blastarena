@@ -191,6 +191,17 @@ export class MenuScene extends Phaser.Scene {
     const showGuest = owStatus?.enabled && owStatus?.guestAccess;
     const playerCount = owStatus?.playerCount ?? 0;
 
+    // Register only while registration is open: with it closed the button opened the login form.
+    // The guest HUD's login/register bar reads the same flag from the registry.
+    let registrationOpen = true;
+    try {
+      const res = await fetch(`${API_URL}/admin/settings/registration_enabled`);
+      if (res.ok) registrationOpen = (await res.json()).enabled !== false;
+    } catch {
+      // Keep the button: the form itself falls back to login.
+    }
+    this.registry.set('registrationOpen', registrationOpen);
+
     // The background arena is drawn in the admin's default art style for visitors who never
     // picked one, so wait briefly for that default (fetched at boot) before starting it.
     if (showGuest) await artStyleManager.ready(800);
@@ -217,7 +228,7 @@ export class MenuScene extends Phaser.Scene {
             : ''
         }
         <button class="btn btn-secondary" id="menu-login-btn">${t('ui:menu.login')}</button>
-        <button class="btn btn-ghost" id="menu-register-btn">${t('ui:menu.register')}</button>
+        ${registrationOpen ? `<button class="btn btn-ghost" id="menu-register-btn">${t('ui:menu.register')}</button>` : ''}
       </div>
     `,
     );
@@ -239,7 +250,7 @@ export class MenuScene extends Phaser.Scene {
       this.showAuth();
     });
 
-    this.landingContainer.querySelector('#menu-register-btn')!.addEventListener('click', () => {
+    this.landingContainer.querySelector('#menu-register-btn')?.addEventListener('click', () => {
       this.leaveBackgroundArena();
       this.hideLanding();
       this.showAuth('register');
