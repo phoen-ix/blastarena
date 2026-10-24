@@ -238,11 +238,12 @@ export class MessagesView implements ILobbyView {
   private openConversation(userId: number, username: string): void {
     this.activeConversation = { userId, username };
     this.messages = [];
+    // Read before rendering: zeroed afterwards, the list kept the unread badge of the open chat.
+    const conv = this.conversations.find((c) => c.userId === userId);
+    if (conv) conv.unreadCount = 0;
     this.renderView();
     this.loadMessages(userId);
     this.deps.socketClient.emit('dm:read', { fromUserId: userId });
-    const conv = this.conversations.find((c) => c.userId === userId);
-    if (conv) conv.unreadCount = 0;
   }
 
   private async loadMessages(userId: number): Promise<void> {
