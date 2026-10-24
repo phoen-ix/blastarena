@@ -323,3 +323,54 @@ describe('views stop writing to .main-body once destroyed (item 11)', () => {
     intervalSpy.mockRestore();
   });
 });
+
+describe('LobbyUI on a phone', () => {
+  // At 390px the expanded sidebar covered the whole lobby, and the choice to collapse it was
+  // saved for the desktop too. On a phone it is a drawer: closed on start and after each pick.
+  function phone(matches: boolean) {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches, media: query }));
+  }
+  const sidebar = () => document.querySelector('.sidebar')!;
+
+  it('starts with the drawer closed and closes it after a pick', async () => {
+    phone(true);
+    localStorage.setItem('blast-arena-sidebar-collapsed', 'false');
+    const { LobbyUI } = await import('../../src/ui/LobbyUI');
+    const lobby = new LobbyUI(
+      fakeSocket() as unknown as SocketClient,
+      authManager(false, 'token'),
+      notifications as unknown as NotificationUI,
+      () => {},
+    );
+    lobby.show('rooms');
+    await flush();
+    expect(sidebar().classList.contains('collapsed')).toBe(true);
+
+    (document.querySelector('#sidebar-toggle') as HTMLElement).click();
+    expect(sidebar().classList.contains('collapsed')).toBe(false);
+    expect(localStorage.getItem('blast-arena-sidebar-collapsed')).toBe('false');
+
+    (document.querySelector('#nav-maps') as HTMLElement).click();
+    await flush();
+    expect(sidebar().classList.contains('collapsed')).toBe(true);
+    lobby.hide();
+  });
+
+  it('keeps the saved sidebar state on a wide screen', async () => {
+    phone(false);
+    const { LobbyUI } = await import('../../src/ui/LobbyUI');
+    const lobby = new LobbyUI(
+      fakeSocket() as unknown as SocketClient,
+      authManager(false, 'token'),
+      notifications as unknown as NotificationUI,
+      () => {},
+    );
+    lobby.show('rooms');
+    await flush();
+    expect(sidebar().classList.contains('collapsed')).toBe(false);
+    (document.querySelector('#nav-maps') as HTMLElement).click();
+    await flush();
+    expect(sidebar().classList.contains('collapsed')).toBe(false);
+    lobby.hide();
+  });
+});

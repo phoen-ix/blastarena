@@ -11,6 +11,8 @@ import { RoomsView } from './views/RoomsView';
 import { t, i18n } from '../i18n';
 
 const SIDEBAR_COLLAPSED_KEY = 'blast-arena-sidebar-collapsed';
+/** Phones get the sidebar as a drawer over the content (styles.css), closed by default. */
+const isPhone = () => !!window.matchMedia?.('(max-width: 640px)')?.matches;
 
 export class LobbyUI {
   private container: HTMLElement;
@@ -51,7 +53,7 @@ export class LobbyUI {
     this.onJoinRoom = onJoinRoom;
     this.container = document.createElement('div');
     this.container.className = 'app-layout';
-    this.sidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
+    this.sidebarCollapsed = isPhone() || localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
     this.createPanels();
   }
 
@@ -159,6 +161,9 @@ export class LobbyUI {
     }
 
     this.activeViewId = viewId;
+
+    // On a phone the open drawer covers the view just picked
+    if (isPhone() && !this.sidebarCollapsed) this.setSidebarCollapsed(true);
 
     // Update sidebar active state
     this.container.querySelectorAll('.sidebar-nav-item').forEach((item) => {
@@ -554,15 +559,19 @@ export class LobbyUI {
 
     // Sidebar collapse toggle (ear)
     this.container.querySelector('#sidebar-toggle')!.addEventListener('click', () => {
-      this.sidebarCollapsed = !this.sidebarCollapsed;
-      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(this.sidebarCollapsed));
-      const sidebar = this.container.querySelector('.sidebar')!;
-      sidebar.classList.toggle('collapsed', this.sidebarCollapsed);
-      const ear = this.container.querySelector('#sidebar-toggle') as HTMLElement;
-      const icon = ear.querySelector('.sidebar-ear-icon')!;
-      setHtml(icon, this.sidebarCollapsed ? '&#9654;' : '&#9664;');
-      ear.title = this.sidebarCollapsed ? t('ui:sidebar.expand') : t('ui:sidebar.collapse');
+      this.setSidebarCollapsed(!this.sidebarCollapsed);
+      // The phone drawer's state is not a preference
+      if (!isPhone()) localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(this.sidebarCollapsed));
     });
+  }
+
+  private setSidebarCollapsed(collapsed: boolean): void {
+    this.sidebarCollapsed = collapsed;
+    this.container.querySelector('.sidebar')?.classList.toggle('collapsed', collapsed);
+    const ear = this.container.querySelector<HTMLElement>('#sidebar-toggle');
+    if (!ear) return;
+    setHtml(ear.querySelector('.sidebar-ear-icon')!, collapsed ? '&#9654;' : '&#9664;');
+    ear.title = collapsed ? t('ui:sidebar.expand') : t('ui:sidebar.collapse');
   }
 
   private async joinRoom(code: string): Promise<void> {

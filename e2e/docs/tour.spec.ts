@@ -303,6 +303,15 @@ test('level editor', async ({ page }) => {
   await shoot(page, 'editor-map');
 });
 
+test('lobby on a phone', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await lobby(page, HERO.username);
+  // The sidebar is a drawer on a phone, closed to its icon rail.
+  await expect(page.locator('.sidebar')).toHaveClass(/collapsed/);
+  await expect(page.locator('#ow-join-btn')).toBeInViewport({ ratio: 1 });
+  await shoot(page, 'lobby-openworld.mobile', { freezeTimers: true });
+});
+
 test('lobby in a light theme', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('blast-arena-theme', 'daylight'));
   await lobby(page, HERO.username);

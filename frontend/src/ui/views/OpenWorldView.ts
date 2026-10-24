@@ -126,7 +126,7 @@ export class OpenWorldView implements ILobbyView {
       `
       <div style="padding:1rem; max-width:500px; margin:0 auto; text-align:center;">
         <div class="panel-content" style="padding:1.5rem;">
-          <div style="display:flex; justify-content:center; gap:1.5rem; margin-bottom:1rem;">
+          <div style="display:flex; flex-wrap:wrap; justify-content:center; gap:0.75rem 1.5rem; margin-bottom:1rem;">
             <span class="mini-stat" id="ow-players">
               ${t('ui:openWorld.playerCount', { current: status.playerCount, max: status.maxPlayers })}
             </span>
