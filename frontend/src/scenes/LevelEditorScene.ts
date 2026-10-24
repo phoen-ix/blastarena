@@ -583,13 +583,13 @@ export class LevelEditorScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const worldW = this.mapWidth * TILE_SIZE;
     const worldH = this.mapHeight * TILE_SIZE;
-    cam.setBounds(-TILE_SIZE, -TILE_SIZE, worldW + TILE_SIZE * 2, worldH + TILE_SIZE * 2);
 
     // Restrict rendering to the area right of the toolbar. The canvas is in device pixels
     // (sharp rendering), so the CSS-sized toolbar and the zoom scale by the render ratio.
     const tw = LevelEditorScene.toolbarPx();
     cam.setViewport(tw, 0, this.scale.width - tw, this.scale.height);
     cam.setZoom(renderRatio());
+    this.fitCameraBounds();
     cam.centerOn(worldW / 2, worldH / 2);
 
     // Update viewport on window resize. Removed in shutdown(): `this.scale` is the game-wide
@@ -598,6 +598,7 @@ export class LevelEditorScene extends Phaser.Scene {
     this.onResize = (gameSize: Phaser.Structs.Size) => {
       const px = LevelEditorScene.toolbarPx();
       cam.setViewport(px, 0, gameSize.width - px, gameSize.height);
+      this.fitCameraBounds();
     };
     this.scale.on('resize', this.onResize);
 
@@ -614,8 +615,23 @@ export class LevelEditorScene extends Phaser.Scene {
         const r = renderRatio();
         const newZoom = Phaser.Math.Clamp(cam.zoom - dz * 0.001 * r, 0.25 * r, 3 * r);
         cam.setZoom(newZoom);
+        this.fitCameraBounds();
       },
     );
+  }
+
+  /**
+   * Camera bounds: the map plus a one-tile margin, widened to the visible area when the map is
+   * smaller than it. Bounds smaller than the view pin the camera to their top-left corner, so a
+   * small map sat in the corner instead of where centerOn() put it.
+   */
+  private fitCameraBounds(): void {
+    const cam = this.cameras.main;
+    const worldW = this.mapWidth * TILE_SIZE;
+    const worldH = this.mapHeight * TILE_SIZE;
+    const w = Math.max(worldW + TILE_SIZE * 2, cam.width / cam.zoom);
+    const h = Math.max(worldH + TILE_SIZE * 2, cam.height / cam.zoom);
+    cam.setBounds((worldW - w) / 2, (worldH - h) / 2, w, h);
   }
 
   private setupInput(): void {
@@ -1200,7 +1216,7 @@ export class LevelEditorScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const worldW = this.mapWidth * TILE_SIZE;
     const worldH = this.mapHeight * TILE_SIZE;
-    cam.setBounds(-TILE_SIZE, -TILE_SIZE, worldW + TILE_SIZE * 2, worldH + TILE_SIZE * 2);
+    this.fitCameraBounds();
     cam.centerOn(worldW / 2, worldH / 2);
   }
 
