@@ -15,7 +15,7 @@ A lobby view (sidebar → Admin, shown to admin and moderator roles). Tabs a mod
 | Logs | Admin | Audit trail of all admin actions with action type filter |
 | Simulations | Admin | Batch bot-only game simulations (see below) |
 | AI | Admin | Upload/manage custom bot AI implementations (see below) |
-| Announcements | Admin + Mod | Toast broadcast (ephemeral) + persistent lobby banner (admin only) |
+| Announcements | Admin | Toast broadcast (ephemeral) + persistent lobby banner |
 | Campaign | Admin | Create/edit worlds, levels (visual editor), and enemy types; campaign replays |
 | Seasons | Admin | Create, activate (with confirmation), end the active season with a hard/soft Elo reset, delete; rank tier editor |
 | Achievements | Admin | Create/edit achievements with conditions and cosmetic rewards |

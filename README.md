@@ -148,7 +148,7 @@ Admin-configurable achievement system with four condition types: cumulative stat
 | Logs | Admin | Audit trail with filters, click-to-expand detail rows |
 | Simulations | Admin | Batch bot-only games (1-1000), fast/realtime, queue |
 | AI | Admin | Upload/manage custom bot AI and enemy AI implementations |
-| Announcements | Staff | Toast broadcasts, persistent banners |
+| Announcements | Admin | Toast broadcasts, persistent banners |
 | Campaign | Admin | Worlds, levels (visual editor), enemy types, JSON export/import, campaign replays |
 | Seasons | Admin | Season CRUD, activate, end the active season (hard/soft Elo reset), rank tier config with color pickers |
 | Achievements | Admin | Achievement CRUD (4 condition types), cosmetic CRUD (4 types), reward linking, JSON export/import |

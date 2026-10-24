@@ -95,7 +95,9 @@ export class AdminUI {
       {
         id: 'announcements',
         label: t('admin:tabs.announcements'),
-        adminOnly: false,
+        // Toast and banner are admin-only on the server (audit AUTHZ-1); a moderator's tab only
+        // ever answered 403.
+        adminOnly: true,
         instance: new AnnouncementsTab(notifications, role),
       },
       {
