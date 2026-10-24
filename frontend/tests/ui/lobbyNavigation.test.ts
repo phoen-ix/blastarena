@@ -32,7 +32,7 @@ vi.mock('../../src/network/ApiClient', () => ({
   },
 }));
 vi.mock('../../src/main', () => ({
-  game: { registry: { set: vi.fn() }, scene: { getScene: vi.fn(() => null) } },
+  game: { registry: { set: vi.fn(), get: vi.fn() }, scene: { getScene: vi.fn(() => null) } },
 }));
 
 /** A promise with its resolve function, to hold an await open. */

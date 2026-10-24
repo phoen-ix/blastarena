@@ -304,9 +304,12 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private onGuestPlay(): void {
-    if (this.bgArenaStarted && this.scene.isActive('GameScene')) {
-      // The arena is already live + interactive behind the menu — just reveal it.
-      this.revealArena();
+    if (this.bgArenaStarted) {
+      // The arena is already live + interactive behind the menu — just reveal it. Right after the
+      // join ack its launch can still be queued (a slow frame): reveal once it has been created.
+      // Falling through to the lobby flow joined the world a second time ("Already in open world").
+      if (this.scene.isActive('GameScene')) this.revealArena();
+      else this.scene.get('GameScene').events.once('create', () => this.revealArena());
       return;
     }
     if (this.bgJoinInFlight) {
@@ -373,6 +376,9 @@ export class MenuScene extends Phaser.Scene {
     if (this.revealed) return;
     this.revealed = true;
     this.registry.remove('landingTitle');
+    // The guest is in the world now: leaving it must land in the lobby's Open World view, which
+    // otherwise auto-joined straight back in (it joins once per page load unless this is set).
+    this.registry.set('openWorldAutoJoined', true);
     // No longer a background arena — restore normal foreground AFK behavior (kick → lobby).
     this.registry.remove('openWorldBackground');
     // If the landing already docked, HUD's auth bar takes over in place — skip its fly-in.
@@ -434,6 +440,8 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
     this.socketClient.connect();
+    // A sign-in (also from the guest's HUD bar) auto-joins the world once as the account.
+    this.registry.remove('openWorldAutoJoined');
     this.scene.start('LobbyScene');
   }
 

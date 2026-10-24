@@ -40,9 +40,6 @@ export class OpenWorldView implements ILobbyView {
     return t('ui:openWorld.title');
   }
 
-  /** Track whether we've auto-joined this session (prevents re-join loop on game exit) */
-  private static hasAutoJoined = false;
-
   private deps: ViewDeps;
   private container: HTMLElement | null = null;
   private infoHandler: ((data: OpenWorldInfo) => void) | null = null;
@@ -61,7 +58,9 @@ export class OpenWorldView implements ILobbyView {
 
     // When auto-joining, hide the entire lobby UI so it doesn't flash over the canvas
     // while waiting for the server response. Restored on error or when showing the lobby.
-    const willAutoJoin = !OpenWorldView.hasAutoJoined;
+    // Once per sign-in (registry `openWorldAutoJoined`: cleared by MenuScene on sign-in, also set
+    // when a landing guest enters the arena): leaving the world shows this view, not a re-join.
+    const willAutoJoin = !game.registry.get('openWorldAutoJoined');
     const appLayout = container.closest('.app-layout') as HTMLElement | null;
     if (willAutoJoin && appLayout) {
       appLayout.style.display = 'none';
@@ -109,7 +108,7 @@ export class OpenWorldView implements ILobbyView {
 
     if (willAutoJoin) {
       // First visit this session — auto-join immediately
-      OpenWorldView.hasAutoJoined = true;
+      game.registry.set('openWorldAutoJoined', true);
       this.joinWorld();
     } else {
       // Returning from game — show lobby with join button
