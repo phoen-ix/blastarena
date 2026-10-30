@@ -153,7 +153,8 @@ const levelSchema = z.object({
   parTime: z.number().int().min(0).max(3600).optional(),
   carryOverPowerups: z.boolean().optional(),
   startingPowerups: z.any().optional(),
-  availablePowerupTypes: z.array(z.string()).optional(),
+  // null = every type (what the editor's export writes for a level that never restricted them)
+  availablePowerupTypes: z.array(z.string()).nullable().optional(),
   powerupDropRate: z.number().min(0).max(1).optional(),
   reinforcedWalls: z.boolean().optional(),
   hazardTiles: z.boolean().optional(),

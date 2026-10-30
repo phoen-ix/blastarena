@@ -1477,6 +1477,30 @@ describe('POST /admin/campaign/levels/import', () => {
     );
   });
 
+  it("imports the editor's export of a level with every power-up type (null)", async () => {
+    mockCreateLevel.mockResolvedValue(22);
+
+    const req = mockReq({
+      user: { userId: 1 },
+      body: {
+        worldId: 3,
+        level: {
+          _format: 'blast-arena-level',
+          _version: 1,
+          name: 'Exported Level',
+          tiles: [['empty']],
+          enemyPlacements: [],
+          availablePowerupTypes: null,
+        },
+      },
+    });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+
+    expect(res._status).toBe(201);
+    expect(res._json).toEqual({ id: 22 });
+  });
+
   it('imports raw level data without format markers', async () => {
     mockCreateLevel.mockResolvedValue(21);
 
