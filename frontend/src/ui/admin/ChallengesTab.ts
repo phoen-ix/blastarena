@@ -279,7 +279,7 @@ export class ChallengesTab {
                     ? `<button class="btn btn-sm btn-ghost" data-action="deactivate" data-id="${c.id}" title="${escapeAttr(t('admin:challenges.deactivate'))}" aria-label="${escapeAttr(t('admin:challenges.deactivate'))}">&times;</button>`
                     : `<button class="btn btn-sm btn-primary" data-action="activate" data-id="${c.id}" title="${escapeAttr(t('admin:challenges.activate'))}" aria-label="${escapeAttr(t('admin:challenges.activate'))}">&#10003;</button>`
                 }
-                <button class="btn btn-sm btn-ghost" style="color:var(--danger);" data-action="delete" data-id="${c.id}" title="${escapeAttr(t('admin:challenges.deleteBtn'))}">&minus;</button>
+                <button class="btn btn-sm btn-ghost" style="color:var(--danger);" data-action="delete" data-id="${c.id}" title="${escapeAttr(t('admin:challenges.deleteBtn'))}" aria-label="${escapeAttr(t('admin:challenges.deleteBtn'))}">&minus;</button>
               </td>
             </tr>`,
             )
