@@ -8,6 +8,7 @@ import { escapeHtml, setHtml } from '../utils/html';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { ILobbyView, ViewDeps } from './views/types';
 import { RoomsView } from './views/RoomsView';
+import { ApiClient } from '../network/ApiClient';
 import { t, i18n } from '../i18n';
 
 const SIDEBAR_COLLAPSED_KEY = 'blast-arena-sidebar-collapsed';
@@ -485,6 +486,7 @@ export class LobbyUI {
         <div class="main-header">
           <div class="main-header-actions"></div>
         </div>
+        <div id="lobby-banner-area"></div>
         <div class="main-body"></div>
       </div>
     `,
@@ -500,6 +502,25 @@ export class LobbyUI {
 
     // Sidebar rank/level badges (their elements were just rebuilt too)
     this.loadSidebarBadges();
+    // The admin banner sits above every view (it used to show only above the room list, and the
+    // lobby opens on Open World); admin:banner updates it live (LobbyScene).
+    this.loadBanner();
+  }
+
+  private async loadBanner(): Promise<void> {
+    try {
+      const banner = await ApiClient.get<{ message: string } | null>('/admin/announcements/banner');
+      const area = this.container.querySelector('#lobby-banner-area');
+      if (area && banner?.message) {
+        setHtml(
+          area,
+          `<div class="admin-banner"><span>${escapeHtml(banner.message)}</span><button class="banner-close">&times;</button></div>`,
+        );
+        area.querySelector('.banner-close')?.addEventListener('click', () => setHtml(area, ''));
+      }
+    } catch {
+      // No banner
+    }
   }
 
   private bindEvents(): void {
@@ -637,6 +658,7 @@ export class LobbyUI {
           '.main-body input, .main-body select, .main-body textarea, .main-body button, .main-body .btn, .main-body .room-card, .main-body .admin-tab, .main-body .tab-item, .main-body .messages-conv-item, .main-body .log-row, .main-body .lb-user-link, .main-body .campaign-world-header, .main-body .campaign-level-card:not([data-locked="true"]), .main-body .help-guide-section summary, .main-body .help-markdown a',
         ),
         ...this.container.querySelectorAll<HTMLElement>('.main-header .btn'),
+        ...this.container.querySelectorAll<HTMLElement>('#lobby-banner-area button'),
       ],
       onBack: () => {
         if (this.activeViewId !== 'openWorld') {

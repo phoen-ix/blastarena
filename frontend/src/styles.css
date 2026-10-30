@@ -1481,6 +1481,15 @@
     }
 
     /* ============ ADMIN BANNER ============ */
+    #lobby-banner-area {
+      flex-shrink: 0;
+      padding: 12px var(--sp-6) 0;
+    }
+
+    #lobby-banner-area:empty {
+      display: none;
+    }
+
     .admin-banner {
       background: linear-gradient(90deg, var(--bg-elevated), var(--bg-surface));
       border: 1px solid var(--warning);

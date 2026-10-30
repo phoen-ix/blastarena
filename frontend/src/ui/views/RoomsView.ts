@@ -4,14 +4,6 @@ import { RoomListItem, Room, getErrorMessage, gameModeName } from '@blast-arena/
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
 
-/** Active banner row returned by GET /admin/announcements/banner (null when no banner). */
-interface ActiveBanner {
-  id: number;
-  message: string;
-  admin_username: string;
-  created_at: string;
-}
-
 export class RoomsView implements ILobbyView {
   readonly viewId = 'rooms';
   get title() {
@@ -39,7 +31,6 @@ export class RoomsView implements ILobbyView {
     setHtml(
       container,
       `
-      <div id="lobby-banner-area" style="padding:0 var(--sp-6);"></div>
       <div class="room-list empty" id="room-list">
         <div class="room-list-empty-state">${t('ui:rooms.loading')}</div>
       </div>
@@ -63,8 +54,6 @@ export class RoomsView implements ILobbyView {
         this.joinRoom(card.dataset.code);
       }
     });
-
-    this.loadBanner();
 
     if (this.cachedRooms) {
       this.renderRooms(this.cachedRooms);
@@ -144,28 +133,5 @@ export class RoomsView implements ILobbyView {
         }
       },
     );
-  }
-
-  private async loadBanner(): Promise<void> {
-    try {
-      const banner = await ApiClient.get<ActiveBanner | null>('/admin/announcements/banner');
-      const area = this.container?.querySelector('#lobby-banner-area');
-      if (area && banner && banner.message) {
-        setHtml(
-          area,
-          `
-          <div class="admin-banner">
-            <span>${escapeHtml(banner.message)}</span>
-            <button class="banner-close">&times;</button>
-          </div>
-        `,
-        );
-        area.querySelector('.banner-close')?.addEventListener('click', () => {
-          setHtml(area, '');
-        });
-      }
-    } catch {
-      // No banner — ignore
-    }
   }
 }
