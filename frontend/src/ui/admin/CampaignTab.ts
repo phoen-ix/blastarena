@@ -72,6 +72,28 @@ function defaultEnemyConfig(): EnemyTypeConfig {
   };
 }
 
+/**
+ * The order updates that swap item `id` with its neighbour above (-1) or below (1) in `list` (as
+ * shown, sorted by sortOrder). Setting only the moved item to `sortOrder ± 1` left it on the same
+ * number as its neighbour, so nothing moved, and the guard `sortOrder <= 1` kept the second item
+ * from ever reaching the top (orders start at 0).
+ */
+function swapWithNeighbour(
+  list: { id: number; sortOrder: number }[],
+  id: number,
+  dir: -1 | 1,
+): [number, number][] {
+  const i = list.findIndex((x) => x.id === id);
+  const self = list[i];
+  const other = list[i + dir];
+  if (!self || !other) return [];
+  if (self.sortOrder === other.sortOrder) return [[self.id, other.sortOrder + dir]];
+  return [
+    [self.id, other.sortOrder],
+    [other.id, self.sortOrder],
+  ];
+}
+
 export class CampaignTab {
   private container: HTMLElement | null = null;
   private notifications: NotificationUI;
@@ -359,18 +381,14 @@ export class CampaignTab {
       btn.addEventListener('click', async (e: Event) => {
         e.stopPropagation();
         const id = Number((btn as HTMLElement).dataset.id);
-        const world = this.worlds.find((w) => w.id === id);
-        if (!world || world.sortOrder <= 1) return;
-        await this.updateWorldOrder(id, world.sortOrder - 1);
+        await this.moveWorld(id, -1);
       });
     });
     content.querySelectorAll('.camp-order-down').forEach((btn) => {
       btn.addEventListener('click', async (e: Event) => {
         e.stopPropagation();
         const id = Number((btn as HTMLElement).dataset.id);
-        const world = this.worlds.find((w) => w.id === id);
-        if (!world) return;
-        await this.updateWorldOrder(id, world.sortOrder + 1);
+        await this.moveWorld(id, 1);
       });
     });
 
@@ -517,27 +535,15 @@ export class CampaignTab {
     content.querySelectorAll('.camp-level-order-up').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const id = Number((btn as HTMLElement).dataset.id);
-        const level = this.findLevel(id);
-        if (!level || level.sortOrder <= 1) return;
-        await this.updateLevelOrder(id, level.sortOrder - 1);
+        await this.moveLevel(id, -1);
       });
     });
     content.querySelectorAll('.camp-level-order-down').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const id = Number((btn as HTMLElement).dataset.id);
-        const level = this.findLevel(id);
-        if (!level) return;
-        await this.updateLevelOrder(id, level.sortOrder + 1);
+        await this.moveLevel(id, 1);
       });
     });
-  }
-
-  private findLevel(levelId: number): CampaignLevelSummary | undefined {
-    for (const w of this.worlds) {
-      const found = w.levels?.find((l) => l.id === levelId);
-      if (found) return found;
-    }
-    return undefined;
   }
 
   private async loadLevelsForWorld(world: WorldWithLevels): Promise<void> {
@@ -571,18 +577,23 @@ export class CampaignTab {
     if (content) this.renderWorldsTable(content);
   }
 
-  private async updateWorldOrder(id: number, newOrder: number): Promise<void> {
+  private async moveWorld(id: number, dir: -1 | 1): Promise<void> {
     try {
-      await ApiClient.put(`/admin/campaign/worlds/${id}/order`, { sortOrder: newOrder });
+      for (const [worldId, sortOrder] of swapWithNeighbour(this.worlds, id, dir)) {
+        await ApiClient.put(`/admin/campaign/worlds/${worldId}/order`, { sortOrder });
+      }
       await this.loadWorlds();
     } catch (err: unknown) {
       this.notifications.error(getErrorMessage(err));
     }
   }
 
-  private async updateLevelOrder(id: number, newOrder: number): Promise<void> {
+  private async moveLevel(id: number, dir: -1 | 1): Promise<void> {
+    const levels = this.worlds.find((w) => w.levels?.some((l) => l.id === id))?.levels ?? [];
     try {
-      await ApiClient.put(`/admin/campaign/levels/${id}/order`, { sortOrder: newOrder });
+      for (const [levelId, sortOrder] of swapWithNeighbour(levels, id, dir)) {
+        await ApiClient.put(`/admin/campaign/levels/${levelId}/order`, { sortOrder });
+      }
       await this.reloadExpandedLevels();
     } catch (err: unknown) {
       this.notifications.error(getErrorMessage(err));
