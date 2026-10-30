@@ -45,22 +45,44 @@ test('leaderboard links to profiles; add friend from a profile', async ({ page }
   await expect(page.getByText(`Friend request sent to ${top.username}`)).toBeVisible();
 });
 
-test('a season with no games yet shows an empty leaderboard', async ({ page }) => {
-  const a = await admin();
-  const name = uniq('Season ');
-  await ok('POST', '/admin/seasons', a.token, {
-    name,
-    startDate: '2031-01-01',
-    endDate: '2031-03-31',
-  });
-  const u = await createUser('lbs');
-  await openLobby(page, u);
+test('leaderboard pages through the ranking', async ({ page }) => {
+  // More ranked players than one page holds (25), whatever else the run has seeded.
+  const ranked: User[] = [];
+  for (let i = 0; i < 26; i++) ranked.push(await createUser('lbp'));
+  for (const [i, u] of ranked.entries()) seedStats(u, 500 + i);
+  await openLobby(page, ranked[0]);
   await openView(page, 'leaderboard');
-  const select = page.locator('#lb-season-select');
-  await expect(select.locator('option', { hasText: name })).toHaveCount(1);
-  await select.selectOption({ label: name });
-  await expect(page.getByText('No entries yet for this season.')).toBeVisible();
+  const info = page.locator('#lb-pagination .page-info');
+  await expect(info).toHaveText(/^Page 1 of \d+$/);
+  await expect(page.locator('#lb-prev')).toBeDisabled();
+  await expect(page.locator('#lb-table-container tbody tr')).toHaveCount(25);
+  await page.locator('#lb-next').click();
+  await expect(info).toHaveText(/^Page 2 of \d+$/);
+  await expect(page.locator('#lb-prev')).toBeEnabled();
+  await page.locator('#lb-prev').click();
+  await expect(info).toHaveText(/^Page 1 of \d+$/);
 });
+
+test(
+  'a season with no games yet shows an empty leaderboard',
+  { tag: '@global' },
+  async ({ page }) => {
+    const a = await admin();
+    const name = uniq('Season ');
+    await ok('POST', '/admin/seasons', a.token, {
+      name,
+      startDate: '2031-01-01',
+      endDate: '2031-03-31',
+    });
+    const u = await createUser('lbs');
+    await openLobby(page, u);
+    await openView(page, 'leaderboard');
+    const select = page.locator('#lb-season-select');
+    await expect(select.locator('option', { hasText: name })).toHaveCount(1);
+    await select.selectOption({ label: name });
+    await expect(page.getByText('No entries yet for this season.')).toBeVisible();
+  },
+);
 
 test('a private profile hides from other players', async ({ page }) => {
   const [me, shy] = [await createUser('pv'), await createUser('shy')];

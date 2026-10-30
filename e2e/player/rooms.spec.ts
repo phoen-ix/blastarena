@@ -228,3 +228,29 @@ test('spectating after death: banner, spectator chat and actions', async ({
   await expect(page.locator('#nav-rooms')).toBeVisible();
   for (const p of others) await p.context().close();
 });
+
+test('the lobby reconnects after the connection drops and stays live', async ({
+  page,
+  browser,
+  guard,
+}) => {
+  // socket.io notices a dead connection by its ping (25 s interval, 60 s timeout) at the latest.
+  test.setTimeout(240_000);
+  const [a, b] = [await createUser('rcn'), await createUser('rco')];
+  const pageB = await newPage(browser, guard);
+  await openLobby(page, a);
+  await openLobby(pageB, b);
+  await openView(page, 'rooms');
+
+  await page.context().setOffline(true);
+  const overlay = page.getByText('Reconnecting to server...');
+  await expect(overlay).toBeVisible({ timeout: 120_000 });
+  await page.context().setOffline(false);
+  await expect(overlay).toHaveCount(0, { timeout: 60_000 });
+
+  // The room list is live again: a room created elsewhere shows up without a reload.
+  const name = uniq('Back ');
+  await createRoom(pageB, { name });
+  await expect(page.locator('.room-card', { hasText: name })).toBeVisible();
+  await pageB.context().close();
+});

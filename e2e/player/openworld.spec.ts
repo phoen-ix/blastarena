@@ -1,4 +1,14 @@
-import { test, expect, createUser, newPage, openLobby, signInContext, PASSWORD } from './lib';
+import {
+  test,
+  expect,
+  admin,
+  createUser,
+  newPage,
+  ok,
+  openLobby,
+  signInContext,
+  PASSWORD,
+} from './lib';
 
 /* The open world: the live arena behind the landing page (guests), the HUD scoreboard with every
  * player in it (several browser contexts on real sockets), leaving and re-joining from the lobby,
@@ -82,13 +92,65 @@ test('the lobby Open World view shows round, players and standings', async ({ pa
   await expect(page.locator('#ow-board')).toBeVisible();
 });
 
-test('an idle player is kicked out of the world after the AFK timeout', async ({ page }) => {
-  // The default timeout is 60 s, checked every 5 s.
-  test.setTimeout(150_000);
-  const u = await createUser('afk');
-  await signInContext(page.context(), u);
-  await page.goto('/');
-  await expect(page.locator('.hud-ow-board')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Join World' })).toBeVisible({ timeout: 90_000 });
-  await expect(page.locator('.hud-ow-board')).toHaveCount(0);
-});
+test(
+  'an idle player is kicked out of the world after the AFK timeout',
+  { tag: '@global' },
+  async ({ page }) => {
+    // The shared world's AFK timeout cut to 10 s (checked every 5 s), then restored. A new round
+    // restarts every player's idle clock, so the wait allows for one round boundary.
+    const a = await admin();
+    const { afkTimeoutSeconds } = await ok<{ afkTimeoutSeconds: number }>(
+      'GET',
+      '/admin/settings/open_world',
+      a.token,
+    );
+    const u = await createUser('afk');
+    await signInContext(page.context(), u);
+    try {
+      await ok('PUT', '/admin/settings/open_world', a.token, { afkTimeoutSeconds: 10 });
+      await page.goto('/');
+      await expect(page.locator('.hud-ow-board')).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByRole('button', { name: 'Join World' })).toBeVisible({
+        timeout: 60_000,
+      });
+      await expect(page.locator('.hud-ow-board')).toHaveCount(0);
+    } finally {
+      await ok('PUT', '/admin/settings/open_world', a.token, { afkTimeoutSeconds });
+    }
+  },
+);
+
+test(
+  'a round ends: the standings overlay, then the next round',
+  { tag: '@global' },
+  async ({ page }) => {
+    // Cuts the shared world's round time to 30 s (the minimum) and restores it.
+    test.setTimeout(150_000);
+    const a = await admin();
+    const { roundTime } = await ok<{ roundTime: number }>(
+      'GET',
+      '/admin/settings/open_world',
+      a.token,
+    );
+    const u = await createUser('owr');
+    await signInContext(page.context(), u);
+    await page.goto('/');
+    await expect(page.locator('.hud-ow-board')).toBeVisible({ timeout: 60_000 });
+    try {
+      await ok('PUT', '/admin/settings/open_world', a.token, { roundTime: 30 });
+      const overlay = page.locator('.hud-ow-roundend');
+      await expect(overlay).toBeVisible({ timeout: 60_000 });
+      await expect(overlay.locator('.hud-ow-roundend-title')).toHaveText('Round Over');
+      await expect(overlay.locator('.hud-ow-roundend-table')).toContainText(u.username);
+      await expect(overlay.locator('.hud-ow-roundend-next')).toContainText(/Next round in \d+s/);
+      const ended = Number(
+        (await overlay.locator('.hud-ow-roundend-sub').textContent())!.replace(/\D/g, ''),
+      );
+      await expect(overlay).toHaveCount(0, { timeout: 20_000 });
+      await expect(page.locator('#hud-round')).toHaveText(`Round ${ended + 1}`);
+      await expect(page.locator('.hud-ow-board')).toBeVisible();
+    } finally {
+      await ok('PUT', '/admin/settings/open_world', a.token, { roundTime });
+    }
+  },
+);

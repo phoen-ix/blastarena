@@ -2,7 +2,8 @@
 # End-to-end suite: builds the production images, starts a throwaway stack on loopback ports
 # (nginx on PORT_BASE, Mailpit on PORT_BASE+5) and runs the Playwright specs in e2e/ against it.
 #
-#   bash scripts/e2e.sh [playwright args]    # e.g. player/rooms.spec.ts, --grep @smoke
+#   bash scripts/e2e.sh [playwright args]    # e.g. player/rooms.spec.ts, b/ (filter by path: a -g
+#                                            # would replace the @global phase filter)
 #
 # PORT_BASE (default 24200); COMPOSE_PROJECT_NAME defaults to blastarena_e2e and must start with
 # blastarena_ (blast-arena and blast-arena-dev are real stacks). Playwright output, the HTML
@@ -50,5 +51,11 @@ compose up -d --wait --wait-timeout 600
 
 cd "$ROOT/e2e"
 [ -d node_modules ] || npm ci --no-audit --no-fund
-PLAYWRIGHT_OUTPUT_DIR=$ARTIFACTS/test-results PLAYWRIGHT_HTML_OUTPUT_DIR=$ARTIFACTS/report \
-  npx playwright test "$@"
+# Tests tagged @global change server-wide state (settings, banner, active challenge, seasons):
+# they run after the rest, one at a time. A phase with nothing to run (a filtered run) passes.
+export PLAYWRIGHT_OUTPUT_DIR=$ARTIFACTS/test-results PLAYWRIGHT_HTML_OUTPUT_DIR=$ARTIFACTS/report
+status=0
+npx playwright test --grep-invert @global --pass-with-no-tests "$@" || status=$?
+export PLAYWRIGHT_OUTPUT_DIR=$ARTIFACTS/test-results-global PLAYWRIGHT_HTML_OUTPUT_DIR=$ARTIFACTS/report-global
+npx playwright test --grep @global --workers=1 --pass-with-no-tests "$@" || status=$?
+exit $status

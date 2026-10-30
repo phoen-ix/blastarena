@@ -70,12 +70,15 @@ async function openWorld(page: Page, world: string): Promise<void> {
 
 const level = (page: Page, name: string) => page.locator('.campaign-level-card', { hasText: name });
 
-/** Escape during the start countdown does nothing; retry until the pause menu shows. */
+/** Escape during the start countdown does nothing; retry until the pause menu shows. A second
+ * Escape while the server's pause ack is on its way would resume, so press only while it is not
+ * shown. */
 async function pause(page: Page): Promise<void> {
+  const overlay = page.locator('.pause-overlay');
   await expect(async () => {
-    await page.keyboard.press('Escape');
-    await expect(page.locator('.pause-overlay')).toBeVisible({ timeout: 300 });
-  }).toPass({ timeout: 30_000, intervals: [100] });
+    if (!(await overlay.isVisible())) await page.keyboard.press('Escape');
+    await expect(overlay).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
 }
 
 test('solo level: HUD, pause, continue, restart, exit', async ({ page }) => {

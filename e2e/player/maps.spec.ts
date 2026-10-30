@@ -85,30 +85,34 @@ test('create room on a custom map: preview and the room names the map', async ({
   await expect(page.getByText('Wall Density')).toHaveCount(0);
 });
 
-test('weekly challenge: details, empty board, play creates the room', async ({ page }) => {
-  const a = await admin();
-  const creator = await createUser('chc');
-  const mapName = uniq('Chal map ');
-  const mapId = await makeMap(creator, mapName, true);
-  const title = uniq('Challenge ');
-  const c = await ok<{ id: number }>('POST', '/admin/challenges', a.token, {
-    title,
-    description: 'Most wins takes the crown.',
-    customMapId: mapId,
-    gameMode: 'ffa',
-    startDate: '2026-01-01',
-    endDate: '2036-01-01',
-  });
-  await ok('POST', `/admin/challenges/${c.id}/activate`, a.token);
+test(
+  'weekly challenge: details, empty board, play creates the room',
+  { tag: '@global' },
+  async ({ page }) => {
+    const a = await admin();
+    const creator = await createUser('chc');
+    const mapName = uniq('Chal map ');
+    const mapId = await makeMap(creator, mapName, true);
+    const title = uniq('Challenge ');
+    const c = await ok<{ id: number }>('POST', '/admin/challenges', a.token, {
+      title,
+      description: 'Most wins takes the crown.',
+      customMapId: mapId,
+      gameMode: 'ffa',
+      startDate: '2026-01-01',
+      endDate: '2036-01-01',
+    });
+    await ok('POST', `/admin/challenges/${c.id}/activate`, a.token);
 
-  const u = await createUser('chp');
-  await openLobby(page, u);
-  await openView(page, 'challenge');
-  await expect(page.getByRole('heading', { name: title })).toBeVisible();
-  await expect(page.getByText(mapName)).toBeVisible();
-  await expect(page.getByText(creator.username)).toBeVisible();
-  await expect(page.getByText('No scores yet — be the first to play!')).toBeVisible();
-  await page.getByRole('button', { name: 'Play Challenge' }).click();
-  await expect(page.getByRole('heading', { name: title })).toBeVisible();
-  await expect(page.locator('#room-player-list')).toContainText(u.username);
-});
+    const u = await createUser('chp');
+    await openLobby(page, u);
+    await openView(page, 'challenge');
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    await expect(page.getByText(mapName)).toBeVisible();
+    await expect(page.getByText(creator.username)).toBeVisible();
+    await expect(page.getByText('No scores yet — be the first to play!')).toBeVisible();
+    await page.getByRole('button', { name: 'Play Challenge' }).click();
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    await expect(page.locator('#room-player-list')).toContainText(u.username);
+  },
+);

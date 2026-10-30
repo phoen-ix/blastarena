@@ -47,7 +47,7 @@ test('staff get the level-editor and staff-docs tabs', async ({ page }) => {
   await expect(page.locator('#help-tab-content')).toContainText(/API|Admin|Infrastructure/);
 });
 
-test('the imprint tab shows the text an admin set', async ({ page }) => {
+test('the imprint tab shows the text an admin set', { tag: '@global' }, async ({ page }) => {
   const a = await admin();
   await ok('PUT', '/admin/settings/imprint', a.token, {
     enabled: true,
