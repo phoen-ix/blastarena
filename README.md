@@ -318,12 +318,12 @@ blastarena/
 │       ├── art/             # Art styles (Canvas 2D painters), sharp rendering
 │       ├── game/            # Client renderers, effects, replay, gamepad
 │       └── network/         # ApiClient, SocketClient, AuthManager
-├── e2e/                     # Playwright docs tour (own npm package)
-├── scripts/                 # docs-screenshots.sh
+├── e2e/                     # Playwright e2e suite + docs tour (own npm package)
+├── scripts/                 # e2e.sh, docs-screenshots.sh
 ├── docs/                    # Detailed documentation (see below)
 ├── docker-compose.yml       # Production orchestration
 ├── docker-compose.dev.yml   # Development overrides
-└── docker-compose.e2e.yml   # Throwaway stack for the docs tour
+└── docker-compose.e2e.yml   # Throwaway stack for the e2e suite and the docs tour
 ```
 
 ## Testing & Linting
@@ -335,6 +335,15 @@ npm run format:check        # Prettier format check
 ```
 
 Jest covers the backend and shared code (game logic, services, routes, socket handlers, middleware, database, simulation, utilities), Vitest the frontend. One suite, `tests/backend/db/migrationLock.test.ts`, needs a real MariaDB and runs only with `REQUIRE_DB_TESTS=1`. See [docs/testing.md](docs/testing.md) for the test inventory, mocking patterns, and a guide for writing new tests.
+
+## E2E
+
+```bash
+bash scripts/e2e.sh                         # the whole Playwright suite against a throwaway stack
+bash scripts/e2e.sh player/rooms.spec.ts    # Playwright arguments pass through
+```
+
+The script builds the production images, starts `docker-compose.yml` + `docker-compose.e2e.yml` as project `blastarena_e2e` on `127.0.0.1:${PORT_BASE:-24200}` with a Mailpit sink for verification and reset mails (`PORT_BASE+5`), runs every spec under `e2e/` except the docs tour, and tears the stack down. Multiplayer tests use one browser context per player on real sockets; bots fill the rooms. Tests that change server-wide state (tag `@global`) run after the rest, one at a time. [e2e/COVERAGE.md](e2e/COVERAGE.md) maps every feature to its test.
 
 ## Screenshots
 

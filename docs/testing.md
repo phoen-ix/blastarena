@@ -6,6 +6,7 @@ BlastArena's tests cover the full stack: game logic, backend services, API route
 |-------|-----------|----------|
 | Backend (incl. `tests/shared`) | Jest + ts-jest | `tests/backend/`, `tests/shared/` |
 | Frontend | Vitest + jsdom | `frontend/tests/` |
+| End to end | Playwright against a throwaway Docker stack | `e2e/` (own npm package; map in `e2e/COVERAGE.md`) |
 
 `npm test` prints the current counts.
 
@@ -18,6 +19,7 @@ cd frontend && npx vitest run                                 # Frontend only
 npx jest --config tests/backend/jest.config.ts -- <file>      # Single backend file
 npx jest --config tests/backend/jest.config.ts --watch        # Backend watch mode
 cd frontend && npx vitest                                     # Frontend watch mode
+bash scripts/e2e.sh [playwright args]                         # E2E suite (Docker + Node 26)
 ```
 
 ## Test Configuration
