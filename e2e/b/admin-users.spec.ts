@@ -249,7 +249,8 @@ test(
     const banner = `Season finale this weekend ${uid()}`;
     await page.getByRole('textbox', { name: 'Banner message' }).fill(banner);
     await page.getByRole('button', { name: 'Set Banner' }).click();
-    await expect(page.locator('.admin-banner')).toContainText(banner);
+    // The tab's own preview (the lobby banner area above the Admin view shows it too).
+    await expect(page.locator('#admin-tab-content .admin-banner')).toContainText(banner);
     // Players see it above the room list (live, and after a reload).
     await nav(player, 'Rooms').click();
     await expect(player.getByText(banner)).toBeVisible();
