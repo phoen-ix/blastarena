@@ -29,10 +29,19 @@ async function paint(page: Page, size: [number, number], x: number, y: number): 
   await page.mouse.click(cx + (x + 0.5 - size[0] / 2) * TILE, cy + (y + 0.5 - size[1] / 2) * TILE);
 }
 
-/** Phaser queues key presses and handles them on its next game step (pointer events at once):
- * on a slow frame a shortcut could land after the next click. Two animation frames = one step. */
-async function shortcut(page: Page, key: string): Promise<void> {
-  await page.keyboard.press(key);
+/** Ctrl+<key> as a quick tap sends it: Ctrl down, key down, key up, Ctrl up in one task, so all
+ * four land in one frame (Phaser replays that frame's key queue on every later key event: the
+ * editor used to undo or redo two or three steps per press), then a game step passes. */
+async function shortcut(page: Page, key: 'z' | 'y'): Promise<void> {
+  await page.evaluate((k) => {
+    const code = k.toUpperCase().charCodeAt(0);
+    const fire = (type: string, key: string, keyCode: number, ctrlKey: boolean) =>
+      window.dispatchEvent(new KeyboardEvent(type, { key, keyCode, ctrlKey, bubbles: true }));
+    fire('keydown', 'Control', 17, true);
+    fire('keydown', k, code, true);
+    fire('keyup', k, code, true);
+    fire('keyup', 'Control', 17, false);
+  }, key);
   await page.evaluate(
     () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
   );
@@ -128,18 +137,41 @@ test('create a map: tools, the spawn rule, settings, save', async ({ page }) => 
 
 test('undo, redo, eraser and resize', async ({ page }) => {
   const user = await createUser();
+  const t = await token(user.username);
   await lobby(page, user);
   await openNew(page);
-  let size: [number, number] = [15, 13];
+  const name = `Undo ${uid()}`;
+  await editor(page).getByLabel('Name').fill(name);
+  /** Saves, then reads back which of (3,1), (5,1), (7,1) are destructible. */
+  const saved = async (): Promise<string> => {
+    const m = (await ok<{ maps: MapRow[] }>('GET', '/maps/mine', t)).maps.find(
+      (x) => x.name === name,
+    );
+    if (!m) return '';
+    const row = (await ok<{ map: MapRow }>('GET', `/maps/${m.id}`, t)).map.tiles[1];
+    return [3, 5, 7].filter((x) => row[x] === 'destructible').join(',');
+  };
+  const save = async (expected: string) => {
+    await editor(page).getByRole('button', { name: 'Save', exact: true }).click();
+    await expect.poll(saved).toBe(expected);
+  };
+
+  const size: [number, number] = [15, 13];
   await tool(page, 'Spawn');
   await paint(page, size, 13, 11);
   await tool(page, 'Destructible');
   await paint(page, size, 3, 1);
   await paint(page, size, 5, 1);
   await paint(page, size, 7, 1);
-  await shortcut(page, 'Control+z');
-  await shortcut(page, 'Control+z');
-  await shortcut(page, 'Control+y');
+  // One press = one step (a quick tap used to undo or redo up to three).
+  await shortcut(page, 'z');
+  await save('3,5');
+  await shortcut(page, 'y');
+  await save('3,5,7');
+  await shortcut(page, 'z');
+  await shortcut(page, 'z');
+  await shortcut(page, 'y');
+  await save('3,5');
   await tool(page, 'Eraser');
   await paint(page, size, 3, 1);
 
@@ -148,18 +180,11 @@ test('undo, redo, eraser and resize', async ({ page }) => {
   await editor(page).getByLabel('Width').press('Enter');
   await editor(page).getByLabel('Width').blur();
   await expect(editor(page).getByLabel('Width')).toHaveValue('17');
-  size = [17, 13];
 
-  const name = `Undo ${uid()}`;
-  await editor(page).getByLabel('Name').fill(name);
-  await editor(page).getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(page.getByText('Map saved!')).toBeVisible();
+  await save('5');
   const id = (await myMaps(user)).find((m) => m.name === name)!.id;
   const full = await map(user, id);
   expect(full.mapWidth).toBe(17);
-  expect(full.tiles[1][3]).toBe('empty');
-  expect(full.tiles[1][5]).toBe('destructible');
-  expect(full.tiles[1][7]).toBe('empty');
   // The old right border became floor, the new one is wall.
   expect(full.tiles[1][14]).toBe('empty');
   expect(full.tiles[1][16]).toBe('wall');

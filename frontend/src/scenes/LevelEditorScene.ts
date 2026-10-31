@@ -677,16 +677,23 @@ export class LevelEditorScene extends Phaser.Scene {
       this.isPanning = false;
     });
 
-    // Keyboard shortcuts
+    // Keyboard shortcuts. Phaser replays its whole key queue on every key event until the frame
+    // ends, so a press whose keydown and keyup land in one frame (a quick tap, a slow frame)
+    // reached these handlers two or three times and undid or redid several steps at once.
     if (this.input.keyboard) {
+      const handled = new WeakSet<KeyboardEvent>();
+      const shortcut = (event: KeyboardEvent): boolean => {
+        if (!(event.ctrlKey || event.metaKey) || handled.has(event)) return false;
+        handled.add(event);
+        return true;
+      };
       this.input.keyboard.on('keydown-Z', (event: KeyboardEvent) => {
-        if (event.ctrlKey || event.metaKey) {
-          if (event.shiftKey) this.redo();
-          else this.undo();
-        }
+        if (!shortcut(event)) return;
+        if (event.shiftKey) this.redo();
+        else this.undo();
       });
       this.input.keyboard.on('keydown-Y', (event: KeyboardEvent) => {
-        if (event.ctrlKey || event.metaKey) this.redo();
+        if (shortcut(event)) this.redo();
       });
 
       // Pan keys (false = don't capture, so Ctrl+Z still works)
