@@ -68,6 +68,10 @@ const configSchema = z.object({
   REPLAY_MAX_AGE_DAYS: z.coerce.number().positive().default(365),
   REPLAY_MAX_TOTAL_MB: z.coerce.number().positive().default(10240),
 
+  // Per-IP budget of the app-wide /api limiter (app.ts). The default is built in; the variable
+  // exists only so the e2e overlay can raise it for its single-IP test traffic.
+  API_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(1000),
+
   // GAME_TICK_RATE, MAX_ROOMS, MAX_PLAYERS_PER_ROOM, BOMB_TIMER_SECONDS, POWERUP_DROP_CHANCE and
   // RATE_LIMIT_LOGIN/REGISTER/API used to be declared here, in docker-compose.yml and in
   // .env.example, and were read by nothing: the tick rate and bomb timings are constants in

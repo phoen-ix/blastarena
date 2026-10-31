@@ -18,6 +18,7 @@
 - Admin `roomMessage` server-side sanitization: type check, empty check, 500-char length limit
 
 ### Rate Limiting
+- App-wide HTTP limiter: every `/api` route goes through `express-rate-limit` first (memory store, per IP via `req.ip`, 1000 requests/min, standard `RateLimit` headers, 429 `RATE_LIMITED`). A safety net that needs neither nginx nor Redis; `API_RATE_LIMIT_PER_MIN` exists only so the e2e overlay can raise it
 - Socket rate limiter: in-memory sliding window per socket ID (game:input 30/sec, room:create 2/sec, room:join 5/sec)
 - Cleanup: entries removed on socket disconnect + periodic 60s sweep of stale entries (prevents memory leak)
 - HTTP rate limiter in-memory fallback: when Redis is unavailable, continues via in-memory sliding window instead of failing open

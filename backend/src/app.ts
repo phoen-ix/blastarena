@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { rateLimit } from 'express-rate-limit';
 import { registerRoutes } from './routes';
 import { errorHandler } from './middleware/errorHandler';
 import { localeMiddleware } from './middleware/locale';
@@ -24,6 +25,23 @@ export function createApp(): express.Express {
 
   // Trust proxy (behind nginx)
   app.set('trust proxy', 1);
+
+  // App-wide per-IP safety net in front of every API route, independent of nginx's limit_req and
+  // of Redis (memory store). The strict per-route limiters (middleware/rateLimiter.ts) still apply
+  // on top. 1000 requests per minute is far above any real client: a player averages well under
+  // one request per second (a view switch fires about ten, the open-world view polls every 10 s,
+  // gameplay runs over Socket.io, which never reaches Express), so the budget still covers dozens
+  // of players sharing one NAT address. Keyed by req.ip under the trust-proxy setting above.
+  app.use(
+    '/api',
+    rateLimit({
+      windowMs: 60_000,
+      limit: getConfig().API_RATE_LIMIT_PER_MIN,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      message: { error: 'Too many requests', code: 'RATE_LIMITED' },
+    }),
+  );
 
   // Security headers are set by nginx, not here.
   //

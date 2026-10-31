@@ -24,6 +24,10 @@ services:
 
   backend:
     volumes: !reset []
+    environment:
+      # Every spec and the seed reach the API from one address; the production default
+      # (1000/min per IP, app.ts) is sized for players, not a parallel test suite.
+      API_RATE_LIMIT_PER_MIN: 1000000
     healthcheck:
       interval: 5s
 
