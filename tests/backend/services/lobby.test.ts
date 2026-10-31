@@ -43,7 +43,7 @@ const mockRedis = {
   }),
   // SCAN returns all matching keys in a single cursor pass (test simplification)
   scan: jest.fn<AnyFn>((_cursor: string, _matchKw: string, pattern: string) => {
-    const prefix = pattern.replace('*', '');
+    const prefix = pattern.replaceAll('*', '');
     const matched = [...store.keys()].filter((k) => k.startsWith(prefix));
     return Promise.resolve(['0', matched]);
   }),
@@ -114,7 +114,7 @@ describe('lobby service', () => {
       return Promise.resolve(removed);
     });
     mockRedis.scan.mockImplementation((_cursor: string, _matchKw: string, pattern: string) => {
-      const prefix = pattern.replace('*', '');
+      const prefix = pattern.replaceAll('*', '');
       const matched = [...store.keys()].filter((k) => k.startsWith(prefix));
       return Promise.resolve(['0', matched]);
     });
