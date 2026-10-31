@@ -57,13 +57,17 @@ export function validatePasswordI18n(password: string): ValidationError | null {
   return null;
 }
 
+// Domain labels exclude the dot, so every dot is a label separator and the match is linear.
+// `[^\s@]+\.[^\s@]+` let both sides claim the dots, which backtracked quadratically on input
+// like `a@a.` followed by many `a.`.
+export const EMAIL_RE = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
+
 export function validateEmailI18n(email: string): ValidationError | null {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return { key: 'common:validation.emailInvalid' };
-  }
   if (email.length > 255) {
     return { key: 'common:validation.emailMaxLength', params: { max: 255 } };
+  }
+  if (!EMAIL_RE.test(email)) {
+    return { key: 'common:validation.emailInvalid' };
   }
   return null;
 }

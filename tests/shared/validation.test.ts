@@ -3,6 +3,7 @@ import {
   validateUsername,
   validatePassword,
   validateEmail,
+  EMAIL_RE,
 } from '../../shared/src/utils/validation';
 
 describe('Validation Utils', () => {
@@ -55,6 +56,23 @@ describe('Validation Utils', () => {
       expect(validateEmail('notanemail')).not.toBeNull();
       expect(validateEmail('@domain.com')).not.toBeNull();
       expect(validateEmail('user@')).not.toBeNull();
+      expect(validateEmail('user@domain..com')).not.toBeNull();
+      expect(validateEmail('user@.domain.com')).not.toBeNull();
+      expect(validateEmail('user@domain.com.')).not.toBeNull();
+    });
+
+    it('accepts multi-label domains', () => {
+      expect(validateEmail('a.b@mail.sub.example.co.uk')).toBeNull();
+    });
+
+    it('rejects pathological input in linear time', () => {
+      // The old pattern backtracked quadratically on `!@!.` + many `!.` (CodeQL js/polynomial-redos).
+      // 40k repetitions take the old pattern ~8 s; the new one ~2 ms.
+      const evil = '!@!.' + '!.'.repeat(40_000) + ' ';
+      const start = Date.now();
+      expect(EMAIL_RE.test(evil)).toBe(false);
+      expect(Date.now() - start).toBeLessThan(1000);
+      expect(validateEmail(evil)).not.toBeNull();
     });
   });
 });
