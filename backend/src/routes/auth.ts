@@ -1,8 +1,10 @@
 import { Router, Response } from 'express';
+import cookieParser from 'cookie-parser';
 import { z } from 'zod';
 import { validate } from '../middleware/validation';
 import { authMiddleware } from '../middleware/auth';
 import { rateLimiter } from '../middleware/rateLimiter';
+import { issueCsrfToken, verifyCsrfToken } from '../middleware/csrf';
 import * as authService from '../services/auth';
 import * as cosmeticsService from '../services/cosmetics';
 import * as totpService from '../services/totp';
@@ -22,6 +24,11 @@ import {
 import { param } from '../utils/params';
 
 const router = Router();
+
+// Cookies are parsed only on the routes that read one: the refresh/CSRF cookies (path /api/auth)
+// and the local co-op P2 cookie (path /api/local-coop). Everything else authenticates with the
+// Authorization header, so no other handler can come to rely on an ambient credential.
+const parseCookies = cookieParser();
 
 const registerSchema = z.object({
   username: z.string().min(USERNAME_MIN_LENGTH).max(USERNAME_MAX_LENGTH),
@@ -134,11 +141,13 @@ router.post(
   },
 );
 
+router.get('/auth/csrf', parseCookies, issueCsrfToken);
+
 // No authMiddleware: logout must revoke the refresh token even when the access token has
-// expired. It acts solely on the httpOnly refresh-token cookie (which is sameSite=strict, so it
-// is not sent on cross-site requests — CSRF-safe). Without this, an expired access token left the
-// refresh token live in the DB after a "logout". (audit AUTH-1)
-router.post('/auth/logout', async (req, res, next) => {
+// expired. It acts solely on the httpOnly refresh-token cookie (sameSite=strict, plus the
+// double-submit CSRF token). Without this, an expired access token left the refresh token live
+// in the DB after a "logout". (audit AUTH-1)
+router.post('/auth/logout', parseCookies, verifyCsrfToken, async (req, res, next) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
     if (refreshToken) {
@@ -152,7 +161,7 @@ router.post('/auth/logout', async (req, res, next) => {
   }
 });
 
-router.post('/auth/refresh', async (req, res, next) => {
+router.post('/auth/refresh', parseCookies, verifyCsrfToken, async (req, res, next) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
     if (!refreshToken) {
@@ -365,7 +374,7 @@ async function startLocalCoopSession(
   res.json({ user: { id: userId, username }, cosmetics });
 }
 
-router.get('/local-coop/session', async (req, res, next) => {
+router.get('/local-coop/session', parseCookies, async (req, res, next) => {
   try {
     const token = req.cookies?.[LOCAL_COOP_COOKIE];
     if (!token) {
@@ -396,7 +405,7 @@ router.get('/local-coop/session', async (req, res, next) => {
   }
 });
 
-router.get('/local-coop/socket-token', authMiddleware, async (req, res, next) => {
+router.get('/local-coop/socket-token', parseCookies, authMiddleware, async (req, res, next) => {
   try {
     const cookieToken = req.cookies?.[LOCAL_COOP_COOKIE];
     if (!cookieToken) {

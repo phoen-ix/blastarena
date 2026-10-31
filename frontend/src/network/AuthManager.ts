@@ -11,6 +11,16 @@ import { API_URL } from '../config';
 
 export type AuthChangeCallback = (user: PublicUser | null) => void;
 
+/**
+ * The double-submit token the cookie-authenticated routes (/auth/refresh, /auth/logout) require.
+ * Fetched before each use: the server reuses its cookie, so every tab gets the same value.
+ */
+async function csrfHeaders(): Promise<Record<string, string>> {
+  const response = await fetch(`${API_URL}/auth/csrf`, { credentials: 'include' });
+  const { csrfToken } = (await response.json()) as { csrfToken: string };
+  return { 'X-CSRF-Token': csrfToken };
+}
+
 export class AuthManager {
   private accessToken: string | null = null;
   private currentUser: PublicUser | null = null;
@@ -145,6 +155,7 @@ export class AuthManager {
       const response = await fetch(`${API_URL}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
+        headers: await csrfHeaders(),
       });
 
       if (!response.ok) return false;
@@ -161,7 +172,11 @@ export class AuthManager {
     if (this._loggingOut) return;
     this._loggingOut = true;
     try {
-      await ApiClient.post('/auth/logout', undefined, true);
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: await csrfHeaders(),
+      });
     } catch {
       // Ignore errors during logout
     }

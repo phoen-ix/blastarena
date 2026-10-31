@@ -29,6 +29,7 @@
 
 ### Authentication
 - JWT access tokens in-memory only, refresh token in httpOnly sameSite:strict cookie with secure flag derived from APP_URL
+- CSRF: only the auth and local co-op routes parse cookies (everything else authenticates with the `Authorization` header). `POST /auth/refresh` and `/auth/logout` act on the refresh cookie alone, so they also require a double-submit token: the SPA reads it from `GET /auth/csrf` (sets the httpOnly `csrfToken` cookie, path `/api/auth`) and echoes it in `X-CSRF-Token`; a mismatch is 403 `CSRF_INVALID`
 - Password hashing: bcrypt with 12 salt rounds
 - Refresh token rotation with reuse detection
 - JWT_SECRET minimum 32 chars enforced via Zod config validation

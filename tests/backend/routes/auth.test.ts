@@ -89,6 +89,7 @@ jest.mock('../../../backend/src/utils/logger', () => ({
 // ---------------------------------------------------------------------------
 
 import authRouter from '../../../backend/src/routes/auth';
+import { verifyCsrfToken } from '../../../backend/src/middleware/csrf';
 import { Request, Response, NextFunction } from 'express';
 
 // ---------------------------------------------------------------------------
@@ -572,8 +573,14 @@ describe('Middleware presence', () => {
     const logoutStack = getRouteStack('post', '/auth/logout');
     const middlewareFns = logoutStack.map((entry) => entry.handle);
     expect(middlewareFns).not.toContain(mockAuthMiddleware);
-    // Only the handler remains on the route.
-    expect(logoutStack.length).toBe(1);
+    // Cookie parsing and the double-submit CSRF check, then the handler.
+    expect(middlewareFns).toContain(verifyCsrfToken);
+    expect(logoutStack.length).toBe(3);
+  });
+
+  it('refresh, which also acts on the cookie alone, takes the CSRF check', () => {
+    const middlewareFns = getRouteStack('post', '/auth/refresh').map((entry) => entry.handle);
+    expect(middlewareFns).toContain(verifyCsrfToken);
   });
 
   it('validate middleware is applied to register, login, forgot-password, reset-password', () => {

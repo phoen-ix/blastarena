@@ -259,6 +259,34 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /auth/csrf:
+    get:
+      tags: [Auth]
+      summary: CSRF token for the cookie-authenticated auth routes
+      description: |
+        Returns the double-submit token that POST /auth/refresh and /auth/logout require in
+        X-CSRF-Token, and sets it as the httpOnly csrfToken cookie (path /api/auth). An existing
+        valid cookie is reused, so every tab gets the same token.
+      security: []
+      operationId: getCsrfToken
+      responses:
+        '200':
+          description: The token
+          headers:
+            Set-Cookie:
+              description: httpOnly csrfToken cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [csrfToken]
+                properties:
+                  csrfToken:
+                    type: string
+                    pattern: '^[0-9a-f]{64}$'
+
   /auth/logout:
     post:
       tags: [Auth]
@@ -268,7 +296,11 @@ paths:
         the cookie. Needs no Authorization header, so it also works after the access token has expired.
       security: []
       operationId: logout
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
       responses:
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
         '200':
           description: Logged out
           headers:
@@ -289,6 +321,8 @@ paths:
       security:
         - CookieAuth: []
       operationId: refreshToken
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
       responses:
         '200':
           description: Token refreshed
@@ -308,7 +342,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '403':
-          description: Account deactivated (`DEACTIVATED`)
+          description: Account deactivated (`DEACTIVATED`), or the CSRF token is missing or does not match the csrfToken cookie (`CSRF_INVALID`)
           content:
             application/json:
               schema:
@@ -6377,6 +6411,13 @@ components:
       description: httpOnly refresh token cookie (set by login/refresh endpoints)
 
   parameters:
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: The token from GET /auth/csrf; must match the csrfToken cookie
+      schema:
+        type: string
     ResourceId:
       name: id
       in: path
@@ -6439,6 +6480,12 @@ components:
                       description: Dotted path of the invalid field
                     message:
                       type: string
+    CsrfInvalid:
+      description: Missing X-CSRF-Token, or it does not match the csrfToken cookie (`CSRF_INVALID`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
     RateLimited:
       description: Too many requests (`RATE_LIMITED`)
       headers:
