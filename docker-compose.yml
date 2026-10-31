@@ -33,7 +33,7 @@ services:
         max-file: "3"
 
   redis:
-    image: redis:8.10.2-alpine3.23
+    image: redis:8.10.3-alpine3.23
     container_name: ${COMPOSE_PROJECT_NAME:-blast-arena}-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy volatile-lru

@@ -35,7 +35,7 @@ services:
       - "127.0.0.1:${PORT_BASE:-24200}:80"
 
   mailpit:
-    image: axllent/mailpit:v1.32.0
+    image: axllent/mailpit:v1.33.0
     profiles: [mail]
     container_name: ${COMPOSE_PROJECT_NAME}-mailpit
     environment:
