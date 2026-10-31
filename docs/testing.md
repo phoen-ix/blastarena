@@ -195,6 +195,8 @@ Socket.io event handler tests — handlers tested with mock socket/io objects an
 | `middleware/rateLimiter.test.ts` | Redis-backed rate limiting (atomic Lua, 429 + Retry-After), in-memory fallback, keys per IP and per route pattern (all ids of a parameterised route such as `/admin/replays/:matchId` share one budget) |
 | `middleware/locale.test.ts` | x-language priority, accept-language fallback, base language extraction, default 'en' |
 | `middleware/validation.test.ts` | Zod validation of body/query/params, parsed output replaces the input (extra fields stripped), field-level error details, non-Zod errors forwarded |
+| `middleware/apiRateLimit.test.ts` | Real app over HTTP: the app-wide `/api` limiter answers 429 `RATE_LIMITED` past its per-IP budget on any route, RateLimit headers, default 1000/min |
+| `middleware/csrf.test.ts` | Real app over HTTP: `/auth/refresh` and `/auth/logout` refuse a missing or mismatched X-CSRF-Token (403 `CSRF_INVALID`), a matching one reaches the handler, `GET /auth/csrf` reuses its cookie |
 | `middleware/bodyParserErrors.test.ts` | Real Express stack: malformed JSON → 400 INVALID_JSON (body not reflected), corrupt gzip → 4xx, oversized → 413, unsupported charset → 415 |
 
 ### Database
@@ -228,10 +230,11 @@ Backend utilities, config guards (nginx, Compose, Node version) and the shared-p
 | `shared/xp.test.ts` | XP calculation, level-from-XP math, level-for-XP inverse, placement bonuses, multiplier |
 | `../shared/mapValidation.test.ts` | Dimension limits, odd enforcement, tile validity, border walls, spawn counts, spawnPoints vs spawn tiles, teleporter pairing, switch/gate pairing |
 | `utils/gameLogger.test.ts` | Idle gating of empty-room tick logs, verbosity mapping, pruneOldLogs (age/size limits, logs with real players protected, throttled), peak-player filename on close |
+| `utils/safePath.test.ts` | resolveInside refuses `..`, sibling prefixes, absolute and empty segments |
 | `utils/crypto.test.ts` | Password hashing/comparison, token generation/hashing, scrubEmailError (addresses removed, message capped) |
 | `utils/socketRateLimit.test.ts` | Per-socket sliding window (1s reset, stale-entry cleanup), createRateLimiters presets (input 30/s, create 2/s, join 5/s), removeSocket |
 | `utils/guestUsername.test.ts` | sanitizeGuestUsername (strips/trims/caps, result always USERNAME_REGEX-valid), adminSpectateSchema room-code shape |
-| `../shared/validation.test.ts` | Username, password, email validation rules |
+| `../shared/validation.test.ts` | Username, password, email validation rules; the email pattern runs in linear time |
 | `../shared/artStyles.test.ts` | Art style ids: Classic is the built-in default, isArtStyleId accepts the listed styles only |
 | `utils/composeIsolation.test.ts` | Dev compose stack cannot adopt prod: no shared container names, host ports or data mounts, overrides instead of appends, own project name, documented dev command always passes `-p` |
 | `utils/replayPrune.test.ts` | pruneOldReplays: age/size limits oldest-first, campaign replays never auto-deleted, fresh files kept, throttled, missing directory tolerated |
