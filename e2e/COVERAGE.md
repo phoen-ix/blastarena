@@ -6,7 +6,7 @@ not driven. The suite is split in two parts with their own spec directories and 
 | Part | Scope | Specs | Coverage |
 |---|---|---|---|
 | A | player side: landing and open world, lobby views, rooms, matches (bots, several browser contexts), campaign, replays, help, social, stats, settings | `e2e/player/` | [COVERAGE.a.md](COVERAGE.a.md) |
-| B | admin side and the level editor | see [COVERAGE.b.md](COVERAGE.b.md) | [COVERAGE.b.md](COVERAGE.b.md) |
+| B | admin tabs, level editor, languages, themes, account flows | see [COVERAGE.b.md](COVERAGE.b.md) | [COVERAGE.b.md](COVERAGE.b.md) |
 
 Each part file starts with its extraction command, date and item count.
 

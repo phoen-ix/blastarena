@@ -49,15 +49,21 @@ test('replay a recorded match: play, pause, speed, seek, log, back', async ({ pa
   const play = controls.getByTitle('Play/Pause');
   const at = async () => (await time.textContent()) ?? '';
 
-  // Playing moves the clock; pausing stops it.
+  // Playing moves the clock; pausing stops it. The slider is the frame index (20 a second while
+  // playing): paused, it stays put for 1.5 s of real time.
   if ((await play.textContent()) === '▶') await play.click();
   await expect(play).toHaveText('⏸');
   const t0 = await at();
   await expect.poll(at).not.toBe(t0);
   await play.click();
   await expect(play).toHaveText('▶');
-  const paused = await at();
-  await expect(time).toHaveText(paused);
+  const frame = controls.getByRole('slider');
+  const pausedAt = await frame.inputValue();
+  const since = Date.now();
+  await expect
+    .poll(async () => (await frame.inputValue()) !== pausedAt || Date.now() - since > 1_500)
+    .toBe(true);
+  await expect(frame).toHaveValue(pausedAt);
 
   await controls.getByTitle('Cycle speed').click();
   await expect(controls.getByTitle('Cycle speed')).toHaveText('2x');

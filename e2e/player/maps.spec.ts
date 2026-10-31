@@ -1,15 +1,4 @@
-import {
-  test,
-  expect,
-  admin,
-  createUser,
-  ok,
-  openLobby,
-  openView,
-  press,
-  uniq,
-  type User,
-} from './lib';
+import { test, expect, admin, createUser, ok, openLobby, openView, uniq, type User } from './lib';
 
 /* My Maps (list, publish, delete, open the editor), a custom map in Create Room, and the weekly
  * challenge on a player's map. The editor itself is covered by the admin/editor suite. */
@@ -79,7 +68,7 @@ test('create room on a custom map: preview and the room names the map', async ({
   // The generator's size and density do not apply to a custom map.
   await expect(page.getByLabel('Map Size')).toBeDisabled();
   await page.getByLabel('Room Name').fill(uniq('On map '));
-  await press(page, '#cr-submit');
+  await page.getByRole('button', { name: 'Create Room', exact: true }).click();
   await expect(page.locator('#room-player-list')).toBeVisible();
   await expect(page.getByText(name)).toBeVisible();
   await expect(page.getByText('Wall Density')).toHaveCount(0);

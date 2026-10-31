@@ -9,7 +9,6 @@ import {
   newPage,
   openLobby,
   openView,
-  press,
   selfDestruct,
   uniq,
 } from './lib';
@@ -23,7 +22,7 @@ test('create room form: cancel, then create a room with bots and leave it', asyn
   await openLobby(page, u);
   await openView(page, 'rooms');
   await page.locator('#create-room-btn').click();
-  await press(page, '#cr-cancel');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(page.locator('#room-list')).toBeVisible();
 
   const name = uniq('Room ');
@@ -140,6 +139,40 @@ test('two players: live list, join, ready, start, rematch vote', async ({
   await pageB.context().close();
 });
 
+// Every other mode starts from Create Room into a match (FFA: the solo test above).
+const MODES = [
+  ['teams', 'Teams'],
+  ['battle_royale', 'Battle Royale'],
+  ['sudden_death', 'Sudden Death'],
+  ['deathmatch', 'Deathmatch'],
+  ['king_of_the_hill', 'King of the Hill'],
+] as const;
+for (const [mode, label] of MODES) {
+  test(`a ${label} match starts against a bot`, async ({ page }) => {
+    test.setTimeout(180_000);
+    const u = await createUser('mode');
+    await openLobby(page, u);
+    await createRoom(page, { name: uniq('Mode '), mode, bots: '1' });
+    await expect(page.locator('.lobby-header')).toContainText(label);
+    await page.getByRole('button', { name: 'Start Game' }).click();
+    await expect(page.locator('.hud-players')).toContainText(u.username);
+    await expectScene(page, 'GameScene');
+    if (mode === 'sudden_death') {
+      // Everyone starts maxed out: 8 bombs, range 8, kick.
+      await expect(page.locator('#stat-bombs')).toHaveText('8');
+      await expect(page.locator('#stat-fire')).toHaveText('8');
+      await expect(page.locator('#stat-kick')).toHaveCSS('opacity', '1');
+    }
+    const leave = page.getByRole('button', { name: 'Leave Game' });
+    await expect(async () => {
+      if (!(await leave.isVisible())) await page.keyboard.press('Escape');
+      await expect(leave).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 10_000 });
+    await leave.click();
+    await expect(page.locator('#nav-rooms')).toBeVisible();
+  });
+}
+
 test('teams: the host assigns teams the other player sees', async ({ page, browser, guard }) => {
   const [host, guest] = [await createUser('tmh'), await createUser('tmg')];
   const pageB = await newPage(browser, guard);
@@ -163,7 +196,9 @@ test('teams: the host assigns teams the other player sees', async ({ page, brows
   const bot = page.getByLabel('Team assignment for Bot 1');
   const botOther = (await bot.inputValue()) === '0' ? '1' : '0';
   await bot.selectOption(botOther);
-  await expect(page.getByLabel('Team assignment for Bot 1')).toHaveValue(botOther);
+  await expect(pageB.locator('#room-player-list > div', { hasText: 'Bomber Bot' })).toContainText(
+    new RegExp(botOther === '0' ? 'Red' : 'Blue', 'i'),
+  );
   // Only the host gets the selects.
   await expect(pageB.locator('.team-select')).toHaveCount(0);
   await pageB.context().close();
@@ -189,7 +224,7 @@ test('spectating after death: banner, spectator chat and actions', async ({
   await page.getByLabel('Max Players').selectOption('4');
   await page.getByLabel('Match Time').selectOption('120');
   await page.getByRole('checkbox', { name: /Spectator/i }).check();
-  await press(page, '#cr-submit');
+  await page.getByRole('button', { name: 'Create Room', exact: true }).click();
   for (const p of others) {
     await openView(p, 'rooms');
     await p.locator('.room-card', { hasText: name }).click();

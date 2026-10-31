@@ -273,11 +273,6 @@ export async function openView(page: Page, id: string): Promise<void> {
   await expect(page.locator(`#nav-${id}`)).toHaveClass(/active/);
 }
 
-/** Clicks an element the fixed lobby-chat dock may cover. */
-export async function press(page: Page, selector: string): Promise<void> {
-  await page.locator(selector).evaluate((el: HTMLElement) => el.click());
-}
-
 // ---- Game -------------------------------------------------------------------------------
 
 /** Keys of the running Phaser scenes (e2e build probe, see frontend/src/main.ts). */
@@ -320,7 +315,7 @@ export async function createRoom(page: Page, o: RoomOpts): Promise<void> {
   await page.getByLabel('Match Time').selectOption(o.roundTime ?? '60');
   if (o.bots) await page.getByLabel('Bot Count').selectOption(o.bots);
   if (o.difficulty) await page.getByLabel('Bot Difficulty').selectOption(o.difficulty);
-  await press(page, '#cr-submit');
+  await page.getByRole('button', { name: 'Create Room', exact: true }).click();
   await expect(page.getByRole('heading', { name: o.name })).toBeVisible();
 }
 

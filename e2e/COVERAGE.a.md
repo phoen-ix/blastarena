@@ -1,10 +1,11 @@
 # E2E coverage, part A: the player side
 
 Landing and open world, lobby views, rooms, matches (bots and several browser contexts), campaign,
-replays, help, social, stats, settings. Admin tabs and the level editor are part B
-([COVERAGE.b.md](COVERAGE.b.md)). Specs: `e2e/player/*.spec.ts`; run with `bash scripts/e2e.sh`.
+replays, help, social, stats, settings. Admin tabs, the level editor, languages, themes
+and account flows are part B ([COVERAGE.b.md](COVERAGE.b.md)).
+Specs: `e2e/player/*.spec.ts`; run with `bash scripts/e2e.sh`.
 
-Inventory (2026-10-30, **81 items**; plus 45 rows for views without a nav entry, flows, dialogs and error states), from the repo root:
+Inventory (2026-10-30, **81 items**; plus 46 rows for views without a nav entry, flows, dialogs and error states), from the repo root:
 
 ```bash
 { grep -ho "key: '[A-Za-z]*Scene'" frontend/src/scenes/*.ts | sed "s/key: //;s/'//g;s/^/scene /"
@@ -156,7 +157,8 @@ Roles: G guest, U user, M moderator, A admin. ✅ = `spec › test`; ❌ = not d
 | spectator view after death | U | ✅ `rooms.spec.ts › spectating after death: banner, spectator chat and actions` |
 | game over: Play Again (solo), rematch vote (two humans), Back to Lobby | U | ✅ `rooms.spec.ts › a solo match against a bot: HUD, bomb, game over, play again`, `rooms.spec.ts › two players: live list, join, ready, start, rematch vote`, `replay.spec.ts › replay a recorded match: play, pause, speed, seek, log, back` |
 | game over: Elo, XP, level-up and achievement panels (canvas text) | U | ❌ (c) values from `tests/backend/services/elo.test.ts`, `achievements.test.ts`; the panels are canvas-only text |
-| game modes in play (teams, BR zone, KOTH, sudden death, deathmatch), power-ups, hazards, map events, puzzle tiles | U | ❌ (c) engine rules: `tests/backend/game/{ModeEdgeCases,BattleRoyale,PowerUp,HazardTiles,MapEventPrune,GameLoop}.test.ts`; the e2e matches cover FFA and deathmatch end to end |
+| game modes from Create Room into a match (FFA: solo test; teams, battle royale, sudden death with maxed stats, deathmatch, KOTH) | U | ✅ `rooms.spec.ts › a Teams match starts against a bot`, `rooms.spec.ts › a Battle Royale match starts against a bot`, `rooms.spec.ts › a Sudden Death match starts against a bot`, `rooms.spec.ts › a Deathmatch match starts against a bot`, `rooms.spec.ts › a King of the Hill match starts against a bot` |
+| engine rules: team win, BR zone, KOTH scoring, deathmatch respawn, power-ups, hazards, map events, puzzle tiles | U | ❌ (c) canvas-only, tested in the engine: `tests/backend/game/GameState.test.ts` (team win, KOTH scoring, zone init), `BattleRoyale.test.ts`, `ModeEdgeCases.test.ts` (deathmatch respawn), `{Player,PowerUp,PowerUpDrops}.test.ts`, `HazardTiles.test.ts`, `{MapEventPrune,EngineRegressions}.test.ts` (map events), `tests/shared/puzzle.test.ts`, `CampaignGame.test.ts` (puzzle tiles) |
 | campaign: pause menu (continue, restart, exit) | U | ✅ `campaign.spec.ts › solo level: HUD, pause, continue, restart, exit` |
 | campaign: level complete, results, progress unlocks next level | U | ✅ `campaign.spec.ts › a completed level unlocks the next one` |
 | campaign: local co-op setup dialog, buddy setup dialog | U | ✅ `campaign.spec.ts › local co-op and buddy setup start a level` |

@@ -49,13 +49,18 @@ test('staff get the level-editor and staff-docs tabs', async ({ page }) => {
 
 test('the imprint tab shows the text an admin set', { tag: '@global' }, async ({ page }) => {
   const a = await admin();
-  await ok('PUT', '/admin/settings/imprint', a.token, {
-    enabled: true,
-    text: 'BlastArena e2e imprint\nExample Street 1',
-  });
-  const u = await createUser('imp');
-  await openLobby(page, u);
-  await openView(page, 'help');
-  await page.locator('#help-tab-bar [data-tab="imprint"]').click();
-  await expect(page.locator('#help-tab-content')).toContainText('BlastArena e2e imprint');
+  const before = await ok<{ enabled: boolean; text: string }>('GET', '/admin/settings/imprint');
+  try {
+    await ok('PUT', '/admin/settings/imprint', a.token, {
+      enabled: true,
+      text: 'BlastArena e2e imprint\nExample Street 1',
+    });
+    const u = await createUser('imp');
+    await openLobby(page, u);
+    await openView(page, 'help');
+    await page.locator('#help-tab-bar [data-tab="imprint"]').click();
+    await expect(page.locator('#help-tab-content')).toContainText('BlastArena e2e imprint');
+  } finally {
+    await ok('PUT', '/admin/settings/imprint', a.token, before);
+  }
 });
