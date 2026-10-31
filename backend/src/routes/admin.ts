@@ -976,7 +976,8 @@ router.get('/admin/users', async (req, res, next) => {
     // `?limit=1000000` streamed the whole table. (audit ADMIN-PAGINATION-1)
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
-    const search = req.query.search as string | undefined;
+    // `?search=a&search=b` arrives as an array; only a single string is a search term.
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     const result = await adminService.listUsers(page, limit, search);
     res.json(result);
   } catch (err) {
@@ -1234,7 +1235,7 @@ router.get('/admin/actions', adminOnlyMiddleware, async (req, res, next) => {
     // `?limit=1000000` streamed the whole table. (audit ADMIN-PAGINATION-1)
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
-    const action = req.query.action as string | undefined;
+    const action = typeof req.query.action === 'string' ? req.query.action : undefined;
     const result = await adminService.getAdminActions(page, limit, action);
     res.json(result);
   } catch (err) {

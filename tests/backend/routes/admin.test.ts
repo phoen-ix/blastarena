@@ -1060,6 +1060,15 @@ describe('GET /admin/users', () => {
     expect(mockListUsers).toHaveBeenCalledWith(1, 10, 'alice');
   });
 
+  it('ignores a repeated search parameter (an array, not a string)', async () => {
+    // The service calls string methods on it: `?search=@&search=x` used to throw a 500.
+    mockListUsers.mockResolvedValue({ users: [], total: 0 });
+    const req = mockReq({ query: { search: ['@', 'x'] } });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+    expect(mockListUsers).toHaveBeenCalledWith(1, 20, undefined);
+  });
+
   it('defaults to page 1 and limit 20 when not specified', async () => {
     mockListUsers.mockResolvedValue({ users: [], total: 0 });
     const req = mockReq({ query: {} });
@@ -1539,6 +1548,14 @@ describe('GET /admin/actions', () => {
     const res = mockRes();
     await handler(req, res, jest.fn());
     expect(mockGetAdminActions).toHaveBeenCalledWith(1, 10, 'delete_user');
+  });
+
+  it('ignores a repeated action parameter (an array, not a string)', async () => {
+    mockGetAdminActions.mockResolvedValue({ actions: [], total: 0 });
+    const req = mockReq({ query: { action: ['delete_user', 'create_user'] } });
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+    expect(mockGetAdminActions).toHaveBeenCalledWith(1, 20, undefined);
   });
 
   it('defaults to page 1 and limit 20 when not specified', async () => {
