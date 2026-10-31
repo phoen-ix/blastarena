@@ -1103,13 +1103,16 @@ export class SettingsUI {
     `,
     );
 
+    // One timer: an earlier save's timer must not clear a later save's message.
+    let clearStatus: ReturnType<typeof setTimeout> | undefined;
     const savePrivacy = async (field: string, value: boolean) => {
       const statusEl = this.contentEl!.querySelector('#privacy-status')!;
       try {
         await ApiClient.put('/user/privacy', { [field]: value });
         this.profileCache = null;
         setHtml(statusEl, `<span class="text-success">${t('settings.privacy.saved')}</span>`);
-        setTimeout(() => {
+        clearTimeout(clearStatus);
+        clearStatus = setTimeout(() => {
           setHtml(statusEl, '');
         }, 2000);
       } catch (err: unknown) {

@@ -216,10 +216,21 @@ test('privacy: switches save and take effect for other players', async ({ page }
   await settingsTab(page, 'privacy');
   const accept = page.getByRole('checkbox', { name: /Accept Friend Requests/ });
   await expect(accept).toBeChecked();
+  // Fake, paused time: a second switch saved 1.5 s after the first keeps its "Saved!" for its own
+  // 2 s (the first save's timer used to clear it at once).
+  await page.clock.install();
+  await page.clock.pauseAt(Date.now() + 1_000);
+  const status = page.locator('#privacy-status');
   await accept.click();
-  await expect(page.locator('#privacy-status')).toContainText('Saved!');
+  await expect(status).toContainText('Saved!');
+  await status.locator('span').evaluate((el) => el.setAttribute('data-first', ''));
+  await page.clock.runFor(1_500);
   await page.getByRole('checkbox', { name: /Public Profile/ }).click();
-  await expect(page.locator('#privacy-status')).toContainText('Saved!');
+  await expect(status.locator('span:not([data-first])')).toContainText('Saved!');
+  await page.clock.runFor(600);
+  await expect(status).toContainText('Saved!');
+  await page.clock.runFor(1_500);
+  await expect(status).toBeEmpty();
 
   const profile = await api('GET', `/user/${u.id}/public`, other.token);
   expect(profile.status).toBeGreaterThanOrEqual(400);
