@@ -109,6 +109,20 @@ describe('OpenWorldManager', () => {
     openWorldManager.shutdown();
   });
 
+  describe('guest names', () => {
+    it('draws them from crypto, not Math.random', () => {
+      const spy = jest.spyOn(Math, 'random');
+      try {
+        const res = openWorldManager.handleJoin('sock-guest', 0, '', true);
+        expect(res.success).toBe(true);
+        expect(res.username).toMatch(/^Guest_[A-Z][a-z]+\d{1,2}$/);
+        expect(spy).not.toHaveBeenCalled();
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
   describe('getLeaderboard', () => {
     it('returns every player sorted by score, then kills — not just the top 10', () => {
       for (let i = 0; i < 12; i++) {

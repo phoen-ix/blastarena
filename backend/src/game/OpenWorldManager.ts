@@ -1,3 +1,4 @@
+import { randomInt } from 'crypto';
 import { Server } from 'socket.io';
 import {
   GameState as GameStateType,
@@ -409,7 +410,7 @@ class OpenWorldManager {
     if (isGuest) {
       userId = OPENWORLD_GUEST_ID_START - this.guestCounter++;
       if (!username) {
-        username = `Guest_${ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)]}${Math.floor(Math.random() * 100)}`;
+        username = `Guest_${ADJECTIVES[randomInt(ADJECTIVES.length)]}${randomInt(100)}`;
       }
     }
 
