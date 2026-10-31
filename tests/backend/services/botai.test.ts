@@ -738,5 +738,15 @@ describe('BotAI Service', () => {
 
       expect(result).toBeNull();
     });
+
+    it('never builds a path outside the AI directory from the id', async () => {
+      // The id comes from the URL; MariaDB's PAD SPACE / case-insensitive match means the row
+      // lookup alone does not pin it to the stored value.
+      mockQuery.mockResolvedValue([makeRow({ is_builtin: false })]);
+      mockExistsSync.mockReturnValue(true);
+
+      await expect(downloadSource('../../etc')).rejects.toThrow(/escapes/);
+      expect(mockReadFileSync).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import { resolveInside } from '../utils/safePath';
 import { logger } from '../utils/logger';
 import { BotAI, IBotAI } from '../game/BotAI';
 import { query } from '../db/connection';
@@ -89,7 +90,7 @@ export class BotAIRegistry {
   }
 
   loadAI(id: string): void {
-    const jsPath = path.join(AI_BASE_DIR, id, 'compiled.js');
+    const jsPath = resolveInside(AI_BASE_DIR, id, 'compiled.js');
     if (!fs.existsSync(jsPath)) {
       throw new Error(`Compiled AI file not found: ${jsPath}`);
     }

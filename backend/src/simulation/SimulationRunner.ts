@@ -5,6 +5,7 @@ import { SimulationConfig, SimulationBatchStatus, SimulationGameResult } from '@
 import { SimulationGame } from './SimulationGame';
 import { getIO } from '../game/registry';
 import { logger } from '../utils/logger';
+import { resolveInside } from '../utils/safePath';
 
 const SIM_LOG_DIR = process.env.SIMULATION_LOG_DIR || '/app/simulations';
 
@@ -31,7 +32,7 @@ export class SimulationRunner extends EventEmitter {
 
     // Create log directory: data/simulations/{gameMode}/batch_{timestamp}_{batchId}/
     const ts = this.startedAt.toISOString().replace(/[:.]/g, '-');
-    this.logDir = path.join(SIM_LOG_DIR, config.gameMode, `batch_${ts}_${batchId}`);
+    this.logDir = resolveInside(SIM_LOG_DIR, config.gameMode, `batch_${ts}_${batchId}`);
 
     if (!fs.existsSync(this.logDir)) {
       fs.mkdirSync(this.logDir, { recursive: true });

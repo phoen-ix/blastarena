@@ -19,6 +19,7 @@ import {
   TICK_RATE,
 } from '@blast-arena/shared';
 import { logger } from './logger';
+import { resolveInside } from './safePath';
 import { invalidateReplayIndex } from '../services/replay';
 
 const REPLAY_DIR = process.env.REPLAY_DIR || '/app/replays';
@@ -363,7 +364,7 @@ export class ReplayRecorder {
         this.matchId === 0 && this.sessionId
           ? `campaign_${this.sessionId}.replay.json.gz`
           : `${this.matchId}_${this.roomCode}_${this.gameMode}.replay.json.gz`;
-      const filePath = path.join(dir, filename);
+      const filePath = resolveInside(dir, filename);
       const frameCount = this.frames.length;
       const json = JSON.stringify(replayData);
 

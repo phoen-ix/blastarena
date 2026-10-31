@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import { resolveInside } from '../utils/safePath';
 import { randomUUID } from 'crypto';
 import { EnemyAIEntry } from '@blast-arena/shared';
 import { query, execute } from '../db/connection';
@@ -89,7 +90,7 @@ export async function uploadEnemyAI(
   }
 
   const id = randomUUID();
-  const aiDir = path.join(ENEMY_AI_BASE_DIR, id);
+  const aiDir = resolveInside(ENEMY_AI_BASE_DIR, id);
   fs.mkdirSync(aiDir, { recursive: true });
 
   fs.writeFileSync(path.join(aiDir, 'source.ts'), source);
@@ -133,7 +134,7 @@ export async function uploadEnemyAIFromSource(
   }
 
   const id = randomUUID();
-  const aiDir = path.join(ENEMY_AI_BASE_DIR, id);
+  const aiDir = resolveInside(ENEMY_AI_BASE_DIR, id);
   fs.mkdirSync(aiDir, { recursive: true });
 
   fs.writeFileSync(path.join(aiDir, 'source.ts'), source);
@@ -230,7 +231,7 @@ export async function reuploadEnemyAI(
     return { success: false, errors: result.errors };
   }
 
-  const aiDir = path.join(ENEMY_AI_BASE_DIR, id);
+  const aiDir = resolveInside(ENEMY_AI_BASE_DIR, id);
   fs.writeFileSync(path.join(aiDir, 'source.ts'), source);
   fs.writeFileSync(path.join(aiDir, 'compiled.js'), result.compiledCode!);
 
@@ -265,7 +266,7 @@ export async function deleteEnemyAI(id: string, adminId: number): Promise<void> 
 
   getEnemyAIRegistry().unloadAI(id);
 
-  const aiDir = path.join(ENEMY_AI_BASE_DIR, id);
+  const aiDir = resolveInside(ENEMY_AI_BASE_DIR, id);
   if (fs.existsSync(aiDir)) {
     fs.rmSync(aiDir, { recursive: true, force: true });
   }
@@ -289,7 +290,7 @@ export async function downloadEnemyAISource(
   const rows = await query<EnemyAIRow[]>('SELECT * FROM enemy_ais WHERE id = ?', [id]);
   if (rows.length === 0) return null;
 
-  const sourcePath = path.join(ENEMY_AI_BASE_DIR, id, 'source.ts');
+  const sourcePath = resolveInside(ENEMY_AI_BASE_DIR, id, 'source.ts');
   if (!fs.existsSync(sourcePath)) return null;
 
   return {

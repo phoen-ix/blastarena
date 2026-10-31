@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import { resolveInside } from '../utils/safePath';
 import { logger } from '../utils/logger';
 import { IEnemyAI, EnemyAIContext } from '../game/EnemyAI';
 import { query } from '../db/connection';
@@ -94,7 +95,7 @@ export class EnemyAIRegistry {
 
   /** An uploaded AI: its compiled code runs in an isolate when an instance is created. */
   loadAI(id: string): void {
-    const jsPath = path.join(ENEMY_AI_BASE_DIR, id, 'compiled.js');
+    const jsPath = resolveInside(ENEMY_AI_BASE_DIR, id, 'compiled.js');
     if (!fs.existsSync(jsPath)) {
       throw new Error(`Compiled enemy AI file not found: ${jsPath}`);
     }

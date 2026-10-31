@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import { resolveInside } from '../utils/safePath';
 import { randomUUID } from 'crypto';
 import { BotAIEntry } from '@blast-arena/shared';
 import { query, execute } from '../db/connection';
@@ -82,7 +83,7 @@ export async function uploadAI(
   }
 
   const id = randomUUID();
-  const aiDir = path.join(AI_BASE_DIR, id);
+  const aiDir = resolveInside(AI_BASE_DIR, id);
   fs.mkdirSync(aiDir, { recursive: true });
 
   // Write source and compiled files
@@ -179,7 +180,7 @@ export async function reuploadAI(
     return { success: false, errors: result.errors };
   }
 
-  const aiDir = path.join(AI_BASE_DIR, id);
+  const aiDir = resolveInside(AI_BASE_DIR, id);
   fs.writeFileSync(path.join(aiDir, 'source.ts'), source);
   fs.writeFileSync(path.join(aiDir, 'compiled.js'), result.compiledCode!);
 
@@ -211,7 +212,7 @@ export async function deleteAI(id: string, adminId: number): Promise<void> {
   getBotAIRegistry().unloadAI(id);
 
   // Delete files
-  const aiDir = path.join(AI_BASE_DIR, id);
+  const aiDir = resolveInside(AI_BASE_DIR, id);
   if (fs.existsSync(aiDir)) {
     fs.rmSync(aiDir, { recursive: true, force: true });
   }
@@ -251,7 +252,7 @@ export async function downloadSource(
     };
   }
 
-  const sourcePath = path.join(AI_BASE_DIR, id, 'source.ts');
+  const sourcePath = resolveInside(AI_BASE_DIR, id, 'source.ts');
   if (!fs.existsSync(sourcePath)) return null;
 
   return {

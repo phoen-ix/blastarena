@@ -3,6 +3,7 @@ import * as fsp from 'fs/promises';
 import * as path from 'path';
 import { LogVerbosity, Position } from '@blast-arena/shared';
 import { logger } from './logger';
+import { resolveInside } from './safePath';
 import type { ReplayRecorder } from './replayRecorder';
 import type { Player } from '../game/Player';
 import type { Bomb } from '../game/Bomb';
@@ -63,7 +64,7 @@ export class GameLogger {
       fs.mkdirSync(logDir, { recursive: true });
     }
 
-    this.stream = fs.createWriteStream(path.join(logDir, this.filename), { flags: 'a' });
+    this.stream = fs.createWriteStream(resolveInside(logDir, this.filename), { flags: 'a' });
 
     this.log('game_init', { roomCode, gameMode, playerCount, verbosity: this.verbosity });
 
@@ -441,8 +442,8 @@ export class GameLogger {
     const target = this.filename.replace(/_(\d+)p\.jsonl$/, `_${this.peakPlayerCount}p.jsonl`);
     if (target === this.filename) return Promise.resolve();
 
-    const from = path.join(this.logDir, this.filename);
-    const to = path.join(this.logDir, target);
+    const from = resolveInside(this.logDir, this.filename);
+    const to = resolveInside(this.logDir, target);
     // Resolves when the rename has actually landed, so close() can mean "flushed AND renamed".
     // It previously fired and forgot, which left close() resolving while the file still carried
     // its opening name. Renaming stays best-effort: a failure is logged, never thrown.
