@@ -282,6 +282,17 @@ export async function adminTab(page: Page, tab: string): Promise<void> {
   await expect(btn).toHaveClass(/active/);
 }
 
+/** The replay viewer has a recording loaded: frames to scrub, and Skip to end reaches the last. */
+export async function expectReplay(page: Page): Promise<void> {
+  const controls = page.locator('#replay-controls');
+  const slider = controls.getByRole('slider');
+  await expect(slider).toBeVisible();
+  const last = (await slider.getAttribute('max'))!;
+  expect(Number(last)).toBeGreaterThan(0);
+  await controls.getByTitle('Skip to end').click();
+  await expect(slider).toHaveValue(last);
+}
+
 export function randomHex(n: number): string {
   return randomBytes(n).toString('hex');
 }

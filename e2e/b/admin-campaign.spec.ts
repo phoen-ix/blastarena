@@ -8,6 +8,7 @@ import {
   BASE,
   createUser,
   expect,
+  expectReplay,
   lobby,
   ok,
   test,
@@ -17,10 +18,20 @@ import {
 import type { Page } from '@playwright/test';
 
 /* Admin > Campaign: worlds (create, edit, publish, delete), levels built in the level editor
- * (campaign tools, settings, save, export, back to the tab, publish, import, delete), enemy types
+ * (campaign tools and theme hazards, settings, save, export, back to the tab, publish, the row's
+ * export and bundle, import, reorder, delete), enemy types
  * and the replays view (a run a player lost: watch it, delete it). */
 
 const TILE = 48;
+const HAZARDS = {
+  vine: 'Vine',
+  quicksand: 'Quicksand',
+  ice: 'Ice',
+  lava: 'Lava',
+  mud: 'Mud',
+  spikes: 'Spikes',
+  dark_rift: 'Dark Rift',
+};
 const TOOLBAR = 200;
 
 const toast = (page: Page, text: string | RegExp) =>
@@ -132,6 +143,13 @@ test('levels: build one in the editor, export, import, publish, delete', async (
   await paint(page, size, 9, 5);
   await editor(page).getByRole('button', { name: 'Crumbling Floor', exact: true }).click();
   await paint(page, size, 3, 3);
+  // Theme Hazards: a classic world has none of its own; "Show all themes" offers all seven.
+  await expect(editor(page)).toContainText('No hazard tiles for this theme');
+  await editor(page).getByLabel('Show all themes').check();
+  for (const [i, name] of Object.values(HAZARDS).entries()) {
+    await editor(page).getByRole('button', { name, exact: true }).click();
+    await paint(page, size, 1 + 2 * i, 9);
+  }
   const levelName = `Gate ${uid()}`;
   await editor(page).getByLabel('Name').fill(levelName);
   await editor(page).getByLabel('Lives').fill('5');
@@ -152,6 +170,9 @@ test('levels: build one in the editor, export, import, publish, delete', async (
   expect(data.tiles[5][5]).toBe('switch_blue');
   expect(data.tiles[5][9]).toBe('gate_blue');
   expect(data.tiles[3][3]).toBe('crumbling');
+  expect(Object.keys(HAZARDS).map((_, i) => data.tiles[9][1 + 2 * i])).toEqual(
+    Object.keys(HAZARDS),
+  );
   expect(data.puzzleConfig).toEqual({ switchVariants: { '5,5': 'pressure' } });
   expect(data.enemyPlacements).toHaveLength(1);
   expect(data.powerupPlacements).toEqual([
@@ -168,6 +189,15 @@ test('levels: build one in the editor, export, import, publish, delete', async (
   await expect(level).toContainText('Find Exit');
   await level.getByRole('button', { name: 'Publish' }).click();
   await toast(page, 'Level published');
+  // The row's Export and Bundle (level + its enemy types) download from the server.
+  for (const [button, format] of [
+    ['Export', 'blast-arena-level'],
+    ['Bundle', 'blast-arena-level-bundle'],
+  ]) {
+    const file = page.waitForEvent('download');
+    await level.getByRole('button', { name: button, exact: true }).click();
+    expect(JSON.parse(readFileSync(await (await file).path(), 'utf8'))._format).toBe(format);
+  }
 
   // Import the exported file as a second level.
   await levels.getByRole('button', { name: 'Import Level' }).click();
@@ -291,6 +321,7 @@ test('campaign replays: a lost run is listed, watched and deleted', async ({ pag
 
   // Watch it, then Back returns to the replays list.
   await row.getByRole('button', { name: 'Watch' }).click();
+  await expectReplay(page);
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await expect(
     page.locator('#admin-tab-bar').getByRole('button', { name: 'Campaign' }),

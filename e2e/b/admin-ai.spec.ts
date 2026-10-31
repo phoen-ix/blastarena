@@ -1,10 +1,20 @@
 import { readFileSync } from 'node:fs';
 
-import { adminTab, createUser, expect, lobby, test, uid } from './support';
-import type { Page } from '@playwright/test';
+import {
+  adminSession,
+  adminTab,
+  createUser,
+  expect,
+  expectReplay,
+  lobby,
+  ok,
+  test,
+  uid,
+} from './support';
+import type { Locator, Page } from '@playwright/test';
 
 /* Admin > AI (bot AI and enemy AI: upload with compile errors and success, activate, edit,
- * download, delete) and Admin > Simulations (configure and run a batch, view, delete). */
+ * re-upload, download, delete) and Admin > Simulations (configure and run a batch, view, delete). */
 
 const BOT = `import { PlayerInput } from '@blast-arena/shared';
 
@@ -33,12 +43,24 @@ const file = (name: string, src: string) => ({
 const toast = (page: Page, text: string | RegExp) =>
   expect(page.locator('.toast').filter({ hasText: text }).first()).toBeVisible();
 
+// Re-upload replaces the source: the download then carries the new class name.
+async function reupload(page: Page, row: Locator, dialog: string, src: string, success: string) {
+  await row.getByRole('button', { name: 'Re-upload' }).click();
+  const modal = page.getByRole('dialog', { name: dialog });
+  await modal.getByLabel('TypeScript File (.ts) *').setInputFiles(file('Replaced.ts', src));
+  await modal.getByRole('button', { name: 'Upload & Compile' }).click();
+  await toast(page, success);
+  await expect(modal).toHaveCount(0);
+}
+
 async function asAdmin(page: Page, tab: string): Promise<void> {
   await lobby(page, await createUser('admin', 'a'));
   await adminTab(page, tab);
 }
 
-test('bot AI: refused source, upload, toggle, edit, download, delete', async ({ page }) => {
+test('bot AI: refused source, upload, toggle, edit, re-upload, download, delete', async ({
+  page,
+}) => {
   await asAdmin(page, 'AI');
   await page.getByRole('button', { name: 'Upload New AI' }).click();
   const upload = page.getByRole('dialog', { name: 'Upload New Bot AI' });
@@ -76,9 +98,16 @@ test('bot AI: refused source, upload, toggle, edit, download, delete', async ({ 
   await toast(page, 'AI updated');
   await expect(row).toContainText('Waits patiently');
 
+  await reupload(
+    page,
+    row,
+    'Re-upload AI Source',
+    BOT.replace('IdleBot', 'PatientBot'),
+    'AI re-uploaded and compiled successfully',
+  );
   const download = page.waitForEvent('download');
   await row.getByRole('button', { name: 'Download' }).click();
-  expect(readFileSync(await (await download).path(), 'utf8')).toContain('class IdleBot');
+  expect(readFileSync(await (await download).path(), 'utf8')).toContain('class PatientBot');
 
   await row.getByRole('button', { name: 'Delete' }).click();
   const del = page.getByRole('dialog', { name: 'Delete AI' });
@@ -88,7 +117,7 @@ test('bot AI: refused source, upload, toggle, edit, download, delete', async ({ 
   await expect(row).toHaveCount(0);
 });
 
-test('enemy AI: upload, toggle, download, delete', async ({ page }) => {
+test('enemy AI: upload, toggle, re-upload, download, delete', async ({ page }) => {
   await asAdmin(page, 'AI');
   await page.getByRole('button', { name: 'Upload New Enemy AI' }).click();
   const upload = page.getByRole('dialog', { name: 'Upload New Enemy AI' });
@@ -101,9 +130,16 @@ test('enemy AI: upload, toggle, download, delete', async ({ page }) => {
   await expect(row).toBeVisible();
   await row.getByRole('button', { name: /^(Activate|Deactivate)$/ }).click();
   await toast(page, /Enemy AI (activated|deactivated)/);
+  await reupload(
+    page,
+    row,
+    'Re-upload Enemy AI Source',
+    ENEMY.replace('StillEnemy', 'SleepyEnemy'),
+    'Enemy AI re-uploaded and compiled successfully',
+  );
   const download = page.waitForEvent('download');
   await row.getByRole('button', { name: 'Download' }).click();
-  expect(readFileSync(await (await download).path(), 'utf8')).toContain('class StillEnemy');
+  expect(readFileSync(await (await download).path(), 'utf8')).toContain('class SleepyEnemy');
   await row.getByRole('button', { name: 'Delete' }).click();
   const del = page.getByRole('dialog', { name: 'Delete Enemy AI' });
   await del.getByRole('textbox').fill(name);
@@ -120,55 +156,72 @@ async function newBatch(page: Page, mode: string, speed: 'fast' | 'realtime', ga
   await modal.getByLabel('Speed', { exact: true }).selectOption(speed);
   await modal.getByLabel('Match Time').selectOption('60');
   await modal.getByRole('button', { name: 'Start Batch' }).click();
-  await toast(page, /Simulation (batch started|queued)/);
+  await toast(page, 'Simulation batch started');
 }
 
-test('simulations: run a fast batch, read the results, watch a replay, delete it', async ({
-  page,
-}) => {
-  await asAdmin(page, 'Simulations');
-  await newBatch(page, 'ffa', 'fast', '2');
-  // Starting opens the batch's live view; its status is shown in the UI's words.
-  await expect(page.getByRole('heading', { name: 'Free for All Simulation' })).toBeVisible();
-  await expect(page.locator('.sim-detail-header .sim-status')).toHaveText('Completed', {
-    timeout: 180_000,
-  });
-  // (No Win Distribution assertion: it shows only when a game had a winner, and bots can draw.)
-  await expect(page.getByText('2/2 games (100%)')).toBeVisible();
-  // Both games are listed (a game that ended while the view loaded used to go missing).
-  const games = page
-    .locator('#admin-tab-content')
-    .getByRole('row')
-    .filter({ has: page.getByRole('button', { name: 'Replay' }) });
-  await expect(games).toHaveCount(2);
+// The server runs one batch at a time (a second one queues), so the simulation tests are @global:
+// they run alone, and each leaves no batch running.
+test(
+  'simulations: run a fast batch, read the results, watch a replay, delete it',
+  {
+    tag: '@global',
+  },
+  async ({ page }) => {
+    await asAdmin(page, 'Simulations');
+    await newBatch(page, 'ffa', 'fast', '2');
+    // Starting opens the batch's live view; its status is shown in the UI's words.
+    await expect(page.getByRole('heading', { name: 'Free for All Simulation' })).toBeVisible();
+    await expect(page.locator('.sim-detail-header .sim-status')).toHaveText('Completed', {
+      timeout: 180_000,
+    });
+    // (No Win Distribution assertion: it shows only when a game had a winner, and bots can draw.)
+    await expect(page.getByText('2/2 games (100%)')).toBeVisible();
+    // Both games are listed (a game that ended while the view loaded used to go missing).
+    const games = page
+      .locator('#admin-tab-content')
+      .getByRole('row')
+      .filter({ has: page.getByRole('button', { name: 'Replay' }) });
+    await expect(games).toHaveCount(2);
 
-  // Replays are recorded by default: watch one, come back to the batch.
-  await games.first().getByRole('button', { name: 'Replay' }).click();
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Free for All Simulation' })).toBeVisible();
-  await page.getByRole('button', { name: 'Back to List' }).click();
+    // Replays are recorded by default: watch one, come back to the batch.
+    await games.first().getByRole('button', { name: 'Replay' }).click();
+    await expectReplay(page);
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Free for All Simulation' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to List' }).click();
 
-  const row = page.getByRole('row').filter({ hasText: 'Free for All' }).first();
-  await expect(row.locator('.sim-status')).toHaveText('Completed');
-  page.once('dialog', (d) => d.accept());
-  await row.getByRole('button', { name: 'Delete' }).click();
-  await toast(page, 'Simulation deleted');
-});
+    const row = page.getByRole('row').filter({ hasText: 'Free for All' }).first();
+    await expect(row.locator('.sim-status')).toHaveText('Completed');
+    page.once('dialog', (d) => d.accept());
+    await row.getByRole('button', { name: 'Delete' }).click();
+    await toast(page, 'Simulation deleted');
+  },
+);
 
-test('simulations: a real-time batch opens its spectator view, leave, watch again, cancel', async ({
-  page,
-}) => {
-  await asAdmin(page, 'Simulations');
-  await newBatch(page, 'deathmatch', 'realtime', '3');
-  // A real-time batch starts in the spectator view; leaving it opens the batch.
-  await expect(page.locator('.hud-players')).toBeVisible();
-  await page.keyboard.press('Escape');
-  const batch = page.getByRole('heading', { name: 'Deathmatch Simulation' });
-  await expect(batch).toBeVisible();
-  await page.getByRole('button', { name: 'Spectate Current Game' }).click();
-  await expect(page.locator('.hud-players')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(batch).toBeVisible();
-  await page.getByRole('button', { name: 'Cancel Batch' }).click();
-  await toast(page, 'Batch cancellation requested');
-});
+test(
+  'simulations: a real-time batch opens its spectator view, leave, watch again, cancel',
+  {
+    tag: '@global',
+  },
+  async ({ page }) => {
+    const { token } = await adminSession();
+    await asAdmin(page, 'Simulations');
+    await newBatch(page, 'deathmatch', 'realtime', '3');
+    // A real-time batch starts in the spectator view; leaving it opens the batch.
+    await expect(page.locator('.hud-players')).toBeVisible();
+    await page.keyboard.press('Escape');
+    const batch = page.getByRole('heading', { name: 'Deathmatch Simulation' });
+    await expect(batch).toBeVisible();
+    await page.getByRole('button', { name: 'Spectate Current Game' }).click();
+    await expect(page.locator('.hud-players')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(batch).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel Batch' }).click();
+    await toast(page, 'Batch cancellation requested');
+    // The newest batch (a running or queued one would be listed first) has stopped.
+    const newest = async () =>
+      (await ok<{ batches: { status: string }[] }>('GET', '/admin/simulations?limit=1', token))
+        .batches[0]?.status;
+    await expect.poll(newest, { timeout: 60_000 }).toBe('cancelled');
+  },
+);

@@ -194,31 +194,35 @@ test('email settings: save, send a test mail, reset', { tag: '@global' }, async 
   }
 });
 
-test('game creation defaults save and reset', { tag: '@global' }, async ({ page }) => {
-  const { token } = await adminSession();
-  await dashboard(page);
-  try {
-    await page.getByRole('button', { name: /Game Creation Defaults/ }).click();
-    await page.getByRole('combobox', { name: 'Game Mode' }).first().selectOption('teams');
-    await page.locator('#gd-body').getByRole('button', { name: 'Save', exact: true }).click();
-    await toast(page, 'Game defaults saved');
-    const saved = await api<{ defaults: { gameMode?: string } }>(
-      'GET',
-      '/admin/settings/game_defaults',
-    );
-    expect(saved.data.defaults.gameMode).toBe('teams');
-    await page.getByRole('button', { name: /Game Creation Defaults/ }).click();
-    await page.locator('#gd-body').getByRole('button', { name: 'Reset to Defaults' }).click();
-    await toast(page, 'Game defaults reset');
-    const reset = await api<{ defaults: { gameMode?: string } }>(
-      'GET',
-      '/admin/settings/game_defaults',
-    );
-    expect(reset.data.defaults.gameMode).toBeUndefined();
-  } finally {
-    await ok('PUT', '/admin/settings/game_defaults', token, { defaults: {} });
-  }
-});
+for (const d of [
+  // prettier-ignore
+  { section: 'Game Creation Defaults', id: 'gd', key: 'game_defaults', word: 'Game', field: 'Game Mode', prop: 'gameMode', value: 'teams' },
+  // prettier-ignore
+  { section: 'Simulation Defaults', id: 'sd', key: 'simulation_defaults', word: 'Simulation', field: 'Speed', prop: 'speed', value: 'realtime' },
+] as const) {
+  test(`${d.section.toLowerCase()} save and reset`, { tag: '@global' }, async ({ page }) => {
+    const { token } = await adminSession();
+    await dashboard(page);
+    const section = page.getByRole('button', { name: d.section });
+    const body = page.locator(`#${d.id}-body`);
+    const stored = async () =>
+      (await ok<{ defaults: Record<string, unknown> }>('GET', `/admin/settings/${d.key}`, token))
+        .defaults[d.prop];
+    try {
+      await section.click();
+      await body.getByRole('combobox', { name: d.field, exact: true }).selectOption(d.value);
+      await body.getByRole('button', { name: 'Save', exact: true }).click();
+      await toast(page, `${d.word} defaults saved`);
+      expect(await stored()).toBe(d.value);
+      await section.click();
+      await body.getByRole('button', { name: 'Reset to Defaults' }).click();
+      await toast(page, `${d.word} defaults reset`);
+      expect(await stored()).toBeUndefined();
+    } finally {
+      await ok('PUT', `/admin/settings/${d.key}`, token, { defaults: {} });
+    }
+  });
+}
 
 test(
   'revoke all sessions: typed confirmation, then everyone is signed out',

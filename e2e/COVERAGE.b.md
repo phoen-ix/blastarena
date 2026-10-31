@@ -6,14 +6,17 @@ Part a (player side: landing, lobby views, rooms, matches, open world, social, s
 `COVERAGE.md`. Specs: `e2e/b/*.spec.ts`, run by `scripts/e2e.sh` (all of `e2e/`) or
 `bash scripts/e2e.sh b/` (this part only).
 
-- **Extraction:** `bash e2e/b/inventory.sh` (admin tab ids from `AdminUI.ts`; every `ApiClient` call and
-  `admin:`/`sim:` socket event in `frontend/src/ui/admin/*.ts`; editor tools and actions from
-  `LevelEditorScene.ts`; the `/auth/*` and `/user/*` account routes; `supportedLngs`; `THEME_IDS`).
-- **Date:** 2026-10-30 · **Items:** 197 (+ 24 cross-cutting rows below)
-- **Status:** ✅ 197 · ❌ 0
+- **Extraction:** `bash e2e/b/inventory.sh` (admin tab ids from `AdminUI.ts`; every `ApiClient` call
+  (endpoints held in `const endpoint(s)` or passed to `downloadExport` resolved) and `admin:`/`sim:`
+  socket event in `frontend/src/ui/admin/*.ts`; editor tools and actions from `LevelEditorScene.ts`
+  plus the campaign Theme Hazards (`HAZARD_TILE_NAMES`) and their "Show all themes" toggle; the
+  `/auth/*` and `/user/*` account routes; `supportedLngs`; `THEME_IDS`).
+- **Date:** 2026-10-31 · **Items:** 218 (+ 24 cross-cutting rows below)
+- **Status:** ✅ 218 · ❌ 0
 - Tests tagged `@global` change server-wide settings (registration, chat modes, defaults, seasons,
-  challenges, announcements, revoke-all, delete-all): `scripts/e2e.sh` runs them after the rest with
-  one worker, so they cannot pull the rug from under parallel specs.
+  challenges, announcements, revoke-all, delete-all) or hold the server's one simulation slot:
+  `scripts/e2e.sh` runs them after the rest with one worker, so they cannot pull the rug from under
+  parallel specs.
 
 
 ## Admin tabs (as admin; staff tabs also as moderator)
@@ -38,34 +41,41 @@ Part a (player side: landing, lobby views, rooms, matches, open world, social, s
 | Item | | Test (`spec › title`) or reason |
 |---|---|---|
 | `delete /admin/achievements/:x` | ✅ | admin-content.spec.ts › achievements: create, edit, export, delete |
+| `delete /admin/ai/:x` | ✅ | admin-ai.spec.ts › bot AI: refused source, upload, toggle, edit, re-upload, download, delete |
 | `delete /admin/announcements/banner` | ✅ | admin-users.spec.ts › announcements: a toast reaches players, a banner stays until cleared |
+| `delete /admin/campaign/enemy-types/:x` | ✅ | admin-campaign.spec.ts › enemy types: create, edit, export, delete, import, and the replays view |
 | `delete /admin/campaign/levels/:x` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete |
 | `delete /admin/campaign-replays/:x` | ✅ | admin-campaign.spec.ts › campaign replays: a lost run is listed, watched and deleted |
+| `delete /admin/campaign/worlds/:x` | ✅ | admin-campaign.spec.ts › worlds: create, edit, reorder, publish, delete |
 | `delete /admin/challenges/:x` | ✅ | admin-content.spec.ts › challenges: toggle, create, activate, deactivate, delete |
 | `delete /admin/cosmetics/:x` | ✅ | admin-content.spec.ts › cosmetics: create, edit, export, delete, import |
+| `delete /admin/enemy-ai/:x` | ✅ | admin-ai.spec.ts › enemy AI: upload, toggle, re-upload, download, delete |
 | `delete /admin/matches` | ✅ | admin-games.spec.ts › delete all matches |
 | `delete /admin/matches/:x` | ✅ | admin-games.spec.ts › match history: details and delete |
 | `delete /admin/seasons/:x` | ✅ | admin-content.spec.ts › seasons: create, activate, end with a soft reset, delete |
 | `delete /admin/simulations/:x` | ✅ | admin-ai.spec.ts › simulations: run a fast batch, read the results, watch a replay, delete it |
 | `delete /admin/users/:x` | ✅ | admin-users.spec.ts › delete a user |
-| `download /admin/ai/:x/download` | ✅ | admin-ai.spec.ts › bot AI: refused source, upload, toggle, edit, download, delete |
-| `download /admin/enemy-ai/:x/download` | ✅ | admin-ai.spec.ts › enemy AI: upload, toggle, download, delete |
+| `download /admin/ai/:x/download` | ✅ | admin-ai.spec.ts › bot AI: refused source, upload, toggle, edit, re-upload, download, delete |
+| `download /admin/enemy-ai/:x/download` | ✅ | admin-ai.spec.ts › enemy AI: upload, toggle, re-upload, download, delete |
 | `get /admin/achievements` | ✅ | admin-content.spec.ts › achievements: create, edit, export, delete |
 | `get /admin/achievements/export-all` | ✅ | admin-content.spec.ts › achievements: create, edit, export, delete |
 | `get /admin/achievements/:x/export` | ✅ | admin-content.spec.ts › achievements: create, edit, export, delete |
 | `get /admin/actions` | ✅ | admin-users.spec.ts › logs list the admin actions and filter by type |
-| `get /admin/ai` | ✅ | admin-ai.spec.ts › bot AI: refused source, upload, toggle, edit, download, delete |
+| `get /admin/ai` | ✅ | admin-ai.spec.ts › bot AI: refused source, upload, toggle, edit, re-upload, download, delete |
 | `get /admin/ai/active` | ✅ | admin-sweep.spec.ts › an admin opens all 12 tabs (Dashboard and Simulations load it) |
 | `get /admin/announcements/banner` | ✅ | admin-users.spec.ts › announcements: a toast reaches players, a banner stays until cleared |
 | `get /admin/campaign/enemy-types` | ✅ | admin-campaign.spec.ts › enemy types: create, edit, export, delete, import, and the replays view |
+| `get /admin/campaign/enemy-types/:x/export` | ✅ | admin-campaign.spec.ts › enemy types: create, edit, export, delete, import, and the replays view |
 | `get /admin/campaign/levels` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete |
+| `get /admin/campaign/levels/:x/export` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete (the level row's Export) |
+| `get /admin/campaign/levels/:x/export-bundle` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete (the level row's Bundle) |
 | `get /admin/campaign-replays` | ✅ | admin-campaign.spec.ts › enemy types: create, edit, export, delete, import, and the replays view; admin-campaign.spec.ts › campaign replays: a lost run is listed, watched and deleted |
 | `get /admin/campaign-replays/:x` | ✅ | admin-campaign.spec.ts › campaign replays: a lost run is listed, watched and deleted |
 | `get /admin/campaign/worlds` | ✅ | admin-campaign.spec.ts › worlds: create, edit, reorder, publish, delete |
 | `get /admin/challenges` | ✅ | admin-content.spec.ts › challenges: toggle, create, activate, deactivate, delete |
 | `get /admin/cosmetics` | ✅ | admin-content.spec.ts › cosmetics: create, edit, export, delete, import |
 | `get /admin/cosmetics/:x/export` | ✅ | admin-content.spec.ts › cosmetics: create, edit, export, delete, import |
-| `get /admin/enemy-ai` | ✅ | admin-ai.spec.ts › enemy AI: upload, toggle, download, delete |
+| `get /admin/enemy-ai` | ✅ | admin-ai.spec.ts › enemy AI: upload, toggle, re-upload, download, delete |
 | `get /admin/enemy-ai/active` | ✅ | admin-campaign.spec.ts › enemy types: create, edit, export, delete, import, and the replays view (the enemy modal loads it) |
 | `get /admin/matches` | ✅ | admin-games.spec.ts › match history: details and delete |
 | `get /admin/matches/:x` | ✅ | admin-games.spec.ts › match history: details and delete |
@@ -121,32 +131,38 @@ Part a (player side: landing, lobby views, rooms, matches, open world, social, s
 | `post /admin/users/cleanup/preview` | ✅ | admin-users.spec.ts › account cleanup previews and deletes old unverified accounts |
 | `post /admin/users/:x/reset-totp` | ✅ | admin-users.spec.ts › reset 2FA from the users table |
 | `post /admin/users/:x/revoke-sessions` | ✅ | admin-users.spec.ts › reset a password and revoke sessions |
+| `postForm /admin/ai` | ✅ | admin-ai.spec.ts › bot AI: refused source, upload, toggle, edit, re-upload, download, delete |
+| `postForm /admin/enemy-ai` | ✅ | admin-ai.spec.ts › enemy AI: upload, toggle, re-upload, download, delete |
 | `put /admin/achievements/:x` | ✅ | admin-content.spec.ts › achievements: create, edit, export, delete |
-| `put /admin/ai/:x` | ✅ | admin-ai.spec.ts › bot AI: refused source, upload, toggle, edit, download, delete |
+| `put /admin/ai/:x` | ✅ | admin-ai.spec.ts › bot AI: refused source, upload, toggle, edit, re-upload, download, delete |
 | `put /admin/campaign/enemy-types/:x` | ✅ | admin-campaign.spec.ts › enemy types: create, edit, export, delete, import, and the replays view |
 | `put /admin/campaign/levels/:x` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete |
 | `put /admin/campaign/levels/:x/order` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete |
 | `put /admin/campaign/worlds/:x` | ✅ | admin-campaign.spec.ts › worlds: create, edit, reorder, publish, delete |
 | `put /admin/campaign/worlds/:x/order` | ✅ | admin-campaign.spec.ts › worlds: create, edit, reorder, publish, delete |
 | `put /admin/cosmetics/:x` | ✅ | admin-content.spec.ts › cosmetics: create, edit, export, delete, import |
-| `put /admin/enemy-ai/:x` | ✅ | admin-ai.spec.ts › enemy AI: upload, toggle, download, delete |
+| `put /admin/enemy-ai/:x` | ✅ | admin-ai.spec.ts › enemy AI: upload, toggle, re-upload, download, delete |
 | `put /admin/settings/challenges_enabled` | ✅ | admin-content.spec.ts › challenges: toggle, create, activate, deactivate, delete |
 | `put /admin/settings/default_art_style` | ✅ | admin-dashboard.spec.ts › toggles and chat modes save and survive a reload |
 | `put /admin/settings/default_theme` | ✅ | themes.spec.ts › the admin default theme applies to browsers without a choice |
 | `put /admin/settings/display_github` | ✅ | admin-dashboard.spec.ts › imprint and GitHub link appear on the sign-in form |
 | `put /admin/settings/email_settings` | ✅ | admin-dashboard.spec.ts › email settings: save, send a test mail, reset |
+| `put /admin/settings/game_defaults` | ✅ | admin-dashboard.spec.ts › game creation defaults save and reset |
 | `put /admin/settings/imprint` | ✅ | admin-dashboard.spec.ts › imprint and GitHub link appear on the sign-in form |
 | `put /admin/settings/open_world` | ✅ | admin-dashboard.spec.ts › open world settings save |
 | `put /admin/settings/party_chat_mode` | ✅ | admin-dashboard.spec.ts › toggles and chat modes save and survive a reload |
 | `put /admin/settings/rank_tiers` | ✅ | admin-content.spec.ts › rank tiers: add a tier, validate, save |
 | `put /admin/settings/recordings_enabled` | ✅ | admin-dashboard.spec.ts › toggles and chat modes save and survive a reload |
 | `put /admin/settings/registration_enabled` | ✅ | admin-dashboard.spec.ts › toggles and chat modes save and survive a reload; account.spec.ts › register and verify › with registration off there is no way to register |
+| `put /admin/settings/simulation_defaults` | ✅ | admin-dashboard.spec.ts › simulation defaults save and reset |
 | `put /admin/settings/spectator_actions_enabled` | ✅ | admin-dashboard.spec.ts › toggles and chat modes save and survive a reload |
-| `put /admin/settings/:x` | ✅ | admin-dashboard.spec.ts › toggles and chat modes save and survive a reload (lobby/DM/emote/spectator chat modes); admin-dashboard.spec.ts › game creation defaults save and reset (game_defaults) |
+| `put /admin/settings/:x` | ✅ | admin-dashboard.spec.ts › toggles and chat modes save and survive a reload (lobby/DM/emote/spectator chat modes) |
 | `put /admin/settings/xp_multiplier` | ✅ | admin-dashboard.spec.ts › XP multiplier is range-checked and saved |
 | `put /admin/users/:x/deactivate` | ✅ | admin-users.spec.ts › deactivate and reactivate |
 | `put /admin/users/:x/password` | ✅ | admin-users.spec.ts › reset a password and revoke sessions |
 | `put /admin/users/:x/role` | ✅ | admin-users.spec.ts › change a role, with confirmation |
+| `putForm /admin/ai/:x/upload` | ✅ | admin-ai.spec.ts › bot AI: refused source, upload, toggle, edit, re-upload, download, delete (Re-upload) |
+| `putForm /admin/enemy-ai/:x/upload` | ✅ | admin-ai.spec.ts › enemy AI: upload, toggle, re-upload, download, delete (Re-upload) |
 | `socket admin:closeRoom` | ✅ | admin-games.spec.ts › message, kick and close a waiting room |
 | `socket admin:kick` | ✅ | admin-games.spec.ts › message, kick and close a waiting room |
 | `socket admin:roomMessage` | ✅ | admin-games.spec.ts › message, kick and close a waiting room |
@@ -156,7 +172,7 @@ Part a (player side: landing, lobby views, rooms, matches, open world, social, s
 | `socket sim:spectate` | ✅ | admin-ai.spec.ts › simulations: a real-time batch opens its spectator view, leave, watch again, cancel |
 | `socket sim:start` | ✅ | admin-ai.spec.ts › simulations: run a fast batch, read the results, watch a replay, delete it |
 
-## Level editor (`LevelEditorScene`: tools and actions)
+## Level editor (`LevelEditorScene`: tools and actions, campaign Theme Hazards)
 
 | Item | | Test (`spec › title`) or reason |
 |---|---|---|
@@ -166,23 +182,31 @@ Part a (player side: landing, lobby views, rooms, matches, open world, social, s
 | `modals.cancel` | ✅ | editor.spec.ts › leaving with unsaved changes: cancel, discard, save and exit |
 | `modals.discard` | ✅ | editor.spec.ts › leaving with unsaved changes: cancel, discard, save and exit |
 | `modals.saveAndExit` | ✅ | editor.spec.ts › leaving with unsaved changes: cancel, discard, save and exit |
+| `toggle hazard-show-all` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete (classic world: no own hazards, "Show all themes" lists all seven) |
 | `tool conveyor_down` | ✅ | editor.spec.ts › create a map: tools, the spawn rule, settings, save |
 | `tool conveyor_left` | ✅ | editor.spec.ts › create a map: tools, the spawn rule, settings, save |
 | `tool conveyor_right` | ✅ | editor.spec.ts › create a map: tools, the spawn rule, settings, save |
 | `tool conveyor_up` | ✅ | editor.spec.ts › create a map: tools, the spawn rule, settings, save |
 | `tool crumbling` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete |
+| `tool dark_rift` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete (Theme Hazards, via "Show all themes") |
 | `tool destructible` | ✅ | editor.spec.ts › create a map: tools, the spawn rule, settings, save |
 | `tool empty` | ✅ | editor.spec.ts › create a map: tools, the spawn rule, settings, save |
 | `tool enemy` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete |
 | `tool eraser` | ✅ | editor.spec.ts › undo, redo, eraser and resize |
 | `tool exit` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete |
 | `tool goal` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete |
+| `tool ice` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete (Theme Hazards, via "Show all themes") |
+| `tool lava` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete (Theme Hazards, via "Show all themes") |
+| `tool mud` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete (Theme Hazards, via "Show all themes") |
 | `tool powerup` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete |
 | `tool puzzle_gate` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete |
 | `tool puzzle_switch` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete |
+| `tool quicksand` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete (Theme Hazards, via "Show all themes") |
 | `tool spawn` | ✅ | editor.spec.ts › create a map: tools, the spawn rule, settings, save |
+| `tool spikes` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete (Theme Hazards, via "Show all themes") |
 | `tool teleporter_a` | ✅ | editor.spec.ts › create a map: tools, the spawn rule, settings, save |
 | `tool teleporter_b` | ✅ | editor.spec.ts › create a map: tools, the spawn rule, settings, save |
+| `tool vine` | ✅ | admin-campaign.spec.ts › levels: build one in the editor, export, import, publish, delete (Theme Hazards, via "Show all themes") |
 | `tool wall` | ✅ | editor.spec.ts › leaving with unsaved changes: cancel, discard, save and exit |
 
 ## Account flows (`/auth/*`, `/user/*` account routes)

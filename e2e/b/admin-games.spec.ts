@@ -5,6 +5,7 @@ import {
   BASE,
   createUser,
   expect,
+  expectReplay,
   lobby,
   sql,
   test,
@@ -162,6 +163,7 @@ test('a played match: details, watch its replay, back to Matches', async ({ page
   // The players come from the replay, so the bot is listed too.
   await expect(detail).toContainText('(bot)');
   await detail.getByRole('button', { name: 'Watch Replay' }).click();
+  await expectReplay(page);
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await expect(page.locator('#admin-tab-bar').getByRole('button', { name: 'Matches' })).toHaveClass(
     /active/,
