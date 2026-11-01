@@ -47,7 +47,11 @@ describe('route mounting', () => {
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     const { port } = server.address() as AddressInfo;
     base = `http://127.0.0.1:${port}`;
-  });
+    // The first request loads fetch's HTTP client (undici) and opens the first connection: real
+    // one-time work, done here so no single test pays for it. Under heavy host load the same
+    // work overran the 5 s default in csrf.test.ts, hence the hook's own budget.
+    await (await fetch(`${base}/`)).text();
+  }, 30_000);
 
   afterAll(async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
