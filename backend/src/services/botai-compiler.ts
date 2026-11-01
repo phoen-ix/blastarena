@@ -93,7 +93,10 @@ export interface CompileResult {
  * Runs compiled CommonJS in a fresh context and returns its `module.exports` — an object of
  * exports, or the class itself when the code assigns `module.exports = SomeClass`.
  */
-export function loadBotAIInSandbox(code: string): Record<string, unknown> {
+export function loadBotAIInSandbox(
+  code: string,
+  timeoutMs = VM_TIMEOUT_MS,
+): Record<string, unknown> {
   const frozenConsole = Object.freeze({
     log: () => {},
     warn: () => {},
@@ -116,7 +119,7 @@ export function loadBotAIInSandbox(code: string): Record<string, unknown> {
   // esbuild emits CommonJS that assigns to `module.exports` / `exports`; provide those as
   // context-local bindings via an IIFE wrapper and return whatever the module exported.
   const wrapped = `(function () { 'use strict'; const module = { exports: {} }; const exports = module.exports;\n${code}\n;\nreturn module.exports; })()`;
-  const result = vm.runInContext(wrapped, context, { timeout: VM_TIMEOUT_MS }) as
+  const result = vm.runInContext(wrapped, context, { timeout: timeoutMs }) as
     Record<string, unknown> | undefined;
 
   return result ?? {};

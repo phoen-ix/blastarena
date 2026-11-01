@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, beforeAll } from '@jest/globals';
 import { compileBotAI, loadBotAIInSandbox } from '../../../backend/src/services/botai-compiler';
 
 const VALID_AI_SOURCE = `
@@ -10,6 +10,13 @@ export class MyAI {
 `;
 
 describe('Bot AI sandbox security', () => {
+  // The first compile spawns the esbuild service process and creates the first isolated-vm
+  // isolate: real one-time work, done here so no single test pays for it. On a host under heavy
+  // load (load average 50-80) it has taken more than the 5 s default, hence the hook's own budget.
+  beforeAll(async () => {
+    expect((await compileBotAI(VALID_AI_SOURCE)).success).toBe(true);
+  }, 30_000);
+
   // ── Source-level blocking ──────────────────────────────────────────
 
   describe('source scan: dangerous imports', () => {
@@ -132,8 +139,9 @@ describe('Bot AI sandbox security', () => {
     });
 
     it('times out on infinite loops', () => {
+      // A short budget: the default (5 s) would spin a core for the full 5 s.
       const code = `while(true) {}`;
-      expect(() => loadBotAIInSandbox(code)).toThrow(/timed out|Script execution timed out/i);
+      expect(() => loadBotAIInSandbox(code, 50)).toThrow(/timed out|Script execution timed out/i);
     });
   });
 
