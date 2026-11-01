@@ -19,8 +19,8 @@ const IDLE_LOG_WINDOW_TICKS = Number(process.env.GAME_LOG_IDLE_WINDOW_TICKS ?? 6
 // Retention bounds. Deliberately generous: this is a safety net against unbounded growth, not an
 // archiving policy. Automatic pruning only ever touches logs where nobody played (see
 // EMPTY_ROOM_LOG_RE) — a log with real gameplay in it is never deleted on our own initiative.
-const MAX_TOTAL_MB = Number(process.env.GAME_LOG_MAX_TOTAL_MB ?? 20480);
-const MAX_AGE_DAYS = Number(process.env.GAME_LOG_MAX_AGE_DAYS ?? 365);
+// The bounds, GAME_LOG_MAX_TOTAL_MB (default 20480) and GAME_LOG_MAX_AGE_DAYS (default 365), are
+// read from the environment on each prune.
 const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 
 // Only "0 peak players" logs are prunable. The trailing count is rewritten on close to reflect the
@@ -91,7 +91,7 @@ export class GameLogger {
       // Directory-wide footprint. This deliberately counts logs we will never delete: the size cap
       // is a statement about how much disk this directory may occupy, so it has to be measured
       // against the whole directory. Summing only the deletable subset — as this used to — meant
-      // MAX_TOTAL_MB was compared against a fraction of the real usage, so once real-player logs
+      // the size cap was compared against a fraction of the real usage, so once real-player logs
       // dominated, the cap could never trigger and the "bound the directory by total size"
       // guarantee in the comment above silently did not hold. (audit GAMELOG-ACCOUNTING-1)
       let total = 0;
@@ -116,8 +116,8 @@ export class GameLogger {
       }
 
       entries.sort((a, b) => a.mtimeMs - b.mtimeMs); // oldest first
-      const maxTotalBytes = MAX_TOTAL_MB * 1024 * 1024;
-      const maxAgeMs = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+      const maxTotalBytes = Number(process.env.GAME_LOG_MAX_TOTAL_MB ?? 20480) * 1024 * 1024;
+      const maxAgeMs = Number(process.env.GAME_LOG_MAX_AGE_DAYS ?? 365) * 24 * 60 * 60 * 1000;
 
       let removed = 0;
       let freed = 0;

@@ -12,10 +12,6 @@ import type { Player } from '../../../backend/src/game/Player';
 import type { Bomb } from '../../../backend/src/game/Bomb';
 import type { Explosion } from '../../../backend/src/game/Explosion';
 
-// GameLogger reads its bounds from env at module load, so the prune tests re-import the module
-// with different values rather than mutating constants.
-type LoadedModule = typeof import('../../../backend/src/utils/gameLogger');
-
 // pruneOldLogs and its throttle are private statics; expose them without reaching for `any`.
 interface PrunableGameLogger {
   pruneOldLogs(logDir: string): Promise<void>;
@@ -92,10 +88,14 @@ async function waitFor(predicate: () => boolean, timeoutMs = 5000): Promise<void
   }
 }
 
-/** Create a .jsonl of roughly `sizeBytes`, backdated so the prune mtime guard does not skip it. */
+/**
+ * Create a sparse .jsonl of `sizeBytes` (stat reports the size, nothing is written), backdated so
+ * the prune mtime guard does not skip it.
+ */
 function seedLog(dir: string, name: string, ageMs: number, sizeBytes: number): string {
   const file = path.join(dir, name);
-  fs.writeFileSync(file, 'x'.repeat(sizeBytes));
+  fs.writeFileSync(file, '');
+  fs.truncateSync(file, sizeBytes);
   const when = new Date(Date.now() - ageMs);
   fs.utimesSync(file, when, when);
   return file;
@@ -220,11 +220,10 @@ describe('GameLogger', () => {
   });
 
   describe('pruneOldLogs', () => {
+    // The bounds are read from env on each prune; one import serves every case.
     const loadWith = async (env: Record<string, string>): Promise<PrunableGameLogger> => {
-      jest.resetModules();
       Object.assign(process.env, env);
-      const mod: LoadedModule = await import('../../../backend/src/utils/gameLogger');
-      const prunable = mod.GameLogger as unknown as PrunableGameLogger;
+      const prunable = GameLogger as unknown as PrunableGameLogger;
       prunable.lastPruneAt = 0; // defeat the once-per-hour throttle
       return prunable;
     };
