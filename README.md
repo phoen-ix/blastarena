@@ -1,6 +1,6 @@
 # BlastArena
 
-A multiplayer online grid-based explosive arena game built with Phaser and Node.js. Navigate a destructible grid, place bombs strategically, collect power-ups, and compete across six distinct game modes. Supports 2-8 players with AI bots, real-time spectating, team play, a campaign with a level editor, and full admin tools.
+A multiplayer bomb arena game for the browser, built with Phaser and Node.js. 2–8 players, with bots filling the gaps, fight on a destructible grid in six game modes. Around that: a persistent open world, a campaign with a level editor, and full admin tools.
 
 <img src="docs/screenshots/menu-landing.png" alt="The landing page: the BlastArena title and the Play as Guest, Login and Register buttons over the live open-world arena, with the visitor's guest character above the title" width="800">
 
@@ -16,6 +16,8 @@ A multiplayer online grid-based explosive arena game built with Phaser and Node.
 </p>
 
 Every screen, with a sentence each: [screenshot gallery](docs/screenshots/README.md). The landing page [in German](docs/screenshots/menu-landing.de.png); the lobby [on a phone](docs/screenshots/lobby-openworld.mobile.png).
+
+**Contents:** [Quick Start](#quick-start) · [Game Modes](#game-modes) · [Controls](#controls) · [Power-Ups](#power-ups) · [Map Features](#map-features) · [Open World](#open-world-mode-wip) · [Campaign](#campaign) · [Custom Maps](#custom-maps) · [Bot AI](#bot-ai) · [Progression](#progression) · [Social](#social-features) · [Look & Feel](#look--feel) · [Account & Security](#account--security) · [Admin Panel](#admin-panel) · [Replays](#game-replays) · [In-Game Help](#in-game-help--documentation) · [Languages](#internationalization) · [Architecture](#architecture) · [Tech Stack](#tech-stack) · [Testing](#testing--linting) · [Documentation](#documentation)
 
 ## Quick Start
 
@@ -40,11 +42,13 @@ docker compose up --build -d
 docker compose -p blast-arena-dev -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-The dev stack is fully isolated from production — its own Compose project, container names, host ports (nginx `8285`, Vite `5183`, DB `3317`, Redis `6390`) and data directory (`./data-dev`) — so the two can run side by side.
+- **Dev and production side by side:** the dev stack has its own Compose project, container names, host ports (nginx `8285`, Vite `5183`, DB `3317`, Redis `6390`) and data directory (`./data-dev`).
+- **Production networking:** Nginx binds to `127.0.0.1:8280` (loopback only) and expects a host-level reverse proxy that terminates TLS. For local use, open the proxied port or forward `127.0.0.1:8280`.
+- **Configuration:** every option is listed in `.env.example`.
 
-In production, Nginx binds to `127.0.0.1:8280` (loopback only) and is expected to sit behind a host-level reverse proxy that terminates TLS and forwards traffic to it. For local/dev use, open the app on the proxied port (or forward `127.0.0.1:8280`). See `.env.example` for all configuration options.
+### First admin
 
-There is no default account. Register through the app; without SMTP settings the verification email is only logged, not sent, so the first admin is verified and promoted in the database:
+There is no default account. Register through the app. Without SMTP settings the verification email is only logged, not sent, so verify and promote the first admin in the database:
 
 ```bash
 docker compose exec db mariadb -u blast_user -p blast_arena \
@@ -53,7 +57,9 @@ docker compose exec db mariadb -u blast_user -p blast_arena \
 
 Admins can then create further (already verified) accounts in Admin → Users.
 
-**Upgrading an existing install to a newer MariaDB major:** the `db` service sets `MARIADB_AUTO_UPGRADE=1`, so the container upgrades `data/db` in place on its first start. Take a verified dump first (`docker compose exec db mariadb-dump ...`) — a major-version upgrade cannot be rolled back.
+### Upgrading MariaDB
+
+The `db` service sets `MARIADB_AUTO_UPGRADE=1`, so the container upgrades `data/db` in place on its first start after a major-version bump. Take a verified dump first (`docker compose exec db mariadb-dump ...`): a major-version upgrade cannot be rolled back.
 
 ## Game Modes
 
@@ -79,7 +85,10 @@ Admins can then create further (already verified) accounts in Admin → Users.
 | `Escape` | Start | Pause (campaign) / Leave game (multiplayer) |
 | `1`-`9` | LB / RB | Spectate player (when dead) |
 
-Walk into a bomb with the Kick power-up to send it sliding. Click a player name in the HUD to follow them as spectator. Press Escape during a multiplayer game to open the leave confirmation menu — leaving kills your player immediately and returns you to the lobby. If all human players leave, the remaining bot match speeds up to 5x and the room is removed from the lobby.
+- **Kick:** with the Kick power-up, walk into a bomb to send it sliding.
+- **Follow a player:** click their name in the HUD while spectating.
+- **Leaving:** Escape in a multiplayer game opens the leave menu. Leaving kills your player at once and returns you to the lobby.
+- **Bots only:** when every human has left, the remaining bot match runs at 5× speed and the room disappears from the lobby.
 
 ## Power-Ups
 
@@ -91,51 +100,210 @@ Walk into a bomb with the Kick power-up to send it sliding. Click a player name 
 | **Shield** | Absorbs one hit from any source (no time limit, doesn't stack) |
 | **Kick** | Walk into bombs to kick them |
 | **Pierce Bomb** | Explosions pass through destructible walls |
-| **Remote Bomb** | Bombs don't auto-detonate; press E to detonate all (10s safety max). Toggle FIFO mode (oldest first) by pressing E with no bombs placed |
+| **Remote Bomb** | Bombs wait for `E`, which detonates them all (10 s safety limit). `E` with no bombs out toggles FIFO mode (oldest first) |
 | **Line Bomb** | Places a line of bombs in facing direction |
-| **Bomb Throw** | Press Q to throw a bomb in facing direction, flying over walls and obstacles. Lands up to 3 tiles away normally; flies further over consecutive walls to find the first open tile |
+| **Bomb Throw** | `Q` throws a bomb up to 3 tiles ahead, over walls and obstacles. Over a run of walls it flies on to the first open tile |
 
-Killed players drop one random collected power-up at their death position. All power-up icons are procedurally drawn (no emoji) for consistent rendering across all platforms.
+Killed players drop one random collected power-up where they died. All power-up icons are drawn procedurally (no emoji), so they look the same on every platform.
 
 ## Map Features
 
-All optional, toggled per-room with individually selectable types: **Reinforced Walls** (2-hit destructible walls), **Map Events** (choose which events can occur — meteor strikes with 2-second visual warning, pulsing crosshair, exclamation mark, growing shadow followed by a falling meteor animation with screen shake and particle effects; power-up rain every 60s; wall collapse destroys a 3x3 area with dust warning; freeze wave converts a row or column to ice temporarily; bomb surge reduces all bomb fuse timers with a screen pulse; UFO abduction teleports a random player to a new location with tractor beam warning and brief invulnerability), **Hazard Tiles** (choose which hazard types appear — teleporter pairs with random A↔B transport, conveyor belts with animated moving stripes that auto-push players and bombs, vine slows movement, quicksand slows and kills over time, ice causes sliding momentum, lava kills instantly and detonates adjacent bombs, mud slows movement, spikes cycle between safe and lethal phases, dark rift teleports to a random tile). Hazard tiles are placed as clustered groups on the map. Special tiles and power-ups can be hidden under destructible walls — revealed when the wall is destroyed. **Puzzle Tiles** (campaign + multiplayer): color-coded switches (toggle, pressure plate, one-shot) that open/close matching gates (explosions pass through gates in both states), and crumbling floors that collapse into pits after being stepped on — enables environmental puzzle design with bomb-triggered switches, timed pressure plate rushes, and path-planning challenges. In multiplayer, puzzle tiles are procedurally placed with category selection (switches & gates, crumbling floors).
+All optional and toggled per room; each event type, hazard type and puzzle category can be picked on its own.
+
+- **Reinforced walls:** destructible walls that take two hits.
+- **Hidden tiles:** special tiles and power-ups can sit under destructible walls and appear when the wall is destroyed.
+
+### Map events
+
+| Event | What happens |
+|-------|--------------|
+| **Meteor strike** | A 2-second warning (pulsing crosshair, exclamation mark, growing shadow), then a falling meteor with screen shake and particles |
+| **Power-up rain** | Power-ups rain down every 60 s |
+| **Wall collapse** | A dust warning, then a 3x3 area is destroyed |
+| **Freeze wave** | A row or column turns to ice for a while |
+| **Bomb surge** | Every bomb's fuse gets shorter, with a screen pulse |
+| **UFO abduction** | A tractor-beam warning, then a random player is teleported elsewhere and is briefly invulnerable |
+
+### Hazard tiles
+
+Placed on the map in clustered groups.
+
+| Tile | Effect |
+|------|--------|
+| **Teleporter pair** | Transports between its A and B tiles |
+| **Conveyor belt** | Animated stripes; pushes players and bombs along |
+| **Vine** | Slows movement |
+| **Mud** | Slows movement |
+| **Quicksand** | Slows you and kills over time |
+| **Ice** | You slide with momentum |
+| **Lava** | Kills instantly and detonates adjacent bombs |
+| **Spikes** | Cycle between safe and lethal phases |
+| **Dark rift** | Teleports you to a random tile |
+
+### Puzzle tiles
+
+In the campaign and in multiplayer. Multiplayer places them procedurally from the categories the room picks (switches & gates, crumbling floors).
+
+- **Switches:** colour-coded, in three kinds: toggle, pressure plate and one-shot. Each opens and closes the gates of its colour.
+- **Gates:** explosions pass through them, open or closed.
+- **Crumbling floors:** collapse into pits after being stepped on.
+
+Together they make bomb-triggered switches, timed pressure-plate rushes and path-planning puzzles.
+
+## Open World Mode (WIP)
+
+A persistent bomb arena and the default landing page. Visitors join automatically on page load, with no room to create, and guests play without an account.
+
+- **Toroidal map:** a wrapping 51x41 grid without border walls. Players, bombs and explosions wrap across the edges, so the world feels endless.
+- **Ghost rendering:** the tilemap and every entity (players with shields and labels, bombs, explosions, power-ups) draw ghost copies at the edges, so wrapping looks seamless.
+- **Guest play:** visitors without an account jump in from the menu screen.
+- **Rounds:** configurable length (default 5 minutes), a freeze between rounds, and a new map each round.
+- **Live scoring:** stats update in real time and are saved to the database periodically.
+- **Remote bombs:** detonate FIFO (oldest first) by default; detonating with none placed switches to all at once. Chain reactions always spread between adjacent bombs.
+- **Explosion performance:**
+  - same-frame explosions share one louder sound
+  - a particle budget degrades gracefully (20/40 emitter caps)
+  - screen shake is coalesced
+  - audio and shake use the wrapped distance near the edges
+- **AFK timeout:** idle players are kicked after 60 s by default (admin: 0–600 s, 0 disables). Registered users keep the XP they earned.
+- **Round counter:** shown on the round timer.
+- **Live scoreboard:** replaces the player list (rank, name, kills/deaths, score) and highlights your row, even below the visible cut-off. Kills move it instantly; a full snapshot re-syncs every 5 s.
+- **End-of-round standings:** the final top 10 over the frozen arena, with a countdown to the next round.
+- **Admin controls:** on/off, round length, map settings and AFK timeout. The settings are prefixed `open_world_` in the admin dashboard and all hot-reload.
 
 ## Campaign
 
-Campaign with hand-crafted levels grouped into themed worlds (9 themes: classic, forest, desert, ice, volcano, void, castle, swamp, sky — each with unique color palettes and tile textures). Defeat enemies (5 built-in movement patterns, boss phases, or custom AI scripts), earn 1-3 stars per level, track progress. Supports solo play, online co-op (2 players via party), local co-op (same keyboard/gamepads), and buddy mode. Local co-op features a setup modal for Player 2 identity (guest with custom name/color, or log in as a registered player with own cosmetics and cookie-based session persistence), control presets (WASD, Arrows, Numpad, Gamepad 1/2), and camera mode: shared auto-zoom, horizontal split-screen, or vertical split-screen. Split-screen auto-zooms to fill each viewport and shows off-screen partner arrows at viewport edges (aligned on the line connecting the two players). **Buddy Mode** is designed for playing with very young or inexperienced players — the buddy is a smaller, permanently invulnerable support character who can pass through destructible walls and bombs, pick up power-ups for P1, and place limited bombs (1 bomb, 1 fire range). Buddy name, color, and size (40-80%) are saved per-account and configurable in Settings > Preferences or the pre-launch modal. Selecting a level shows a themed pixel-art map preview. 3-2-1-GO countdown, pause menu (Escape key — Continue/Exit), win grace period for smooth transitions, and seamless retry/play-again with full mode preservation. Admins create enemy types and levels via a visual editor with resizable maps, WASD/arrow panning, zoom, and prominent spawn point markers. Enemy types are fully customizable: 6 body shapes (blob, spiky, ghost, robot, bug, skull), 4 eye styles, 8 visual addons (teeth, horns, tail, aura, crown, scar, wings, accessories like bow tie/monocle/bandana), primary/secondary colors, and size multiplier — all with live preview. Enemy types can optionally use custom AI scripts (TypeScript `decide()` method) that override built-in movement patterns — uploaded in the AI tab and assigned per enemy type with a difficulty setting. Ships with 6 default enemy AIs: Hunter (aggressive chaser), Patrol Guard (path follower), Bomber (area denial), Coward (flee + trap), Swarm (coordinated flanking), and Ambusher (wait + rush) — all scaling across easy/normal/hard difficulty. Export/import levels and enemy types as JSON (AI source bundled in exports). Ships with "Training Grounds" (3 intro levels) plus 8 tutorial worlds (21 levels) covering every power-up, hazard tile, special tile, and puzzle mechanic. See [docs/campaign.md](docs/campaign.md) and [docs/enemy-ai-guide.md](docs/enemy-ai-guide.md).
+Hand-crafted levels in themed worlds: defeat enemies, earn 1–3 stars per level and track your progress. Details: [docs/campaign.md](docs/campaign.md) and [docs/enemy-ai-guide.md](docs/enemy-ai-guide.md).
+
+- **9 world themes**, each with its own palette and tile textures: classic, forest, desert, ice, volcano, void, castle, swamp, sky.
+- **Bundled content:** "Training Grounds" (3 intro levels) plus 8 tutorial worlds (21 levels) covering every power-up, hazard tile, special tile and puzzle mechanic.
+- **Level flow:**
+  - selecting a level shows a themed pixel-art map preview
+  - a 3-2-1-GO countdown, then a pause menu on Escape (Continue/Exit)
+  - a short grace period after a win, and retry or play again in the same mode
+
+### Play modes
+
+- **Solo.**
+- **Online co-op:** two players in a party.
+- **Local co-op:** two players on one keyboard or on gamepads.
+  - Player 2 joins as a guest (own name and colour) or logs in with their own account and cosmetics; the session persists via cookie.
+  - Control presets: WASD, Arrows, Numpad, Gamepad 1, Gamepad 2.
+  - Camera: shared auto-zoom, or horizontal or vertical split-screen. Split-screen zooms each viewport and points an arrow at an off-screen partner, on the line between the two players.
+- **Buddy mode:** for very young or new players. The buddy is a smaller, permanently invulnerable helper.
+  - It passes through destructible walls and bombs, picks up power-ups for P1 and places limited bombs (1 bomb, range 1).
+  - Name, colour and size (40–80%) are saved per account, in Settings > Preferences or the launch modal.
+
+### Enemies and the level editor
+
+- **Visual editor (admins):** resizable maps, WASD/arrow panning, zoom and clear spawn markers. Levels and enemy types export and import as JSON, AI source included.
+- **Enemy looks**, all with live preview:
+  - 6 body shapes: blob, spiky, ghost, robot, bug, skull
+  - 4 eye styles and 8 add-ons: teeth, horns, tail, aura, crown, scar, wings, accessories (bow tie, monocle, bandana)
+  - primary and secondary colour, and a size multiplier
+- **Enemy behaviour:** 5 built-in movement patterns and boss phases. Alternatively a custom AI script (a TypeScript `decide()` method), uploaded in the AI tab and assigned per enemy type with a difficulty.
+- **6 bundled enemy AIs**, each scaling across easy, normal and hard:
+
+| AI | Behaviour |
+|----|-----------|
+| Hunter | Aggressive chaser |
+| Patrol Guard | Follows a path |
+| Bomber | Area denial |
+| Coward | Flees and sets traps |
+| Swarm | Coordinated flanking |
+| Ambusher | Waits, then rushes |
 
 ## Custom Maps
 
-Create and share custom maps for multiplayer rooms. The built-in map editor (adapted from the campaign level editor) lets any authenticated user design maps with walls, destructible blocks, spawn points, teleporter pairs, and conveyor belts. Maps can be published for the community or kept private.
+Any signed-in player can design maps for multiplayer rooms in the built-in editor (adapted from the campaign editor): walls, destructible blocks, spawn points, teleporter pairs and conveyor belts. Maps stay private or are published for the community.
 
 - **My Maps** sidebar view: list, edit, publish/unpublish, delete your maps
-- **Map picker** in room creation: choose from your own maps or community-published maps (grouped in dropdown). Selecting a custom map auto-disables map size and wall density settings and shows a pixel-art map preview
-- **Validation**: Maps must have odd dimensions (9-51), wall borders, 2-8 spawn points, and valid tile types. Validated both client-side and server-side
-- **Play count tracking**: Each game played on a custom map increments its play counter
-- **Community ratings**: Players can rate published maps 1-5 stars. Maps sorted by average rating on the community listing. Star ratings shown in room creation dropdown
-- **Map Challenges**: Admin-created weekly challenges featuring published community maps. Players compete on the featured map with results auto-recorded to a challenge-specific leaderboard (wins, kills, games played). Challenge view in lobby sidebar shows active challenge with map preview, creator spotlight, and top scores. "Play Challenge" creates a room with locked map and game mode. Maps linked to active/upcoming challenges are protected from deletion. Admin panel tab for CRUD, activate/deactivate (one active at a time), and global toggle
+- **Map picker** in room creation: your own maps and community maps, grouped. A custom map shows a pixel-art preview and turns off the map size and wall density settings
+- **Validation**: odd dimensions (9-51), border walls, 2-8 spawn points and valid tile types, checked in the client and on the server
+- **Play count**: each game on a custom map counts toward it
+- **Community ratings**: 1-5 stars on published maps; the community list sorts by average rating, and the room dropdown shows the stars
+- **Map challenges**: weekly admin-created challenges on a featured community map, with their own leaderboard (wins, kills, games played).
+  - The lobby's Challenge view shows the map preview, a creator spotlight and the top scores. "Play Challenge" opens a room with map and mode locked.
+  - Admins manage them in their own tab: one active at a time, plus a global toggle. Maps tied to an active or upcoming challenge can't be deleted.
 
 ## Bot AI
 
-Three difficulty tiers optimized through 20,000+ simulation games:
+Three difficulty tiers, tuned over 20,000+ simulated games:
 - **Easy**: Low awareness, shallow escape, intentional mistakes
 - **Normal**: BFS pathfinding, dynamic danger assessment, competitive
 - **Hard**: Deep search, chain reaction awareness, shield aggression, dominant
 
-All bots feature team awareness (won't hunt, bomb, or kick teammates in team mode) and smart power-up value scoring (prioritize shield > speed > kick/throw > pierce > remote/line > fire > bomb; skip already-maxed power-ups). Admins can upload custom AI implementations as TypeScript files. See [docs/bot-ai-guide.md](docs/bot-ai-guide.md) for the developer guide and [docs/bot-ai-internals.md](docs/bot-ai-internals.md) for built-in AI details.
+All bots share:
+- **Team awareness:** in team mode they never hunt, bomb or kick teammates.
+- **Power-up scoring:** shield > speed > kick/throw > pierce > remote/line > fire > bomb; maxed power-ups are skipped.
 
-## Leaderboard & Ranking
+Admins can upload their own bot AIs as TypeScript files. Guides: [docs/bot-ai-guide.md](docs/bot-ai-guide.md) (writing one) and [docs/bot-ai-internals.md](docs/bot-ai-internals.md) (how the built-in AI decides).
 
-Elo-based competitive ranking across all game modes. Standard Elo formula with adaptive K-factor. Seasonal system with admin-defined dates, history archiving, and hard/soft resets. Six rank tiers (Bronze through Champion) with optional sub-tiers (I/II/III) — all admin-configurable. Leaderboard view with season filtering (hidden when no seasons) and clickable profiles leading to full-page profile views. Rank and level badges displayed next to usernames in lobby. Elo deltas and XP gains shown on game-over screen. **Match History** sidebar view shows recent matches with mode, result, K/D, placement, duration, and per-mode stat breakdown (win rate, avg kills) with pagination.
+## Progression
 
-## Player XP & Levels
+### Leaderboard & ranking
 
-XP-based leveling system separate from Elo. Earn XP from kills, bomb placements, power-up collection, match completion, and placement bonuses. Level curve: each level requires progressively more XP. Level milestones can unlock exclusive cosmetics. Admin-configurable XP multiplier. Level displayed on leaderboard, profiles, lobby, and game-over screen with progress bar.
+- **Elo** across all game modes: the standard formula with an adaptive K-factor.
+- **Seasons:** admin-defined dates, archived history, hard or soft resets.
+- **Rank tiers:** six (Bronze to Champion) with optional sub-tiers I/II/III, all admin-configurable.
+- **Leaderboard view:** a season filter (hidden when there are no seasons); names open full-page profiles.
+- **Badges:** rank and level next to usernames in the lobby. The game-over screen shows the Elo change and XP gained.
+- **Match History** sidebar view: recent matches with mode, result, K/D, placement and duration, plus per-mode stats (win rate, average kills), paginated.
 
-## Achievements & Cosmetics
+### XP & levels
 
-Admin-configurable achievement system with four condition types: cumulative stats, per-game feats, mode-specific milestones, and campaign progress. Ships with a default pack of 47 achievements and 25 cosmetic rewards across combat, victory, dedication, mode mastery, and campaign categories. Achievement progress tracking with progress bars on profiles (own profile only). Achievements can reward cosmetics. Four cosmetic types: player colors, eye styles, movement trails, and bomb skins. Unlocked via achievements, campaign stars, level milestones, or by default. Live preview panel in settings shows equipped player sprite, bomb, and trail. Export/import achievements and cosmetics as JSON. Full-page profile views show rank, level, stats grid, season history, achievements, and equipped cosmetics with a privacy toggle.
+Separate from Elo.
+
+- **XP comes from** kills, bomb placements, power-ups, finishing matches and placement bonuses. Each level needs more XP than the last.
+- **Rewards:** level milestones can unlock exclusive cosmetics. Admins set an XP multiplier.
+- **Shown on** the leaderboard, profiles, the lobby and the game-over screen (with a progress bar).
+
+### Achievements & cosmetics
+
+- **Achievements:** four condition types (cumulative stats, per-game feats, mode milestones, campaign progress), admin-configurable. The default pack has 47 achievements and 25 cosmetic rewards across combat, victory, dedication, mode mastery and campaign.
+- **Progress bars** for unfinished achievements on your own profile.
+- **Cosmetics:** player colours, eye styles, movement trails and bomb skins. They unlock through achievements, campaign stars or level milestones, or are available by default.
+- **Live preview** in Settings of the equipped player sprite, bomb and trail.
+- **Profiles:** a full page with rank, level, stats grid, season history, achievements and equipped cosmetics, plus a privacy toggle.
+- **Export/import** of achievements and cosmetics as JSON.
+
+## Social Features
+
+- **Friends**: a full-page view with tabs (Friends/Requests/Blocked), search, and friend cards with online status.
+- **Online presence**: friends' live status (online, in lobby, in game, in campaign), tracked in Redis with a 120 s TTL.
+- **Parties**: a full-page view: create a party, or see member cards, chat and invites. When the leader joins a room, all members follow.
+- **Room invites**: invite friends to your current room; the invite toast has Accept/Decline and dismisses itself after 30 s.
+- **Lobby chat**: a global, ephemeral chat in a collapsible panel at the bottom right. Users can hide it in Settings > Preferences > Chat.
+- **Direct messages**: a two-column view (conversations + the open conversation). Persistent messages between friends, with unread badges, real-time delivery and read receipts.
+- **In-game emotes**: 12 bubbles that float above the player, with a 3 s cooldown. Keys 1-6 send quick emotes; backtick (`) opens a radial wheel with all 12.
+  - GG, Help!, Nice!, Oops, Taunt, Thanks, Wow, Sorry, Let's Go!, No!, Wait, Boom!
+- **Spectator chat**: dead players chat during live games, in a collapsible panel at the bottom left, with role-coloured names and a 3 messages/s limit.
+- **Spectator game master**: dead players gain energy (1/tick, max 100) and spend it on the live match. Admin global toggle plus a per-room setting.
+  - Actions, from an action bar (Q/W/E/R) with click-to-place targeting: temporary wall (30 energy, 10 s), targeted meteor (50, 1.5 s warning), random power-up (40), speed boost or slow zone (25, 8 s).
+  - Anti-griefing: 1 s cooldown, rate limits, no occupied tiles, nothing near spawns or allies.
+- **Rematch voting**: after a game, more than 50% of votes restart it with the same settings (30 s timeout). Solo games (one human plus bots) show a "Play Again" button instead.
+- **Admin chat controls**: party chat, lobby chat, DMs, emotes and spectator chat can each be set to everyone (default), staff only, admin only, or off.
+
+## Look & Feel
+
+- **11 colour themes** for the whole UI and the game canvas. Users pick one in Settings > Preferences; admins set the global default in the Dashboard.
+  - Dark: Inferno, Arctic, Toxic, Crimson, Midnight
+  - Vivid light: Daylight, Sakura, Sand
+  - Pastel light: Frost, Blossom, Dune
+- **4 art styles** for the arena: Classic, Neon Arena, Toy Diorama, Crisp Pixel. Each player picks one per device in Settings; admins set the default.
+- **Graphics settings:** quality, sharp rendering (up to 2× pixel density), particles, animations, screen shake and the minimap. An OS "reduce motion" preference turns animations and shake off by default.
+- **Colour-blind mode:** safe player and team colours, plus a shape marker per player.
+- **Sidebar navigation:** a collapsible left sidebar with an "ear" toggle. Every lobby view opens inline in the main area, with no overlays. On phones the sidebar folds to an icon rail and opens as a drawer.
+  - Views: Open World, Rooms, Create Room, Campaign, My Maps, Challenge, Friends, Messages, Party, Leaderboard, Match History, Profile, Settings, Help, Admin
+
+## Account & Security
+
+- **Two-factor authentication:** optional TOTP in Settings > Account.
+  - Set up by scanning a QR code (or typing the secret) into any authenticator app, such as Google Authenticator, Authy or 1Password. Setup gives 10 one-time backup codes.
+  - Login then asks for the 6-digit code; disabling needs the password and a code.
+  - Secrets are encrypted at rest (AES-256-GCM). Admins see each user's 2FA status and can reset it in the Users tab.
+- **Account deletion:** self-service in Settings > Account, confirmed by password. It removes all user data (stats, replays, maps, messages, friends). Admin accounts can't delete themselves.
+- Security headers, rate limiting and validation: see [SEO & Web Standards](#seo--web-standards) and [Tech Stack](#tech-stack).
 
 ## Admin Panel
 
@@ -154,30 +322,17 @@ Admin-configurable achievement system with four condition types: cumulative stat
 | Achievements | Admin | Achievement CRUD (4 condition types), cosmetic CRUD (4 types), reward linking, JSON export/import |
 | Challenges | Admin | Map challenge CRUD, activate/deactivate, global toggle, published map selection |
 
-All actions audit-logged. See [docs/admin-and-systems.md](docs/admin-and-systems.md).
-
-## Social Features
-
-- **Theme System**: 11 color themes — 5 dark (Inferno, Arctic, Toxic, Crimson, Midnight), 3 vivid light (Daylight, Sakura, Sand), 3 pastel light (Frost, Blossom, Dune). User selects in Settings > Preferences; admin sets global default in Dashboard. Themes affect all UI and Phaser canvas colors.
-- **Sidebar Navigation**: Persistent collapsible left sidebar with "ear" toggle tab. All lobby views (Open World, Rooms, Create Room, Campaign, My Maps, Challenge, Friends, Messages, Party, Leaderboard, Match History, Profile, Settings, Help, Admin) render inline in the main content area — no overlays or slide-out panels.
-- **Friends**: Full-page view with tabs (Friends/Requests/Blocked), search, friend cards with online status indicators.
-- **Online Presence**: See friends' real-time status (online, in lobby, in game, in campaign). Presence tracked via Redis with 120s TTL.
-- **Parties**: Full-page view with two states: empty (create party) / active (member cards, chat, invites). When the party leader joins a room, all members auto-follow.
-- **Room Invites**: Invite friends directly to your current room. Invite toasts with Accept/Decline buttons (30s auto-dismiss).
-- **Lobby Chat**: Global ephemeral chat for all connected lobby users. Collapsible panel bottom-right. Users can hide via Settings > Preferences > Chat toggle.
-- **Direct Messages**: Full-page two-column view (conversation sidebar + active conversation). Persistent messages between friends with unread badges, real-time delivery, read receipts.
-- **In-Game Emotes**: 12 emotes (GG, Help!, Nice!, Oops, Taunt, Thanks, Wow, Sorry, Let's Go!, No!, Wait, Boom!) — keys 1-6 for quick emotes, backtick (`) opens radial emote wheel for all 12. Floating bubbles above player sprites with 3s cooldown.
-- **Spectator Chat**: Dead players can text chat during live games. Collapsible panel bottom-left, role-colored usernames, 3/sec rate limit.
-- **Spectator Game Master**: Dead players accumulate energy (1/tick, cap 100) and spend it to interact with the live match: place temporary walls (30 energy, 10s duration), trigger targeted meteors (50 energy, 1.5s warning), drop random power-ups (40 energy), or create speed boost/slow zones (25 energy, 8s duration). Anti-griefing: 1s cooldown, rate limited, cannot target occupied tiles or near spawns/allies. Admin global toggle + per-room setting. Frontend action bar (Q/W/E/R hotkeys) with energy display and click-to-place targeting.
-- **Rematch Voting**: After game over, players vote for rematch. >50% triggers auto-restart with same settings. 30s timeout. Solo games (1 human + bots) show direct "Play Again" button instead of voting.
-- **Admin Chat Controls**: All chat features (party chat, lobby chat, DMs, emotes, spectator chat) individually configurable: everyone (default), staff only, admin only, or fully disabled.
-- **Imprint & GitHub**: Admin-toggled links displayed on the login page footer and as right-aligned items in the Help tab bar. Imprint text editable in Dashboard; shown as modal on login, inline tab in Help. GitHub link opens repo in new tab.
-- **Two-Factor Authentication**: Optional TOTP 2FA in Settings > Account. Enable by scanning a QR code (or entering the secret manually) with any authenticator app (Google Authenticator, Authy, 1Password, etc.). 10 one-time backup codes provided during setup. Login prompts for 6-digit code when 2FA is active. Disable requires password + authenticator code. TOTP secrets encrypted at rest with AES-256-GCM. Admins can view 2FA status and reset a user's 2FA from the Users tab.
-- **Account Deletion**: Self-service account deletion in Settings > Account. Password confirmation required. Permanently removes all user data (stats, replays, maps, messages, friends). Admin accounts are protected from self-deletion.
+- **Imprint & GitHub links:** admin-toggled; shown in the login page footer and on the right of the Help tab bar.
+  - The imprint text is edited in the Dashboard and opens as a modal on login or as a tab in Help.
+- **Audit log:** every admin action is logged. See [docs/admin-and-systems.md](docs/admin-and-systems.md).
 
 ## Game Replays
 
-Games recorded as gzipped JSON with video-player controls (play/pause, seek, 0.5-4x speed), synced event log panel, and click-to-follow spectating. Access via Matches tab or Simulations tab. Campaign games also record replays (with enemy rendering) when recordings are enabled — access via Campaign tab Replays sub-view. See [docs/replay-system.md](docs/replay-system.md).
+- **Recording:** games are saved as gzipped JSON. Campaign games are recorded too, with enemies, when recordings are on.
+- **Viewer:** video-player controls (play/pause, seek, 0.5-4x speed), a synced event log and click-to-follow spectating.
+- **Where:** the Matches and Simulations tabs, and the Campaign tab's Replays view.
+
+Details: [docs/replay-system.md](docs/replay-system.md).
 
 ## In-Game Help & Documentation
 
@@ -193,7 +348,7 @@ Full-page Help view accessible from the lobby sidebar. Seven tabs with role-base
 | Level Editor | Staff | Visual tile reference (27 tile types with Canvas2D icons) + campaign system docs |
 | Admin Docs | Staff | Admin systems, infrastructure, testing, performance, bot AI internals, API reference |
 
-Documentation served via backend API from `docs/` directory (bind-mounted in dev, baked into image for prod). Markdown rendered client-side with `marked`.
+The backend serves the documentation from `docs/` (bind-mounted in dev, baked into the image for production); the client renders the markdown with `marked`.
 
 ## Architecture
 
@@ -222,52 +377,26 @@ Documentation served via backend API from `docs/` directory (bind-mounted in dev
 
 - **Server-authoritative**: All game logic runs on the server at 20 ticks/sec
 - **Grid-based movement**: Players occupy exactly one tile at a time
-- **Procedural audio**: All SFX synthesized via Web Audio API (explosions, bombs, power-ups, death, countdown, victory/defeat) — no external audio files. Sound toggle + volume controls in Settings
-- **In-game minimap**: Canvas2D overlay showing tiles, players, bombs, explosions, zone boundaries, and KOTH hill. Toggleable in settings
+- **Procedural audio**: all SFX are synthesised with the Web Audio API (explosions, bombs, power-ups, death, countdown, victory/defeat), with no audio files. Sound toggle and volume in Settings
+- **In-game minimap**: a Canvas2D overlay of tiles, players, bombs, explosions, zone boundaries and the KOTH hill; toggleable in Settings
 - **Kill feed with cause**: Death causes tracked (bomb, zone, lava, quicksand, spikes, dark rift, self, disconnect) with icons in kill feed and death banner
 - **Monorepo**: npm workspaces — `shared/` (types + constants), `backend/` (server), `frontend/` (client)
 - **Self-hosted assets**: All fonts, sounds, and static resources served locally — no external CDN dependencies
 
-## Open World Mode (WIP)
-
-Persistent bomb arena that serves as the default landing experience. Players auto-join on page load — no room creation needed. Supports guest access for unauthenticated players (no account required to play).
-
-- **Toroidal map**: Wrapping 51x41 grid with no border walls. Players, bombs, and explosions wrap seamlessly across edges — the world feels infinite in every direction
-- **Ghost rendering**: Tilemap and all entities (players with shield/labels, bombs, explosions, power-ups) render ghost copies at wrapping edges for seamless visual continuity
-- **Guest play**: Unauthenticated visitors can jump in immediately via the menu screen guest option
-- **Round cycle**: Configurable round duration (default 5 minutes) with freeze period between rounds and automatic map regeneration
-- **Live scoring**: Stats tracked in real-time with periodic database persistence
-- **Remote bombs**: Default to FIFO detonation (oldest first) in open world; toggle to all-at-once by pressing detonate with none placed. Chain reactions always propagate between adjacent bombs regardless of mode
-- **Explosion performance**: Audio batching (same-frame explosions → single louder sound), particle budget (graceful degradation with 20/40 emitter caps), screen shake coalescing, wrapped distance for accurate audio/shake near map edges
-- **AFK timeout**: Idle players are automatically kicked after 60 seconds of inactivity (default). Admin-configurable (0-600s, 0 disables). Registered users keep earned XP on kick
-- **Admin controls**: Server settings for enabling/disabling, round duration, map configuration, and AFK timeout. Settings prefixed `open_world_` in the admin dashboard. All settings hot-reloadable
-- **HUD round counter + leaderboard**: The round timer carries a round counter, and the player list is replaced by a live scoreboard (rank, name, kills/deaths, score) that highlights your own row — and keeps showing it even when you rank below the visible cut-off. Kills move the board instantly; a full snapshot re-syncs every 5 seconds
-- **End-of-round standings**: When a round ends, the final top 10 is shown over the frozen arena with a countdown to the next round
-
 ## Internationalization
 
-Full i18n support via [i18next](https://www.i18next.com/). UI strings live in JSON locale files, with every key present in all 12 languages (enforced by `tests/shared/localeParity.test.ts`).
+Full i18n via [i18next](https://www.i18next.com/). UI strings live in JSON locale files, and every key exists in all 12 languages (enforced by `tests/shared/localeParity.test.ts`).
 
-| Language   | Code | Status |
-|------------|------|--------|
-| English    | `en` | Complete |
-| German     | `de` | Complete |
-| French     | `fr` | Complete |
-| Spanish    | `es` | Complete |
-| Italian    | `it` | Complete |
-| Portuguese | `pt` | Complete |
-| Polish     | `pl` | Complete |
-| Dutch      | `nl` | Complete |
-| Turkish    | `tr` | Complete |
-| Swedish    | `sv` | Complete |
-| Norwegian  | `nb` | Complete |
-| Danish     | `da` | Complete |
+All 12 are complete: English `en`, German `de`, French `fr`, Spanish `es`, Italian `it`, Portuguese `pt`, Polish `pl`, Dutch `nl`, Turkish `tr`, Swedish `sv`, Norwegian `nb`, Danish `da`.
 
-- **Language selection**: Flag dropdown on login screen + Settings > Preferences dropdown. Auto-detects browser language on first visit
-- **Namespaces** organize translations: shared (`common`, `game`), frontend-only (`ui`, `auth`, `admin`, `campaign`, `help`, `editor`, `errors`), backend-only (`server`, `email`)
-- **Email i18n**: All transactional emails (verification, password reset, email change, warnings, test) sent in the user's preferred language
-- **Adding a new language**: Create translated JSON files in `frontend/src/i18n/locales/{code}/`, `shared/src/i18n/locales/{code}/`, and `backend/src/i18n/locales/{code}/`, then register the language code in the i18n config files
-- **RTL ready**: Document direction attribute set dynamically for RTL languages
+- **Language selection**: a flag dropdown on the login screen and in Settings > Preferences. The browser language is detected on the first visit
+- **Namespaces**:
+  - shared: `common`, `game`
+  - frontend: `ui`, `auth`, `admin`, `campaign`, `help`, `editor`, `errors`
+  - backend: `server`, `email`
+- **Email i18n**: every transactional email (verification, password reset, email change, warnings, test) goes out in the user's language
+- **Adding a language**: add translated JSON files in `frontend/src/i18n/locales/{code}/`, `shared/src/i18n/locales/{code}/` and `backend/src/i18n/locales/{code}/`, then register the code in the i18n config files
+- **RTL ready**: the document direction is set dynamically for RTL languages
 
 ## SEO & Web Standards
 
@@ -334,7 +463,9 @@ npm run lint                # ESLint across all workspaces
 npm run format:check        # Prettier format check
 ```
 
-Jest covers the backend and shared code (game logic, services, routes, socket handlers, middleware, database, simulation, utilities), Vitest the frontend. One suite, `tests/backend/db/migrationLock.test.ts`, needs a real MariaDB and runs only with `REQUIRE_DB_TESTS=1`. See [docs/testing.md](docs/testing.md) for the test inventory, mocking patterns, and a guide for writing new tests.
+- **Jest** covers the backend and shared code: game logic, services, routes, socket handlers, middleware, database, simulation, utilities. **Vitest** covers the frontend.
+- `tests/backend/db/migrationLock.test.ts` needs a real MariaDB and runs only with `REQUIRE_DB_TESTS=1`.
+- [docs/testing.md](docs/testing.md) has the test inventory, mocking patterns, and a guide to writing new tests.
 
 ## E2E
 
@@ -343,7 +474,11 @@ bash scripts/e2e.sh                         # the whole Playwright suite against
 bash scripts/e2e.sh player/rooms.spec.ts    # Playwright arguments pass through
 ```
 
-The script builds the production images, starts `docker-compose.yml` + `docker-compose.e2e.yml` as project `blastarena_e2e` on `127.0.0.1:${PORT_BASE:-24200}` with a Mailpit sink for verification and reset mails (`PORT_BASE+5`), runs every spec under `e2e/` except the docs tour, and tears the stack down. Multiplayer tests use one browser context per player on real sockets; bots fill the rooms. Tests that change server-wide state (tag `@global`) run after the rest, one at a time. [e2e/COVERAGE.md](e2e/COVERAGE.md) maps every feature to its test.
+- **Stack:** the script builds the production images and starts `docker-compose.yml` + `docker-compose.e2e.yml` as project `blastarena_e2e` on `127.0.0.1:${PORT_BASE:-24200}`. A Mailpit sink catches verification and reset mails (`PORT_BASE+5`).
+- **Run:** every spec under `e2e/` except the docs tour, then the stack is torn down.
+- **Multiplayer tests** use one browser context per player on real sockets; bots fill the rooms.
+- **Server-wide state:** tests tagged `@global` run after the rest, one at a time.
+- **Coverage:** [e2e/COVERAGE.md](e2e/COVERAGE.md) maps every feature to its test.
 
 ## Screenshots
 
@@ -354,7 +489,10 @@ bash scripts/docs-screenshots.sh            # writes docs/screenshots/*.png
 bash scripts/docs-screenshots.sh /tmp/shots # or anywhere else
 ```
 
-It builds the production images, starts a throwaway stack (`docker-compose.yml` + `docker-compose.e2e.yml`, project `blastarena_docs`, nginx on `127.0.0.1:${PORT_BASE:-24200}`, no host data directories), seeds it through the API (`e2e/docs/seed.ts`), runs `e2e/docs/tour.spec.ts` and tears everything down. Needs Docker and Node 26; run `npx playwright install chromium` in `e2e/` once. The tour asserts each screen before it shoots, so it doubles as a render check. On GitHub, the manual **Docs screenshots** workflow produces the same PNGs as an artifact.
+- **Stack:** the production images in a throwaway stack (`docker-compose.yml` + `docker-compose.e2e.yml`, project `blastarena_docs`, nginx on `127.0.0.1:${PORT_BASE:-24200}`, no host data directories).
+- **Run:** seeds through the API (`e2e/docs/seed.ts`), runs `e2e/docs/tour.spec.ts`, and tears everything down. The tour asserts each screen before it shoots, so it doubles as a render check.
+- **Needs** Docker and Node 26; run `npx playwright install chromium` in `e2e/` once.
+- **On GitHub**, the manual **Docs screenshots** workflow produces the same PNGs as an artifact.
 
 ## Documentation
 
