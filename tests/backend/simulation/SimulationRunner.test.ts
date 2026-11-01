@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
@@ -80,6 +80,10 @@ describe('SimulationRunner isolate disposal', () => {
     jest.clearAllMocks();
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('disposes the game when it completes normally', async () => {
     mockRunFast.mockResolvedValue(result(0));
 
@@ -104,7 +108,11 @@ describe('SimulationRunner isolate disposal', () => {
       .mockResolvedValueOnce(result(1))
       .mockRejectedValueOnce(new Error('boom'));
 
-    await new SimulationRunner(config({ totalGames: 5 }), 'batch-mid').run();
+    // The runner pauses 500 ms between games; fake timers skip the pauses.
+    jest.useFakeTimers();
+    const run = new SimulationRunner(config({ totalGames: 5 }), 'batch-mid').run();
+    await jest.runAllTimersAsync();
+    await run;
 
     // Two successes plus the failing one — no isolate left behind.
     expect(mockDispose).toHaveBeenCalledTimes(3);
