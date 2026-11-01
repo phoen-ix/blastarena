@@ -237,7 +237,7 @@ Backend utilities, config guards (nginx, Compose, Node version) and the shared-p
 | `../shared/validation.test.ts` | Username, password, email validation rules; the email pattern runs in linear time |
 | `../shared/artStyles.test.ts` | Art style ids: Classic is the built-in default, isArtStyleId accepts the listed styles only |
 | `utils/composeIsolation.test.ts` | Dev compose stack cannot adopt prod: no shared container names, host ports or data mounts, overrides instead of appends, own project name, documented dev command always passes `-p` |
-| `utils/replayPrune.test.ts` | pruneOldReplays: age/size limits oldest-first, campaign replays never auto-deleted, fresh files kept, throttled, missing directory tolerated |
+| `utils/replayPrune.test.ts` | pruneOldReplays: age/size limits oldest-first, campaign replays never auto-deleted, fresh files kept, throttled, missing directory tolerated (fake clock, sparse files) |
 | `utils/totpKeyValidation.test.ts` | isValidTotpKey requires exactly 64 hex chars; TOTP secret encryption round-trips, rejects invalid keys, cannot decrypt with another key |
 | `utils/nodeVersion.test.ts` | Same Node major across Docker stages, package.json engines, .nvmrc and the AI bundle target |
 
@@ -546,6 +546,13 @@ describe('GET /my-route', () => {
   });
 });
 ```
+
+### Tests on a Loaded Host
+
+Jest's 5 s default timeout applies to every async test and hook, and the suite also runs on busy hosts (load averages of 50-80 have been seen):
+- Import modules once, at the top of the file. Code that reads time or keeps module state is driven by a fake clock (`jest.spyOn(Date, 'now')`, see `utils/replayPrune.test.ts`), not by `jest.resetModules()` and a fresh import per test.
+- Size fixtures are sparse files (`fs.truncateSync(file, size)`): `stat` reports the size, nothing is written.
+- Unavoidable one-time work (the esbuild service process, the first isolate, the first HTTP request) goes in a `beforeAll` with its own budget and a comment saying why (`services/botai-sandbox.test.ts`, `middleware/csrf.test.ts`).
 
 ### Game Logic Tests
 
