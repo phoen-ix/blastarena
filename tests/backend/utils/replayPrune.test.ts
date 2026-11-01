@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach, afterEach, afterAll } from '@jest/globals';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -6,6 +6,8 @@ import * as path from 'path';
 jest.mock('../../../backend/src/utils/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
+
+import { pruneOldReplays } from '../../../backend/src/utils/replayRecorder';
 
 /**
  * Replays had no retention policy at all: one gzipped file per finished match, forever, removed
@@ -18,30 +20,33 @@ const MB = 1024 * 1024;
 
 let tmpDir: string;
 
+// A fake clock: each case starts two hours after the last, so the once-per-hour throttle (module
+// state) never carries over and the module is imported only once.
+let now = Date.UTC(2026, 0, 1);
+const dateNow = jest.spyOn(Date, 'now').mockImplementation(() => now);
+
+// Sparse files: stat reports the size, but nothing is written to disk.
 function seed(dir: string, name: string, ageMs: number, sizeBytes: number): string {
   const file = path.join(dir, name);
-  fs.writeFileSync(file, 'x'.repeat(sizeBytes));
-  const when = new Date(Date.now() - ageMs);
+  fs.writeFileSync(file, '');
+  fs.truncateSync(file, sizeBytes);
+  const when = new Date(now - ageMs);
   fs.utimesSync(file, when, when);
   return file;
 }
 
 const exists = (name: string) => fs.existsSync(path.join(tmpDir, name));
 
-// Bounds are read from env at module load, and the once-per-hour throttle is module state, so
-// each case re-imports the module with the values it needs.
-const loadWith = async (env: Record<string, string>) => {
-  jest.resetModules();
-  Object.assign(process.env, env);
-  const mod = await import('../../../backend/src/utils/replayRecorder');
-  return mod.pruneOldReplays;
-};
-
 describe('pruneOldReplays', () => {
   const originalEnv = { ...process.env };
 
+  const prune = (env: Record<string, string>, dir = tmpDir) => {
+    Object.assign(process.env, env);
+    return pruneOldReplays(dir);
+  };
+
   beforeEach(() => {
-    jest.clearAllMocks();
+    now += 2 * HOUR_MS;
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'replayprune-test-'));
   });
 
@@ -50,12 +55,13 @@ describe('pruneOldReplays', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
+  afterAll(() => dateNow.mockRestore());
+
   it('deletes replays past the age limit and keeps newer ones', async () => {
     seed(tmpDir, '1_old_ffa.replay.json.gz', 5 * DAY_MS, 1024);
     seed(tmpDir, '2_new_ffa.replay.json.gz', 2 * HOUR_MS, 1024);
 
-    const prune = await loadWith({ REPLAY_MAX_AGE_DAYS: '1', REPLAY_MAX_TOTAL_MB: '4096' });
-    await prune(tmpDir);
+    await prune({ REPLAY_MAX_AGE_DAYS: '1', REPLAY_MAX_TOTAL_MB: '4096' });
 
     expect(exists('1_old_ffa.replay.json.gz')).toBe(false);
     expect(exists('2_new_ffa.replay.json.gz')).toBe(true);
@@ -66,8 +72,7 @@ describe('pruneOldReplays', () => {
     seed(tmpDir, '2_b_ffa.replay.json.gz', 4 * HOUR_MS, 2 * MB);
     seed(tmpDir, '3_c_ffa.replay.json.gz', 3 * HOUR_MS, 2 * MB);
 
-    const prune = await loadWith({ REPLAY_MAX_AGE_DAYS: '3650', REPLAY_MAX_TOTAL_MB: '5' });
-    await prune(tmpDir);
+    await prune({ REPLAY_MAX_AGE_DAYS: '3650', REPLAY_MAX_TOTAL_MB: '5' });
 
     // 6 MB against a 5 MB budget: drop the oldest, and stop as soon as it fits.
     expect(exists('1_a_ffa.replay.json.gz')).toBe(false);
@@ -81,8 +86,7 @@ describe('pruneOldReplays', () => {
     seed(tmpDir, 'campaign_sess-abc.replay.json.gz', 900 * DAY_MS, 50 * MB);
     seed(tmpDir, '1_match_ffa.replay.json.gz', 900 * DAY_MS, 1024);
 
-    const prune = await loadWith({ REPLAY_MAX_AGE_DAYS: '1', REPLAY_MAX_TOTAL_MB: '1' });
-    await prune(tmpDir);
+    await prune({ REPLAY_MAX_AGE_DAYS: '1', REPLAY_MAX_TOTAL_MB: '1' });
 
     expect(exists('campaign_sess-abc.replay.json.gz')).toBe(true);
     expect(exists('1_match_ffa.replay.json.gz')).toBe(false);
@@ -91,8 +95,7 @@ describe('pruneOldReplays', () => {
   it('never deletes a file written inside the prune interval, however small the limits', async () => {
     seed(tmpDir, '1_fresh_ffa.replay.json.gz', 0, 10 * MB);
 
-    const prune = await loadWith({ REPLAY_MAX_AGE_DAYS: '0', REPLAY_MAX_TOTAL_MB: '0' });
-    await prune(tmpDir);
+    await prune({ REPLAY_MAX_AGE_DAYS: '0', REPLAY_MAX_TOTAL_MB: '0' });
 
     expect(exists('1_fresh_ffa.replay.json.gz')).toBe(true);
   });
@@ -101,8 +104,7 @@ describe('pruneOldReplays', () => {
     seed(tmpDir, 'notes.txt', 900 * DAY_MS, 1024);
     seed(tmpDir, '1_match_ffa.replay.json.gz', 900 * DAY_MS, 1024);
 
-    const prune = await loadWith({ REPLAY_MAX_AGE_DAYS: '1', REPLAY_MAX_TOTAL_MB: '4096' });
-    await prune(tmpDir);
+    await prune({ REPLAY_MAX_AGE_DAYS: '1', REPLAY_MAX_TOTAL_MB: '4096' });
 
     expect(exists('notes.txt')).toBe(true);
     expect(exists('1_match_ffa.replay.json.gz')).toBe(false);
@@ -110,18 +112,18 @@ describe('pruneOldReplays', () => {
 
   it('is throttled to once per interval', async () => {
     seed(tmpDir, '1_old_ffa.replay.json.gz', 5 * DAY_MS, 1024);
-    const prune = await loadWith({ REPLAY_MAX_AGE_DAYS: '1', REPLAY_MAX_TOTAL_MB: '4096' });
-    await prune(tmpDir);
+    await prune({ REPLAY_MAX_AGE_DAYS: '1', REPLAY_MAX_TOTAL_MB: '4096' });
     expect(exists('1_old_ffa.replay.json.gz')).toBe(false);
 
     // A second call in the same window must not even read the directory again.
     seed(tmpDir, '2_also_old_ffa.replay.json.gz', 5 * DAY_MS, 1024);
-    await prune(tmpDir);
+    await prune({ REPLAY_MAX_AGE_DAYS: '1', REPLAY_MAX_TOTAL_MB: '4096' });
     expect(exists('2_also_old_ffa.replay.json.gz')).toBe(true);
   });
 
   it('does not throw when the directory is missing', async () => {
-    const prune = await loadWith({ REPLAY_MAX_AGE_DAYS: '1', REPLAY_MAX_TOTAL_MB: '1' });
-    await expect(prune(path.join(tmpDir, 'nope'))).resolves.toBeUndefined();
+    await expect(
+      prune({ REPLAY_MAX_AGE_DAYS: '1', REPLAY_MAX_TOTAL_MB: '1' }, path.join(tmpDir, 'nope')),
+    ).resolves.toBeUndefined();
   });
 });

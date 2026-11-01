@@ -31,8 +31,8 @@ const REPLAY_DIR = process.env.REPLAY_DIR || '/app/replays';
 // data/replays bind mount has no Docker-level rotation either. A modest deployment had already
 // accumulated 5.5k files. Deliberately generous — a safety net against unbounded growth, not an
 // archiving policy. (audit REPLAY-RETENTION-1)
-const REPLAY_MAX_TOTAL_MB = Number(process.env.REPLAY_MAX_TOTAL_MB ?? 10240);
-const REPLAY_MAX_AGE_DAYS = Number(process.env.REPLAY_MAX_AGE_DAYS ?? 365);
+// The bounds, REPLAY_MAX_TOTAL_MB (default 10240) and REPLAY_MAX_AGE_DAYS (default 365), are read
+// from the environment on each prune.
 const REPLAY_PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 
 // Only multiplayer match replays are prunable. Campaign replays (`campaign_<sessionId>...`) are
@@ -72,8 +72,8 @@ export async function pruneOldReplays(dir: string): Promise<void> {
     entries.sort((a, b) => a.mtimeMs - b.mtimeMs); // oldest first
 
     let total = entries.reduce((sum, e) => sum + e.size, 0);
-    const maxTotalBytes = REPLAY_MAX_TOTAL_MB * 1024 * 1024;
-    const maxAgeMs = REPLAY_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+    const maxTotalBytes = Number(process.env.REPLAY_MAX_TOTAL_MB ?? 10240) * 1024 * 1024;
+    const maxAgeMs = Number(process.env.REPLAY_MAX_AGE_DAYS ?? 365) * 24 * 60 * 60 * 1000;
 
     let removed = 0;
     let freed = 0;
