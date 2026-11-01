@@ -550,7 +550,9 @@ describe('GET /my-route', () => {
 ### Tests on a Loaded Host
 
 Jest's 5 s default timeout applies to every async test and hook, and the suite also runs on busy hosts (load averages of 50-80 have been seen):
-- Import modules once, at the top of the file. Code that reads time or keeps module state is driven by a fake clock (`jest.spyOn(Date, 'now')`, see `utils/replayPrune.test.ts`), not by `jest.resetModules()` and a fresh import per test.
+- Import modules once, at the top of the file, not with `require()`/`import()` inside a test. Code that reads time or keeps module state is driven by a fake clock (`jest.spyOn(Date, 'now')`, see `utils/replayPrune.test.ts`), not by `jest.resetModules()` and a fresh import per test.
+- Real waits (`setTimeout` pauses in the code under test) run on fake timers: `jest.useFakeTimers()`, then `await jest.runAllTimersAsync()` (`simulation/SimulationRunner.test.ts`).
+- No `expect()` inside a loop of thousands of iterations: count in the loop, assert once after it (`game/PowerUpDrops.test.ts`).
 - Size fixtures are sparse files (`fs.truncateSync(file, size)`): `stat` reports the size, nothing is written.
 - Unavoidable one-time work (the esbuild service process, the first isolate, the first HTTP request) goes in a `beforeAll` with its own budget and a comment saying why (`services/botai-sandbox.test.ts`, `middleware/csrf.test.ts`).
 
