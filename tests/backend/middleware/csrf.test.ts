@@ -29,6 +29,9 @@ import { loadConfig } from '../../../backend/src/config';
 let server: http.Server;
 let base: string;
 
+// One server for the file. The first request loads fetch's HTTP client (undici) and opens the
+// first connection: real one-time work, done here so no single test pays for it. On a host under
+// heavy load (load average 50-80) it has taken more than the 5 s default, hence the hook's budget.
 beforeAll(async () => {
   process.env.DB_PASSWORD ??= 'test-db-password';
   process.env.JWT_SECRET ??= 'x'.repeat(32);
@@ -40,7 +43,8 @@ beforeAll(async () => {
   server = http.createServer(createApp());
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-});
+  await (await fetch(`${base}/api/auth/csrf`)).text();
+}, 30_000);
 
 afterAll(async () => {
   await new Promise<void>((resolve, reject) =>
