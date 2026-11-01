@@ -31,13 +31,14 @@ describe('power-up drop selection', () => {
   it('follows the declared weights when all power-ups are enabled', () => {
     const gs = new GameStateManager({ ...BASE_CONFIG, enabledPowerUps: ALL_POWER_UPS });
 
+    // One expect() after the loop, not one per pick: 60k matcher calls cost about 4 s.
     const N = 60_000;
-    const counts = new Map<PowerUpType, number>();
+    const counts = new Map<PowerUpType | null, number>();
     for (let i = 0; i < N; i++) {
       const t = pick(gs);
-      expect(t).not.toBeNull();
-      counts.set(t as PowerUpType, (counts.get(t as PowerUpType) ?? 0) + 1);
+      counts.set(t, (counts.get(t) ?? 0) + 1);
     }
+    expect(counts.has(null)).toBe(false);
 
     for (const type of ALL_POWER_UPS) {
       const expected = POWERUP_DEFINITIONS[type].weight / TOTAL_WEIGHT;
