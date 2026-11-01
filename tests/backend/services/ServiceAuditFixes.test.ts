@@ -12,6 +12,7 @@ jest.mock('../../../backend/src/db/connection', () => ({
 }));
 
 import { canUserPlayMap } from '../../../backend/src/services/custom-maps';
+import { cleanupExpiredRefreshTokens } from '../../../backend/src/services/auth';
 
 describe('custom map access control', () => {
   beforeEach(() => {
@@ -60,7 +61,6 @@ describe('refresh token reaping', () => {
     mockExecute
       .mockResolvedValueOnce({ affectedRows: 12 })
       .mockResolvedValueOnce({ affectedRows: 3 });
-    const { cleanupExpiredRefreshTokens } = await import('../../../backend/src/services/auth');
 
     const removed = await cleanupExpiredRefreshTokens();
 
@@ -77,7 +77,6 @@ describe('refresh token reaping', () => {
 
   it('reports zero when the driver omits affectedRows', async () => {
     mockExecute.mockResolvedValue({});
-    const { cleanupExpiredRefreshTokens } = await import('../../../backend/src/services/auth');
     expect(await cleanupExpiredRefreshTokens()).toBe(0);
   });
 });

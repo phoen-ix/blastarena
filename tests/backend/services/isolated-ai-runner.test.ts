@@ -6,6 +6,7 @@ import {
   AI_INVOKE_TIMEOUT_MS,
 } from '../../../backend/src/services/IsolatedAIRunner';
 import { CollisionSystem } from '../../../backend/src/game/CollisionSystem';
+import { GameStateManager } from '../../../backend/src/game/GameState';
 import type { Direction, TileType } from '../../../shared/src/types/game';
 
 // CJS strings mimic esbuild's `module.exports = ...` output for an uploaded AI.
@@ -353,8 +354,6 @@ describe('IsolatedAIRunner — incremental tile sync', () => {
   };`;
 
   it('sees tracked tile changes on later decisions without re-sending the grid', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { GameStateManager } = require('../../../backend/src/game/GameState');
     const gs = new GameStateManager({
       mapWidth: 9,
       mapHeight: 9,
