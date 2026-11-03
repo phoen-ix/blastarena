@@ -1,14 +1,17 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest';
 
 let callCount = 0;
 
-jest.mock('bcrypt', () => ({
-  hash: jest.fn(async () => {
-    callCount++;
-    return `$2b$12$mocksalt${callCount}hashvalue${callCount}`;
-  }),
-  compare: jest.fn(async () => true),
-}));
+vi.mock('bcrypt', () => {
+  const bcrypt = {
+    hash: vi.fn(async () => {
+      callCount++;
+      return `$2b$12$mocksalt${callCount}hashvalue${callCount}`;
+    }),
+    compare: vi.fn(async () => true),
+  };
+  return { ...bcrypt, default: bcrypt };
+});
 
 import bcrypt from 'bcrypt';
 import {
@@ -19,12 +22,12 @@ import {
   scrubEmailError,
 } from '../../../backend/src/utils/crypto';
 
-const mockHash = bcrypt.hash as jest.MockedFunction<typeof bcrypt.hash>;
-const mockCompare = bcrypt.compare as jest.MockedFunction<typeof bcrypt.compare>;
+const mockHash = bcrypt.hash as MockedFunction<typeof bcrypt.hash>;
+const mockCompare = bcrypt.compare as MockedFunction<typeof bcrypt.compare>;
 
 describe('Crypto Utils', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     callCount = 0;
     mockHash.mockImplementation(async () => {
       callCount++;

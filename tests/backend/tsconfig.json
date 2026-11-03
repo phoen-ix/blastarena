@@ -1,0 +1,13 @@
+{
+  // Type-checks the backend and shared tests (vitest only strips types). Unused locals and
+  // parameters are allowed here so a leftover import cannot fail the check (audit DEAD-CODE-1).
+  "extends": "../../backend/tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "../..",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "paths": { "@blast-arena/shared": ["../../shared/src"] }
+  },
+  "include": ["**/*.ts", "../shared/**/*.ts"]
+}

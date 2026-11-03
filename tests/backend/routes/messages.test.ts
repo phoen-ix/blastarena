@@ -1,26 +1,26 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
 // Mock services
-const mockGetConversationList = jest.fn<AnyFn>();
-const mockGetConversation = jest.fn<AnyFn>();
-const mockMarkRead = jest.fn<AnyFn>();
+const mockGetConversationList = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetConversation = vi.hoisted(() => vi.fn<AnyFn>());
+const mockMarkRead = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/messages', () => ({
+vi.mock('../../../backend/src/services/messages', () => ({
   getConversationList: mockGetConversationList,
   getConversation: mockGetConversation,
   markRead: mockMarkRead,
 }));
 
 // Mock middleware as pass-through
-const mockAuthMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
-jest.mock('../../../backend/src/middleware/auth', () => ({
+const mockAuthMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
+vi.mock('../../../backend/src/middleware/auth', () => ({
   authMiddleware: mockAuthMiddleware,
 }));
 
-const mockEmailVerifiedMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
-jest.mock('../../../backend/src/middleware/emailVerified', () => ({
+const mockEmailVerifiedMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
+vi.mock('../../../backend/src/middleware/emailVerified', () => ({
   emailVerifiedMiddleware: mockEmailVerifiedMiddleware,
 }));
 
@@ -82,7 +82,7 @@ function mockRes() {
 
 describe('Messages Routes', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('Middleware presence', () => {
@@ -116,7 +116,7 @@ describe('Messages Routes', () => {
       const handler = getHandler('get', '/messages');
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetConversationList).toHaveBeenCalledWith(1);
       expect(res._json).toEqual({ conversations });
@@ -128,7 +128,7 @@ describe('Messages Routes', () => {
       const handler = getHandler('get', '/messages');
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -143,7 +143,7 @@ describe('Messages Routes', () => {
       const handler = getHandler('get', '/messages/:userId');
       const req = mockReq({ params: { userId: '5' }, query: {} });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetConversation).toHaveBeenCalledWith(1, 5, 1, 20);
       expect(res._json).toEqual(result);
@@ -156,7 +156,7 @@ describe('Messages Routes', () => {
       const handler = getHandler('get', '/messages/:userId');
       const req = mockReq({ params: { userId: '5' }, query: { page: '3', limit: '10' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetConversation).toHaveBeenCalledWith(1, 5, 3, 10);
     });
@@ -168,7 +168,7 @@ describe('Messages Routes', () => {
       const handler = getHandler('get', '/messages/:userId');
       const req = mockReq({ params: { userId: '5' }, query: { limit: '200' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetConversation).toHaveBeenCalledWith(1, 5, 1, 50);
     });
@@ -189,7 +189,7 @@ describe('Messages Routes', () => {
       const handler = getHandler('get', '/messages/:userId');
       const req = mockReq({ params: { userId: '5' }, query });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(mockGetConversation).toHaveBeenCalledWith(1, 5, expectedPage, expectedLimit);
@@ -200,7 +200,7 @@ describe('Messages Routes', () => {
       const handler = getHandler('get', '/messages/:userId');
       const req = mockReq({ params: { userId: 'abc' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(res._status).toBe(400);
       expect(res._json).toEqual({ error: 'Invalid user ID' });
@@ -213,7 +213,7 @@ describe('Messages Routes', () => {
       const handler = getHandler('get', '/messages/:userId');
       const req = mockReq({ params: { userId: '5' }, query: {} });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -227,7 +227,7 @@ describe('Messages Routes', () => {
       const handler = getHandler('put', '/messages/:userId/read');
       const req = mockReq({ params: { userId: '5' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockMarkRead).toHaveBeenCalledWith(1, 5);
       expect(res._json).toEqual({ message: 'Messages marked as read' });
@@ -237,7 +237,7 @@ describe('Messages Routes', () => {
       const handler = getHandler('put', '/messages/:userId/read');
       const req = mockReq({ params: { userId: 'bad' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(res._status).toBe(400);
       expect(res._json).toEqual({ error: 'Invalid user ID' });
@@ -250,7 +250,7 @@ describe('Messages Routes', () => {
       const handler = getHandler('put', '/messages/:userId/read');
       const req = mockReq({ params: { userId: '5' } });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));

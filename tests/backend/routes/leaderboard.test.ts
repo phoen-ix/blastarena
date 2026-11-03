@@ -1,29 +1,29 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
 // Mock services
-const mockGetLeaderboard = jest.fn<AnyFn>();
-const mockGetRankConfig = jest.fn<AnyFn>();
-const mockGetPublicProfile = jest.fn<AnyFn>();
-const mockGetUserRank = jest.fn<AnyFn>();
+const mockGetLeaderboard = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetRankConfig = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetPublicProfile = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetUserRank = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/leaderboard', () => ({
+vi.mock('../../../backend/src/services/leaderboard', () => ({
   getLeaderboard: mockGetLeaderboard,
   getRankConfig: mockGetRankConfig,
   getPublicProfile: mockGetPublicProfile,
   getUserRank: mockGetUserRank,
 }));
 
-const mockGetSeasons = jest.fn<AnyFn>();
+const mockGetSeasons = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/season', () => ({
+vi.mock('../../../backend/src/services/season', () => ({
   getSeasons: mockGetSeasons,
 }));
 
 // Mock middleware
-const mockAuthMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
-jest.mock('../../../backend/src/middleware/auth', () => ({
+const mockAuthMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
+vi.mock('../../../backend/src/middleware/auth', () => ({
   authMiddleware: mockAuthMiddleware,
 }));
 
@@ -85,7 +85,7 @@ function mockRes() {
 
 describe('Leaderboard Routes', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('GET /leaderboard', () => {
@@ -96,7 +96,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/leaderboard');
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetLeaderboard).toHaveBeenCalledWith({ page: 1, limit: 25, seasonId: undefined });
       expect(res._json).toEqual(result);
@@ -109,7 +109,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/leaderboard');
       const req = mockReq({ query: { page: '3', limit: '10', season_id: '7' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetLeaderboard).toHaveBeenCalledWith({ page: 3, limit: 10, seasonId: 7 });
       expect(res._json).toEqual(result);
@@ -121,7 +121,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/leaderboard');
       const req = mockReq({ query: { page: '-5' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetLeaderboard).toHaveBeenCalledWith({ page: 1, limit: 25, seasonId: undefined });
     });
@@ -132,7 +132,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/leaderboard');
       const req = mockReq({ query: { limit: '500' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetLeaderboard).toHaveBeenCalledWith({ page: 1, limit: 100, seasonId: undefined });
     });
@@ -143,7 +143,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/leaderboard');
       const req = mockReq({ query: { limit: '-5' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetLeaderboard).toHaveBeenCalledWith({ page: 1, limit: 1, seasonId: undefined });
     });
@@ -154,7 +154,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/leaderboard');
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -172,7 +172,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/leaderboard/tiers');
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetRankConfig).toHaveBeenCalled();
       expect(res._json).toEqual(config);
@@ -184,7 +184,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/leaderboard/tiers');
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -199,7 +199,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/leaderboard/seasons');
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetSeasons).toHaveBeenCalledWith(1, 20);
       expect(res._json).toEqual(result);
@@ -212,7 +212,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/leaderboard/seasons');
       const req = mockReq({ query: { page: '2', limit: '5' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetSeasons).toHaveBeenCalledWith(2, 5);
       expect(res._json).toEqual(result);
@@ -224,7 +224,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/leaderboard/seasons');
       const req = mockReq({ query: { page: '0' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetSeasons).toHaveBeenCalledWith(1, 20);
     });
@@ -235,7 +235,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/leaderboard/seasons');
       const req = mockReq({ query: { limit: '200' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetSeasons).toHaveBeenCalledWith(1, 50);
     });
@@ -246,7 +246,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/leaderboard/seasons');
       const req = mockReq({ query: { limit: '-10' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetSeasons).toHaveBeenCalledWith(1, 1);
     });
@@ -257,7 +257,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/leaderboard/seasons');
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -272,7 +272,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/user/:id/public');
       const req = mockReq({ params: { id: '2' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetPublicProfile).toHaveBeenCalledWith(2);
       expect(res._json).toEqual(profile);
@@ -282,7 +282,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/user/:id/public');
       const req = mockReq({ params: { id: 'abc' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(res._status).toBe(400);
       expect(res._json).toEqual({ error: 'Invalid user ID' });
@@ -295,7 +295,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/user/:id/public');
       const req = mockReq({ params: { id: '999' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetPublicProfile).toHaveBeenCalledWith(999);
       expect(res._status).toBe(404);
@@ -308,7 +308,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/user/:id/public');
       const req = mockReq({ params: { id: '2' } });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -329,7 +329,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/user/rank');
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetUserRank).toHaveBeenCalledWith(1);
       expect(res._json).toEqual(rank);
@@ -341,7 +341,7 @@ describe('Leaderboard Routes', () => {
       const handler = getHandler('get', '/user/rank');
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));

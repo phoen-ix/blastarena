@@ -1,12 +1,12 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
-const mockWithTransaction = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+const mockWithTransaction = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
   withTransaction: mockWithTransaction,
@@ -16,13 +16,13 @@ jest.mock('../../../backend/src/db/connection', () => ({
     (err as { errno?: unknown } | null)?.errno === 1062,
 }));
 
-const mockComparePassword = jest.fn<AnyFn>();
-const mockHashPassword = jest.fn<AnyFn>();
-const mockGenerateToken = jest.fn<AnyFn>();
-const mockHashToken = jest.fn<AnyFn>();
-const mockHashEmail = jest.fn<AnyFn>();
-const mockGenerateEmailHint = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/utils/crypto', () => ({
+const mockComparePassword = vi.hoisted(() => vi.fn<AnyFn>());
+const mockHashPassword = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGenerateToken = vi.hoisted(() => vi.fn<AnyFn>());
+const mockHashToken = vi.hoisted(() => vi.fn<AnyFn>());
+const mockHashEmail = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGenerateEmailHint = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/utils/crypto', async () => ({
   comparePassword: mockComparePassword,
   hashPassword: mockHashPassword,
   generateToken: mockGenerateToken,
@@ -31,29 +31,31 @@ jest.mock('../../../backend/src/utils/crypto', () => ({
   generateEmailHint: mockGenerateEmailHint,
   // Real implementation on purpose: these tests assert that error logs do NOT contain
   // an address, and a stub returning undefined would pass while leaking. (audit EMAIL-LOG-1)
-  scrubEmailError: jest.requireActual<typeof import('../../../backend/src/utils/crypto')>(
-    '../../../backend/src/utils/crypto',
+  scrubEmailError: (
+    await vi.importActual<typeof import('../../../backend/src/utils/crypto')>(
+      '../../../backend/src/utils/crypto',
+    )
   ).scrubEmailError,
 }));
 
-jest.mock('../../../backend/src/config', () => ({
+vi.mock('../../../backend/src/config', () => ({
   getConfig: () => ({
     EMAIL_PEPPER: 'test-pepper-minimum-32-characters-long',
   }),
 }));
 
-const mockSendEmailChangeEmail = jest.fn<AnyFn>();
-const mockSendEmailTakenChangeWarning = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/email', () => ({
+const mockSendEmailChangeEmail = vi.hoisted(() => vi.fn<AnyFn>());
+const mockSendEmailTakenChangeWarning = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/email', () => ({
   sendEmailChangeEmail: mockSendEmailChangeEmail,
   sendEmailTakenChangeWarning: mockSendEmailTakenChangeWarning,
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
+vi.mock('../../../backend/src/utils/logger', () => ({
   logger: {
-    error: jest.fn(),
-    warn: jest.fn(),
-    info: jest.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
@@ -71,7 +73,7 @@ import { AppError } from '../../../backend/src/middleware/errorHandler';
 
 describe('user service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockHashEmail.mockReturnValue('hashed-email');
     mockGenerateEmailHint.mockReturnValue('n***@e***.com');
     mockSendEmailTakenChangeWarning.mockResolvedValue(undefined);
@@ -333,10 +335,10 @@ describe('user service', () => {
   // ── confirmEmailChange ─────────────────────────────────────────────
 
   describe('confirmEmailChange', () => {
-    let mockConnExecute: jest.Mock<AnyFn>;
+    let mockConnExecute: Mock<AnyFn>;
 
     beforeEach(() => {
-      mockConnExecute = jest.fn<AnyFn>();
+      mockConnExecute = vi.fn<AnyFn>();
       mockWithTransaction.mockImplementation(async (fn: AnyFn) => fn({ execute: mockConnExecute }));
     });
 

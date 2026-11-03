@@ -1,27 +1,31 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const mockQuery = jest.fn<(...args: any[]) => Promise<any>>();
-const mockExecute = jest.fn<(...args: any[]) => Promise<any>>();
+const mockQuery = vi.hoisted(() => vi.fn<(...args: any[]) => Promise<any>>());
+const mockExecute = vi.hoisted(() => vi.fn<(...args: any[]) => Promise<any>>());
 // Transaction connection used by the refresh rotation (audit B12). Its execute() follows the
 // mysql2 promise shape, `[result, fields]`; the pool-level mockExecute above returns `result`.
-const mockConnExecute = jest.fn<(...args: any[]) => Promise<any>>();
-const mockWithTransaction = jest.fn<(...args: any[]) => Promise<any>>(async (fn) =>
-  fn({ execute: mockConnExecute, query: jest.fn() }),
+const mockConnExecute = vi.fn<(...args: any[]) => Promise<any>>();
+const mockWithTransaction = vi.hoisted(() =>
+  vi.fn<(...args: any[]) => Promise<any>>(async (fn) =>
+    fn({ execute: mockConnExecute, query: vi.fn() }),
+  ),
 );
-jest.mock('../../../backend/src/db/connection', () => ({
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
   withTransaction: mockWithTransaction,
 }));
 
-const mockHashPassword = jest.fn<(password: string) => Promise<string>>();
-const mockComparePassword = jest.fn<(password: string, hash: string) => Promise<boolean>>();
-const mockGenerateToken = jest.fn<() => string>();
-const mockHashToken = jest.fn<(token: string) => string>();
-const mockHashEmail = jest.fn<(email: string, pepper: string) => string>();
-const mockGenerateEmailHint = jest.fn<(email: string) => string>();
-jest.mock('../../../backend/src/utils/crypto', () => ({
+const mockHashPassword = vi.hoisted(() => vi.fn<(password: string) => Promise<string>>());
+const mockComparePassword = vi.hoisted(() =>
+  vi.fn<(password: string, hash: string) => Promise<boolean>>(),
+);
+const mockGenerateToken = vi.hoisted(() => vi.fn<() => string>());
+const mockHashToken = vi.hoisted(() => vi.fn<(token: string) => string>());
+const mockHashEmail = vi.hoisted(() => vi.fn<(email: string, pepper: string) => string>());
+const mockGenerateEmailHint = vi.hoisted(() => vi.fn<(email: string) => string>());
+vi.mock('../../../backend/src/utils/crypto', async () => ({
   hashPassword: mockHashPassword,
   comparePassword: mockComparePassword,
   generateToken: mockGenerateToken,
@@ -30,21 +34,25 @@ jest.mock('../../../backend/src/utils/crypto', () => ({
   generateEmailHint: mockGenerateEmailHint,
   // Real implementation on purpose: these tests assert that error logs do NOT contain
   // an address, and a stub returning undefined would pass while leaking. (audit EMAIL-LOG-1)
-  scrubEmailError: jest.requireActual<typeof import('../../../backend/src/utils/crypto')>(
-    '../../../backend/src/utils/crypto',
+  scrubEmailError: (
+    await vi.importActual<typeof import('../../../backend/src/utils/crypto')>(
+      '../../../backend/src/utils/crypto',
+    )
   ).scrubEmailError,
 }));
 
-const mockSendVerificationEmail = jest.fn<(...args: any[]) => Promise<void>>();
-const mockSendPasswordResetEmail = jest.fn<(...args: any[]) => Promise<void>>();
-const mockSendEmailTakenRegistrationWarning = jest.fn<(...args: any[]) => Promise<void>>();
-jest.mock('../../../backend/src/services/email', () => ({
+const mockSendVerificationEmail = vi.hoisted(() => vi.fn<(...args: any[]) => Promise<void>>());
+const mockSendPasswordResetEmail = vi.hoisted(() => vi.fn<(...args: any[]) => Promise<void>>());
+const mockSendEmailTakenRegistrationWarning = vi.hoisted(() =>
+  vi.fn<(...args: any[]) => Promise<void>>(),
+);
+vi.mock('../../../backend/src/services/email', () => ({
   sendVerificationEmail: mockSendVerificationEmail,
   sendPasswordResetEmail: mockSendPasswordResetEmail,
   sendEmailTakenRegistrationWarning: mockSendEmailTakenRegistrationWarning,
 }));
 
-jest.mock('../../../backend/src/config', () => ({
+vi.mock('../../../backend/src/config', () => ({
   getConfig: () => ({
     JWT_SECRET: 'test-secret-key-that-is-at-least-32-chars-long',
     JWT_EXPIRES_IN: '15m',
@@ -53,12 +61,12 @@ jest.mock('../../../backend/src/config', () => ({
   }),
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
+vi.mock('../../../backend/src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
   },
 }));
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -69,7 +77,7 @@ import { verifyAccessToken } from '../../../backend/src/middleware/auth';
 
 describe('Auth Service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockHashPassword.mockResolvedValue('hashed-password');
     mockComparePassword.mockResolvedValue(true);
     mockGenerateToken.mockReturnValue('a'.repeat(64));

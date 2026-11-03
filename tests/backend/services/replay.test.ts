@@ -1,29 +1,29 @@
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
-const mockExistsSync = jest.fn<AnyFn>();
-const mockReaddirSync = jest.fn<AnyFn>();
-const mockStatSync = jest.fn<AnyFn>();
-const mockReadFileSync = jest.fn<AnyFn>();
-const mockUnlink = jest.fn<AnyFn>();
-const mockAccess = jest.fn<AnyFn>();
-const mockReaddir = jest.fn<AnyFn>();
-const mockStat = jest.fn<AnyFn>();
-const mockReadFile = jest.fn<AnyFn>();
-jest.mock('fs', () => ({
+const mockExistsSync = vi.hoisted(() => vi.fn<AnyFn>());
+const mockReaddirSync = vi.hoisted(() => vi.fn<AnyFn>());
+const mockStatSync = vi.hoisted(() => vi.fn<AnyFn>());
+const mockReadFileSync = vi.hoisted(() => vi.fn<AnyFn>());
+const mockUnlink = vi.hoisted(() => vi.fn<AnyFn>());
+const mockAccess = vi.hoisted(() => vi.fn<AnyFn>());
+const mockReaddir = vi.hoisted(() => vi.fn<AnyFn>());
+const mockStat = vi.hoisted(() => vi.fn<AnyFn>());
+const mockReadFile = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('fs', () => ({
   existsSync: mockExistsSync,
   readdirSync: mockReaddirSync,
   statSync: mockStatSync,
@@ -38,12 +38,12 @@ jest.mock('fs', () => ({
   },
 }));
 
-const mockGunzip = jest.fn<AnyFn>();
-jest.mock('zlib', () => ({
+const mockGunzip = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('zlib', () => ({
   gunzip: mockGunzip,
 }));
 
-jest.mock('util', () => ({
+vi.mock('util', () => ({
   promisify: () => mockGunzip,
 }));
 
@@ -120,14 +120,14 @@ describe('Replay Service', () => {
   // service exposes no reset hook (the one it had was dead code — audit G5), so each test moves
   // the clock past the index TTL instead, which is what happens in production too.
   let clock = 1_000_000_000_000;
-  let dateNowSpy: jest.SpiedFunction<typeof Date.now>;
+  let dateNowSpy: MockInstance<typeof Date.now>;
   const advancePastIndexTtl = () => {
     clock += 60_000;
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    dateNowSpy = jest.spyOn(Date, 'now').mockImplementation(() => clock);
+    vi.clearAllMocks();
+    dateNowSpy = vi.spyOn(Date, 'now').mockImplementation(() => clock);
     advancePastIndexTtl();
     mockReaddir.mockResolvedValue([]);
     mockUnlink.mockResolvedValue(undefined);

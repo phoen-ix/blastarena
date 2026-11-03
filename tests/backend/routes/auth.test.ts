@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
@@ -7,19 +7,19 @@ type AnyFn = (...args: any[]) => any;
 // in auth.ts see the fakes.
 // ---------------------------------------------------------------------------
 
-const mockRegister = jest.fn<AnyFn>();
-const mockLogin = jest.fn<AnyFn>();
-const mockLogout = jest.fn<AnyFn>();
-const mockRefreshAccessToken = jest.fn<AnyFn>();
-const mockVerifyEmail = jest.fn<AnyFn>();
-const mockForgotPassword = jest.fn<AnyFn>();
-const mockResetPassword = jest.fn<AnyFn>();
-const mockVerifyCredentials = jest.fn<AnyFn>();
-const mockGenerateLocalCoopToken = jest.fn<AnyFn>();
-const mockGenerateLocalCoopTotpToken = jest.fn<AnyFn>();
-const mockVerifyLocalCoopTotpToken = jest.fn<AnyFn>();
+const mockRegister = vi.hoisted(() => vi.fn<AnyFn>());
+const mockLogin = vi.hoisted(() => vi.fn<AnyFn>());
+const mockLogout = vi.hoisted(() => vi.fn<AnyFn>());
+const mockRefreshAccessToken = vi.hoisted(() => vi.fn<AnyFn>());
+const mockVerifyEmail = vi.hoisted(() => vi.fn<AnyFn>());
+const mockForgotPassword = vi.hoisted(() => vi.fn<AnyFn>());
+const mockResetPassword = vi.hoisted(() => vi.fn<AnyFn>());
+const mockVerifyCredentials = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGenerateLocalCoopToken = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGenerateLocalCoopTotpToken = vi.hoisted(() => vi.fn<AnyFn>());
+const mockVerifyLocalCoopTotpToken = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/auth', () => ({
+vi.mock('../../../backend/src/services/auth', () => ({
   register: mockRegister,
   login: mockLogin,
   logout: mockLogout,
@@ -33,55 +33,59 @@ jest.mock('../../../backend/src/services/auth', () => ({
   verifyLocalCoopTotpToken: mockVerifyLocalCoopTotpToken,
 }));
 
-const mockVerifyCode = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/totp', () => ({
+const mockVerifyCode = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/totp', () => ({
   verifyCode: mockVerifyCode,
 }));
 
-const mockQuery = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
 }));
 
-const mockGetPlayerCosmeticsForGame = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/cosmetics', () => ({
+const mockGetPlayerCosmeticsForGame = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/cosmetics', () => ({
   getPlayerCosmeticsForGame: mockGetPlayerCosmeticsForGame,
 }));
 
-const mockIsRegistrationEnabled = jest.fn<AnyFn>();
+const mockIsRegistrationEnabled = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/settings', () => ({
+vi.mock('../../../backend/src/services/settings', () => ({
   isRegistrationEnabled: mockIsRegistrationEnabled,
 }));
 
-const mockGetConfig = jest.fn<AnyFn>();
+const mockGetConfig = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/config', () => ({
+vi.mock('../../../backend/src/config', () => ({
   getConfig: mockGetConfig,
 }));
 
 // Middleware pass‑throughs — we test route handlers, not middleware.
-const mockAuthMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
+const mockAuthMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
 
-jest.mock('../../../backend/src/middleware/auth', () => ({
+vi.mock('../../../backend/src/middleware/auth', () => ({
   authMiddleware: mockAuthMiddleware,
   ACCESS_TOKEN_TYPE: 'access',
 }));
 
-const mockRateLimiter = jest.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next());
+const mockRateLimiter = vi.hoisted(() =>
+  vi.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next()),
+);
 
-jest.mock('../../../backend/src/middleware/rateLimiter', () => ({
+vi.mock('../../../backend/src/middleware/rateLimiter', () => ({
   rateLimiter: mockRateLimiter,
 }));
 
-const mockValidate = jest.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next());
+const mockValidate = vi.hoisted(() =>
+  vi.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next()),
+);
 
-jest.mock('../../../backend/src/middleware/validation', () => ({
+vi.mock('../../../backend/src/middleware/validation', () => ({
   validate: mockValidate,
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
 // ---------------------------------------------------------------------------
@@ -182,7 +186,7 @@ function mockReq(overrides: Record<string, unknown> = {}): any {
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   mockGetConfig.mockReturnValue({ APP_URL: 'http://localhost:8080' });
 });
 
@@ -203,7 +207,7 @@ describe('POST /auth/register', () => {
       body: { username: 'testuser', email: 'test@example.com', password: 'password123' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     // Uniform 200 + no cookie set, so email existence can't be inferred from the response. (audit EMAIL-005)
     expect(res._status).toBe(200);
@@ -218,7 +222,7 @@ describe('POST /auth/register', () => {
       body: { username: 'testuser', email: 'test@example.com', password: 'password123' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(403);
     expect(res._json).toEqual({ error: 'Registration is currently disabled' });
@@ -232,7 +236,7 @@ describe('POST /auth/register', () => {
       body: { username: 'ab', email: 'test@example.com', password: 'password123' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(400);
     expect(res._json).toEqual(
@@ -248,7 +252,7 @@ describe('POST /auth/register', () => {
       body: { username: 'testuser', email: 'test@example.com', password: 'short' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(400);
     expect(res._json).toEqual(
@@ -264,7 +268,7 @@ describe('POST /auth/register', () => {
       body: { username: 'testuser', email: 'not-an-email', password: 'password123' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(400);
     expect(res._json).toEqual(expect.objectContaining({ error: expect.stringContaining('email') }));
@@ -279,7 +283,7 @@ describe('POST /auth/register', () => {
       body: { username: 'alice', email: 'alice@example.com', password: 'securepass1' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockRegister).toHaveBeenCalledWith('alice', 'alice@example.com', 'securepass1', 'en');
   });
@@ -293,7 +297,7 @@ describe('POST /auth/register', () => {
       body: { username: 'testuser', email: 'test@example.com', password: 'password123' },
     });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -314,7 +318,7 @@ describe('POST /auth/login', () => {
 
     const req = mockReq({ body: { username: 'u', password: 'p' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._json).toEqual(authData);
     expect(res._cookie).not.toBeNull();
@@ -327,7 +331,7 @@ describe('POST /auth/login', () => {
 
     const req = mockReq({ body: { username: 'u', password: 'p' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     const opts = res._cookie.opts;
     expect(opts.httpOnly).toBe(true);
@@ -343,14 +347,14 @@ describe('POST /auth/login', () => {
 
     let req = mockReq({ body: { username: 'u', password: 'p' } });
     let res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._cookie.opts.secure).toBe(false);
 
     // HTTPS
     mockGetConfig.mockReturnValue({ APP_URL: 'https://blast.example.com' });
     req = mockReq({ body: { username: 'u', password: 'p' } });
     res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._cookie.opts.secure).toBe(true);
   });
 
@@ -360,7 +364,7 @@ describe('POST /auth/login', () => {
 
     const req = mockReq({ body: { username: 'u', password: 'p' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -380,7 +384,7 @@ describe('POST /auth/logout', () => {
 
     const req = mockReq({ cookies: { refreshToken: 'rt_abc' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._json).toEqual({ message: 'Logged out' });
     expect(res._clearCookie).toEqual({ name: 'refreshToken', opts: { path: '/api/auth' } });
@@ -391,7 +395,7 @@ describe('POST /auth/logout', () => {
 
     const req = mockReq({ cookies: { refreshToken: 'rt_xyz' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockLogout).toHaveBeenCalledWith('rt_xyz');
   });
@@ -399,7 +403,7 @@ describe('POST /auth/logout', () => {
   it('does not call authService.logout when no cookie present', async () => {
     const req = mockReq({ cookies: {} });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockLogout).not.toHaveBeenCalled();
     expect(res._json).toEqual({ message: 'Logged out' });
@@ -417,7 +421,7 @@ describe('POST /auth/refresh', () => {
   it('returns 401 when no refresh token cookie', async () => {
     const req = mockReq({ cookies: {} });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(401);
     expect(res._json).toEqual({ error: 'No refresh token', code: 'NO_REFRESH_TOKEN' });
@@ -429,7 +433,7 @@ describe('POST /auth/refresh', () => {
 
     const req = mockReq({ cookies: { refreshToken: 'old_rt' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._json).toEqual(authData);
     expect(res._cookie.name).toBe('refreshToken');
@@ -444,7 +448,7 @@ describe('POST /auth/refresh', () => {
 
     const req = mockReq({ cookies: { refreshToken: 'stale_rt' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -464,7 +468,7 @@ describe('GET /auth/verify-email/:token', () => {
 
     const req = mockReq({ params: { token: 'valid_token' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._redirect).toEqual({ status: 302, url: 'http://localhost:8080?emailVerified=true' });
     expect(mockVerifyEmail).toHaveBeenCalledWith('valid_token');
@@ -476,7 +480,7 @@ describe('GET /auth/verify-email/:token', () => {
 
     const req = mockReq({ params: { token: 'bad' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -496,7 +500,7 @@ describe('POST /auth/forgot-password', () => {
 
     const req = mockReq({ body: { email: 'any@example.com' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._json).toEqual({ message: 'If the email exists, a reset link has been sent' });
     expect(mockForgotPassword).toHaveBeenCalledWith('any@example.com');
@@ -508,7 +512,7 @@ describe('POST /auth/forgot-password', () => {
 
     const req = mockReq({ body: { email: 'x@y.com' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -528,7 +532,7 @@ describe('POST /auth/reset-password', () => {
 
     const req = mockReq({ body: { token: 'reset_tok', password: 'newpassword1' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._json).toEqual({ message: 'Password reset successfully' });
     expect(mockResetPassword).toHaveBeenCalledWith('reset_tok', 'newpassword1');
@@ -540,7 +544,7 @@ describe('POST /auth/reset-password', () => {
 
     const req = mockReq({ body: { token: 't', password: 'p' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -628,7 +632,7 @@ describe('local co-op P2 with 2FA', () => {
     await getHandler('post', '/local-coop/login')(
       mockReq({ user: { userId: 1 }, body: { username: 'p2', password: 'pw', duration: 6 } }),
       res,
-      jest.fn(),
+      vi.fn(),
     );
     expect(res._json).toEqual({ totpRequired: true, totpToken: 'pending' });
     expect(res._cookie).toBeNull();
@@ -642,7 +646,7 @@ describe('local co-op P2 with 2FA', () => {
     await getHandler('post', '/local-coop/verify-totp')(
       mockReq({ user: { userId: 1 }, body: { totpToken: 'pending', code: '000000' } }),
       res,
-      jest.fn(),
+      vi.fn(),
     );
     expect(res._status).toBe(401);
     expect(res._cookie).toBeNull();
@@ -654,7 +658,7 @@ describe('local co-op P2 with 2FA', () => {
     await getHandler('post', '/local-coop/verify-totp')(
       mockReq({ user: { userId: 9 }, body: { totpToken: 'pending', code: '123456' } }),
       res,
-      jest.fn(),
+      vi.fn(),
     );
     expect(res._status).toBe(401);
     expect(mockVerifyCode).not.toHaveBeenCalled();
@@ -668,7 +672,7 @@ describe('local co-op P2 with 2FA', () => {
     await getHandler('post', '/local-coop/verify-totp')(
       mockReq({ user: { userId: 1 }, body: { totpToken: 'pending', code: '123456' } }),
       res,
-      jest.fn(),
+      vi.fn(),
     );
     expect(res._cookie).toMatchObject({ name: 'localCoopP2', value: 'p2-token' });
     expect(res._json).toEqual({ user: { id: 2, username: 'p2' }, cosmetics: {} });
@@ -704,7 +708,7 @@ describe('POST /local-coop/login', () => {
       body: { username: 'p2', password: 'pw', duration: 0 },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._cookie).toMatchObject({ name: 'localCoopP2', value: 'p2-token' });
     expect(res._json).toEqual({
@@ -721,7 +725,7 @@ describe('POST /local-coop/login', () => {
       body: { username: 'p2', password: 'pw', duration: 0 },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(403);
     expect(res._json).toEqual({ error: 'Email not verified', code: 'EMAIL_NOT_VERIFIED' });
@@ -736,7 +740,7 @@ describe('POST /local-coop/login', () => {
       body: { username: 'p1', password: 'pw', duration: 0 },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(400);
     expect(res._cookie).toBeNull();

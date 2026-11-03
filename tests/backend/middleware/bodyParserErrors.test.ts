@@ -1,10 +1,10 @@
-import { describe, it, expect, jest, beforeAll, afterAll } from '@jest/globals';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import express from 'express';
 import http from 'http';
 import { AddressInfo } from 'net';
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
 import { errorHandler } from '../../../backend/src/middleware/errorHandler';

@@ -1,20 +1,20 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 type AnyFn = (...args: any[]) => any;
 
 // Mock middleware
-const mockAuthMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
-jest.mock('../../../backend/src/middleware/auth', () => ({
+const mockAuthMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
+vi.mock('../../../backend/src/middleware/auth', () => ({
   authMiddleware: mockAuthMiddleware,
 }));
 
-const mockStaffMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
-jest.mock('../../../backend/src/middleware/admin', () => ({
+const mockStaffMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
+vi.mock('../../../backend/src/middleware/admin', () => ({
   staffMiddleware: mockStaffMiddleware,
 }));
 
 // Mock fs
-const mockReadFile = jest.fn<AnyFn>();
-jest.mock('fs', () => ({
+const mockReadFile = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('fs', () => ({
   promises: { readFile: mockReadFile },
 }));
 
@@ -89,7 +89,7 @@ function mockRes() {
 
 describe('Docs Routes', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // -----------------------------------------------------------------------

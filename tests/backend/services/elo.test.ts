@@ -1,13 +1,13 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
-const mockWithTransaction = jest.fn<AnyFn>();
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+const mockWithTransaction = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/db/connection', () => ({
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
   withTransaction: mockWithTransaction,
@@ -23,10 +23,10 @@ import {
 
 describe('Elo Service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockWithTransaction.mockImplementation(async (fn: AnyFn) => {
       const conn = {
-        execute: jest.fn<AnyFn>().mockResolvedValue([{ affectedRows: 1 }]),
+        execute: vi.fn<AnyFn>().mockResolvedValue([{ affectedRows: 1 }]),
       };
       return fn(conn);
     });

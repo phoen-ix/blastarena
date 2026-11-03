@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
@@ -8,25 +8,25 @@ type AnyFn = (...args: any[]) => any;
 // ---------------------------------------------------------------------------
 
 // --- adminService ---
-const mockCreateUser = jest.fn<AnyFn>();
-const mockListUsers = jest.fn<AnyFn>();
-const mockChangeUserRole = jest.fn<AnyFn>();
-const mockDeactivateUser = jest.fn<AnyFn>();
-const mockDeleteUser = jest.fn<AnyFn>();
-const mockResetUserPassword = jest.fn<AnyFn>();
-const mockGetServerStats = jest.fn<AnyFn>();
-const mockGetMatchHistory = jest.fn<AnyFn>();
-const mockGetMatchDetail = jest.fn<AnyFn>();
-const mockGetAdminActions = jest.fn<AnyFn>();
-const mockGetActiveRooms = jest.fn<AnyFn>();
-const mockSendToast = jest.fn<AnyFn>();
-const mockSetBanner = jest.fn<AnyFn>();
-const mockClearBanner = jest.fn<AnyFn>();
-const mockGetActiveBanner = jest.fn<AnyFn>();
-const mockPreviewCleanup = jest.fn<AnyFn>();
-const mockExecuteCleanup = jest.fn<AnyFn>();
+const mockCreateUser = vi.hoisted(() => vi.fn<AnyFn>());
+const mockListUsers = vi.hoisted(() => vi.fn<AnyFn>());
+const mockChangeUserRole = vi.hoisted(() => vi.fn<AnyFn>());
+const mockDeactivateUser = vi.hoisted(() => vi.fn<AnyFn>());
+const mockDeleteUser = vi.hoisted(() => vi.fn<AnyFn>());
+const mockResetUserPassword = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetServerStats = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetMatchHistory = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetMatchDetail = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetAdminActions = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetActiveRooms = vi.hoisted(() => vi.fn<AnyFn>());
+const mockSendToast = vi.hoisted(() => vi.fn<AnyFn>());
+const mockSetBanner = vi.hoisted(() => vi.fn<AnyFn>());
+const mockClearBanner = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetActiveBanner = vi.hoisted(() => vi.fn<AnyFn>());
+const mockPreviewCleanup = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecuteCleanup = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/admin', () => ({
+vi.mock('../../../backend/src/services/admin', () => ({
   createUser: mockCreateUser,
   listUsers: mockListUsers,
   changeUserRole: mockChangeUserRole,
@@ -47,29 +47,29 @@ jest.mock('../../../backend/src/services/admin', () => ({
 }));
 
 // --- replayService ---
-const mockListReplays = jest.fn<AnyFn>();
-const mockGetReplay = jest.fn<AnyFn>();
-const mockDeleteReplay = jest.fn<AnyFn>();
+const mockListReplays = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetReplay = vi.hoisted(() => vi.fn<AnyFn>());
+const mockDeleteReplay = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/replay', () => ({
+vi.mock('../../../backend/src/services/replay', () => ({
   listReplays: mockListReplays,
   getReplay: mockGetReplay,
   deleteReplay: mockDeleteReplay,
 }));
 
 // --- settingsService ---
-const mockIsRegistrationEnabled = jest.fn<AnyFn>();
-const mockIsRecordingEnabled = jest.fn<AnyFn>();
-const mockGetGameDefaults = jest.fn<AnyFn>();
-const mockSetGameDefaults = jest.fn<AnyFn>();
-const mockGetSimulationDefaults = jest.fn<AnyFn>();
-const mockSetSimulationDefaults = jest.fn<AnyFn>();
-const mockSetSetting = jest.fn<AnyFn>();
-const mockGetSetting = jest.fn<AnyFn>();
-const mockGetEmailSettings = jest.fn<AnyFn>();
-const mockSetEmailSettings = jest.fn<AnyFn>();
+const mockIsRegistrationEnabled = vi.hoisted(() => vi.fn<AnyFn>());
+const mockIsRecordingEnabled = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetGameDefaults = vi.hoisted(() => vi.fn<AnyFn>());
+const mockSetGameDefaults = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetSimulationDefaults = vi.hoisted(() => vi.fn<AnyFn>());
+const mockSetSimulationDefaults = vi.hoisted(() => vi.fn<AnyFn>());
+const mockSetSetting = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetSetting = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetEmailSettings = vi.hoisted(() => vi.fn<AnyFn>());
+const mockSetEmailSettings = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/settings', () => ({
+vi.mock('../../../backend/src/services/settings', () => ({
   isRegistrationEnabled: mockIsRegistrationEnabled,
   isRecordingEnabled: mockIsRecordingEnabled,
   getGameDefaults: mockGetGameDefaults,
@@ -83,15 +83,15 @@ jest.mock('../../../backend/src/services/settings', () => ({
 }));
 
 // --- botaiService ---
-const mockListAllAIs = jest.fn<AnyFn>();
-const mockListActiveAIs = jest.fn<AnyFn>();
-const mockUploadAI = jest.fn<AnyFn>();
-const mockUpdateAI = jest.fn<AnyFn>();
-const mockReuploadAI = jest.fn<AnyFn>();
-const mockDownloadSource = jest.fn<AnyFn>();
-const mockDeleteAI = jest.fn<AnyFn>();
+const mockListAllAIs = vi.hoisted(() => vi.fn<AnyFn>());
+const mockListActiveAIs = vi.hoisted(() => vi.fn<AnyFn>());
+const mockUploadAI = vi.hoisted(() => vi.fn<AnyFn>());
+const mockUpdateAI = vi.hoisted(() => vi.fn<AnyFn>());
+const mockReuploadAI = vi.hoisted(() => vi.fn<AnyFn>());
+const mockDownloadSource = vi.hoisted(() => vi.fn<AnyFn>());
+const mockDeleteAI = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/botai', () => ({
+vi.mock('../../../backend/src/services/botai', () => ({
   listAllAIs: mockListAllAIs,
   listActiveAIs: mockListActiveAIs,
   uploadAI: mockUploadAI,
@@ -102,21 +102,21 @@ jest.mock('../../../backend/src/services/botai', () => ({
 }));
 
 // --- email service ---
-const mockInvalidateTransporter = jest.fn<AnyFn>();
-const mockSendTestEmail = jest.fn<AnyFn>();
+const mockInvalidateTransporter = vi.hoisted(() => vi.fn<AnyFn>());
+const mockSendTestEmail = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/email', () => ({
+vi.mock('../../../backend/src/services/email', () => ({
   invalidateTransporter: mockInvalidateTransporter,
   sendTestEmail: mockSendTestEmail,
 }));
 
 // --- registry ---
-const mockGetHistory = jest.fn<AnyFn>();
-const mockGetBatchResults = jest.fn<AnyFn>();
-const mockGetSimulationReplay = jest.fn<AnyFn>();
-const mockStartBatch = jest.fn<AnyFn>();
-const mockCancelBatch = jest.fn<AnyFn>();
-const mockDeleteBatch = jest.fn<AnyFn>();
+const mockGetHistory = vi.fn<AnyFn>();
+const mockGetBatchResults = vi.fn<AnyFn>();
+const mockGetSimulationReplay = vi.fn<AnyFn>();
+const mockStartBatch = vi.fn<AnyFn>();
+const mockCancelBatch = vi.fn<AnyFn>();
+const mockDeleteBatch = vi.fn<AnyFn>();
 
 const mockSimulationManager = {
   getHistory: mockGetHistory,
@@ -127,56 +127,58 @@ const mockSimulationManager = {
   deleteBatch: mockDeleteBatch,
 };
 
-const mockIOEmit = jest.fn<AnyFn>();
-const mockIO = { emit: mockIOEmit, to: jest.fn<AnyFn>().mockReturnValue({ emit: mockIOEmit }) };
+const mockIOEmit = vi.fn<AnyFn>();
+const mockIO = { emit: mockIOEmit, to: vi.fn<AnyFn>().mockReturnValue({ emit: mockIOEmit }) };
 
-jest.mock('../../../backend/src/game/registry', () => ({
+vi.mock('../../../backend/src/game/registry', () => ({
   getSimulationManager: () => mockSimulationManager,
   getIO: () => mockIO,
 }));
 
 // --- db connection ---
-const mockExecute = jest.fn<AnyFn>();
-const mockQuery = jest.fn<AnyFn>();
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/db/connection', () => ({
+vi.mock('../../../backend/src/db/connection', () => ({
   execute: mockExecute,
   query: mockQuery,
 }));
 
 // --- config ---
-const mockGetConfig = jest.fn<AnyFn>();
+const mockGetConfig = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/config', () => ({
+vi.mock('../../../backend/src/config', () => ({
   getConfig: mockGetConfig,
 }));
 
 // --- Middleware pass-throughs ---
-const mockAuthMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
-const mockStaffMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
-const mockAdminOnlyMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
+const mockAuthMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
+const mockStaffMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
+const mockAdminOnlyMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
 
-jest.mock('../../../backend/src/middleware/auth', () => ({
+vi.mock('../../../backend/src/middleware/auth', () => ({
   authMiddleware: mockAuthMiddleware,
 }));
 
-jest.mock('../../../backend/src/middleware/admin', () => ({
+vi.mock('../../../backend/src/middleware/admin', () => ({
   staffMiddleware: mockStaffMiddleware,
   adminOnlyMiddleware: mockAdminOnlyMiddleware,
 }));
 
-const mockValidate = jest.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next());
+const mockValidate = vi.hoisted(() =>
+  vi.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next()),
+);
 
-jest.mock('../../../backend/src/middleware/validation', () => ({
+vi.mock('../../../backend/src/middleware/validation', () => ({
   validate: mockValidate,
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
 // Mock multer to just pass through, injecting req.file when present
-jest.mock('multer', () => {
+vi.mock('multer', () => {
   const multerFn = () => ({
     single: () => (req: any, _res: any, next: any) => next(),
   });
@@ -287,7 +289,7 @@ function mockReq(overrides: Record<string, unknown> = {}): any {
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   mockGetConfig.mockReturnValue({
     APP_URL: 'http://localhost:8080',
     SMTP_HOST: 'smtp.example.com',
@@ -311,7 +313,7 @@ describe('GET /admin/settings/registration_enabled (public)', () => {
     mockIsRegistrationEnabled.mockResolvedValue(true);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual({ enabled: true });
   });
 
@@ -319,7 +321,7 @@ describe('GET /admin/settings/registration_enabled (public)', () => {
     mockIsRegistrationEnabled.mockResolvedValue(false);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual({ enabled: false });
   });
 
@@ -328,7 +330,7 @@ describe('GET /admin/settings/registration_enabled (public)', () => {
     mockIsRegistrationEnabled.mockRejectedValue(err);
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -341,7 +343,7 @@ describe('GET /admin/settings/recordings_enabled (public)', () => {
     mockIsRecordingEnabled.mockResolvedValue(true);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual({ enabled: true });
   });
 
@@ -349,7 +351,7 @@ describe('GET /admin/settings/recordings_enabled (public)', () => {
     mockIsRecordingEnabled.mockResolvedValue(false);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual({ enabled: false });
   });
 
@@ -358,7 +360,7 @@ describe('GET /admin/settings/recordings_enabled (public)', () => {
     mockIsRecordingEnabled.mockRejectedValue(err);
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -372,7 +374,7 @@ describe('GET /admin/settings/game_defaults (public)', () => {
     mockGetGameDefaults.mockResolvedValue(defaults);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual({ defaults });
   });
 
@@ -381,7 +383,7 @@ describe('GET /admin/settings/game_defaults (public)', () => {
     mockGetGameDefaults.mockRejectedValue(err);
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -395,7 +397,7 @@ describe('GET /admin/ai/active (public)', () => {
     mockListActiveAIs.mockResolvedValue(ais);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual({ ais });
   });
 
@@ -403,7 +405,7 @@ describe('GET /admin/ai/active (public)', () => {
     mockListActiveAIs.mockResolvedValue([]);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual({ ais: [] });
   });
 
@@ -412,7 +414,7 @@ describe('GET /admin/ai/active (public)', () => {
     mockListActiveAIs.mockRejectedValue(err);
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -426,7 +428,7 @@ describe('GET /admin/announcements/banner (public)', () => {
     mockGetActiveBanner.mockResolvedValue(banner);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual(banner);
   });
 
@@ -434,7 +436,7 @@ describe('GET /admin/announcements/banner (public)', () => {
     mockGetActiveBanner.mockResolvedValue({ active: false, message: null });
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual({ active: false, message: null });
   });
 
@@ -443,7 +445,7 @@ describe('GET /admin/announcements/banner (public)', () => {
     mockGetActiveBanner.mockRejectedValue(err);
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -459,7 +461,7 @@ describe('GET /admin/settings/default_art_style (public)', () => {
   it('returns the stored style', async () => {
     mockGetSetting.mockResolvedValue('toy');
     const res = mockRes();
-    await handler(mockReq(), res, jest.fn());
+    await handler(mockReq(), res, vi.fn());
     expect(mockGetSetting).toHaveBeenCalledWith('default_art_style');
     expect(res._json).toEqual({ style: 'toy' });
   });
@@ -468,7 +470,7 @@ describe('GET /admin/settings/default_art_style (public)', () => {
     for (const stored of [null, '', 'vaporwave']) {
       mockGetSetting.mockResolvedValue(stored);
       const res = mockRes();
-      await handler(mockReq(), res, jest.fn());
+      await handler(mockReq(), res, vi.fn());
       expect(res._json).toEqual({ style: 'classic' });
     }
   });
@@ -484,7 +486,7 @@ describe('PUT /admin/settings/default_art_style', () => {
   it('stores the style, audits it and broadcasts it to everyone', async () => {
     mockSetSetting.mockResolvedValue(undefined);
     const res = mockRes();
-    await handler(mockReq({ body: { style: 'neon' } }), res, jest.fn());
+    await handler(mockReq({ body: { style: 'neon' } }), res, vi.fn());
     expect(mockSetSetting).toHaveBeenCalledWith('default_art_style', 'neon');
     expect(mockExecute).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO admin_actions'),
@@ -504,7 +506,7 @@ describe('PUT /admin/settings/default_art_style', () => {
   it('passes error to next() on failure', async () => {
     const err = new Error('DB error');
     mockSetSetting.mockRejectedValue(err);
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(mockReq({ body: { style: 'pixel' } }), mockRes(), next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -517,7 +519,7 @@ describe('PUT /admin/settings/registration_enabled', () => {
     mockSetSetting.mockResolvedValue(undefined);
     const req = mockReq({ body: { enabled: true } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockSetSetting).toHaveBeenCalledWith('registration_enabled', 'true');
     expect(res._json).toEqual({ message: 'Setting updated' });
   });
@@ -526,7 +528,7 @@ describe('PUT /admin/settings/registration_enabled', () => {
     mockSetSetting.mockResolvedValue(undefined);
     const req = mockReq({ body: { enabled: false } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockExecute).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO admin_actions'),
       expect.arrayContaining([1, 'update_setting', 'setting', 0]),
@@ -537,7 +539,7 @@ describe('PUT /admin/settings/registration_enabled', () => {
     mockSetSetting.mockResolvedValue(undefined);
     const req = mockReq({ body: { enabled: true } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockIOEmit).toHaveBeenCalledWith('admin:settingsChanged', {
       key: 'registration_enabled',
       value: true,
@@ -553,7 +555,7 @@ describe('PUT /admin/settings/registration_enabled', () => {
     mockSetSetting.mockRejectedValue(err);
     const req = mockReq({ body: { enabled: true } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -566,7 +568,7 @@ describe('PUT /admin/settings/recordings_enabled', () => {
     mockSetSetting.mockResolvedValue(undefined);
     const req = mockReq({ body: { enabled: false } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockSetSetting).toHaveBeenCalledWith('recordings_enabled', 'false');
     expect(res._json).toEqual({ message: 'Setting updated' });
   });
@@ -575,7 +577,7 @@ describe('PUT /admin/settings/recordings_enabled', () => {
     mockSetSetting.mockResolvedValue(undefined);
     const req = mockReq({ body: { enabled: true } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockExecute).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO admin_actions'),
       expect.arrayContaining([1, 'update_setting', 'setting', 0]),
@@ -586,7 +588,7 @@ describe('PUT /admin/settings/recordings_enabled', () => {
     mockSetSetting.mockResolvedValue(undefined);
     const req = mockReq({ body: { enabled: false } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockIOEmit).toHaveBeenCalledWith('admin:settingsChanged', {
       key: 'recordings_enabled',
       value: false,
@@ -602,7 +604,7 @@ describe('PUT /admin/settings/recordings_enabled', () => {
     mockSetSetting.mockRejectedValue(err);
     const req = mockReq({ body: { enabled: true } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -618,7 +620,7 @@ describe('GET /admin/settings/simulation_defaults', () => {
     mockGetSimulationDefaults.mockResolvedValue(defaults);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual({ defaults });
   });
 
@@ -627,7 +629,7 @@ describe('GET /admin/settings/simulation_defaults', () => {
     mockGetSimulationDefaults.mockRejectedValue(err);
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -641,7 +643,7 @@ describe('PUT /admin/settings/game_defaults', () => {
     const defaults = { gameMode: 'ffa', maxPlayers: 6 };
     const req = mockReq({ body: { defaults } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockSetGameDefaults).toHaveBeenCalledWith(defaults);
     expect(res._json).toEqual({ message: 'Game defaults updated' });
   });
@@ -651,7 +653,7 @@ describe('PUT /admin/settings/game_defaults', () => {
     const defaults = { gameMode: 'teams' };
     const req = mockReq({ body: { defaults } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockExecute).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO admin_actions'),
       expect.arrayContaining([1, 'update_setting', 'setting', 0]),
@@ -663,7 +665,7 @@ describe('PUT /admin/settings/game_defaults', () => {
     const defaults = { gameMode: 'ffa' };
     const req = mockReq({ body: { defaults } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockIOEmit).toHaveBeenCalledWith('admin:settingsChanged', {
       key: 'game_defaults',
       value: defaults,
@@ -679,7 +681,7 @@ describe('PUT /admin/settings/game_defaults', () => {
     mockSetGameDefaults.mockRejectedValue(err);
     const req = mockReq({ body: { defaults: {} } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -693,7 +695,7 @@ describe('PUT /admin/settings/simulation_defaults', () => {
     const defaults = { botCount: 8, speed: 'fast' };
     const req = mockReq({ body: { defaults } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockSetSimulationDefaults).toHaveBeenCalledWith(defaults);
     expect(res._json).toEqual({ message: 'Simulation defaults updated' });
   });
@@ -703,7 +705,7 @@ describe('PUT /admin/settings/simulation_defaults', () => {
     const defaults = { speed: 'realtime' };
     const req = mockReq({ body: { defaults } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockExecute).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO admin_actions'),
       expect.arrayContaining([1, 'update_setting', 'setting', 0]),
@@ -715,7 +717,7 @@ describe('PUT /admin/settings/simulation_defaults', () => {
     const defaults = { speed: 'fast' };
     const req = mockReq({ body: { defaults } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockIOEmit).toHaveBeenCalledWith('admin:settingsChanged', {
       key: 'simulation_defaults',
       value: defaults,
@@ -731,7 +733,7 @@ describe('PUT /admin/settings/simulation_defaults', () => {
     mockSetSimulationDefaults.mockRejectedValue(err);
     const req = mockReq({ body: { defaults: {} } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -748,7 +750,7 @@ describe('GET /admin/settings/email_settings', () => {
     mockGetEmailSettings.mockResolvedValue({});
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual({
       settings: {
         smtpHost: 'smtp.example.com',
@@ -772,7 +774,7 @@ describe('GET /admin/settings/email_settings', () => {
     });
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual({
       settings: {
         smtpHost: 'db-smtp.example.com',
@@ -798,7 +800,7 @@ describe('GET /admin/settings/email_settings', () => {
     });
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect((res._json as any).settings.smtpPassword).toBe('');
   });
 
@@ -811,7 +813,7 @@ describe('GET /admin/settings/email_settings', () => {
     mockGetEmailSettings.mockRejectedValue(err);
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -827,7 +829,7 @@ describe('PUT /admin/settings/email_settings', () => {
       body: { smtpHost: 'new-smtp.example.com', smtpPort: 465 },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockSetEmailSettings).toHaveBeenCalled();
     expect(res._json).toEqual({ message: 'Email settings updated' });
   });
@@ -839,7 +841,7 @@ describe('PUT /admin/settings/email_settings', () => {
       body: { smtpPassword: '••••••••', smtpHost: 'smtp.test.com' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     const savedSettings = mockSetEmailSettings.mock.calls[0][0];
     expect(savedSettings.smtpPassword).toBe('existing-secret');
   });
@@ -851,7 +853,7 @@ describe('PUT /admin/settings/email_settings', () => {
       body: { smtpHost: 'smtp.test.com' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     const savedSettings = mockSetEmailSettings.mock.calls[0][0];
     expect(savedSettings.smtpPassword).toBe('old-pw');
   });
@@ -863,7 +865,7 @@ describe('PUT /admin/settings/email_settings', () => {
       body: { smtpPassword: '' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     const savedSettings = mockSetEmailSettings.mock.calls[0][0];
     expect(savedSettings.smtpPassword).toBeUndefined();
   });
@@ -875,7 +877,7 @@ describe('PUT /admin/settings/email_settings', () => {
       body: { smtpPassword: 'brand-new-password' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     const savedSettings = mockSetEmailSettings.mock.calls[0][0];
     expect(savedSettings.smtpPassword).toBe('brand-new-password');
   });
@@ -885,7 +887,7 @@ describe('PUT /admin/settings/email_settings', () => {
     mockSetEmailSettings.mockResolvedValue(undefined);
     const req = mockReq({ body: { smtpHost: 'new.host.com' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockInvalidateTransporter).toHaveBeenCalled();
   });
 
@@ -894,7 +896,7 @@ describe('PUT /admin/settings/email_settings', () => {
     mockSetEmailSettings.mockResolvedValue(undefined);
     const req = mockReq({ body: { smtpHost: 'new.host.com' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockExecute).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO admin_actions'),
       expect.arrayContaining([1, 'update_setting', 'setting', 0]),
@@ -906,7 +908,7 @@ describe('PUT /admin/settings/email_settings', () => {
     mockSetEmailSettings.mockResolvedValue(undefined);
     const req = mockReq({ body: { smtpHost: 'new.host.com' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockIOEmit).toHaveBeenCalledWith('admin:settingsChanged', {
       key: 'email_settings',
     });
@@ -921,7 +923,7 @@ describe('PUT /admin/settings/email_settings', () => {
     mockGetEmailSettings.mockRejectedValue(err);
     const req = mockReq({ body: {} });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -934,7 +936,7 @@ describe('POST /admin/settings/email_settings/test', () => {
     mockSendTestEmail.mockResolvedValue(undefined);
     const req = mockReq({ body: { to: 'test@example.com' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockSendTestEmail).toHaveBeenCalledWith('test@example.com', 'en');
     expect(res._json).toEqual({ message: 'Test email sent successfully' });
   });
@@ -943,7 +945,7 @@ describe('POST /admin/settings/email_settings/test', () => {
     mockSendTestEmail.mockRejectedValue(new Error('SMTP connect failed'));
     const req = mockReq({ body: { to: 'test@example.com' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(400);
     expect(res._json).toEqual({
       error: expect.stringContaining('Failed to send test email'),
@@ -955,7 +957,7 @@ describe('POST /admin/settings/email_settings/test', () => {
     mockSendTestEmail.mockRejectedValue(new Error('Connection refused'));
     const req = mockReq({ body: { to: 'test@example.com' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect((res._json as any).error).toBe('Failed to send test email');
     expect((res._json as any).error).not.toContain('Connection refused');
   });
@@ -979,7 +981,7 @@ describe('POST /admin/users', () => {
       body: { username: 'newuser', email: 'new@example.com', password: 'pass123' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(201);
     expect(res._json).toEqual(user);
   });
@@ -996,7 +998,7 @@ describe('POST /admin/users', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockCreateUser).toHaveBeenCalledWith(
       10,
       'newmod',
@@ -1012,7 +1014,7 @@ describe('POST /admin/users', () => {
       body: { username: 'basic', email: 'basic@example.com', password: 'pass123' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockCreateUser).toHaveBeenCalledWith(
       1,
       'basic',
@@ -1033,7 +1035,7 @@ describe('POST /admin/users', () => {
       body: { username: 'dup', email: 'dup@example.com', password: 'pass123' },
     });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1047,7 +1049,7 @@ describe('GET /admin/users', () => {
     mockListUsers.mockResolvedValue(result);
     const req = mockReq({ query: { page: '1', limit: '20' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual(result);
     expect(mockListUsers).toHaveBeenCalledWith(1, 20, undefined);
   });
@@ -1056,7 +1058,7 @@ describe('GET /admin/users', () => {
     mockListUsers.mockResolvedValue({ users: [], total: 0 });
     const req = mockReq({ query: { page: '1', limit: '10', search: 'alice' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockListUsers).toHaveBeenCalledWith(1, 10, 'alice');
   });
 
@@ -1065,7 +1067,7 @@ describe('GET /admin/users', () => {
     mockListUsers.mockResolvedValue({ users: [], total: 0 });
     const req = mockReq({ query: { search: ['@', 'x'] } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockListUsers).toHaveBeenCalledWith(1, 20, undefined);
   });
 
@@ -1073,7 +1075,7 @@ describe('GET /admin/users', () => {
     mockListUsers.mockResolvedValue({ users: [], total: 0 });
     const req = mockReq({ query: {} });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockListUsers).toHaveBeenCalledWith(1, 20, undefined);
   });
 
@@ -1081,7 +1083,7 @@ describe('GET /admin/users', () => {
     mockListUsers.mockResolvedValue({ users: [], total: 0 });
     const req = mockReq({ query: { page: 'abc', limit: 'xyz' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockListUsers).toHaveBeenCalledWith(1, 20, undefined);
   });
 
@@ -1094,7 +1096,7 @@ describe('GET /admin/users', () => {
     mockListUsers.mockRejectedValue(err);
     const req = mockReq({ query: {} });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1107,7 +1109,7 @@ describe('PUT /admin/users/:id/role', () => {
     mockChangeUserRole.mockResolvedValue(undefined);
     const req = mockReq({ params: { id: '5' }, body: { role: 'moderator' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockChangeUserRole).toHaveBeenCalledWith(1, 5, 'moderator');
     expect(res._json).toEqual({ message: 'Role updated' });
   });
@@ -1116,7 +1118,7 @@ describe('PUT /admin/users/:id/role', () => {
     mockChangeUserRole.mockResolvedValue(undefined);
     const req = mockReq({ params: { id: '42' }, body: { role: 'admin' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockChangeUserRole).toHaveBeenCalledWith(1, 42, 'admin');
   });
 
@@ -1129,7 +1131,7 @@ describe('PUT /admin/users/:id/role', () => {
     mockChangeUserRole.mockRejectedValue(err);
     const req = mockReq({ params: { id: '1' }, body: { role: 'user' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1142,7 +1144,7 @@ describe('PUT /admin/users/:id/deactivate', () => {
     mockDeactivateUser.mockResolvedValue(undefined);
     const req = mockReq({ params: { id: '7' }, body: { deactivated: true } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockDeactivateUser).toHaveBeenCalledWith(1, 7, true);
     expect(res._json).toEqual({ message: 'User deactivated' });
   });
@@ -1151,7 +1153,7 @@ describe('PUT /admin/users/:id/deactivate', () => {
     mockDeactivateUser.mockResolvedValue(undefined);
     const req = mockReq({ params: { id: '7' }, body: { deactivated: false } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockDeactivateUser).toHaveBeenCalledWith(1, 7, false);
     expect(res._json).toEqual({ message: 'User reactivated' });
   });
@@ -1165,7 +1167,7 @@ describe('PUT /admin/users/:id/deactivate', () => {
     mockDeactivateUser.mockRejectedValue(err);
     const req = mockReq({ params: { id: '1' }, body: { deactivated: true } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1178,7 +1180,7 @@ describe('PUT /admin/users/:id/password', () => {
     mockResetUserPassword.mockResolvedValue(undefined);
     const req = mockReq({ params: { id: '5' }, body: { password: 'newpass123' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockResetUserPassword).toHaveBeenCalledWith(1, 5, 'newpass123');
     expect(res._json).toEqual({ message: 'Password reset' });
   });
@@ -1187,7 +1189,7 @@ describe('PUT /admin/users/:id/password', () => {
     mockResetUserPassword.mockResolvedValue(undefined);
     const req = mockReq({ params: { id: '99' }, body: { password: 'p4ssw0rd' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockResetUserPassword).toHaveBeenCalledWith(1, 99, 'p4ssw0rd');
   });
 
@@ -1200,7 +1202,7 @@ describe('PUT /admin/users/:id/password', () => {
     mockResetUserPassword.mockRejectedValue(err);
     const req = mockReq({ params: { id: '999' }, body: { password: 'newpass' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1213,7 +1215,7 @@ describe('DELETE /admin/users/:id', () => {
     mockDeleteUser.mockResolvedValue(undefined);
     const req = mockReq({ params: { id: '5' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockDeleteUser).toHaveBeenCalledWith(1, 5);
     expect(res._json).toEqual({ message: 'User deleted' });
   });
@@ -1225,7 +1227,7 @@ describe('DELETE /admin/users/:id', () => {
       params: { id: '42' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockDeleteUser).toHaveBeenCalledWith(10, 42);
   });
 
@@ -1238,7 +1240,7 @@ describe('DELETE /admin/users/:id', () => {
     mockDeleteUser.mockRejectedValue(err);
     const req = mockReq({ params: { id: '1' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1256,7 +1258,7 @@ describe('GET /admin/stats', () => {
     mockGetServerStats.mockResolvedValue(stats);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual(stats);
   });
 
@@ -1269,7 +1271,7 @@ describe('GET /admin/stats', () => {
     mockGetServerStats.mockRejectedValue(err);
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1287,7 +1289,7 @@ describe('GET /admin/matches', () => {
     mockGetMatchHistory.mockResolvedValue(result);
     const req = mockReq({ query: { page: '2', limit: '10' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetMatchHistory).toHaveBeenCalledWith(2, 10);
     expect(res._json).toEqual(result);
   });
@@ -1296,7 +1298,7 @@ describe('GET /admin/matches', () => {
     mockGetMatchHistory.mockResolvedValue({ matches: [], total: 0 });
     const req = mockReq({ query: {} });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetMatchHistory).toHaveBeenCalledWith(1, 20);
   });
 
@@ -1309,7 +1311,7 @@ describe('GET /admin/matches', () => {
     mockGetMatchHistory.mockRejectedValue(err);
     const req = mockReq({ query: {} });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1323,7 +1325,7 @@ describe('GET /admin/matches/:id', () => {
     mockGetMatchDetail.mockResolvedValue(detail);
     const req = mockReq({ params: { id: '5' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetMatchDetail).toHaveBeenCalledWith(5);
     expect(res._json).toEqual(detail);
   });
@@ -1332,7 +1334,7 @@ describe('GET /admin/matches/:id', () => {
     mockGetMatchDetail.mockResolvedValue({});
     const req = mockReq({ params: { id: '123' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetMatchDetail).toHaveBeenCalledWith(123);
   });
 
@@ -1345,7 +1347,7 @@ describe('GET /admin/matches/:id', () => {
     mockGetMatchDetail.mockRejectedValue(err);
     const req = mockReq({ params: { id: '999' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1360,7 +1362,7 @@ describe('DELETE /admin/matches/:id', () => {
     mockExecute.mockResolvedValue({ affectedRows: 1 });
     const req = mockReq({ params: { id: '10' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockDeleteReplay).toHaveBeenCalledWith(10);
     expect(mockExecute).toHaveBeenCalledWith('DELETE FROM matches WHERE id = ?', [10]);
     expect(mockExecute).toHaveBeenCalledWith(
@@ -1376,7 +1378,7 @@ describe('DELETE /admin/matches/:id', () => {
     mockExecute.mockResolvedValue({ affectedRows: 1 });
     const req = mockReq({ params: { id: '10' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual({ message: 'Match deleted' });
   });
 
@@ -1384,7 +1386,7 @@ describe('DELETE /admin/matches/:id', () => {
     mockQuery.mockResolvedValueOnce([]);
     const req = mockReq({ params: { id: '404' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(404);
     expect(mockDeleteReplay).not.toHaveBeenCalled();
     expect(mockExecute).not.toHaveBeenCalled();
@@ -1401,7 +1403,7 @@ describe('DELETE /admin/matches/:id', () => {
     mockExecute.mockRejectedValue(err);
     const req = mockReq({ params: { id: '10' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1417,7 +1419,7 @@ describe('DELETE /admin/matches (bulk)', () => {
     mockExecute.mockResolvedValue({ affectedRows: 3 });
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockQuery).toHaveBeenCalledWith('SELECT id FROM matches');
     expect(mockGetMatchHistory).not.toHaveBeenCalled();
     expect(mockDeleteReplay).toHaveBeenCalledTimes(3);
@@ -1439,7 +1441,7 @@ describe('DELETE /admin/matches (bulk)', () => {
     });
     mockExecute.mockResolvedValue({ affectedRows: 45 });
     const res = mockRes();
-    await handler(mockReq(), res, jest.fn());
+    await handler(mockReq(), res, vi.fn());
     expect(mockDeleteReplay).toHaveBeenCalledTimes(45);
     expect(peak).toBe(20);
     expect(res._json).toEqual({ message: 'All matches deleted', count: 45, replaysCleaned: 45 });
@@ -1451,7 +1453,7 @@ describe('DELETE /admin/matches (bulk)', () => {
     mockExecute.mockResolvedValue({ affectedRows: 1 });
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO admin_actions'), [
       1,
       'delete_all_matches',
@@ -1466,7 +1468,7 @@ describe('DELETE /admin/matches (bulk)', () => {
     mockExecute.mockResolvedValue({ affectedRows: 0 });
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockDeleteReplay).not.toHaveBeenCalled();
     expect(res._json).toEqual({ message: 'All matches deleted', count: 0, replaysCleaned: 0 });
   });
@@ -1480,7 +1482,7 @@ describe('DELETE /admin/matches (bulk)', () => {
     mockQuery.mockRejectedValue(err);
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1498,7 +1500,7 @@ describe('GET /admin/rooms', () => {
     mockGetActiveRooms.mockResolvedValue(rooms);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual(rooms);
   });
 
@@ -1506,7 +1508,7 @@ describe('GET /admin/rooms', () => {
     mockGetActiveRooms.mockResolvedValue([]);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual([]);
   });
 
@@ -1519,7 +1521,7 @@ describe('GET /admin/rooms', () => {
     mockGetActiveRooms.mockRejectedValue(err);
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1537,7 +1539,7 @@ describe('GET /admin/actions', () => {
     mockGetAdminActions.mockResolvedValue(result);
     const req = mockReq({ query: { page: '1', limit: '20' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetAdminActions).toHaveBeenCalledWith(1, 20, undefined);
     expect(res._json).toEqual(result);
   });
@@ -1546,7 +1548,7 @@ describe('GET /admin/actions', () => {
     mockGetAdminActions.mockResolvedValue({ actions: [], total: 0 });
     const req = mockReq({ query: { page: '1', limit: '10', action: 'delete_user' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetAdminActions).toHaveBeenCalledWith(1, 10, 'delete_user');
   });
 
@@ -1554,7 +1556,7 @@ describe('GET /admin/actions', () => {
     mockGetAdminActions.mockResolvedValue({ actions: [], total: 0 });
     const req = mockReq({ query: { action: ['delete_user', 'create_user'] } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetAdminActions).toHaveBeenCalledWith(1, 20, undefined);
   });
 
@@ -1562,7 +1564,7 @@ describe('GET /admin/actions', () => {
     mockGetAdminActions.mockResolvedValue({ actions: [], total: 0 });
     const req = mockReq({ query: {} });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetAdminActions).toHaveBeenCalledWith(1, 20, undefined);
   });
 
@@ -1575,7 +1577,7 @@ describe('GET /admin/actions', () => {
     mockGetAdminActions.mockRejectedValue(err);
     const req = mockReq({ query: {} });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1592,7 +1594,7 @@ describe('POST /admin/announcements/toast', () => {
     mockSendToast.mockResolvedValue(undefined);
     const req = mockReq({ body: { message: 'Server maintenance in 10 minutes' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockSendToast).toHaveBeenCalledWith(1, 'Server maintenance in 10 minutes');
     expect(res._json).toEqual({ message: 'Toast sent' });
   });
@@ -1604,7 +1606,7 @@ describe('POST /admin/announcements/toast', () => {
       body: { message: 'Test toast' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockSendToast).toHaveBeenCalledWith(42, 'Test toast');
   });
 
@@ -1618,7 +1620,7 @@ describe('POST /admin/announcements/toast', () => {
     mockSendToast.mockRejectedValue(err);
     const req = mockReq({ body: { message: 'toast' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1631,7 +1633,7 @@ describe('POST /admin/announcements/banner', () => {
     mockSetBanner.mockResolvedValue(undefined);
     const req = mockReq({ body: { message: 'Scheduled downtime tonight at 2AM' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockSetBanner).toHaveBeenCalledWith(1, 'Scheduled downtime tonight at 2AM');
     expect(res._json).toEqual({ message: 'Banner set' });
   });
@@ -1643,7 +1645,7 @@ describe('POST /admin/announcements/banner', () => {
       body: { message: 'New banner' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockSetBanner).toHaveBeenCalledWith(99, 'New banner');
   });
 
@@ -1656,7 +1658,7 @@ describe('POST /admin/announcements/banner', () => {
     mockSetBanner.mockRejectedValue(err);
     const req = mockReq({ body: { message: 'banner' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1669,7 +1671,7 @@ describe('DELETE /admin/announcements/banner', () => {
     mockClearBanner.mockResolvedValue(undefined);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockClearBanner).toHaveBeenCalledWith(1);
     expect(res._json).toEqual({ message: 'Banner cleared' });
   });
@@ -1678,7 +1680,7 @@ describe('DELETE /admin/announcements/banner', () => {
     mockClearBanner.mockResolvedValue(undefined);
     const req = mockReq({ user: { userId: 50, username: 'admin', role: 'admin' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockClearBanner).toHaveBeenCalledWith(50);
   });
 
@@ -1691,7 +1693,7 @@ describe('DELETE /admin/announcements/banner', () => {
     mockClearBanner.mockRejectedValue(err);
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1709,7 +1711,7 @@ describe('GET /admin/replays', () => {
     mockListReplays.mockResolvedValue(result);
     const req = mockReq({ query: { page: '1', limit: '10' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockListReplays).toHaveBeenCalledWith(1, 10);
     expect(res._json).toEqual(result);
   });
@@ -1718,7 +1720,7 @@ describe('GET /admin/replays', () => {
     mockListReplays.mockResolvedValue({ replays: [], total: 0 });
     const req = mockReq({ query: {} });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockListReplays).toHaveBeenCalledWith(1, 20);
   });
 
@@ -1731,7 +1733,7 @@ describe('GET /admin/replays', () => {
     mockListReplays.mockRejectedValue(err);
     const req = mockReq({ query: {} });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1745,7 +1747,7 @@ describe('GET /admin/replays/:matchId', () => {
     mockGetReplay.mockResolvedValue(replay);
     const req = mockReq({ params: { matchId: '5' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetReplay).toHaveBeenCalledWith(5);
     expect(res._json).toEqual(replay);
   });
@@ -1754,7 +1756,7 @@ describe('GET /admin/replays/:matchId', () => {
     mockGetReplay.mockResolvedValue(null);
     const req = mockReq({ params: { matchId: '999' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'Replay not found' });
   });
@@ -1768,7 +1770,7 @@ describe('GET /admin/replays/:matchId', () => {
     mockGetReplay.mockRejectedValue(err);
     const req = mockReq({ params: { matchId: '5' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1781,7 +1783,7 @@ describe('DELETE /admin/replays/:matchId', () => {
     mockDeleteReplay.mockReturnValue(true);
     const req = mockReq({ params: { matchId: '5' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockDeleteReplay).toHaveBeenCalledWith(5);
     expect(res._json).toEqual({ message: 'Replay deleted' });
   });
@@ -1790,7 +1792,7 @@ describe('DELETE /admin/replays/:matchId', () => {
     mockDeleteReplay.mockReturnValue(false);
     const req = mockReq({ params: { matchId: '999' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'Replay not found' });
   });
@@ -1806,7 +1808,7 @@ describe('DELETE /admin/replays/:matchId', () => {
     });
     const req = mockReq({ params: { matchId: '5' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1825,7 +1827,7 @@ describe('GET /admin/simulations', () => {
     mockGetHistory.mockResolvedValue(history);
     const req = mockReq({ query: { page: '2', limit: '10' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetHistory).toHaveBeenCalledWith(2, 10);
     expect(res._json).toEqual(history);
   });
@@ -1833,7 +1835,7 @@ describe('GET /admin/simulations', () => {
   it('passes error to next() when the manager fails', async () => {
     const err = new Error('disk error');
     mockGetHistory.mockRejectedValue(err);
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(mockReq(), mockRes(), next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1842,7 +1844,7 @@ describe('GET /admin/simulations', () => {
     mockGetHistory.mockResolvedValue({ batches: [], total: 0 });
     const req = mockReq({ query: { page: '0' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetHistory).toHaveBeenCalledWith(1, 20);
   });
 
@@ -1850,7 +1852,7 @@ describe('GET /admin/simulations', () => {
     mockGetHistory.mockResolvedValue({ batches: [], total: 0 });
     const req = mockReq({ query: { limit: '200' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetHistory).toHaveBeenCalledWith(1, 100);
   });
 
@@ -1858,7 +1860,7 @@ describe('GET /admin/simulations', () => {
     mockGetHistory.mockResolvedValue({ batches: [], total: 0 });
     const req = mockReq({ query: { limit: '0' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     // parseInt('0') is 0 which is falsy, so || 20 yields 20
     expect(mockGetHistory).toHaveBeenCalledWith(1, 20);
   });
@@ -1867,7 +1869,7 @@ describe('GET /admin/simulations', () => {
     mockGetHistory.mockResolvedValue({ batches: [], total: 0 });
     const req = mockReq({ query: { page: 'abc', limit: 'xyz' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetHistory).toHaveBeenCalledWith(1, 20);
   });
 
@@ -1884,7 +1886,7 @@ describe('GET /admin/simulations/:batchId', () => {
     mockGetBatchResults.mockResolvedValue(data);
     const req = mockReq({ params: { batchId: 'batch-123' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetBatchResults).toHaveBeenCalledWith('batch-123');
     expect(res._json).toEqual(data);
   });
@@ -1893,7 +1895,7 @@ describe('GET /admin/simulations/:batchId', () => {
     mockGetBatchResults.mockResolvedValue(null);
     const req = mockReq({ params: { batchId: 'nonexistent' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'Batch not found' });
   });
@@ -1911,7 +1913,7 @@ describe('GET /admin/simulations/:batchId/replay/:gameIndex', () => {
     mockGetSimulationReplay.mockResolvedValue(replay);
     const req = mockReq({ params: { batchId: 'batch-1', gameIndex: '0' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockGetSimulationReplay).toHaveBeenCalledWith('batch-1', 0);
     expect(res._json).toEqual(replay);
   });
@@ -1919,7 +1921,7 @@ describe('GET /admin/simulations/:batchId/replay/:gameIndex', () => {
   it('returns 400 for invalid (NaN) game index', async () => {
     const req = mockReq({ params: { batchId: 'batch-1', gameIndex: 'abc' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(400);
     expect(res._json).toEqual({ error: 'Invalid game index' });
   });
@@ -1927,7 +1929,7 @@ describe('GET /admin/simulations/:batchId/replay/:gameIndex', () => {
   it('returns 400 for negative game index', async () => {
     const req = mockReq({ params: { batchId: 'batch-1', gameIndex: '-1' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(400);
     expect(res._json).toEqual({ error: 'Invalid game index' });
   });
@@ -1936,7 +1938,7 @@ describe('GET /admin/simulations/:batchId/replay/:gameIndex', () => {
     mockGetSimulationReplay.mockResolvedValue(null);
     const req = mockReq({ params: { batchId: 'batch-1', gameIndex: '5' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'Replay not found' });
   });
@@ -1950,7 +1952,7 @@ describe('GET /admin/simulations/:batchId/replay/:gameIndex', () => {
     mockGetSimulationReplay.mockRejectedValue(err);
     const req = mockReq({ params: { batchId: 'batch-1', gameIndex: '0' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -1964,7 +1966,7 @@ describe('POST /admin/simulations', () => {
     mockStartBatch.mockReturnValue(result);
     const req = mockReq({ body: { gameMode: 'ffa', botCount: 4 } });
     const res = mockRes();
-    handler(req, res, jest.fn());
+    handler(req, res, vi.fn());
     expect(mockStartBatch).toHaveBeenCalledWith({ gameMode: 'ffa', botCount: 4 }, 1);
     expect(res._status).toBe(201);
     expect(res._json).toEqual(result);
@@ -1975,7 +1977,7 @@ describe('POST /admin/simulations', () => {
     mockStartBatch.mockReturnValue(result);
     const req = mockReq({ body: { gameMode: 'ffa', botCount: 4 } });
     const res = mockRes();
-    handler(req, res, jest.fn());
+    handler(req, res, vi.fn());
     expect(res._status).toBe(429);
     expect(res._json).toEqual(result);
   });
@@ -1987,7 +1989,7 @@ describe('POST /admin/simulations', () => {
       body: { gameMode: 'teams' },
     });
     const res = mockRes();
-    handler(req, res, jest.fn());
+    handler(req, res, vi.fn());
     expect(mockStartBatch).toHaveBeenCalledWith({ gameMode: 'teams' }, 77);
   });
 
@@ -2004,7 +2006,7 @@ describe('DELETE /admin/simulations/:batchId', () => {
     mockDeleteBatch.mockResolvedValue(true);
     const req = mockReq({ params: { batchId: 'batch-123' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockCancelBatch).toHaveBeenCalledWith('batch-123');
     expect(mockDeleteBatch).toHaveBeenCalledWith('batch-123');
     expect(res._json).toEqual({ message: 'Batch deleted' });
@@ -2015,7 +2017,7 @@ describe('DELETE /admin/simulations/:batchId', () => {
     mockDeleteBatch.mockResolvedValue(false);
     const req = mockReq({ params: { batchId: 'nonexistent' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'Batch not found' });
   });
@@ -2025,7 +2027,7 @@ describe('DELETE /admin/simulations/:batchId', () => {
     mockDeleteBatch.mockResolvedValue(true);
     const req = mockReq({ params: { batchId: 'completed-batch' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockCancelBatch).toHaveBeenCalledWith('completed-batch');
     expect(mockDeleteBatch).toHaveBeenCalledWith('completed-batch');
     expect(res._json).toEqual({ message: 'Batch deleted' });
@@ -2051,7 +2053,7 @@ describe('GET /admin/ai', () => {
     mockListAllAIs.mockResolvedValue(ais);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual({ ais });
   });
 
@@ -2059,7 +2061,7 @@ describe('GET /admin/ai', () => {
     mockListAllAIs.mockResolvedValue([]);
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._json).toEqual({ ais: [] });
   });
 
@@ -2072,7 +2074,7 @@ describe('GET /admin/ai', () => {
     mockListAllAIs.mockRejectedValue(err);
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -2092,7 +2094,7 @@ describe('POST /admin/ai', () => {
       body: { name: 'TestAI', description: 'A test AI' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockUploadAI).toHaveBeenCalledWith(
       'TestAI',
       'A test AI',
@@ -2107,7 +2109,7 @@ describe('POST /admin/ai', () => {
   it('returns 400 when no file uploaded', async () => {
     const req = mockReq({ body: { name: 'TestAI' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(400);
     expect(res._json).toEqual({ error: 'No file uploaded' });
   });
@@ -2118,7 +2120,7 @@ describe('POST /admin/ai', () => {
       body: { name: '' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(400);
     expect(res._json).toEqual({ error: 'Name is required (1-100 characters)' });
   });
@@ -2129,7 +2131,7 @@ describe('POST /admin/ai', () => {
       body: { name: 'x'.repeat(101) },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(400);
     expect(res._json).toEqual({ error: 'Name is required (1-100 characters)' });
   });
@@ -2144,7 +2146,7 @@ describe('POST /admin/ai', () => {
       body: { name: 'BadAI' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(400);
     expect(res._json).toEqual({
       error: 'Compilation/validation failed',
@@ -2159,7 +2161,7 @@ describe('POST /admin/ai', () => {
       body: { name: 'NoDesc' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockUploadAI).toHaveBeenCalledWith('NoDesc', '', expect.any(Buffer), 'test.ts', 1);
   });
 
@@ -2175,7 +2177,7 @@ describe('POST /admin/ai', () => {
       body: { name: 'TestAI' },
     });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -2191,7 +2193,7 @@ describe('PUT /admin/ai/:id', () => {
       body: { name: 'Updated AI', isActive: true },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockUpdateAI).toHaveBeenCalledWith('ai-123', { name: 'Updated AI', isActive: true }, 1);
     expect(res._json).toEqual({ message: 'AI updated' });
   });
@@ -2204,7 +2206,7 @@ describe('PUT /admin/ai/:id', () => {
       body: { description: 'New description' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockUpdateAI).toHaveBeenCalledWith('ai-456', { description: 'New description' }, 55);
   });
 
@@ -2217,7 +2219,7 @@ describe('PUT /admin/ai/:id', () => {
     mockUpdateAI.mockRejectedValue(err);
     const req = mockReq({ params: { id: 'ai-bad' }, body: {} });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -2233,7 +2235,7 @@ describe('PUT /admin/ai/:id/upload', () => {
       file: { buffer: Buffer.from('new code'), originalname: 'updated.ts' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockReuploadAI).toHaveBeenCalledWith('ai-123', Buffer.from('new code'), 'updated.ts', 1);
     expect(res._json).toEqual({ message: 'AI updated' });
   });
@@ -2241,7 +2243,7 @@ describe('PUT /admin/ai/:id/upload', () => {
   it('returns 400 when no file uploaded', async () => {
     const req = mockReq({ params: { id: 'ai-123' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(400);
     expect(res._json).toEqual({ error: 'No file uploaded' });
   });
@@ -2256,7 +2258,7 @@ describe('PUT /admin/ai/:id/upload', () => {
       file: { buffer: Buffer.from('bad'), originalname: 'bad.ts' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(400);
     expect(res._json).toEqual({
       error: 'Compilation/validation failed',
@@ -2276,7 +2278,7 @@ describe('PUT /admin/ai/:id/upload', () => {
       file: { buffer: Buffer.from('code'), originalname: 'test.ts' },
     });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -2290,7 +2292,7 @@ describe('GET /admin/ai/:id/download', () => {
     mockDownloadSource.mockResolvedValue(source);
     const req = mockReq({ params: { id: 'ai-123' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockDownloadSource).toHaveBeenCalledWith('ai-123');
     expect(res._headers['Content-Type']).toBe('text/typescript');
     expect(res._headers['Content-Disposition']).toBe('attachment; filename="myai.ts"');
@@ -2301,7 +2303,7 @@ describe('GET /admin/ai/:id/download', () => {
     mockDownloadSource.mockResolvedValue(null);
     const req = mockReq({ params: { id: 'ai-nonexistent' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'AI source not found' });
   });
@@ -2315,7 +2317,7 @@ describe('GET /admin/ai/:id/download', () => {
     mockDownloadSource.mockRejectedValue(err);
     const req = mockReq({ params: { id: 'ai-123' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -2328,7 +2330,7 @@ describe('DELETE /admin/ai/:id', () => {
     mockDeleteAI.mockResolvedValue(undefined);
     const req = mockReq({ params: { id: 'ai-123' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockDeleteAI).toHaveBeenCalledWith('ai-123', 1);
     expect(res._json).toEqual({ message: 'AI deleted' });
   });
@@ -2340,7 +2342,7 @@ describe('DELETE /admin/ai/:id', () => {
       params: { id: 'ai-456' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockDeleteAI).toHaveBeenCalledWith('ai-456', 33);
   });
 
@@ -2353,7 +2355,7 @@ describe('DELETE /admin/ai/:id', () => {
     mockDeleteAI.mockRejectedValue(err);
     const req = mockReq({ params: { id: 'ai-builtin' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -2370,7 +2372,7 @@ describe('POST /admin/users/cleanup/preview', () => {
     mockPreviewCleanup.mockResolvedValue({ count: 7 });
     const req = mockReq({ body: { type: 'unverified', days: 30 } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockPreviewCleanup).toHaveBeenCalledWith('unverified', 30);
     expect(res._json).toEqual({ count: 7 });
   });
@@ -2379,7 +2381,7 @@ describe('POST /admin/users/cleanup/preview', () => {
     mockPreviewCleanup.mockResolvedValue({ count: 3 });
     const req = mockReq({ body: { type: 'deactivated' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockPreviewCleanup).toHaveBeenCalledWith('deactivated', undefined);
     expect(res._json).toEqual({ count: 3 });
   });
@@ -2388,7 +2390,7 @@ describe('POST /admin/users/cleanup/preview', () => {
     mockPreviewCleanup.mockResolvedValue({ count: 0 });
     const req = mockReq({ body: { type: 'inactive', days: 90 } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockPreviewCleanup).toHaveBeenCalledWith('inactive', 90);
     expect(res._json).toEqual({ count: 0 });
   });
@@ -2398,7 +2400,7 @@ describe('POST /admin/users/cleanup/preview', () => {
     mockPreviewCleanup.mockRejectedValue(err);
     const req = mockReq({ body: { type: 'unverified', days: 7 } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });
@@ -2415,7 +2417,7 @@ describe('POST /admin/users/cleanup/execute', () => {
     mockExecuteCleanup.mockResolvedValue({ deleted: 5 });
     const req = mockReq({ body: { type: 'unverified', days: 30 } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockExecuteCleanup).toHaveBeenCalledWith(1, 'unverified', 30);
     expect(res._json).toEqual({ deleted: 5 });
   });
@@ -2427,7 +2429,7 @@ describe('POST /admin/users/cleanup/execute', () => {
       body: { type: 'inactive', days: 60 },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockExecuteCleanup).toHaveBeenCalledWith(42, 'inactive', 60);
   });
 
@@ -2435,7 +2437,7 @@ describe('POST /admin/users/cleanup/execute', () => {
     mockExecuteCleanup.mockResolvedValue({ deleted: 1 });
     const req = mockReq({ body: { type: 'deactivated' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
     expect(mockExecuteCleanup).toHaveBeenCalledWith(1, 'deactivated', undefined);
   });
 
@@ -2444,7 +2446,7 @@ describe('POST /admin/users/cleanup/execute', () => {
     mockExecuteCleanup.mockRejectedValue(err);
     const req = mockReq({ body: { type: 'deactivated' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
   });

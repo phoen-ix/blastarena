@@ -1,19 +1,19 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
 // ── DB mock ─────────────────────────────────────────────────────────────────
-const mockQuery = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
 }));
 
 // ── FS mock ─────────────────────────────────────────────────────────────────
-const mockExistsSync = jest.fn<AnyFn>();
-const mockReadFileSync = jest.fn<AnyFn>();
-const mockMkdirSync = jest.fn<AnyFn>();
-jest.mock('fs', () => ({
+const mockExistsSync = vi.fn<AnyFn>();
+const mockReadFileSync = vi.fn<AnyFn>();
+const mockMkdirSync = vi.fn<AnyFn>();
+vi.mock('fs', () => ({
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
   readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
   mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
@@ -25,29 +25,29 @@ jest.mock('fs', () => ({
 }));
 
 // ── Sandbox mock (used to load TRUSTED seeded AIs in-process) ────────────────
-const mockLoadBotAIInSandbox = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/botai-compiler', () => ({
+const mockLoadBotAIInSandbox = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/botai-compiler', () => ({
   loadBotAIInSandbox: mockLoadBotAIInSandbox,
 }));
 
 // ── Isolated runner mock (used for UNTRUSTED uploads) ────────────────────────
-const MockIsolatedEnemyAI = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/IsolatedAIRunner', () => ({
+const MockIsolatedEnemyAI = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/IsolatedAIRunner', () => ({
   IsolatedEnemyAI: MockIsolatedEnemyAI,
-  IsolatedBotAI: jest.fn(),
-  disposeAI: jest.fn(),
+  IsolatedBotAI: vi.fn(),
+  disposeAI: vi.fn(),
 }));
 
 // ── Logger mock ─────────────────────────────────────────────────────────────
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 import { EnemyAIRegistry } from '../../../backend/src/services/enemyai-registry';
 
 function makeMockEnemyAIClass() {
-  const MockClass = jest.fn<AnyFn>();
-  MockClass.prototype.decide = jest.fn();
+  const MockClass = vi.fn<AnyFn>();
+  MockClass.prototype.decide = vi.fn();
   return MockClass;
 }
 
@@ -55,7 +55,7 @@ describe('EnemyAIRegistry', () => {
   let registry: EnemyAIRegistry;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     registry = new EnemyAIRegistry();
   });
 

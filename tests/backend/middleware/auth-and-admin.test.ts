@@ -1,11 +1,11 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
-const mockVerify = jest.fn();
-jest.mock('jsonwebtoken', () => ({
-  verify: mockVerify,
+const mockVerify = vi.hoisted(() => vi.fn());
+vi.mock('jsonwebtoken', () => ({
+  default: { verify: mockVerify },
 }));
 
-jest.mock('../../../backend/src/config', () => ({
+vi.mock('../../../backend/src/config', () => ({
   getConfig: () => ({
     JWT_SECRET: 'test-secret-key-that-is-at-least-32-chars-long',
   }),
@@ -13,13 +13,13 @@ jest.mock('../../../backend/src/config', () => ({
 
 // The admin middlewares re-read the role from the users table (audit B18).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockQuery = jest.fn<(...args: any[]) => Promise<any>>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<(...args: any[]) => Promise<any>>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
 import { authMiddleware } from '../../../backend/src/middleware/auth';
@@ -27,8 +27,8 @@ import { staffMiddleware, adminOnlyMiddleware } from '../../../backend/src/middl
 
 function createMockRes() {
   const res = {
-    status: jest.fn().mockReturnThis() as jest.Mock,
-    json: jest.fn() as jest.Mock,
+    status: vi.fn().mockReturnThis() as Mock,
+    json: vi.fn() as Mock,
     locals: {} as Record<string, unknown>,
   };
   return res;
@@ -42,13 +42,13 @@ function dbUser(role: string, is_deactivated = 0) {
 describe('Auth & Admin Middleware', () => {
   let mockReq: any;
   let mockRes: ReturnType<typeof createMockRes>;
-  let mockNext: jest.Mock;
+  let mockNext: Mock;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockReq = { headers: {} };
     mockRes = createMockRes();
-    mockNext = jest.fn();
+    mockNext = vi.fn();
   });
 
   describe('authMiddleware', () => {

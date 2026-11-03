@@ -1,14 +1,14 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
 // Mock services
-const mockGetFriends = jest.fn<AnyFn>();
-const mockGetPendingRequests = jest.fn<AnyFn>();
-const mockGetBlockedUsers = jest.fn<AnyFn>();
-const mockSearchUsers = jest.fn<AnyFn>();
+const mockGetFriends = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetPendingRequests = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetBlockedUsers = vi.hoisted(() => vi.fn<AnyFn>());
+const mockSearchUsers = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/friends', () => ({
+vi.mock('../../../backend/src/services/friends', () => ({
   getFriends: mockGetFriends,
   getPendingRequests: mockGetPendingRequests,
   getBlockedUsers: mockGetBlockedUsers,
@@ -16,13 +16,15 @@ jest.mock('../../../backend/src/services/friends', () => ({
 }));
 
 // Mock middleware
-const mockAuthMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
-jest.mock('../../../backend/src/middleware/auth', () => ({
+const mockAuthMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
+vi.mock('../../../backend/src/middleware/auth', () => ({
   authMiddleware: mockAuthMiddleware,
 }));
 
-const mockValidate = jest.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next());
-jest.mock('../../../backend/src/middleware/validation', () => ({
+const mockValidate = vi.hoisted(() =>
+  vi.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next()),
+);
+vi.mock('../../../backend/src/middleware/validation', () => ({
   validate: mockValidate,
 }));
 
@@ -83,7 +85,7 @@ function mockRes() {
 
 describe('Friends Routes', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('Middleware presence', () => {
@@ -125,7 +127,7 @@ describe('Friends Routes', () => {
       const handler = getHandler('get', '/friends');
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(res._json).toEqual({
         friends,
@@ -143,7 +145,7 @@ describe('Friends Routes', () => {
       const handler = getHandler('get', '/friends');
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -157,7 +159,7 @@ describe('Friends Routes', () => {
       const handler = getHandler('get', '/friends/blocked');
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(res._json).toEqual({ blocked: [{ userId: 5, username: 'eve' }] });
     });
@@ -171,7 +173,7 @@ describe('Friends Routes', () => {
       const handler = getHandler('post', '/friends/search');
       const req = mockReq({ body: { query: 'bo' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(res._json).toEqual({ users });
       expect(mockSearchUsers).toHaveBeenCalledWith('bo', 1);
@@ -183,7 +185,7 @@ describe('Friends Routes', () => {
       const handler = getHandler('post', '/friends/search');
       const req = mockReq({ body: { query: 'bo' } });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));

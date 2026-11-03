@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { BattleRoyaleZone } from '../../../backend/src/game/BattleRoyale';
 import {
   BR_ZONE_INITIAL_DELAY_SECONDS,

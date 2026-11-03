@@ -1,23 +1,23 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
-const mockGetDMMode = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/settings', () => ({
+const mockGetDMMode = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/settings', () => ({
   getDMMode: mockGetDMMode,
 }));
-const mockSendMessage = jest.fn<AnyFn>();
-const mockMarkRead = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/messages', () => ({
+const mockSendMessage = vi.hoisted(() => vi.fn<AnyFn>());
+const mockMarkRead = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/messages', () => ({
   sendMessage: mockSendMessage,
   markRead: mockMarkRead,
 }));
 // One shared isAllowed so a test can drive the rate-limited branch.
-const mockIsAllowed = jest.fn<(id: string) => boolean>().mockReturnValue(true);
-jest.mock('../../../backend/src/utils/socketRateLimit', () => ({
+const mockIsAllowed = vi.hoisted(() => vi.fn<(id: string) => boolean>().mockReturnValue(true));
+vi.mock('../../../backend/src/utils/socketRateLimit', () => ({
   createSocketRateLimiter: () => ({
     isAllowed: mockIsAllowed,
-    remove: jest.fn(),
+    remove: vi.fn(),
   }),
 }));
 
@@ -35,22 +35,22 @@ function createMockSocket(overrides: Record<string, any> = {}) {
       activeRoomCode: undefined,
       ...overrides,
     },
-    on: jest.fn((event: string, handler: Function) => {
+    on: vi.fn((event: string, handler: Function) => {
       handlers[event] = handler;
     }),
-    join: jest.fn(),
-    leave: jest.fn(),
+    join: vi.fn(),
+    leave: vi.fn(),
     _handlers: handlers,
   };
   return socket;
 }
 
 function createMockIO() {
-  const emitFn = jest.fn<AnyFn>();
+  const emitFn = vi.fn<AnyFn>();
   const io: any = {
-    emit: jest.fn<AnyFn>(),
-    to: jest.fn<AnyFn>().mockReturnValue({ emit: emitFn }),
-    in: jest.fn<AnyFn>().mockReturnValue({ fetchSockets: jest.fn<AnyFn>().mockResolvedValue([]) }),
+    emit: vi.fn<AnyFn>(),
+    to: vi.fn<AnyFn>().mockReturnValue({ emit: emitFn }),
+    in: vi.fn<AnyFn>().mockReturnValue({ fetchSockets: vi.fn<AnyFn>().mockResolvedValue([]) }),
     _toEmit: emitFn,
   };
   return io;
@@ -61,7 +61,7 @@ describe('dmHandlers', () => {
   let io: ReturnType<typeof createMockIO>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockIsAllowed.mockReturnValue(true);
     mockGetDMMode.mockResolvedValue('everyone');
     socket = createMockSocket();
@@ -74,7 +74,7 @@ describe('dmHandlers', () => {
 
     it('calls sendMessage and callbacks success with message', async () => {
       mockSendMessage.mockResolvedValue(fakeMsg);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['dm:send'];
       await handler({ toUserId: 2, message: 'hi' }, callback);
@@ -85,7 +85,7 @@ describe('dmHandlers', () => {
 
     it('emits dm:receive to recipient user room', async () => {
       mockSendMessage.mockResolvedValue(fakeMsg);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['dm:send'];
       await handler({ toUserId: 2, message: 'hi' }, callback);
@@ -96,7 +96,7 @@ describe('dmHandlers', () => {
 
     it('returns error when DM mode is disabled', async () => {
       mockGetDMMode.mockResolvedValue('disabled');
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['dm:send'];
       await handler({ toUserId: 2, message: 'hi' }, callback);
@@ -110,7 +110,7 @@ describe('dmHandlers', () => {
 
     it('returns error when mode=admin_only and role=user', async () => {
       mockGetDMMode.mockResolvedValue('admin_only');
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['dm:send'];
       await handler({ toUserId: 2, message: 'hi' }, callback);
@@ -123,7 +123,7 @@ describe('dmHandlers', () => {
 
     it('returns error when mode=staff and role=user', async () => {
       mockGetDMMode.mockResolvedValue('staff');
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['dm:send'];
       await handler({ toUserId: 2, message: 'hi' }, callback);
@@ -140,7 +140,7 @@ describe('dmHandlers', () => {
       socket = createMockSocket({ role: 'admin' });
       io = createMockIO();
       setupDMHandlers(socket, io);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['dm:send'];
       await handler({ toUserId: 2, message: 'hi' }, callback);
@@ -149,7 +149,7 @@ describe('dmHandlers', () => {
     });
 
     it('returns error for empty message after trim', async () => {
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['dm:send'];
       await handler({ toUserId: 2, message: '   ' }, callback);
@@ -162,7 +162,7 @@ describe('dmHandlers', () => {
     });
 
     it('returns error for non-string message', async () => {
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['dm:send'];
       await handler({ toUserId: 2, message: 123 }, callback);
@@ -178,7 +178,7 @@ describe('dmHandlers', () => {
     // already cleared the input box. (audit SOCKET-TRYCATCH-2)
     it('acks instead of hanging when the DM-mode lookup fails', async () => {
       mockGetDMMode.mockRejectedValue(new Error('DB is down'));
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['dm:send'];
       await expect(handler({ toUserId: 2, message: 'hi' }, callback)).resolves.toBeUndefined();
@@ -191,7 +191,7 @@ describe('dmHandlers', () => {
     });
 
     it('acks when rate limited, rather than leaving the caller waiting', async () => {
-      const callback = jest.fn();
+      const callback = vi.fn();
       const handler = socket._handlers['dm:send'];
       // Exhaust the limiter: the harness stubs isAllowed to true, so drive it via the real one.
       mockIsAllowed.mockReturnValueOnce(false);
@@ -203,7 +203,7 @@ describe('dmHandlers', () => {
 
     it('returns error from service exception', async () => {
       mockSendMessage.mockRejectedValue(new Error('DB is down'));
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['dm:send'];
       await handler({ toUserId: 2, message: 'hi' }, callback);

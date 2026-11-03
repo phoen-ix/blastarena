@@ -1,7 +1,7 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 import { compileEnemyAI } from '../../../backend/src/services/enemyai-compiler';
@@ -73,7 +73,7 @@ export class TestEnemy {
 
 describe('compileEnemyAI', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // ── Success cases ──────────────────────────────────────────────────────

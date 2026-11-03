@@ -1,12 +1,12 @@
-import { describe, it, expect, jest } from '@jest/globals';
+import { describe, it, expect, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-jest.mock('../../../backend/src/db/connection', () => ({
-  getPool: () => ({ execute: jest.fn<AnyFn>() }),
+vi.mock('../../../backend/src/db/connection', () => ({
+  getPool: () => ({ execute: vi.fn<AnyFn>() }),
 }));
 
 import { parseSqlStatements } from '../../../backend/src/db/migrations/runner';

@@ -1,10 +1,10 @@
-import { describe, it, expect, jest, beforeEach, afterEach, afterAll } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 import { pruneOldReplays } from '../../../backend/src/utils/replayRecorder';
@@ -23,7 +23,7 @@ let tmpDir: string;
 // A fake clock: each case starts two hours after the last, so the once-per-hour throttle (module
 // state) never carries over and the module is imported only once.
 let now = Date.UTC(2026, 0, 1);
-const dateNow = jest.spyOn(Date, 'now').mockImplementation(() => now);
+const dateNow = vi.spyOn(Date, 'now').mockImplementation(() => now);
 
 // Sparse files: stat reports the size, but nothing is written to disk.
 function seed(dir: string, name: string, ageMs: number, sizeBytes: number): string {

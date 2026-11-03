@@ -1,36 +1,36 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
 // Mock db/connection
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
-const mockWithTransaction = jest.fn<AnyFn>();
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+const mockWithTransaction = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/db/connection', () => ({
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
   withTransaction: mockWithTransaction,
 }));
 
 // Mock presence service
-const mockGetPresenceBatch = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/presence', () => ({
+const mockGetPresenceBatch = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/presence', () => ({
   getPresenceBatch: mockGetPresenceBatch,
 }));
 
 import * as friendsService from '../../../backend/src/services/friends';
 
 // The transaction connection's query() follows the mysql2 promise shape: `[rows, fields]`.
-let connQuery: jest.Mock<AnyFn>;
-let connExecute: jest.Mock<AnyFn>;
+let connQuery: Mock<AnyFn>;
+let connExecute: Mock<AnyFn>;
 
 describe('Friends Service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockGetPresenceBatch.mockResolvedValue(new Map());
-    connQuery = jest.fn<AnyFn>();
-    connExecute = jest.fn<AnyFn>().mockResolvedValue([{ affectedRows: 1 }]);
+    connQuery = vi.fn<AnyFn>();
+    connExecute = vi.fn<AnyFn>().mockResolvedValue([{ affectedRows: 1 }]);
     mockWithTransaction.mockImplementation(async (fn: AnyFn) =>
       fn({ query: connQuery, execute: connExecute }),
     );
@@ -261,9 +261,9 @@ describe('Friends Service', () => {
 
   describe('removeFriend', () => {
     it('should delete both reciprocal rows', async () => {
-      const connExecute = jest.fn<AnyFn>().mockResolvedValue([{ affectedRows: 1 }]);
+      const connExecute = vi.fn<AnyFn>().mockResolvedValue([{ affectedRows: 1 }]);
       mockWithTransaction.mockImplementation(async (fn: AnyFn) =>
-        fn({ query: jest.fn<AnyFn>(), execute: connExecute }),
+        fn({ query: vi.fn<AnyFn>(), execute: connExecute }),
       );
 
       await friendsService.removeFriend(1, 2);
@@ -278,9 +278,9 @@ describe('Friends Service', () => {
     it('should remove friendship and insert block', async () => {
       mockQuery.mockResolvedValueOnce([{ id: 2 }]); // user exists
 
-      const connExecute = jest.fn<AnyFn>().mockResolvedValue([{ affectedRows: 1 }]);
+      const connExecute = vi.fn<AnyFn>().mockResolvedValue([{ affectedRows: 1 }]);
       mockWithTransaction.mockImplementation(async (fn: AnyFn) =>
-        fn({ query: jest.fn<AnyFn>(), execute: connExecute }),
+        fn({ query: vi.fn<AnyFn>(), execute: connExecute }),
       );
 
       await friendsService.blockUser(1, 2);

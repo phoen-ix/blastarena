@@ -458,12 +458,12 @@ blastarena/
 ## Testing & Linting
 
 ```bash
-npm test                    # Run all test suites (backend + shared via Jest, frontend via Vitest)
+npm test                    # Run all test suites (Vitest: backend + shared, frontend)
 npm run lint                # ESLint across all workspaces
 npm run format:check        # Prettier format check
 ```
 
-- **Jest** covers the backend and shared code: game logic, services, routes, socket handlers, middleware, database, simulation, utilities. **Vitest** covers the frontend.
+- **Vitest** covers the backend and shared code (game logic, services, routes, socket handlers, middleware, database, simulation, utilities) and the frontend.
 - `tests/backend/db/migrationLock.test.ts` needs a real MariaDB and runs only with `REQUIRE_DB_TESTS=1`.
 - [docs/testing.md](docs/testing.md) has the test inventory, mocking patterns, and a guide to writing new tests.
 

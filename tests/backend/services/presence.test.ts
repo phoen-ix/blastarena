@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
@@ -6,22 +6,22 @@ const store = new Map<string, string>();
 const ttls = new Map<string, number>();
 
 const mockRedis = {
-  get: jest.fn<AnyFn>((key: string) => Promise.resolve(store.get(key) || null)),
-  set: jest.fn<AnyFn>((...args: unknown[]) => {
+  get: vi.fn<AnyFn>((key: string) => Promise.resolve(store.get(key) || null)),
+  set: vi.fn<AnyFn>((...args: unknown[]) => {
     store.set(args[0] as string, args[1] as string);
     if (args[2] === 'EX') ttls.set(args[0] as string, args[3] as number);
     return Promise.resolve('OK');
   }),
-  del: jest.fn<AnyFn>((key: string) => {
+  del: vi.fn<AnyFn>((key: string) => {
     store.delete(key);
     ttls.delete(key);
     return Promise.resolve(1);
   }),
-  mget: jest.fn<AnyFn>((...keys: string[]) => {
+  mget: vi.fn<AnyFn>((...keys: string[]) => {
     const values = keys.map((k) => store.get(k) || null);
     return Promise.resolve(values);
   }),
-  expire: jest.fn<AnyFn>((key: string, ttl: number) => {
+  expire: vi.fn<AnyFn>((key: string, ttl: number) => {
     if (store.has(key)) {
       ttls.set(key, ttl);
       return Promise.resolve(1);
@@ -30,7 +30,7 @@ const mockRedis = {
   }),
 };
 
-jest.mock('../../../backend/src/db/redis', () => ({
+vi.mock('../../../backend/src/db/redis', () => ({
   getRedis: () => mockRedis,
 }));
 
@@ -38,7 +38,7 @@ import * as presenceService from '../../../backend/src/services/presence';
 
 describe('Presence Service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     store.clear();
     ttls.clear();
   });

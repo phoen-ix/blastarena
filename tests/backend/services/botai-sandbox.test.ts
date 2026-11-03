@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from '@jest/globals';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { compileBotAI, loadBotAIInSandbox } from '../../../backend/src/services/botai-compiler';
 
 const VALID_AI_SOURCE = `

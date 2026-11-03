@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { GameStateManager } from '../../../backend/src/game/GameState';
 import { Bomb } from '../../../backend/src/game/Bomb';
 import { KOTH_ZONE_SIZE, DEATHMATCH_RESPAWN_TICKS, TILE_SIZE } from '@blast-arena/shared';

@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
@@ -13,7 +13,7 @@ const setFor = (key: string): Set<string> => {
   return s;
 };
 const mockRedis = {
-  sadd: jest.fn<AnyFn>((key: string, ...members: string[]) => {
+  sadd: vi.fn<AnyFn>((key: string, ...members: string[]) => {
     const s = setFor(key);
     let added = 0;
     for (const m of members)
@@ -23,50 +23,50 @@ const mockRedis = {
       }
     return Promise.resolve(added);
   }),
-  srem: jest.fn<AnyFn>((key: string, ...members: string[]) => {
+  srem: vi.fn<AnyFn>((key: string, ...members: string[]) => {
     const s = setFor(key);
     let removed = 0;
     for (const m of members) if (s.delete(m)) removed++;
     return Promise.resolve(removed);
   }),
-  smembers: jest.fn<AnyFn>((key: string) => Promise.resolve([...setFor(key)])),
-  get: jest.fn<AnyFn>((key: string) => Promise.resolve(store.get(key) || null)),
-  set: jest.fn<AnyFn>((...args: unknown[]) => {
+  smembers: vi.fn<AnyFn>((key: string) => Promise.resolve([...setFor(key)])),
+  get: vi.fn<AnyFn>((key: string) => Promise.resolve(store.get(key) || null)),
+  set: vi.fn<AnyFn>((...args: unknown[]) => {
     store.set(args[0] as string, args[1] as string);
     return Promise.resolve('OK');
   }),
   // Variadic like the real command: deleteRoom sends every key in one DEL. (audit E11)
-  del: jest.fn<AnyFn>((...keys: string[]) => {
+  del: vi.fn<AnyFn>((...keys: string[]) => {
     let removed = 0;
     for (const key of keys) if (store.delete(key)) removed++;
     return Promise.resolve(removed);
   }),
   // SCAN returns all matching keys in a single cursor pass (test simplification)
-  scan: jest.fn<AnyFn>((_cursor: string, _matchKw: string, pattern: string) => {
+  scan: vi.fn<AnyFn>((_cursor: string, _matchKw: string, pattern: string) => {
     const prefix = pattern.replaceAll('*', '');
     const matched = [...store.keys()].filter((k) => k.startsWith(prefix));
     return Promise.resolve(['0', matched]);
   }),
-  mget: jest.fn<AnyFn>((...keys: string[]) => {
+  mget: vi.fn<AnyFn>((...keys: string[]) => {
     return Promise.resolve(keys.map((k) => store.get(k) || null));
   }),
-  eval: jest.fn<AnyFn>(),
+  eval: vi.fn<AnyFn>(),
 };
 
-jest.mock('../../../backend/src/db/redis', () => ({
+vi.mock('../../../backend/src/db/redis', () => ({
   getRedis: () => mockRedis,
 }));
 
-jest.mock('crypto', () => ({
-  ...jest.requireActual<typeof import('crypto')>('crypto'),
-  randomUUID: jest.fn(() => 'abcdef-1234-5678-9012'),
+vi.mock('crypto', async () => ({
+  ...(await vi.importActual<typeof import('crypto')>('crypto')),
+  randomUUID: vi.fn(() => 'abcdef-1234-5678-9012'),
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
+vi.mock('../../../backend/src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    error: jest.fn(),
-    warn: jest.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
   },
 }));
 
@@ -101,7 +101,7 @@ describe('lobby service', () => {
   beforeEach(() => {
     store.clear();
     sets.clear();
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     // Re-attach real implementations after clearAllMocks resets them
     mockRedis.get.mockImplementation((key: string) => Promise.resolve(store.get(key) || null));
     mockRedis.set.mockImplementation((...args: unknown[]) => {

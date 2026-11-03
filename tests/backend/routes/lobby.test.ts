@@ -1,22 +1,22 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
-const mockListRooms = jest.fn<AnyFn>();
-const mockCreateRoom = jest.fn<AnyFn>();
+const mockListRooms = vi.hoisted(() => vi.fn<AnyFn>());
+const mockCreateRoom = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/lobby', () => ({
+vi.mock('../../../backend/src/services/lobby', () => ({
   listRooms: mockListRooms,
   createRoom: mockCreateRoom,
 }));
 
 // Mock middleware to pass through
-jest.mock('../../../backend/src/middleware/auth', () => ({
-  authMiddleware: jest.fn((_req: any, _res: any, next: any) => next()),
+vi.mock('../../../backend/src/middleware/auth', () => ({
+  authMiddleware: vi.fn((_req: any, _res: any, next: any) => next()),
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
 import lobbyRouter from '../../../backend/src/routes/lobby';
@@ -67,7 +67,7 @@ describe('GET /lobby/rooms', () => {
 
   beforeEach(() => {
     handler = getHandler('get', '/lobby/rooms');
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('returns room list on success', async () => {
@@ -78,7 +78,7 @@ describe('GET /lobby/rooms', () => {
     mockListRooms.mockResolvedValue(rooms);
 
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler({} as Request, res as unknown as Response, next as NextFunction);
 
     expect(res._json).toEqual(rooms);
@@ -89,7 +89,7 @@ describe('GET /lobby/rooms', () => {
     mockListRooms.mockResolvedValue([]);
 
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler({} as Request, res as unknown as Response, next as NextFunction);
 
     expect(res._json).toEqual([]);
@@ -100,7 +100,7 @@ describe('GET /lobby/rooms', () => {
     mockListRooms.mockResolvedValue([]);
 
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler({} as Request, res as unknown as Response, next as NextFunction);
 
     expect(mockListRooms).toHaveBeenCalledTimes(1);
@@ -112,7 +112,7 @@ describe('GET /lobby/rooms', () => {
     mockListRooms.mockRejectedValue(error);
 
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler({} as Request, res as unknown as Response, next as NextFunction);
 
     expect(next).toHaveBeenCalledWith(error);

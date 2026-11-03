@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { validateCustomMap } from '../../shared/src/utils/mapValidation';
 import { TileType } from '../../shared/src/types/game';
 

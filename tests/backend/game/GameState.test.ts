@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GameStateManager } from '../../../backend/src/game/GameState';
 import { Player } from '../../../backend/src/game/Player';
 import { Bomb } from '../../../backend/src/game/Bomb';
@@ -2127,7 +2127,6 @@ describe('GameStateManager', () => {
       placePlayer(p2, 9, 9); // far away
 
       // Place a bomb at (4,3) — manually to control position
-      const { Bomb: BombClass } = require('../../../backend/src/game/Bomb');
       const bomb = new Bomb({ x: 4, y: 3 }, 2, 1, 'normal');
       gs.bombs.set(bomb.id, bomb);
 

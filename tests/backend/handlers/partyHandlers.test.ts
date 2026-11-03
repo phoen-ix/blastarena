@@ -1,17 +1,17 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
-const mockCreateParty = jest.fn<AnyFn>();
-const mockGetParty = jest.fn<AnyFn>();
-const mockJoinParty = jest.fn<AnyFn>();
-const mockLeaveParty = jest.fn<AnyFn>();
-const mockKickFromParty = jest.fn<AnyFn>();
-const mockCreateInvite = jest.fn<AnyFn>();
-const mockGetInvite = jest.fn<AnyFn>();
-const mockRemoveInvite = jest.fn<AnyFn>();
-const mockGetPlayerParty = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/party', () => ({
+const mockCreateParty = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetParty = vi.hoisted(() => vi.fn<AnyFn>());
+const mockJoinParty = vi.hoisted(() => vi.fn<AnyFn>());
+const mockLeaveParty = vi.hoisted(() => vi.fn<AnyFn>());
+const mockKickFromParty = vi.hoisted(() => vi.fn<AnyFn>());
+const mockCreateInvite = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetInvite = vi.hoisted(() => vi.fn<AnyFn>());
+const mockRemoveInvite = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetPlayerParty = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/party', () => ({
   getPlayerParty: mockGetPlayerParty,
   createParty: mockCreateParty,
   getParty: mockGetParty,
@@ -22,22 +22,22 @@ jest.mock('../../../backend/src/services/party', () => ({
   getInvite: mockGetInvite,
   removeInvite: mockRemoveInvite,
 }));
-const mockAreFriends = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/friends', () => ({
+const mockAreFriends = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/friends', () => ({
   areFriends: mockAreFriends,
 }));
-const mockGetChatMode = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/settings', () => ({
+const mockGetChatMode = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/settings', () => ({
   getChatMode: mockGetChatMode,
 }));
-jest.mock('../../../backend/src/utils/socketRateLimit', () => ({
+vi.mock('../../../backend/src/utils/socketRateLimit', () => ({
   createSocketRateLimiter: () => ({
-    isAllowed: jest.fn().mockReturnValue(true),
-    remove: jest.fn(),
+    isAllowed: vi.fn().mockReturnValue(true),
+    remove: vi.fn(),
   }),
 }));
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
 import {
@@ -58,18 +58,18 @@ function createMockSocket(overrides: Record<string, any> = {}) {
       activeRoomCode: undefined,
       ...overrides,
     },
-    on: jest.fn((event: string, handler: Function) => {
+    on: vi.fn((event: string, handler: Function) => {
       handlers[event] = handler;
     }),
-    join: jest.fn(),
-    leave: jest.fn(),
+    join: vi.fn(),
+    leave: vi.fn(),
     _handlers: handlers,
   };
   return socket;
 }
 
 function createMockIO(userSockets: any[] = []) {
-  const emitFn = jest.fn<AnyFn>();
+  const emitFn = vi.fn<AnyFn>();
   // The user's connected sockets (every tab), as the party handlers look them up.
   const rooms = new Map<string, Set<string>>();
   const sockets = new Map<string, any>();
@@ -80,9 +80,9 @@ function createMockIO(userSockets: any[] = []) {
     sockets.set(s.id, s);
   }
   const io: any = {
-    emit: jest.fn<AnyFn>(),
-    to: jest.fn<AnyFn>().mockReturnValue({ emit: emitFn }),
-    in: jest.fn<AnyFn>().mockReturnValue({ fetchSockets: jest.fn<AnyFn>().mockResolvedValue([]) }),
+    emit: vi.fn<AnyFn>(),
+    to: vi.fn<AnyFn>().mockReturnValue({ emit: emitFn }),
+    in: vi.fn<AnyFn>().mockReturnValue({ fetchSockets: vi.fn<AnyFn>().mockResolvedValue([]) }),
     sockets: { adapter: { rooms }, sockets },
     _toEmit: emitFn,
   };
@@ -103,7 +103,7 @@ describe('partyHandlers', () => {
   let io: ReturnType<typeof createMockIO>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockGetChatMode.mockResolvedValue('everyone');
     socket = createMockSocket();
     io = createMockIO([socket]);
@@ -113,7 +113,7 @@ describe('partyHandlers', () => {
   describe('party:create', () => {
     it('creates party, sets activePartyId, and joins socket room', async () => {
       mockCreateParty.mockResolvedValue(fakeParty);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['party:create'];
       await handler(callback);
@@ -126,7 +126,7 @@ describe('partyHandlers', () => {
 
     it('returns error on failure', async () => {
       mockCreateParty.mockRejectedValue(new Error('Redis error'));
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['party:create'];
       await handler(callback);
@@ -144,7 +144,7 @@ describe('partyHandlers', () => {
       mockGetParty.mockResolvedValue(fakeParty);
       mockAreFriends.mockResolvedValue(true);
       mockCreateInvite.mockResolvedValue('invite-123');
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['party:invite'];
       await handler({ userId: 2 }, callback);
@@ -174,7 +174,7 @@ describe('partyHandlers', () => {
 
     it('rejects if not in a party', async () => {
       socket.data.activePartyId = undefined;
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['party:invite'];
       await handler({ userId: 2 }, callback);
@@ -188,7 +188,7 @@ describe('partyHandlers', () => {
     it('rejects if not the leader', async () => {
       socket.data.activePartyId = 'party-abc';
       mockGetParty.mockResolvedValue({ ...fakeParty, leaderId: 99 });
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['party:invite'];
       await handler({ userId: 2 }, callback);
@@ -203,7 +203,7 @@ describe('partyHandlers', () => {
       socket.data.activePartyId = 'party-abc';
       mockGetParty.mockResolvedValue(fakeParty);
       mockAreFriends.mockResolvedValue(false);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['party:invite'];
       await handler({ userId: 2 }, callback);
@@ -224,7 +224,7 @@ describe('partyHandlers', () => {
         ],
       });
       mockAreFriends.mockResolvedValue(true);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['party:invite'];
       await handler({ userId: 2 }, callback);
@@ -248,7 +248,7 @@ describe('partyHandlers', () => {
       mockGetInvite.mockResolvedValue({ type: 'party', partyId: 'party-abc' });
       mockJoinParty.mockResolvedValue(updatedParty);
       mockRemoveInvite.mockResolvedValue(undefined);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['party:acceptInvite'];
       await handler({ inviteId: FAKE_INVITE_ID }, callback);
@@ -265,7 +265,7 @@ describe('partyHandlers', () => {
 
     it('rejects expired invite', async () => {
       mockGetInvite.mockResolvedValue(null);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['party:acceptInvite'];
       await handler({ inviteId: FAKE_INVITE_ID }, callback);
@@ -287,7 +287,7 @@ describe('partyHandlers', () => {
         members: [{ userId: 2, username: 'bob' }],
       };
       mockGetParty.mockResolvedValue(remainingParty);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['party:leave'];
       await handler(callback);
@@ -306,12 +306,12 @@ describe('partyHandlers', () => {
       // Mock fetchSockets returning one remote socket
       const remoteSock = {
         data: { activePartyId: 'party-abc', userId: 2 },
-        leave: jest.fn(),
+        leave: vi.fn(),
       };
-      io.in = jest.fn<AnyFn>().mockReturnValue({
-        fetchSockets: jest.fn<AnyFn>().mockResolvedValue([remoteSock]),
+      io.in = vi.fn<AnyFn>().mockReturnValue({
+        fetchSockets: vi.fn<AnyFn>().mockResolvedValue([remoteSock]),
       });
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['party:leave'];
       await handler(callback);
@@ -325,7 +325,7 @@ describe('partyHandlers', () => {
 
     it('rejects if not in a party', async () => {
       socket.data.activePartyId = undefined;
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['party:leave'];
       await handler(callback);
@@ -349,12 +349,12 @@ describe('partyHandlers', () => {
       // Mock fetchSockets with kicked user's socket
       const kickedSock = {
         data: { activePartyId: 'party-abc', userId: 2 },
-        leave: jest.fn(),
+        leave: vi.fn(),
       };
-      io.in = jest.fn<AnyFn>().mockReturnValue({
-        fetchSockets: jest.fn<AnyFn>().mockResolvedValue([kickedSock]),
+      io.in = vi.fn<AnyFn>().mockReturnValue({
+        fetchSockets: vi.fn<AnyFn>().mockResolvedValue([kickedSock]),
       });
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['party:kick'];
       await handler({ userId: 2 }, callback);
@@ -416,7 +416,7 @@ describe('partyHandlers', () => {
       socket.data.activeRoomCode = 'ROOM-X';
       mockAreFriends.mockResolvedValue(true);
       mockCreateInvite.mockResolvedValue('rinv-1');
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['invite:room'];
       await handler({ userId: 3 }, callback);
@@ -446,7 +446,7 @@ describe('partyHandlers', () => {
 
     it('rejects if not in a room', async () => {
       socket.data.activeRoomCode = undefined;
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['invite:room'];
       await handler({ userId: 3 }, callback);
@@ -460,7 +460,7 @@ describe('partyHandlers', () => {
     it('rejects if not friends', async () => {
       socket.data.activeRoomCode = 'ROOM-X';
       mockAreFriends.mockResolvedValue(false);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['invite:room'];
       await handler({ userId: 3 }, callback);
@@ -476,7 +476,7 @@ describe('partyHandlers', () => {
     it('removes invite and callbacks success', async () => {
       mockGetInvite.mockResolvedValue({ type: 'room', roomCode: 'ROOM-X' });
       mockRemoveInvite.mockResolvedValue(undefined);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['invite:acceptRoom'];
       await handler({ inviteId: FAKE_ROOM_INVITE_ID }, callback);
@@ -521,7 +521,7 @@ describe('partyHandlers', () => {
       setupPartyHandlers(tabA, multiIo);
       mockCreateParty.mockResolvedValue(fakeParty);
 
-      await tabA._handlers['party:create'](jest.fn());
+      await tabA._handlers['party:create'](vi.fn());
 
       expect(tabB.data.activePartyId).toBe('party-abc');
       expect(tabB.join).toHaveBeenCalledWith('party:party-abc');
@@ -530,7 +530,7 @@ describe('partyHandlers', () => {
     it('party:sync reports the current party', async () => {
       mockGetPlayerParty.mockResolvedValue('party-abc');
       mockGetParty.mockResolvedValue(fakeParty);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       await socket._handlers['party:sync'](callback);
 

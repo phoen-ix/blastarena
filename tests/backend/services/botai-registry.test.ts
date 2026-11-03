@@ -1,19 +1,19 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
 // ── DB mock ─────────────────────────────────────────────────────────────────
-const mockQuery = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
 }));
 
 // ── FS mock ─────────────────────────────────────────────────────────────────
-const mockExistsSync = jest.fn<AnyFn>();
-const mockReadFileSync = jest.fn<AnyFn>();
-const mockMkdirSync = jest.fn<AnyFn>();
-jest.mock('fs', () => ({
+const mockExistsSync = vi.fn<AnyFn>();
+const mockReadFileSync = vi.fn<AnyFn>();
+const mockMkdirSync = vi.fn<AnyFn>();
+vi.mock('fs', () => ({
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
   readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
   mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
@@ -28,22 +28,22 @@ jest.mock('fs', () => ({
 // Untrusted custom AIs are now wrapped by IsolatedBotAI (runs in an isolated-vm isolate). Mock it
 // so these unit tests exercise the registry's routing without loading the native addon or building
 // isolates. (Mocking also avoids the `fs` mock breaking node-gyp-build's prebuild lookup.)
-const MockIsolatedBotAI = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/IsolatedAIRunner', () => ({
+const MockIsolatedBotAI = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/IsolatedAIRunner', () => ({
   IsolatedBotAI: MockIsolatedBotAI,
-  IsolatedEnemyAI: jest.fn(),
-  disposeAI: jest.fn(),
+  IsolatedEnemyAI: vi.fn(),
+  disposeAI: vi.fn(),
 }));
 
 // ── Logger mock ─────────────────────────────────────────────────────────────
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 // ── BotAI mock ──────────────────────────────────────────────────────────────
-const MockBotAI = jest.fn<AnyFn>();
-MockBotAI.prototype.generateInput = jest.fn();
-jest.mock('../../../backend/src/game/BotAI', () => ({
+const MockBotAI = vi.hoisted(() => vi.fn<AnyFn>());
+MockBotAI.prototype.generateInput = vi.fn();
+vi.mock('../../../backend/src/game/BotAI', () => ({
   BotAI: MockBotAI,
   IBotAI: {},
 }));
@@ -54,7 +54,7 @@ describe('BotAIRegistry', () => {
   let registry: BotAIRegistry;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     registry = new BotAIRegistry();
   });
 

@@ -1,14 +1,14 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const mockQuery = jest.fn<(...args: any[]) => Promise<any>>();
-const mockExecute = jest.fn<(...args: any[]) => Promise<any>>();
+const mockQuery = vi.hoisted(() => vi.fn<(...args: any[]) => Promise<any>>());
+const mockExecute = vi.hoisted(() => vi.fn<(...args: any[]) => Promise<any>>());
 // Transaction connection: mysql2 promise shape, `[rows, fields]`
-const mockConnExecute = jest.fn<(...args: any[]) => Promise<any>>();
-const mockWithTransaction = jest.fn<(...args: any[]) => Promise<any>>(async (fn) =>
-  fn({ execute: mockConnExecute }),
+const mockConnExecute = vi.fn<(...args: any[]) => Promise<any>>();
+const mockWithTransaction = vi.hoisted(() =>
+  vi.fn<(...args: any[]) => Promise<any>>(async (fn) => fn({ execute: mockConnExecute })),
 );
-jest.mock('../../../backend/src/db/connection', () => ({
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
   withTransaction: mockWithTransaction,

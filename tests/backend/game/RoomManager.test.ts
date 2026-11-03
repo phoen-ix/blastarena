@@ -1,85 +1,92 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-// --- Mock setup (jest.mock is hoisted before imports) ---
+// --- Mock setup (vi.mock is hoisted before imports) ---
 
-jest.mock('../../../backend/src/utils/logger', () => ({
+vi.mock('../../../backend/src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
   },
 }));
 
-const mockExecute = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
-  query: jest.fn(),
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
+  query: vi.fn(),
   execute: mockExecute,
 }));
 
-const mockUpdateRoomStatus = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/lobby', () => ({
+const mockUpdateRoomStatus = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/lobby', () => ({
   updateRoomStatus: mockUpdateRoomStatus,
-  createRoom: jest.fn(),
-  getRoom: jest.fn(),
-  deleteRoom: jest.fn(),
-  getRoomList: jest.fn(),
+  createRoom: vi.fn(),
+  getRoom: vi.fn(),
+  deleteRoom: vi.fn(),
+  getRoomList: vi.fn(),
 }));
 
-jest.mock('../../../backend/src/services/settings', () => ({
-  isRecordingEnabled: jest.fn<AnyFn>().mockResolvedValue(false),
-  getSetting: jest.fn(),
-  setSetting: jest.fn(),
+vi.mock('../../../backend/src/services/settings', () => ({
+  isRecordingEnabled: vi.fn<AnyFn>().mockResolvedValue(false),
+  getSetting: vi.fn(),
+  setSetting: vi.fn(),
 }));
 
-const mockGameLoopStart = jest.fn<AnyFn>();
-const mockGameLoopStop = jest.fn<AnyFn>();
-const mockGameLoopIsRunning = jest.fn<AnyFn>().mockReturnValue(false);
-jest.mock('../../../backend/src/game/GameLoop', () => ({
-  GameLoop: jest.fn<AnyFn>().mockImplementation(() => ({
-    start: mockGameLoopStart,
-    stop: mockGameLoopStop,
-    isRunning: mockGameLoopIsRunning,
-  })),
+const mockGameLoopStart = vi.fn<AnyFn>();
+const mockGameLoopStop = vi.fn<AnyFn>();
+const mockGameLoopIsRunning = vi.fn<AnyFn>().mockReturnValue(false);
+vi.mock('../../../backend/src/game/GameLoop', () => ({
+  GameLoop: vi.fn<AnyFn>().mockImplementation(function () {
+    return {
+      start: mockGameLoopStart,
+      stop: mockGameLoopStop,
+      isRunning: mockGameLoopIsRunning,
+    };
+  }),
 }));
 
-jest.mock('../../../backend/src/utils/replayRecorder', () => ({
-  ReplayRecorder: jest.fn<AnyFn>().mockImplementation(() => ({
-    setMatchId: jest.fn(),
-    recordTick: jest.fn(),
-    finalize: jest.fn(),
-  })),
+vi.mock('../../../backend/src/utils/replayRecorder', () => ({
+  ReplayRecorder: vi.fn<AnyFn>().mockImplementation(function () {
+    return {
+      setMatchId: vi.fn(),
+      recordTick: vi.fn(),
+      finalize: vi.fn(),
+    };
+  }),
 }));
 
-jest.mock('../../../backend/src/utils/gameLogger', () => ({
-  GameLogger: jest.fn<AnyFn>().mockImplementation(() => ({
-    log: jest.fn(),
-    logGameOver: jest.fn(),
-    // GameRoom.stop() closes the log stream — a real GameLogger always has this.
-    close: jest.fn(),
-    replayRecorder: null,
-  })),
+vi.mock('../../../backend/src/utils/gameLogger', () => ({
+  GameLogger: vi.fn<AnyFn>().mockImplementation(function () {
+    return {
+      log: vi.fn(),
+      logGameOver: vi.fn(),
+      // GameRoom.stop() closes the log stream — a real GameLogger always has this.
+      close: vi.fn(),
+      replayRecorder: null,
+    };
+  }),
 }));
 
-jest.mock('../../../backend/src/services/botai-registry', () => ({
-  getBotAIRegistry: jest.fn().mockReturnValue({
-    createInstance: jest.fn().mockReturnValue({
-      getAction: jest.fn().mockReturnValue(null),
+vi.mock('../../../backend/src/services/botai-registry', () => ({
+  getBotAIRegistry: vi.fn().mockReturnValue({
+    createInstance: vi.fn().mockReturnValue({
+      getAction: vi.fn().mockReturnValue(null),
     }),
   }),
 }));
 
 import { RoomManager } from '../../../backend/src/game/RoomManager';
+import { logger } from '../../../backend/src/utils/logger';
 import type { Room } from '@blast-arena/shared';
 
 // --- Helpers ---
 
 function createMockIo() {
-  const mockEmit = jest.fn();
-  const mockTo = jest.fn().mockReturnValue({ emit: mockEmit });
+  const mockEmit = vi.fn();
+  const mockTo = vi.fn().mockReturnValue({ emit: mockEmit });
   return {
     io: {
       to: mockTo,
@@ -158,7 +165,7 @@ describe('RoomManager', () => {
   let mockIo: any;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     const ioSetup = createMockIo();
     mockIo = ioSetup.io;
     mockExecute.mockResolvedValue({ insertId: 1, affectedRows: 1 });
@@ -210,7 +217,6 @@ describe('RoomManager', () => {
     });
 
     it('should log room creation', async () => {
-      const { logger } = require('../../../backend/src/utils/logger');
       const room = createMockRoom();
       await roomManager.createGame(room);
 
@@ -312,10 +318,9 @@ describe('RoomManager', () => {
     });
 
     it('should log room removal', async () => {
-      const { logger } = require('../../../backend/src/utils/logger');
       const room = createMockRoom({ code: 'LOG1' });
       await roomManager.createGame(room);
-      jest.clearAllMocks();
+      vi.clearAllMocks();
 
       roomManager.removeRoom('LOG1');
 
@@ -454,7 +459,7 @@ describe('RoomManager', () => {
     it('should stop rooms it reaps, releasing AI isolates and the log stream', async () => {
       mockGameLoopIsRunning.mockReturnValue(false);
       const room = await roomManager.createGame(createMockRoom({ code: 'DONE3' }));
-      const stopSpy = jest.spyOn(room, 'stop');
+      const stopSpy = vi.spyOn(room, 'stop');
 
       roomManager.cleanup();
 

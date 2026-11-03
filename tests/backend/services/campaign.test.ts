@@ -1,11 +1,11 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
 }));
@@ -90,7 +90,7 @@ function makeLevelRow(overrides: Record<string, unknown> = {}) {
 
 describe('Campaign Service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // ==================== WORLDS ====================
@@ -544,7 +544,7 @@ describe('Campaign Service', () => {
     it('does not select the heavy JSON columns', async () => {
       // Exactly one queued result: with no levels there are no ids to look progress up for, so
       // the second query never runs. An extra mockResolvedValueOnce would survive
-      // jest.clearAllMocks() (which does not drain the once-queue) and corrupt the next test.
+      // vi.clearAllMocks() (which does not drain the once-queue) and corrupt the next test.
       mockQuery.mockResolvedValueOnce([]);
 
       await listLevelsWithProgressForWorlds([1], 42);

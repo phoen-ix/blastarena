@@ -1,54 +1,54 @@
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { SimulationConfig, SimulationBatchStatus } from '@blast-arena/shared';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-// --- Mock setup (jest.mock is hoisted before imports) ---
+// --- Mock setup (vi.mock is hoisted before imports) ---
 
-jest.mock('../../../backend/src/utils/logger', () => ({
+vi.mock('../../../backend/src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
   },
 }));
 
 // Mock the IO registry
-jest.mock('../../../backend/src/game/registry', () => ({
-  getIO: jest.fn().mockReturnValue({
-    to: jest.fn().mockReturnValue({ emit: jest.fn() }),
+vi.mock('../../../backend/src/game/registry', () => ({
+  getIO: vi.fn().mockReturnValue({
+    to: vi.fn().mockReturnValue({ emit: vi.fn() }),
   }),
 }));
 
 // gunzip is promisified at module load; mock the promisified form directly.
-const mockGunzip = jest.fn<AnyFn>();
-jest.mock('util', () => ({
-  ...jest.requireActual<typeof import('util')>('util'),
+const mockGunzip = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('util', async () => ({
+  ...(await vi.importActual<typeof import('util')>('util')),
   promisify: () => mockGunzip,
 }));
 
 // Mock fs module. The manager reads the simulations directory through fs.promises only
 // (audit E3); the sync functions stay mocked so a regression to them is caught (they would
 // return nothing useful).
-const mockReaddirSync = jest.fn<AnyFn>().mockReturnValue([]);
-const mockReadFileSync = jest.fn<AnyFn>().mockReturnValue('{}');
-const mockExistsSync = jest.fn<AnyFn>().mockReturnValue(false);
-const mockRmSync = jest.fn<AnyFn>();
-const mockReaddir = jest.fn<AnyFn>();
-const mockReadFile = jest.fn<AnyFn>();
-const mockRm = jest.fn<AnyFn>();
+const mockReaddirSync = vi.fn<AnyFn>().mockReturnValue([]);
+const mockReadFileSync = vi.fn<AnyFn>().mockReturnValue('{}');
+const mockExistsSync = vi.fn<AnyFn>().mockReturnValue(false);
+const mockRmSync = vi.fn<AnyFn>();
+const mockReaddir = vi.fn<AnyFn>();
+const mockReadFile = vi.fn<AnyFn>();
+const mockRm = vi.fn<AnyFn>();
 
 const enoent = () =>
   Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
 
-jest.mock('fs', () => ({
+vi.mock('fs', () => ({
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
   readdirSync: (...args: unknown[]) => mockReaddirSync(...args),
   readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
-  mkdirSync: jest.fn(),
-  writeFileSync: jest.fn(),
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
   rmSync: (...args: unknown[]) => mockRmSync(...args),
   promises: {
     readdir: (...args: unknown[]) => mockReaddir(...args),
@@ -95,40 +95,41 @@ function mockDisk(tree: FakeTree): void {
 }
 
 // Mock SimulationRunner
-const mockRunnerRun = jest.fn<AnyFn>().mockResolvedValue(undefined);
-const mockRunnerCancel = jest.fn<AnyFn>();
-const mockRunnerIsActive = jest.fn<AnyFn>().mockReturnValue(true);
-const mockRunnerGetStatus = jest.fn<AnyFn>();
-const mockRunnerGetResults = jest.fn<AnyFn>().mockReturnValue([]);
-const mockRunnerOn = jest.fn<AnyFn>();
+const mockRunnerRun = vi.fn<AnyFn>().mockResolvedValue(undefined);
+const mockRunnerCancel = vi.fn<AnyFn>();
+const mockRunnerIsActive = vi.fn<AnyFn>().mockReturnValue(true);
+const mockRunnerGetStatus = vi.fn<AnyFn>();
+const mockRunnerGetResults = vi.fn<AnyFn>().mockReturnValue([]);
+const mockRunnerOn = vi.fn<AnyFn>();
 
-jest.mock('../../../backend/src/simulation/SimulationRunner', () => ({
-  SimulationRunner: jest
-    .fn<AnyFn>()
-    .mockImplementation((config: SimulationConfig, batchId: string) => {
-      const status: SimulationBatchStatus = {
-        batchId,
-        config,
-        status: 'running',
-        gamesCompleted: 0,
-        totalGames: config.totalGames,
-        currentGameTick: null,
-        currentGameMaxTicks: null,
-        startedAt: new Date().toISOString(),
-        completedAt: null,
-      };
-      mockRunnerGetStatus.mockReturnValue(status);
-      return {
-        batchId,
-        run: mockRunnerRun,
-        cancel: mockRunnerCancel,
-        isActive: mockRunnerIsActive,
-        getStatus: mockRunnerGetStatus,
-        getResults: mockRunnerGetResults,
-        on: mockRunnerOn,
-        emit: jest.fn(),
-      };
-    }),
+vi.mock('../../../backend/src/simulation/SimulationRunner', () => ({
+  SimulationRunner: vi.fn<AnyFn>().mockImplementation(function (
+    config: SimulationConfig,
+    batchId: string,
+  ) {
+    const status: SimulationBatchStatus = {
+      batchId,
+      config,
+      status: 'running',
+      gamesCompleted: 0,
+      totalGames: config.totalGames,
+      currentGameTick: null,
+      currentGameMaxTicks: null,
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+    };
+    mockRunnerGetStatus.mockReturnValue(status);
+    return {
+      batchId,
+      run: mockRunnerRun,
+      cancel: mockRunnerCancel,
+      isActive: mockRunnerIsActive,
+      getStatus: mockRunnerGetStatus,
+      getResults: mockRunnerGetResults,
+      on: mockRunnerOn,
+      emit: vi.fn(),
+    };
+  }),
 }));
 
 import { SimulationManager } from '../../../backend/src/simulation/SimulationManager';
@@ -161,7 +162,7 @@ describe('SimulationManager', () => {
   let manager: SimulationManager;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     manager = new SimulationManager();
     // Default: no runner is active, and no simulations directory on disk yet
     mockRunnerIsActive.mockReturnValue(false);

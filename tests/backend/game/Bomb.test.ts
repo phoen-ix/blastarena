@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { Bomb } from '../../../backend/src/game/Bomb';
 import { BOMB_TIMER_TICKS } from '@blast-arena/shared';
 

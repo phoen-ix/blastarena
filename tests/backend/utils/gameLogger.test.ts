@@ -1,10 +1,10 @@
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 import { GameLogger } from '../../../backend/src/utils/gameLogger';
@@ -105,7 +105,7 @@ function seedLog(dir: string, name: string, ageMs: number, sizeBytes: number): s
  * Every logger a test creates, so teardown can wait for each one's stream to actually close.
  *
  * Write streams flush asynchronously. Removing tmpDir while one is still open makes it ENOENT —
- * and because Jest runs several test FILES per worker process, that error surfaced in whichever
+ * and because Jest (the runner then) ran several test FILES per worker process, that error surfaced in whichever
  * suite ran next in the same worker, not here. This suite was the source of intermittent failures
  * in SimulationManager and isolated-ai-runner. It used to paper over the race with a 50ms sleep,
  * which is exactly as reliable as the machine is idle. close() is awaitable now, so teardown waits
@@ -120,7 +120,7 @@ function track(logger: GameLogger): GameLogger {
 
 describe('GameLogger', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     tmpDir = makeTmpDir();
     openLoggers = [];
   });

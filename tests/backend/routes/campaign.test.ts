@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
@@ -8,23 +8,23 @@ type AnyFn = (...args: any[]) => any;
 // ---------------------------------------------------------------------------
 
 // Campaign service mocks
-const mockListWorldsWithProgress = jest.fn<AnyFn>();
-const mockListLevelsWithProgress = jest.fn<AnyFn>();
-const mockGetLevel = jest.fn<AnyFn>();
-const mockListWorlds = jest.fn<AnyFn>();
-const mockCreateWorld = jest.fn<AnyFn>();
-const mockUpdateWorld = jest.fn<AnyFn>();
-const mockDeleteWorld = jest.fn<AnyFn>();
-const mockReorderWorld = jest.fn<AnyFn>();
-const mockListLevels = jest.fn<AnyFn>();
-const mockListLevelsWithProgressForWorlds = jest.fn<AnyFn>();
-const mockCreateLevel = jest.fn<AnyFn>();
-const mockUpdateLevel = jest.fn<AnyFn>();
-const mockDeleteLevel = jest.fn<AnyFn>();
-const mockReorderLevel = jest.fn<AnyFn>();
+const mockListWorldsWithProgress = vi.hoisted(() => vi.fn<AnyFn>());
+const mockListLevelsWithProgress = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetLevel = vi.hoisted(() => vi.fn<AnyFn>());
+const mockListWorlds = vi.hoisted(() => vi.fn<AnyFn>());
+const mockCreateWorld = vi.hoisted(() => vi.fn<AnyFn>());
+const mockUpdateWorld = vi.hoisted(() => vi.fn<AnyFn>());
+const mockDeleteWorld = vi.hoisted(() => vi.fn<AnyFn>());
+const mockReorderWorld = vi.hoisted(() => vi.fn<AnyFn>());
+const mockListLevels = vi.hoisted(() => vi.fn<AnyFn>());
+const mockListLevelsWithProgressForWorlds = vi.hoisted(() => vi.fn<AnyFn>());
+const mockCreateLevel = vi.hoisted(() => vi.fn<AnyFn>());
+const mockUpdateLevel = vi.hoisted(() => vi.fn<AnyFn>());
+const mockDeleteLevel = vi.hoisted(() => vi.fn<AnyFn>());
+const mockReorderLevel = vi.hoisted(() => vi.fn<AnyFn>());
 
-const mockGetWorld = jest.fn<AnyFn>(async () => ({ id: 1 }));
-jest.mock('../../../backend/src/services/campaign', () => ({
+const mockGetWorld = vi.hoisted(() => vi.fn<AnyFn>(async () => ({ id: 1 })));
+vi.mock('../../../backend/src/services/campaign', () => ({
   listWorldsWithProgress: mockListWorldsWithProgress,
   listLevelsWithProgress: mockListLevelsWithProgress,
   listLevelsWithProgressForWorlds: mockListLevelsWithProgressForWorlds,
@@ -43,13 +43,13 @@ jest.mock('../../../backend/src/services/campaign', () => ({
 }));
 
 // Enemy type service mocks
-const mockListEnemyTypes = jest.fn<AnyFn>();
-const mockGetEnemyType = jest.fn<AnyFn>();
-const mockCreateEnemyType = jest.fn<AnyFn>();
-const mockUpdateEnemyType = jest.fn<AnyFn>();
-const mockDeleteEnemyType = jest.fn<AnyFn>();
+const mockListEnemyTypes = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetEnemyType = vi.hoisted(() => vi.fn<AnyFn>());
+const mockCreateEnemyType = vi.hoisted(() => vi.fn<AnyFn>());
+const mockUpdateEnemyType = vi.hoisted(() => vi.fn<AnyFn>());
+const mockDeleteEnemyType = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/enemy-type', () => ({
+vi.mock('../../../backend/src/services/enemy-type', () => ({
   listEnemyTypes: mockListEnemyTypes,
   getEnemyType: mockGetEnemyType,
   createEnemyType: mockCreateEnemyType,
@@ -58,41 +58,43 @@ jest.mock('../../../backend/src/services/enemy-type', () => ({
 }));
 
 // Campaign progress service mocks
-const mockGetUserState = jest.fn<AnyFn>();
+const mockGetUserState = vi.hoisted(() => vi.fn<AnyFn>());
 
-const mockGetEnemyAI = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/enemyai', () => ({
+const mockGetEnemyAI = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/enemyai', () => ({
   getEnemyAI: mockGetEnemyAI,
-  getEnemyAIByName: jest.fn(),
-  uploadEnemyAIFromSource: jest.fn(),
-  downloadEnemyAISource: jest.fn(),
+  getEnemyAIByName: vi.fn(),
+  uploadEnemyAIFromSource: vi.fn(),
+  downloadEnemyAISource: vi.fn(),
 }));
 
-jest.mock('../../../backend/src/services/campaign-progress', () => ({
+vi.mock('../../../backend/src/services/campaign-progress', () => ({
   getUserState: mockGetUserState,
 }));
 
 // Middleware pass-throughs
-const mockAuthMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
+const mockAuthMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
 
-jest.mock('../../../backend/src/middleware/auth', () => ({
+vi.mock('../../../backend/src/middleware/auth', () => ({
   authMiddleware: mockAuthMiddleware,
 }));
 
-const mockAdminOnlyMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
+const mockAdminOnlyMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
 
-jest.mock('../../../backend/src/middleware/admin', () => ({
+vi.mock('../../../backend/src/middleware/admin', () => ({
   adminOnlyMiddleware: mockAdminOnlyMiddleware,
 }));
 
-const mockValidate = jest.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next());
+const mockValidate = vi.hoisted(() =>
+  vi.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next()),
+);
 
-jest.mock('../../../backend/src/middleware/validation', () => ({
+vi.mock('../../../backend/src/middleware/validation', () => ({
   validate: mockValidate,
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
 // ---------------------------------------------------------------------------
@@ -259,7 +261,7 @@ function sampleEnemyType(overrides: Record<string, any> = {}) {
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });
 
 // ============================================================================
@@ -285,7 +287,7 @@ describe('GET /campaign/worlds', () => {
 
     const req = mockReq({ user: { userId: 42 } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockListWorldsWithProgress).toHaveBeenCalledWith(42);
     expect(mockListLevelsWithProgressForWorlds).toHaveBeenCalledTimes(1);
@@ -303,7 +305,7 @@ describe('GET /campaign/worlds', () => {
 
     const req = mockReq({ user: { userId: 1 } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._json).toEqual({ worlds: [] });
     expect(mockListLevelsWithProgress).not.toHaveBeenCalled();
@@ -315,7 +317,7 @@ describe('GET /campaign/worlds', () => {
 
     const req = mockReq({ user: { userId: 1 } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -334,7 +336,7 @@ describe('GET /campaign/worlds/:worldId/levels', () => {
 
     const req = mockReq({ params: { worldId: '3' }, user: { userId: 99 } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockListLevelsWithProgress).toHaveBeenCalledWith(3, 99);
     expect(res._json).toEqual({ levels });
@@ -343,7 +345,7 @@ describe('GET /campaign/worlds/:worldId/levels', () => {
   it('throws AppError for non-numeric worldId', async () => {
     const req = mockReq({ params: { worldId: 'abc' }, user: { userId: 1 } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -357,7 +359,7 @@ describe('GET /campaign/worlds/:worldId/levels', () => {
 
     const req = mockReq({ params: { worldId: '1' }, user: { userId: 1 } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -373,7 +375,7 @@ describe('GET /campaign/levels/:levelId', () => {
 
     const req = mockReq({ params: { levelId: '10' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockGetLevel).toHaveBeenCalledWith(10);
     expect(res._json).toEqual({ level });
@@ -384,7 +386,7 @@ describe('GET /campaign/levels/:levelId', () => {
 
     const req = mockReq({ params: { levelId: '999' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'Level not found' });
@@ -395,7 +397,7 @@ describe('GET /campaign/levels/:levelId', () => {
 
     const req = mockReq({ params: { levelId: '10' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'Level not found' });
@@ -404,7 +406,7 @@ describe('GET /campaign/levels/:levelId', () => {
   it('throws AppError for non-numeric levelId', async () => {
     const req = mockReq({ params: { levelId: 'xyz' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -418,7 +420,7 @@ describe('GET /campaign/levels/:levelId', () => {
 
     const req = mockReq({ params: { levelId: '10' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -440,7 +442,7 @@ describe('GET /campaign/progress', () => {
 
     const req = mockReq({ user: { userId: 42 } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockGetUserState).toHaveBeenCalledWith(42);
     expect(res._json).toEqual({ state });
@@ -458,7 +460,7 @@ describe('GET /campaign/progress', () => {
 
     const req = mockReq({ user: { userId: 99 } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._json).toEqual({ state: defaultState });
   });
@@ -469,7 +471,7 @@ describe('GET /campaign/progress', () => {
 
     const req = mockReq({ user: { userId: 1 } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -485,7 +487,7 @@ describe('GET /campaign/enemy-types (player)', () => {
 
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockListEnemyTypes).toHaveBeenCalled();
     expect(res._json).toEqual({ enemyTypes: types });
@@ -496,7 +498,7 @@ describe('GET /campaign/enemy-types (player)', () => {
 
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._json).toEqual({ enemyTypes: [] });
   });
@@ -507,7 +509,7 @@ describe('GET /campaign/enemy-types (player)', () => {
 
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -527,7 +529,7 @@ describe('GET /admin/campaign/worlds', () => {
 
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockListWorlds).toHaveBeenCalledWith(true);
     expect(res._json).toEqual({ worlds });
@@ -539,7 +541,7 @@ describe('GET /admin/campaign/worlds', () => {
 
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -557,7 +559,7 @@ describe('POST /admin/campaign/worlds', () => {
       body: { name: 'New World', description: 'Desc', theme: 'lava' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateWorld).toHaveBeenCalledWith('New World', 'Desc', 'lava', 1);
     expect(res._status).toBe(201);
@@ -572,7 +574,7 @@ describe('POST /admin/campaign/worlds', () => {
       body: { name: 'Minimal World' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateWorld).toHaveBeenCalledWith('Minimal World', '', 'classic', 1);
   });
@@ -585,7 +587,7 @@ describe('POST /admin/campaign/worlds', () => {
       body: { name: 'Test World', description: 'Some desc' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateWorld).toHaveBeenCalledWith('Test World', 'Some desc', 'classic', 1);
   });
@@ -596,7 +598,7 @@ describe('POST /admin/campaign/worlds', () => {
 
     const req = mockReq({ user: { userId: 1 }, body: { name: 'W' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -614,7 +616,7 @@ describe('PUT /admin/campaign/worlds/:id', () => {
       body: { name: 'Updated Name', isPublished: true },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockUpdateWorld).toHaveBeenCalledWith(3, { name: 'Updated Name', isPublished: true });
     expect(res._json).toEqual({ success: true });
@@ -623,7 +625,7 @@ describe('PUT /admin/campaign/worlds/:id', () => {
   it('throws AppError for non-numeric id', async () => {
     const req = mockReq({ params: { id: 'bad' }, body: {} });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -637,7 +639,7 @@ describe('PUT /admin/campaign/worlds/:id', () => {
 
     const req = mockReq({ params: { id: '1' }, body: { name: 'X' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -652,7 +654,7 @@ describe('DELETE /admin/campaign/worlds/:id', () => {
 
     const req = mockReq({ params: { id: '5' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockDeleteWorld).toHaveBeenCalledWith(5);
     expect(res._json).toEqual({ success: true });
@@ -661,7 +663,7 @@ describe('DELETE /admin/campaign/worlds/:id', () => {
   it('throws AppError for non-numeric id', async () => {
     const req = mockReq({ params: { id: 'nope' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -675,7 +677,7 @@ describe('DELETE /admin/campaign/worlds/:id', () => {
 
     const req = mockReq({ params: { id: '1' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -690,7 +692,7 @@ describe('PUT /admin/campaign/worlds/:id/order', () => {
 
     const req = mockReq({ params: { id: '2' }, body: { sortOrder: 5 } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockReorderWorld).toHaveBeenCalledWith(2, 5);
     expect(res._json).toEqual({ success: true });
@@ -699,7 +701,7 @@ describe('PUT /admin/campaign/worlds/:id/order', () => {
   it('throws AppError for non-numeric id', async () => {
     const req = mockReq({ params: { id: 'x' }, body: { sortOrder: 0 } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -713,7 +715,7 @@ describe('PUT /admin/campaign/worlds/:id/order', () => {
 
     const req = mockReq({ params: { id: '1' }, body: { sortOrder: 0 } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -736,7 +738,7 @@ describe('GET /admin/campaign/levels', () => {
 
     const req = mockReq({ query: { worldId: '1' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockListLevels).toHaveBeenCalledWith(1, true);
     expect(res._json).toEqual({ levels });
@@ -745,7 +747,7 @@ describe('GET /admin/campaign/levels', () => {
   it('throws AppError for non-numeric worldId query param', async () => {
     const req = mockReq({ query: { worldId: 'abc' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -759,7 +761,7 @@ describe('GET /admin/campaign/levels', () => {
 
     const req = mockReq({ query: { worldId: '1' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -778,7 +780,7 @@ describe('POST /admin/campaign/levels', () => {
       query: {},
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateLevel).toHaveBeenCalledWith(
       3,
@@ -798,7 +800,7 @@ describe('POST /admin/campaign/levels', () => {
       query: { worldId: '7' },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateLevel).toHaveBeenCalledWith(7, { name: 'Level via query' }, 2);
   });
@@ -810,7 +812,7 @@ describe('POST /admin/campaign/levels', () => {
       query: {},
     });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -827,7 +829,7 @@ describe('POST /admin/campaign/levels', () => {
       body: { worldId: 1, name: 'L' },
     });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -843,7 +845,7 @@ describe('GET /admin/campaign/levels/:id', () => {
 
     const req = mockReq({ params: { id: '10' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockGetLevel).toHaveBeenCalledWith(10);
     expect(res._json).toEqual({ level });
@@ -854,7 +856,7 @@ describe('GET /admin/campaign/levels/:id', () => {
 
     const req = mockReq({ params: { id: '999' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'Level not found' });
@@ -863,7 +865,7 @@ describe('GET /admin/campaign/levels/:id', () => {
   it('throws AppError for non-numeric id', async () => {
     const req = mockReq({ params: { id: 'bad' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -877,7 +879,7 @@ describe('GET /admin/campaign/levels/:id', () => {
 
     const req = mockReq({ params: { id: '1' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -895,7 +897,7 @@ describe('PUT /admin/campaign/levels/:id', () => {
       body: { name: 'Updated Level', lives: 5 },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockUpdateLevel).toHaveBeenCalledWith(10, { name: 'Updated Level', lives: 5 });
     expect(res._json).toEqual({ success: true });
@@ -904,7 +906,7 @@ describe('PUT /admin/campaign/levels/:id', () => {
   it('throws AppError for non-numeric id', async () => {
     const req = mockReq({ params: { id: 'nope' }, body: {} });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -918,7 +920,7 @@ describe('PUT /admin/campaign/levels/:id', () => {
 
     const req = mockReq({ params: { id: '1' }, body: { name: 'X' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -933,7 +935,7 @@ describe('DELETE /admin/campaign/levels/:id', () => {
 
     const req = mockReq({ params: { id: '10' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockDeleteLevel).toHaveBeenCalledWith(10);
     expect(res._json).toEqual({ success: true });
@@ -942,7 +944,7 @@ describe('DELETE /admin/campaign/levels/:id', () => {
   it('throws AppError for non-numeric id', async () => {
     const req = mockReq({ params: { id: 'bad' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -956,7 +958,7 @@ describe('DELETE /admin/campaign/levels/:id', () => {
 
     const req = mockReq({ params: { id: '1' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -971,7 +973,7 @@ describe('PUT /admin/campaign/levels/:id/order', () => {
 
     const req = mockReq({ params: { id: '10' }, body: { sortOrder: 3 } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockReorderLevel).toHaveBeenCalledWith(10, 3);
     expect(res._json).toEqual({ success: true });
@@ -980,7 +982,7 @@ describe('PUT /admin/campaign/levels/:id/order', () => {
   it('throws AppError for non-numeric id', async () => {
     const req = mockReq({ params: { id: 'x' }, body: { sortOrder: 0 } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -994,7 +996,7 @@ describe('PUT /admin/campaign/levels/:id/order', () => {
 
     const req = mockReq({ params: { id: '1' }, body: { sortOrder: 0 } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -1014,7 +1016,7 @@ describe('GET /admin/campaign/enemy-types', () => {
 
     const req = mockReq();
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockListEnemyTypes).toHaveBeenCalled();
     expect(res._json).toEqual({ enemyTypes: types });
@@ -1026,7 +1028,7 @@ describe('GET /admin/campaign/enemy-types', () => {
 
     const req = mockReq();
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -1045,7 +1047,7 @@ describe('POST /admin/campaign/enemy-types', () => {
       body: { name: et.name, description: et.description, config: et.config },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateEnemyType).toHaveBeenCalledWith(et.name, et.description, et.config, 1);
     expect(res._status).toBe(201);
@@ -1061,7 +1063,7 @@ describe('POST /admin/campaign/enemy-types', () => {
       body: { name: 'NoDesc', config: et.config },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateEnemyType).toHaveBeenCalledWith('NoDesc', '', et.config, 1);
   });
@@ -1075,7 +1077,7 @@ describe('POST /admin/campaign/enemy-types', () => {
       body: { name: 'X', config: {} },
     });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -1093,7 +1095,7 @@ describe('PUT /admin/campaign/enemy-types/:id', () => {
       body: { name: 'Updated', description: 'New desc', config: { speed: 2 } },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockUpdateEnemyType).toHaveBeenCalledWith(5, {
       name: 'Updated',
@@ -1106,7 +1108,7 @@ describe('PUT /admin/campaign/enemy-types/:id', () => {
   it('throws AppError for non-numeric id', async () => {
     const req = mockReq({ params: { id: 'nah' }, body: {} });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -1120,7 +1122,7 @@ describe('PUT /admin/campaign/enemy-types/:id', () => {
 
     const req = mockReq({ params: { id: '1' }, body: {} });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -1135,7 +1137,7 @@ describe('DELETE /admin/campaign/enemy-types/:id', () => {
 
     const req = mockReq({ params: { id: '5' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockDeleteEnemyType).toHaveBeenCalledWith(5);
     expect(res._json).toEqual({ success: true });
@@ -1144,7 +1146,7 @@ describe('DELETE /admin/campaign/enemy-types/:id', () => {
   it('throws AppError for non-numeric id', async () => {
     const req = mockReq({ params: { id: 'x' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -1158,7 +1160,7 @@ describe('DELETE /admin/campaign/enemy-types/:id', () => {
 
     const req = mockReq({ params: { id: '1' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -1178,7 +1180,7 @@ describe('GET /admin/campaign/levels/:id/export', () => {
 
     const req = mockReq({ params: { id: '10' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockGetLevel).toHaveBeenCalledWith(10);
     expect(res._headers['Content-Type']).toBe('application/json');
@@ -1206,7 +1208,7 @@ describe('GET /admin/campaign/levels/:id/export', () => {
 
     const req = mockReq({ params: { id: '10' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._headers['Content-Disposition']).toBe(
       'attachment; filename="level-Level_______1_.json"',
@@ -1218,7 +1220,7 @@ describe('GET /admin/campaign/levels/:id/export', () => {
 
     const req = mockReq({ params: { id: '999' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'Level not found' });
@@ -1227,7 +1229,7 @@ describe('GET /admin/campaign/levels/:id/export', () => {
   it('throws AppError for non-numeric id', async () => {
     const req = mockReq({ params: { id: 'bad' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -1241,7 +1243,7 @@ describe('GET /admin/campaign/levels/:id/export', () => {
 
     const req = mockReq({ params: { id: '1' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -1273,7 +1275,7 @@ describe('GET /admin/campaign/levels/:id/export-bundle', () => {
 
     const req = mockReq({ params: { id: '10' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     const body = res._json as any;
     expect(body._format).toBe('blast-arena-level-bundle');
@@ -1311,7 +1313,7 @@ describe('GET /admin/campaign/levels/:id/export-bundle', () => {
 
     const req = mockReq({ params: { id: '10' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     const body = res._json as any;
     expect(body.enemyTypes).toHaveLength(0);
@@ -1327,7 +1329,7 @@ describe('GET /admin/campaign/levels/:id/export-bundle', () => {
 
     const req = mockReq({ params: { id: '10' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     const body = res._json as any;
     expect(body.enemyTypes).toHaveLength(0);
@@ -1338,7 +1340,7 @@ describe('GET /admin/campaign/levels/:id/export-bundle', () => {
 
     const req = mockReq({ params: { id: '999' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'Level not found' });
@@ -1350,7 +1352,7 @@ describe('GET /admin/campaign/levels/:id/export-bundle', () => {
 
     const req = mockReq({ params: { id: '1' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -1366,7 +1368,7 @@ describe('GET /admin/campaign/enemy-types/:id/export', () => {
 
     const req = mockReq({ params: { id: '5' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockGetEnemyType).toHaveBeenCalledWith(5);
     expect(res._headers['Content-Type']).toBe('application/json');
@@ -1391,7 +1393,7 @@ describe('GET /admin/campaign/enemy-types/:id/export', () => {
 
     const req = mockReq({ params: { id: '999' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'Enemy type not found' });
@@ -1400,7 +1402,7 @@ describe('GET /admin/campaign/enemy-types/:id/export', () => {
   it('throws AppError for non-numeric id', async () => {
     const req = mockReq({ params: { id: 'bad' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -1414,7 +1416,7 @@ describe('GET /admin/campaign/enemy-types/:id/export', () => {
 
     const req = mockReq({ params: { id: '1' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -1441,7 +1443,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(400);
     expect(res._json).toMatchObject({ code: 'WORLD_NOT_FOUND' });
@@ -1466,7 +1468,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(201);
     expect(res._json).toEqual({ id: 20 });
@@ -1495,7 +1497,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(201);
     expect(res._json).toEqual({ id: 22 });
@@ -1516,7 +1518,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(201);
     expect(res._json).toEqual({ id: 21 });
@@ -1531,7 +1533,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(400);
     expect(mockCreateLevel).not.toHaveBeenCalled();
@@ -1546,7 +1548,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(400);
     expect(res._json).toEqual({ error: 'Invalid level data' });
@@ -1561,7 +1563,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(400);
     expect(res._json).toEqual({ error: 'Invalid level data' });
@@ -1576,7 +1578,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(400);
     expect(res._json).toEqual({ error: 'Invalid level data' });
@@ -1601,7 +1603,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     const body = res._json as any;
     expect(body.conflicts).toBeDefined();
@@ -1631,7 +1633,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     const body = res._json as any;
     expect(body.conflicts).toHaveLength(1);
@@ -1656,7 +1658,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     const body = res._json as any;
     expect(body.conflicts).toHaveLength(1);
@@ -1684,7 +1686,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(201);
     expect(res._json).toEqual({ id: 22 });
@@ -1712,7 +1714,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateEnemyType).toHaveBeenCalledWith('Created Monster', 'desc', { speed: 1 }, 1);
     expect(mockCreateLevel).toHaveBeenCalledWith(
@@ -1744,7 +1746,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateLevel).toHaveBeenCalledWith(
       1,
@@ -1778,7 +1780,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateLevel).toHaveBeenCalledWith(
       1,
@@ -1808,7 +1810,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateLevel).toHaveBeenCalledWith(
       1,
@@ -1837,7 +1839,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(201);
     expect(mockCreateLevel).toHaveBeenCalledWith(
@@ -1872,7 +1874,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(201);
     expect(mockCreateLevel).toHaveBeenCalledWith(
@@ -1903,7 +1905,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(res._status).toBe(201);
     expect(mockCreateLevel).toHaveBeenCalledWith(
@@ -1931,7 +1933,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateEnemyType).toHaveBeenCalledWith('Monster', '', { speed: 1 }, 1);
   });
@@ -1953,7 +1955,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     // createEnemyType not called since bundled entry not found for origId 50
     expect(mockCreateEnemyType).not.toHaveBeenCalled();
@@ -1986,7 +1988,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -2017,7 +2019,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     const body = res._json as any;
     expect(body.conflicts).toHaveLength(2);
@@ -2055,7 +2057,7 @@ describe('POST /admin/campaign/levels/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     // 10 -> create -> 300, 20 -> skip (removed), 30 -> remap to 55
     expect(mockCreateEnemyType).toHaveBeenCalledWith('Create Me', 'new', { speed: 1 }, 1);
@@ -2085,7 +2087,7 @@ describe('POST /admin/campaign/enemy-types/import', () => {
       body: { name: et.name, description: et.description, config: et.config },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateEnemyType).toHaveBeenCalledWith(et.name, et.description, et.config, 1);
     expect(res._status).toBe(201);
@@ -2105,7 +2107,7 @@ describe('POST /admin/campaign/enemy-types/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockGetEnemyAI).toHaveBeenCalledWith('missing-id');
     expect(res._status).toBe(400);
@@ -2126,7 +2128,7 @@ describe('POST /admin/campaign/enemy-types/import', () => {
       },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateEnemyType).toHaveBeenCalledWith('X', '', { speed: 1, enemyAiId: 'ai-7' }, 1);
     expect(res._status).toBe(201);
@@ -2140,7 +2142,7 @@ describe('POST /admin/campaign/enemy-types/import', () => {
       body: { name: 'ImportedET', config: { speed: 1 } },
     });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockCreateEnemyType).toHaveBeenCalledWith('ImportedET', '', { speed: 1 }, 1);
   });
@@ -2154,7 +2156,7 @@ describe('POST /admin/campaign/enemy-types/import', () => {
       body: { name: 'X', config: {} },
     });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
@@ -2286,7 +2288,7 @@ describe('parseIntParam validation', () => {
     const handler = getHandler('get', '/admin/campaign/levels/:id');
     const req = mockReq({ params: { id: '0' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockGetLevel).toHaveBeenCalledWith(0);
   });
@@ -2297,7 +2299,7 @@ describe('parseIntParam validation', () => {
     const handler = getHandler('delete', '/admin/campaign/worlds/:id');
     const req = mockReq({ params: { id: '-1' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     expect(mockDeleteWorld).toHaveBeenCalledWith(-1);
   });
@@ -2306,7 +2308,7 @@ describe('parseIntParam validation', () => {
     const handler = getHandler('get', '/admin/campaign/levels/:id');
     const req = mockReq({ params: { id: '' } });
     const res = mockRes();
-    const next = jest.fn();
+    const next = vi.fn();
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
@@ -2321,7 +2323,7 @@ describe('parseIntParam validation', () => {
     const handler = getHandler('get', '/admin/campaign/levels/:id');
     const req = mockReq({ params: { id: '3.5' } });
     const res = mockRes();
-    await handler(req, res, jest.fn());
+    await handler(req, res, vi.fn());
 
     // parseInt('3.5', 10) => 3, which is a valid number
     expect(mockGetLevel).toHaveBeenCalledWith(3);

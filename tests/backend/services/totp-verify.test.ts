@@ -1,9 +1,9 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as OTPAuth from 'otpauth';
 
 const KEY = 'a'.repeat(64);
 
-jest.mock('../../../backend/src/config', () => ({
+vi.mock('../../../backend/src/config', () => ({
   getConfig: () => ({ TOTP_ENCRYPTION_KEY: 'a'.repeat(64) }),
 }));
 
@@ -13,9 +13,9 @@ const row: {
   totp_backup_codes: string | null;
   totp_last_step: number | null;
 } = { totp_secret: '', totp_backup_codes: null, totp_last_step: null };
-jest.mock('../../../backend/src/db/connection', () => ({
-  query: jest.fn(async () => [row]),
-  execute: jest.fn(async (sql: string, params: unknown[]) => {
+vi.mock('../../../backend/src/db/connection', () => ({
+  query: vi.fn(async () => [row]),
+  execute: vi.fn(async (sql: string, params: unknown[]) => {
     if (sql.includes('totp_last_step')) {
       const step = params[0] as number;
       if (row.totp_last_step === null || row.totp_last_step < step) {
@@ -29,7 +29,7 @@ jest.mock('../../../backend/src/db/connection', () => ({
 }));
 
 const store = new Map<string, number>();
-jest.mock('../../../backend/src/db/redis', () => ({
+vi.mock('../../../backend/src/db/redis', () => ({
   getRedis: () => ({
     get: async (k: string) => (store.has(k) ? String(store.get(k)) : null),
     incr: async (k: string) => {

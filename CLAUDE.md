@@ -5,8 +5,8 @@ Multiplayer online grid-based explosive arena game. Monorepo with npm workspaces
 ## Commands
 ```bash
 npm ci                                          # install all workspaces
-npm test                                        # all tests (backend + shared via Jest, frontend via Vitest)
-npx jest --config tests/backend/jest.config.ts  # backend + shared only (from the repo root)
+npm test                                        # all tests (Vitest: backend + shared, frontend)
+npx vitest run --config tests/backend/vitest.config.mts  # backend + shared only (from the repo root)
 cd frontend && npx vitest run                   # frontend only
 npm run lint && npm run format:check            # ESLint, Prettier
 docker compose up --build -d                    # production (nginx on 127.0.0.1:8280)

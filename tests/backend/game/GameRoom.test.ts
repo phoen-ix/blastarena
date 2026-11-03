@@ -1,100 +1,106 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-// --- Mock setup (jest.mock is hoisted before imports) ---
+// --- Mock setup (vi.mock is hoisted before imports) ---
 
-const mockExecute = jest.fn<AnyFn>();
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
 /** Statements issued on the transaction connection, in order. */
-const mockConnExecute = jest.fn<AnyFn>();
-const mockWithTransaction = jest.fn<AnyFn>(async (fn: AnyFn) => fn({ execute: mockConnExecute }));
-jest.mock('../../../backend/src/db/connection', () => ({
-  query: jest.fn(),
+const mockConnExecute = vi.fn<AnyFn>();
+const mockWithTransaction = vi.hoisted(() =>
+  vi.fn<AnyFn>(async (fn: AnyFn) => fn({ execute: mockConnExecute })),
+);
+vi.mock('../../../backend/src/db/connection', () => ({
+  query: vi.fn(),
   execute: mockExecute,
   withTransaction: mockWithTransaction,
 }));
 
-const mockProcessMatchElo = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/elo', () => ({
+const mockProcessMatchElo = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/elo', () => ({
   processMatchElo: mockProcessMatchElo,
 }));
-const mockEvaluateAfterGame = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/achievements', () => ({
+const mockEvaluateAfterGame = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/achievements', () => ({
   evaluateAfterGame: mockEvaluateAfterGame,
 }));
-const mockCheckLevelMilestoneUnlocks = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/cosmetics', () => ({
-  getPlayerCosmeticsForGame: jest.fn<AnyFn>().mockResolvedValue(new Map()),
+const mockCheckLevelMilestoneUnlocks = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/cosmetics', () => ({
+  getPlayerCosmeticsForGame: vi.fn<AnyFn>().mockResolvedValue(new Map()),
   checkLevelMilestoneUnlocks: mockCheckLevelMilestoneUnlocks,
 }));
-jest.mock('../../../backend/src/services/challenges', () => ({
-  getActiveChallenge: jest.fn<AnyFn>().mockResolvedValue(null),
-  recordChallengeResult: jest.fn(),
+vi.mock('../../../backend/src/services/challenges', () => ({
+  getActiveChallenge: vi.fn<AnyFn>().mockResolvedValue(null),
+  recordChallengeResult: vi.fn(),
 }));
 
-const mockUpdateRoomStatus = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/lobby', () => ({
+const mockUpdateRoomStatus = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/lobby', () => ({
   updateRoomStatus: mockUpdateRoomStatus,
-  createRoom: jest.fn(),
-  getRoom: jest.fn(),
-  deleteRoom: jest.fn(),
-  getRoomList: jest.fn(),
+  createRoom: vi.fn(),
+  getRoom: vi.fn(),
+  deleteRoom: vi.fn(),
+  getRoomList: vi.fn(),
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
+vi.mock('../../../backend/src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
   },
 }));
 
-jest.mock('../../../backend/src/services/settings', () => ({
-  isRecordingEnabled: jest.fn<AnyFn>().mockResolvedValue(false),
-  getSetting: jest.fn(),
-  setSetting: jest.fn(),
+vi.mock('../../../backend/src/services/settings', () => ({
+  isRecordingEnabled: vi.fn<AnyFn>().mockResolvedValue(false),
+  getSetting: vi.fn(),
+  setSetting: vi.fn(),
 }));
 
-const mockGameLoopStart = jest.fn();
-const mockGameLoopStop = jest.fn();
-const mockGameLoopIsRunning = jest.fn().mockReturnValue(false);
+const mockGameLoopStart = vi.fn();
+const mockGameLoopStop = vi.fn();
+const mockGameLoopIsRunning = vi.fn().mockReturnValue(false);
 // getTickRate/setTickRate are used by checkBotOnlySpeedup, which every leave/disconnect path
 // reaches. Default to the normal rate so the speed-up branch behaves as it does in a live room.
-// Lazy: jest.mock is hoisted above the imports, so TICK_RATE is not initialised yet at
+// Lazy: vi.mock is hoisted above the imports, so TICK_RATE is not initialised yet at
 // module-eval time — only when the mock is actually called.
-const mockGameLoopGetTickRate = jest.fn(() => TICK_RATE);
-const mockGameLoopSetTickRate = jest.fn();
-jest.mock('../../../backend/src/game/GameLoop', () => ({
-  GameLoop: jest.fn().mockImplementation(() => ({
-    start: mockGameLoopStart,
-    stop: mockGameLoopStop,
-    isRunning: mockGameLoopIsRunning,
-    getTickRate: mockGameLoopGetTickRate,
-    setTickRate: mockGameLoopSetTickRate,
-  })),
+const mockGameLoopGetTickRate = vi.fn(() => TICK_RATE);
+const mockGameLoopSetTickRate = vi.fn();
+vi.mock('../../../backend/src/game/GameLoop', () => ({
+  GameLoop: vi.fn().mockImplementation(function () {
+    return {
+      start: mockGameLoopStart,
+      stop: mockGameLoopStop,
+      isRunning: mockGameLoopIsRunning,
+      getTickRate: mockGameLoopGetTickRate,
+      setTickRate: mockGameLoopSetTickRate,
+    };
+  }),
 }));
 
-jest.mock('../../../backend/src/utils/replayRecorder', () => ({
-  ReplayRecorder: jest.fn().mockImplementation(() => ({
-    setMatchId: jest.fn(),
-    recordTick: jest.fn(),
-    finalize: jest.fn(),
-  })),
+vi.mock('../../../backend/src/utils/replayRecorder', () => ({
+  ReplayRecorder: vi.fn().mockImplementation(function () {
+    return {
+      setMatchId: vi.fn(),
+      recordTick: vi.fn(),
+      finalize: vi.fn(),
+    };
+  }),
 }));
 
 // A permissive stand-in: GameLogger has ~20 log* methods and the code under test calls whichever
 // suits its path (logKill, logPlayerDisconnectKill, close, …). Enumerating them by hand just means
 // the next test to exercise a new path fails on a missing mock rather than on its own assertion.
-jest.mock('../../../backend/src/utils/gameLogger', () => ({
-  GameLogger: jest.fn().mockImplementation(() => {
+vi.mock('../../../backend/src/utils/gameLogger', () => ({
+  GameLogger: vi.fn().mockImplementation(function () {
     const stubs = new Map<string, unknown>();
     return new Proxy({ replayRecorder: null } as Record<string, unknown>, {
       get(target: Record<string, unknown>, prop: string) {
         if (prop in target) return target[prop];
         if (prop === 'then') return undefined; // never look thenable to an await
-        if (!stubs.has(prop)) stubs.set(prop, jest.fn());
+        if (!stubs.has(prop)) stubs.set(prop, vi.fn());
         return stubs.get(prop);
       },
       set(target: Record<string, unknown>, prop: string, value: unknown) {
@@ -154,8 +160,8 @@ function createMockRoom(configOverrides: Record<string, unknown> = {}) {
 }
 
 function createMockIo() {
-  const mockEmit = jest.fn();
-  const mockTo = jest.fn().mockReturnValue({ emit: mockEmit });
+  const mockEmit = vi.fn();
+  const mockTo = vi.fn().mockReturnValue({ emit: mockEmit });
   return {
     io: {
       to: mockTo,
@@ -168,11 +174,11 @@ function createMockIo() {
 
 describe('GameRoom', () => {
   let mockIo: any;
-  let mockTo: jest.Mock;
-  let mockEmit: jest.Mock;
+  let mockTo: Mock;
+  let mockEmit: Mock;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     const ioSetup = createMockIo();
     mockIo = ioSetup.io;
     mockTo = ioSetup.mockTo;

@@ -1,14 +1,14 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
-  withTransaction: jest.fn(),
+  withTransaction: vi.fn(),
 }));
 
 import { canUserPlayMap } from '../../../backend/src/services/custom-maps';
@@ -16,7 +16,7 @@ import { cleanupExpiredRefreshTokens } from '../../../backend/src/services/auth'
 
 describe('custom map access control', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   /**
@@ -48,7 +48,7 @@ describe('custom map access control', () => {
 
 describe('refresh token reaping', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // Rows were inserted on every login and every rotation and only ever flagged revoked — nothing

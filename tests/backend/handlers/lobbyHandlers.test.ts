@@ -1,15 +1,15 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
-const mockGetLobbyChatMode = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/settings', () => ({
+const mockGetLobbyChatMode = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/settings', () => ({
   getLobbyChatMode: mockGetLobbyChatMode,
 }));
-jest.mock('../../../backend/src/utils/socketRateLimit', () => ({
+vi.mock('../../../backend/src/utils/socketRateLimit', () => ({
   createSocketRateLimiter: () => ({
-    isAllowed: jest.fn().mockReturnValue(true),
-    remove: jest.fn(),
+    isAllowed: vi.fn().mockReturnValue(true),
+    remove: vi.fn(),
   }),
 }));
 
@@ -31,22 +31,22 @@ function createMockSocket(overrides: Record<string, any> = {}) {
       activeRoomCode: undefined,
       ...overrides,
     },
-    on: jest.fn((event: string, handler: Function) => {
+    on: vi.fn((event: string, handler: Function) => {
       handlers[event] = handler;
     }),
-    join: jest.fn(),
-    leave: jest.fn(),
+    join: vi.fn(),
+    leave: vi.fn(),
     _handlers: handlers,
   };
   return socket;
 }
 
 function createMockIO() {
-  const emitFn = jest.fn<AnyFn>();
+  const emitFn = vi.fn<AnyFn>();
   const io: any = {
-    emit: jest.fn<AnyFn>(),
-    to: jest.fn<AnyFn>().mockReturnValue({ emit: emitFn }),
-    in: jest.fn<AnyFn>().mockReturnValue({ fetchSockets: jest.fn<AnyFn>().mockResolvedValue([]) }),
+    emit: vi.fn<AnyFn>(),
+    to: vi.fn<AnyFn>().mockReturnValue({ emit: emitFn }),
+    in: vi.fn<AnyFn>().mockReturnValue({ fetchSockets: vi.fn<AnyFn>().mockResolvedValue([]) }),
     _toEmit: emitFn,
   };
   return io;
@@ -57,7 +57,7 @@ describe('lobbyHandlers', () => {
   let io: ReturnType<typeof createMockIO>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockGetLobbyChatMode.mockResolvedValue('everyone');
     socket = createMockSocket();
     io = createMockIO();

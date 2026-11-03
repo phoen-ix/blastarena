@@ -1,29 +1,29 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import type { CampaignLevel, EnemyTypeConfig, TileType } from '@blast-arena/shared';
 import { TICK_RATE } from '@blast-arena/shared';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-jest.mock('../../../backend/src/services/botai-registry', () => ({
-  getBotAIRegistry: jest.fn().mockReturnValue({
-    createInstance: jest.fn().mockReturnValue({ getAction: jest.fn().mockReturnValue(null) }),
+vi.mock('../../../backend/src/services/botai-registry', () => ({
+  getBotAIRegistry: vi.fn().mockReturnValue({
+    createInstance: vi.fn().mockReturnValue({ getAction: vi.fn().mockReturnValue(null) }),
   }),
 }));
 
 let capturedOnTick: AnyFn | null = null;
-jest.mock('../../../backend/src/game/GameLoop', () => ({
-  GameLoop: jest.fn<AnyFn>().mockImplementation((_gs: unknown, onTick: AnyFn) => {
+vi.mock('../../../backend/src/game/GameLoop', () => ({
+  GameLoop: vi.fn<AnyFn>().mockImplementation(function (_gs: unknown, onTick: AnyFn) {
     capturedOnTick = onTick;
     let paused = false;
     return {
-      start: jest.fn(),
-      stop: jest.fn(),
-      isRunning: jest.fn().mockReturnValue(true),
+      start: vi.fn(),
+      stop: vi.fn(),
+      isRunning: vi.fn().mockReturnValue(true),
       pause: () => {
         paused = true;
       },
@@ -35,8 +35,8 @@ jest.mock('../../../backend/src/game/GameLoop', () => ({
   }),
 }));
 
-jest.mock('../../../backend/src/game/EnemyAI', () => ({
-  processEnemyAI: jest.fn<AnyFn>().mockReturnValue({ direction: null, placeBomb: false }),
+vi.mock('../../../backend/src/game/EnemyAI', () => ({
+  processEnemyAI: vi.fn<AnyFn>().mockReturnValue({ direction: null, placeBomb: false }),
 }));
 
 import { CampaignGame, CampaignSessionCallbacks } from '../../../backend/src/game/CampaignGame';
@@ -116,16 +116,16 @@ function level(overrides: Partial<CampaignLevel> = {}): CampaignLevel {
 }
 
 function callbacks(): CampaignSessionCallbacks & {
-  onGameOver: jest.Mock;
-  onLevelComplete: jest.Mock;
+  onGameOver: Mock;
+  onLevelComplete: Mock;
 } {
   return {
-    onStateUpdate: jest.fn(),
-    onPlayerDied: jest.fn(),
-    onEnemyDied: jest.fn(),
-    onExitOpened: jest.fn(),
-    onLevelComplete: jest.fn(),
-    onGameOver: jest.fn(),
+    onStateUpdate: vi.fn(),
+    onPlayerDied: vi.fn(),
+    onEnemyDied: vi.fn(),
+    onExitOpened: vi.fn(),
+    onLevelComplete: vi.fn(),
+    onGameOver: vi.fn(),
   };
 }
 
@@ -138,7 +138,7 @@ function tick(game: CampaignGame, n: number): void {
 
 describe('campaign regressions', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     Enemy.resetIdCounter();
   });
 

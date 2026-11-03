@@ -1,11 +1,11 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
   // Real predicate: the createUser race test hands it the driver's ER_DUP_ENTRY shape. (audit B13)
@@ -14,55 +14,57 @@ jest.mock('../../../backend/src/db/connection', () => ({
     (err as { errno?: unknown } | null)?.errno === 1062,
 }));
 
-const mockHashPassword = jest.fn<AnyFn>();
-const mockHashEmail = jest.fn<AnyFn>();
-const mockGenerateEmailHint = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/utils/crypto', () => ({
+const mockHashPassword = vi.hoisted(() => vi.fn<AnyFn>());
+const mockHashEmail = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGenerateEmailHint = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/utils/crypto', async () => ({
   hashPassword: mockHashPassword,
   hashEmail: mockHashEmail,
   generateEmailHint: mockGenerateEmailHint,
   // Real implementation on purpose: these tests assert that error logs do NOT contain
   // an address, and a stub returning undefined would pass while leaking. (audit EMAIL-LOG-1)
-  scrubEmailError: jest.requireActual<typeof import('../../../backend/src/utils/crypto')>(
-    '../../../backend/src/utils/crypto',
+  scrubEmailError: (
+    await vi.importActual<typeof import('../../../backend/src/utils/crypto')>(
+      '../../../backend/src/utils/crypto',
+    )
   ).scrubEmailError,
 }));
 
-jest.mock('../../../backend/src/config', () => ({
+vi.mock('../../../backend/src/config', () => ({
   getConfig: () => ({
     EMAIL_PEPPER: 'test-pepper-minimum-32-characters-long',
   }),
 }));
 
-const mockGetRoomManager = jest.fn<AnyFn>();
-const mockGetIO = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/game/registry', () => ({
+const mockGetRoomManager = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetIO = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/game/registry', () => ({
   getRoomManager: mockGetRoomManager,
   getIO: mockGetIO,
 }));
 
-const mockHasReplay = jest.fn<AnyFn>();
-const mockGetReplayPlacements = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/replay', () => ({
+const mockHasReplay = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetReplayPlacements = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/replay', () => ({
   hasReplay: mockHasReplay,
   getReplayPlacements: mockGetReplayPlacements,
 }));
 
-const mockListRooms = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/lobby', () => ({
+const mockListRooms = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/lobby', () => ({
   listRooms: mockListRooms,
 }));
 
-const mockUnlockDefaultCosmetics = jest.fn<AnyFn>().mockResolvedValue(undefined);
-jest.mock('../../../backend/src/services/cosmetics', () => ({
+const mockUnlockDefaultCosmetics = vi.hoisted(() => vi.fn<AnyFn>().mockResolvedValue(undefined));
+vi.mock('../../../backend/src/services/cosmetics', () => ({
   unlockDefaultCosmetics: mockUnlockDefaultCosmetics,
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
+vi.mock('../../../backend/src/utils/logger', () => ({
   logger: {
-    error: jest.fn(),
-    warn: jest.fn(),
-    info: jest.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
@@ -89,7 +91,7 @@ import { AppError } from '../../../backend/src/middleware/errorHandler';
 
 describe('admin service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockHashEmail.mockReturnValue('hashed-email');
     mockGenerateEmailHint.mockReturnValue('n***@e***.com');
   });
@@ -413,8 +415,8 @@ describe('admin service', () => {
     it('returns DB stats combined with active room/player counts', async () => {
       mockQuery.mockResolvedValueOnce([{ totalUsers: 100, activeUsers24h: 15, totalMatches: 500 }]);
 
-      const mockEmit = jest.fn();
-      const mockRoomsGet = jest.fn<AnyFn>();
+      const mockEmit = vi.fn();
+      const mockRoomsGet = vi.fn<AnyFn>();
       mockGetIO.mockReturnValue({
         emit: mockEmit,
         sockets: {
@@ -467,7 +469,7 @@ describe('admin service', () => {
     it('handles rooms with no sockets (undefined from rooms.get)', async () => {
       mockQuery.mockResolvedValueOnce([{ totalUsers: 10, activeUsers24h: 1, totalMatches: 3 }]);
 
-      const mockRoomsGet = jest.fn<AnyFn>();
+      const mockRoomsGet = vi.fn<AnyFn>();
       mockGetIO.mockReturnValue({
         sockets: {
           adapter: {
@@ -741,7 +743,7 @@ describe('admin service', () => {
 
   describe('sendToast', () => {
     it('emits toast event and logs audit action', async () => {
-      const mockEmit = jest.fn();
+      const mockEmit = vi.fn();
       mockGetIO.mockReturnValue({ emit: mockEmit });
       mockExecute.mockResolvedValueOnce({});
 
@@ -782,7 +784,7 @@ describe('admin service', () => {
     it('deactivates existing banners, inserts new, emits, and logs', async () => {
       mockExecute.mockResolvedValueOnce({}); // UPDATE deactivate existing
       mockExecute.mockResolvedValueOnce({}); // INSERT new banner
-      const mockEmit = jest.fn();
+      const mockEmit = vi.fn();
       mockGetIO.mockReturnValue({ emit: mockEmit });
       mockExecute.mockResolvedValueOnce({}); // INSERT admin_actions
 
@@ -827,7 +829,7 @@ describe('admin service', () => {
   describe('clearBanner', () => {
     it('deactivates banners, emits null message, and logs', async () => {
       mockExecute.mockResolvedValueOnce({}); // UPDATE deactivate
-      const mockEmit = jest.fn();
+      const mockEmit = vi.fn();
       mockGetIO.mockReturnValue({ emit: mockEmit });
       mockExecute.mockResolvedValueOnce({}); // INSERT admin_actions
 
@@ -944,7 +946,7 @@ describe('admin service', () => {
       mockQuery.mockResolvedValueOnce([{ id: 10 }, { id: 11 }, { id: 12 }]); // SELECT ids
       mockExecute.mockResolvedValueOnce({}); // INSERT audit log
       mockGetIO.mockReturnValue({
-        in: jest.fn().mockReturnValue({ disconnectSockets: jest.fn() }),
+        in: vi.fn().mockReturnValue({ disconnectSockets: vi.fn() }),
       });
       mockExecute.mockResolvedValueOnce({}); // DELETE
 
@@ -970,8 +972,8 @@ describe('admin service', () => {
     });
 
     it('disconnects sockets before deleting users', async () => {
-      const mockDisconnect = jest.fn();
-      const mockIn = jest.fn().mockReturnValue({ disconnectSockets: mockDisconnect });
+      const mockDisconnect = vi.fn();
+      const mockIn = vi.fn().mockReturnValue({ disconnectSockets: mockDisconnect });
       mockQuery.mockResolvedValueOnce([{ id: 20 }, { id: 21 }]);
       mockExecute.mockResolvedValueOnce({}); // audit log
       mockGetIO.mockReturnValue({ in: mockIn });
@@ -1004,7 +1006,7 @@ describe('admin service', () => {
       mockQuery.mockResolvedValueOnce([{ id: 50 }]);
       mockExecute.mockResolvedValueOnce({});
       mockGetIO.mockReturnValue({
-        in: jest.fn().mockReturnValue({ disconnectSockets: jest.fn() }),
+        in: vi.fn().mockReturnValue({ disconnectSockets: vi.fn() }),
       });
       mockExecute.mockResolvedValueOnce({});
 
@@ -1020,7 +1022,7 @@ describe('admin service', () => {
       mockQuery.mockResolvedValueOnce([{ id: 40 }, { id: 41 }]);
       mockExecute.mockResolvedValueOnce({}); // audit log
       mockGetIO.mockReturnValue({
-        in: jest.fn().mockReturnValue({ disconnectSockets: jest.fn() }),
+        in: vi.fn().mockReturnValue({ disconnectSockets: vi.fn() }),
       });
       mockExecute.mockResolvedValueOnce({}); // DELETE
 
@@ -1039,7 +1041,7 @@ describe('admin service', () => {
       mockQuery.mockResolvedValueOnce([{ id: 60 }]);
       mockExecute.mockResolvedValueOnce({});
       mockGetIO.mockReturnValue({
-        in: jest.fn().mockReturnValue({ disconnectSockets: jest.fn() }),
+        in: vi.fn().mockReturnValue({ disconnectSockets: vi.fn() }),
       });
       mockExecute.mockResolvedValueOnce({});
 

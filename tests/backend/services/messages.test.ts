@@ -1,17 +1,17 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
 }));
 
-const mockAreFriends = jest.fn<AnyFn>();
-const mockIsBlocked = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/friends', () => ({
+const mockAreFriends = vi.hoisted(() => vi.fn<AnyFn>());
+const mockIsBlocked = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/friends', () => ({
   areFriends: mockAreFriends,
   isBlocked: mockIsBlocked,
 }));
@@ -43,7 +43,7 @@ function makeDmRow(
 
 describe('Messages Service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('sendMessage', () => {

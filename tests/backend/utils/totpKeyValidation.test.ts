@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import crypto from 'crypto';
 import { isValidTotpKey } from '../../../backend/src/config';
 import { encryptTotpSecret, decryptTotpSecret } from '../../../backend/src/utils/crypto';

@@ -1,10 +1,10 @@
-import { describe, it, expect, jest } from '@jest/globals';
+import { describe, it, expect, vi } from 'vitest';
 import type { TileType } from '@blast-arena/shared';
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
-jest.mock('../../../backend/src/db/connection', () => ({ query: jest.fn(), execute: jest.fn() }));
+vi.mock('../../../backend/src/db/connection', () => ({ query: vi.fn(), execute: vi.fn() }));
 
 import { BUILTIN_ENEMY_AIS } from '../../../backend/src/game/enemy-ai-defaults/sources';
 import { compileEnemyAI } from '../../../backend/src/services/enemyai-compiler';

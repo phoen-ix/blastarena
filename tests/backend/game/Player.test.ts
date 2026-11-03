@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Player } from '../../../backend/src/game/Player';
 import {
   DEFAULT_SPEED,

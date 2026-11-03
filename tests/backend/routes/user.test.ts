@@ -1,16 +1,16 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
-const mockGetUserProfile = jest.fn<AnyFn>();
-const mockUpdateUsername = jest.fn<AnyFn>();
-const mockRequestEmailChange = jest.fn<AnyFn>();
-const mockUpdateEmailDirect = jest.fn<AnyFn>();
-const mockChangePassword = jest.fn<AnyFn>();
-const mockCancelEmailChange = jest.fn<AnyFn>();
-const mockConfirmEmailChange = jest.fn<AnyFn>();
+const mockGetUserProfile = vi.hoisted(() => vi.fn<AnyFn>());
+const mockUpdateUsername = vi.hoisted(() => vi.fn<AnyFn>());
+const mockRequestEmailChange = vi.hoisted(() => vi.fn<AnyFn>());
+const mockUpdateEmailDirect = vi.hoisted(() => vi.fn<AnyFn>());
+const mockChangePassword = vi.hoisted(() => vi.fn<AnyFn>());
+const mockCancelEmailChange = vi.hoisted(() => vi.fn<AnyFn>());
+const mockConfirmEmailChange = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/user', () => ({
+vi.mock('../../../backend/src/services/user', () => ({
   getUserProfile: mockGetUserProfile,
   updateUsername: mockUpdateUsername,
   requestEmailChange: mockRequestEmailChange,
@@ -20,31 +20,33 @@ jest.mock('../../../backend/src/services/user', () => ({
   confirmEmailChange: mockConfirmEmailChange,
 }));
 
-jest.mock('../../../backend/src/services/totp', () => ({
-  beginSetup: jest.fn(),
-  confirmSetup: jest.fn(),
-  disable: jest.fn(),
+vi.mock('../../../backend/src/services/totp', () => ({
+  beginSetup: vi.fn(),
+  confirmSetup: vi.fn(),
+  disable: vi.fn(),
 }));
 
-jest.mock('../../../backend/src/middleware/auth', () => ({
-  authMiddleware: jest.fn((_req: any, _res: any, next: any) => next()),
+vi.mock('../../../backend/src/middleware/auth', () => ({
+  authMiddleware: vi.fn((_req: any, _res: any, next: any) => next()),
 }));
 
-const mockRateLimiterMiddleware = jest.fn((_req: any, _res: any, next: any) => next());
-jest.mock('../../../backend/src/middleware/rateLimiter', () => ({
-  rateLimiter: jest.fn(() => mockRateLimiterMiddleware),
+const mockRateLimiterMiddleware = vi.hoisted(() =>
+  vi.fn((_req: any, _res: any, next: any) => next()),
+);
+vi.mock('../../../backend/src/middleware/rateLimiter', () => ({
+  rateLimiter: vi.fn(() => mockRateLimiterMiddleware),
 }));
 
-jest.mock('../../../backend/src/config', () => ({
+vi.mock('../../../backend/src/config', () => ({
   getConfig: () => ({ APP_URL: 'http://localhost:8080' }),
 }));
 
-jest.mock('../../../backend/src/middleware/validation', () => ({
-  validate: jest.fn(() => (_req: any, _res: any, next: any) => next()),
+vi.mock('../../../backend/src/middleware/validation', () => ({
+  validate: vi.fn(() => (_req: any, _res: any, next: any) => next()),
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
 import userRouter from '../../../backend/src/routes/user';
@@ -96,8 +98,8 @@ function mockRes() {
       return res;
     },
   };
-  jest.spyOn(res, 'status');
-  jest.spyOn(res, 'json');
+  vi.spyOn(res, 'status');
+  vi.spyOn(res, 'json');
   return res;
 }
 
@@ -112,7 +114,7 @@ function mockReq(overrides: Record<string, any> = {}): any {
 
 describe('User routes', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('GET /user/profile', () => {
@@ -124,7 +126,7 @@ describe('User routes', () => {
 
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(res._json).toEqual(profile);
     });
@@ -134,7 +136,7 @@ describe('User routes', () => {
 
       const req = mockReq({ user: { userId: 99, username: 'other', role: 'user' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetUserProfile).toHaveBeenCalledWith(99);
     });
@@ -145,7 +147,7 @@ describe('User routes', () => {
 
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(error);
@@ -163,7 +165,7 @@ describe('User routes', () => {
 
       const req = mockReq({ body: { username: 'newname' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockUpdateUsername).toHaveBeenCalledWith(42, 'newname');
       expect(res._json).toEqual(updatedProfile);
@@ -172,7 +174,7 @@ describe('User routes', () => {
     it('returns 400 for invalid username when validateUsername returns error', async () => {
       const req = mockReq({ body: { username: 'x' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(res._status).toBe(400);
       expect(res._json).toEqual({ error: expect.any(String) });
@@ -185,7 +187,7 @@ describe('User routes', () => {
 
       const req = mockReq({ body: {} });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockUpdateUsername).not.toHaveBeenCalled();
       expect(mockGetUserProfile).toHaveBeenCalledWith(42);
@@ -204,7 +206,7 @@ describe('User routes', () => {
 
       const req = mockReq({ body: { username: 'ValidName' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(callOrder).toEqual(['updateUsername', 'getUserProfile']);
       expect(mockGetUserProfile).toHaveBeenCalledWith(42);
@@ -216,7 +218,7 @@ describe('User routes', () => {
 
       const req = mockReq({ body: { username: 'ValidName' } });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(error);
@@ -234,7 +236,7 @@ describe('User routes', () => {
         body: { email: 'new@example.com' },
       });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockUpdateEmailDirect).toHaveBeenCalledWith(1, 'new@example.com');
       expect(mockRequestEmailChange).not.toHaveBeenCalled();
@@ -246,7 +248,7 @@ describe('User routes', () => {
 
       const req = mockReq({ body: { email: 'new@example.com' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockRequestEmailChange).toHaveBeenCalledWith(42, 'new@example.com', 'en');
       expect(mockUpdateEmailDirect).not.toHaveBeenCalled();
@@ -258,7 +260,7 @@ describe('User routes', () => {
     it('returns 400 for invalid email when validateEmailFn returns error', async () => {
       const req = mockReq({ body: { email: 'not-an-email' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(res._status).toBe(400);
       expect(res._json).toEqual({ error: expect.any(String) });
@@ -274,7 +276,7 @@ describe('User routes', () => {
         body: { email: 'valid@test.com' },
       });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockRequestEmailChange).toHaveBeenCalledWith(77, 'valid@test.com', 'en');
     });
@@ -285,7 +287,7 @@ describe('User routes', () => {
 
       const req = mockReq({ body: { email: 'valid@test.com' } });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(error);
@@ -302,7 +304,7 @@ describe('User routes', () => {
         body: { currentPassword: 'OldPass123!', newPassword: 'NewPass456!' },
       });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(res._json).toEqual({ message: 'Password updated successfully' });
     });
@@ -312,7 +314,7 @@ describe('User routes', () => {
         body: { currentPassword: 'SamePass123!', newPassword: 'SamePass123!' },
       });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(res._status).toBe(400);
       expect(res._json).toEqual({
@@ -326,7 +328,7 @@ describe('User routes', () => {
         body: { currentPassword: 'OldPass123!', newPassword: 'x' },
       });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(res._status).toBe(400);
       expect(res._json).toEqual({ error: expect.any(String) });
@@ -341,7 +343,7 @@ describe('User routes', () => {
         body: { currentPassword: 'OldPass123!', newPassword: 'NewPass456!' },
       });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockChangePassword).toHaveBeenCalledWith(55, 'OldPass123!', 'NewPass456!');
     });
@@ -354,7 +356,7 @@ describe('User routes', () => {
         body: { currentPassword: 'OldPass123!', newPassword: 'NewPass456!' },
       });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(error);
@@ -369,7 +371,7 @@ describe('User routes', () => {
 
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockCancelEmailChange).toHaveBeenCalledWith(42);
       expect(res._json).toEqual({ message: 'Pending email change cancelled' });
@@ -381,7 +383,7 @@ describe('User routes', () => {
 
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(error);
@@ -396,7 +398,7 @@ describe('User routes', () => {
 
       const req = mockReq({ params: { token: 'abc123token' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockConfirmEmailChange).toHaveBeenCalledWith('abc123token');
       expect(res._redirect).toBe('http://localhost:8080?emailChanged=true');
@@ -418,7 +420,7 @@ describe('User routes', () => {
 
       const req = mockReq({ params: { token: 'badtoken' } });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(error);

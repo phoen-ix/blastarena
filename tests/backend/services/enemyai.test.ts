@@ -1,27 +1,27 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
 // ── DB mocks ────────────────────────────────────────────────────────────────
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
 }));
 
 // ── Compiler mock ───────────────────────────────────────────────────────────
-const mockCompileEnemyAI = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/enemyai-compiler', () => ({
+const mockCompileEnemyAI = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/enemyai-compiler', () => ({
   compileEnemyAI: mockCompileEnemyAI,
 }));
 
 // ── Registry mock ───────────────────────────────────────────────────────────
-const mockLoadAI = jest.fn<AnyFn>();
-const mockUnloadAI = jest.fn<AnyFn>();
-const mockReloadAI = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/enemyai-registry', () => ({
+const mockLoadAI = vi.fn<AnyFn>();
+const mockUnloadAI = vi.fn<AnyFn>();
+const mockReloadAI = vi.fn<AnyFn>();
+vi.mock('../../../backend/src/services/enemyai-registry', () => ({
   getEnemyAIRegistry: () => ({
     loadAI: mockLoadAI,
     unloadAI: mockUnloadAI,
@@ -30,17 +30,17 @@ jest.mock('../../../backend/src/services/enemyai-registry', () => ({
 }));
 
 // ── FS mock ─────────────────────────────────────────────────────────────────
-const mockMkdirSync = jest.fn<AnyFn>();
-const mockWriteFileSync = jest.fn<AnyFn>();
-const mockExistsSync = jest.fn<AnyFn>();
-const mockRmSync = jest.fn<AnyFn>();
-const mockReadFileSync = jest.fn<AnyFn>();
-const mockLoadBuiltinEnemyAI = jest.fn<AnyFn>().mockResolvedValue(true);
-jest.mock('../../../backend/src/game/enemy-ai-defaults', () => ({
+const mockMkdirSync = vi.fn<AnyFn>();
+const mockWriteFileSync = vi.fn<AnyFn>();
+const mockExistsSync = vi.fn<AnyFn>();
+const mockRmSync = vi.fn<AnyFn>();
+const mockReadFileSync = vi.fn<AnyFn>();
+const mockLoadBuiltinEnemyAI = vi.hoisted(() => vi.fn<AnyFn>().mockResolvedValue(true));
+vi.mock('../../../backend/src/game/enemy-ai-defaults', () => ({
   loadBuiltinEnemyAI: mockLoadBuiltinEnemyAI,
 }));
 
-jest.mock('fs', () => ({
+vi.mock('fs', () => ({
   mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
   writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
@@ -57,14 +57,14 @@ jest.mock('fs', () => ({
 
 // ── UUID mock ───────────────────────────────────────────────────────────────
 const FIXED_UUID = 'test-uuid-123';
-jest.mock('crypto', () => ({
-  ...jest.requireActual<typeof import('crypto')>('crypto'),
+vi.mock('crypto', async () => ({
+  ...(await vi.importActual<typeof import('crypto')>('crypto')),
   randomUUID: () => FIXED_UUID,
 }));
 
 // ── Logger mock ─────────────────────────────────────────────────────────────
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 import {
@@ -100,7 +100,7 @@ function makeAIRow(overrides: Record<string, unknown> = {}) {
 
 describe('EnemyAI Service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // ── rowToEntry mapping (tested via public functions) ────────────────────

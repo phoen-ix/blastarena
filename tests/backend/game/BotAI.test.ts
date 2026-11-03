@@ -1,7 +1,8 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GameStateManager } from '../../../backend/src/game/GameState';
 import { BotAI } from '../../../backend/src/game/BotAI';
 import { Bomb } from '../../../backend/src/game/Bomb';
+import { PowerUp } from '../../../backend/src/game/PowerUp';
 import type { PlayerInput, Direction } from '@blast-arena/shared';
 import { BOMB_TIMER_TICKS, MOVE_COOLDOWN_BASE } from '@blast-arena/shared';
 
@@ -851,7 +852,6 @@ describe('BotAI', () => {
       clearCooldown(p1);
 
       // Place shield left, bomb_up right — both at distance 1
-      const { PowerUp } = require('../../../backend/src/game/PowerUp');
       const shield = new PowerUp({ x: 4, y: 5 }, 'shield');
       const bombUp = new PowerUp({ x: 6, y: 5 }, 'bomb_up');
       gs.powerUps.set(shield.id, shield);
@@ -881,7 +881,6 @@ describe('BotAI', () => {
       p1.hasKick = true; // Already has kick
 
       // Place kick (worthless) left, fire_up (valuable) right
-      const { PowerUp } = require('../../../backend/src/game/PowerUp');
       const kick = new PowerUp({ x: 4, y: 5 }, 'kick');
       const fireUp = new PowerUp({ x: 6, y: 5 }, 'fire_up');
       gs.powerUps.set(kick.id, kick);

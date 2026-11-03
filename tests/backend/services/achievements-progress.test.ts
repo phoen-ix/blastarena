@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
  * getAchievementProgress used to run a query INSIDE its loop for every locked mode_specific and
@@ -11,17 +11,17 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
 }));
 
-jest.mock('../../../backend/src/services/cosmetics', () => ({
-  unlockCosmetic: jest.fn(),
-  getCosmeticById: jest.fn(),
-  checkCampaignStarUnlocks: jest.fn(),
+vi.mock('../../../backend/src/services/cosmetics', () => ({
+  unlockCosmetic: vi.fn(),
+  getCosmeticById: vi.fn(),
+  checkCampaignStarUnlocks: vi.fn(),
 }));
 
 import { getAchievementProgress } from '../../../backend/src/services/achievements';
@@ -61,7 +61,7 @@ function routeQueries(routes: Array<[RegExp, unknown[]]>): void {
 
 describe('getAchievementProgress (audit E2)', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   const baseRoutes: Array<[RegExp, unknown[]]> = [

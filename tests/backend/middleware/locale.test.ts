@@ -1,8 +1,8 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 type AnyFn = (...args: any[]) => any;
 
-const mockLanguages = ['en', 'de', 'fr', 'es', 'ja'];
-jest.mock('../../../backend/src/i18n', () => ({
+const mockLanguages = vi.hoisted(() => ['en', 'de', 'fr', 'es', 'ja']);
+vi.mock('../../../backend/src/i18n', () => ({
   i18n: { languages: mockLanguages },
 }));
 
@@ -14,12 +14,12 @@ function createMockRes() {
 
 describe('localeMiddleware', () => {
   let mockRes: ReturnType<typeof createMockRes>;
-  let mockNext: jest.Mock;
+  let mockNext: Mock;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockRes = createMockRes();
-    mockNext = jest.fn();
+    mockNext = vi.fn();
   });
 
   it('should set locale from x-language header when supported', () => {

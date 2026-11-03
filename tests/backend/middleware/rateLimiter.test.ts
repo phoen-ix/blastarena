@@ -1,21 +1,21 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
-const mockEval = jest.fn<(...args: unknown[]) => Promise<number>>();
-const mockTtl = jest.fn<(key: string) => Promise<number>>();
-const mockLoggerWarn = jest.fn();
+const mockEval = vi.fn<(...args: unknown[]) => Promise<number>>();
+const mockTtl = vi.fn<(key: string) => Promise<number>>();
+const mockLoggerWarn = vi.hoisted(() => vi.fn());
 
-jest.mock('../../../backend/src/db/redis', () => ({
-  getRedis: jest.fn(() => ({
+vi.mock('../../../backend/src/db/redis', () => ({
+  getRedis: vi.fn(() => ({
     eval: mockEval,
     ttl: mockTtl,
   })),
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
+vi.mock('../../../backend/src/utils/logger', () => ({
   logger: {
     warn: mockLoggerWarn,
-    error: jest.fn(),
-    info: jest.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
@@ -33,15 +33,15 @@ function mockReq(overrides: Partial<Request> = {}): Request {
 
 function mockRes(): Response {
   const res: Partial<Response> = {};
-  res.status = jest.fn<(code: number) => Response>().mockReturnValue(res as Response);
-  res.json = jest.fn<(body: unknown) => Response>().mockReturnValue(res as Response);
-  (res as Record<string, unknown>).set = jest.fn().mockReturnValue(res as Response);
+  res.status = vi.fn<(code: number) => Response>().mockReturnValue(res as Response);
+  res.json = vi.fn<(body: unknown) => Response>().mockReturnValue(res as Response);
+  (res as Record<string, unknown>).set = vi.fn().mockReturnValue(res as Response);
   return res as Response;
 }
 
 describe('rateLimiter middleware', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   const config = { windowMs: 60000, maxRequests: 5 };
@@ -53,7 +53,7 @@ describe('rateLimiter middleware', () => {
       const middleware = rateLimiter(config);
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn() as unknown as NextFunction;
+      const next = vi.fn() as unknown as NextFunction;
 
       await middleware(req, res, next);
 
@@ -76,7 +76,7 @@ describe('rateLimiter middleware', () => {
           baseUrl: '/api',
           route: { path: '/admin/replays/:matchId' },
         } as unknown as Partial<Request>);
-        await middleware(req, mockRes(), jest.fn() as unknown as NextFunction);
+        await middleware(req, mockRes(), vi.fn() as unknown as NextFunction);
       }
       const keys = mockEval.mock.calls.map((c) => c[2]);
       expect(keys).toEqual([
@@ -91,7 +91,7 @@ describe('rateLimiter middleware', () => {
       const middleware = rateLimiter(config);
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn() as unknown as NextFunction;
+      const next = vi.fn() as unknown as NextFunction;
 
       await middleware(req, res, next);
 
@@ -106,7 +106,7 @@ describe('rateLimiter middleware', () => {
       const middleware = rateLimiter(config);
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn() as unknown as NextFunction;
+      const next = vi.fn() as unknown as NextFunction;
 
       await middleware(req, res, next);
 
@@ -132,8 +132,8 @@ describe('rateLimiter middleware', () => {
       const res1 = mockRes();
       const res2 = mockRes();
 
-      await middleware(req1, res1, jest.fn() as unknown as NextFunction);
-      await middleware(req2, res2, jest.fn() as unknown as NextFunction);
+      await middleware(req1, res1, vi.fn() as unknown as NextFunction);
+      await middleware(req2, res2, vi.fn() as unknown as NextFunction);
 
       const evalCalls = mockEval.mock.calls;
       expect(evalCalls[0][2]).toBe('ratelimit:10.0.0.1:/api/test');
@@ -150,8 +150,8 @@ describe('rateLimiter middleware', () => {
       const res1 = mockRes();
       const res2 = mockRes();
 
-      await middleware(req1, res1, jest.fn() as unknown as NextFunction);
-      await middleware(req2, res2, jest.fn() as unknown as NextFunction);
+      await middleware(req1, res1, vi.fn() as unknown as NextFunction);
+      await middleware(req2, res2, vi.fn() as unknown as NextFunction);
 
       const evalCalls = mockEval.mock.calls;
       expect(evalCalls[0][2]).toBe('ratelimit:127.0.0.1:/api/login');
@@ -166,7 +166,7 @@ describe('rateLimiter middleware', () => {
       const middleware = rateLimiter({ windowMs: 60000, maxRequests: 3 });
       const req = mockReq({ ip: '192.168.1.1', path: '/fallback' } as Partial<Request>);
       const res = mockRes();
-      const next = jest.fn() as unknown as NextFunction;
+      const next = vi.fn() as unknown as NextFunction;
 
       await middleware(req, res, next);
 
@@ -183,12 +183,12 @@ describe('rateLimiter middleware', () => {
       const middleware = rateLimiter({ windowMs: 60000, maxRequests: 3 });
       const req = mockReq({ ip: '192.168.2.1', path: '/fallback-ok' } as Partial<Request>);
       const res = mockRes();
-      const next = jest.fn() as unknown as NextFunction;
+      const next = vi.fn() as unknown as NextFunction;
 
       await middleware(req, res, next);
       expect(next).toHaveBeenCalled();
 
-      (next as unknown as jest.Mock).mockClear();
+      (next as unknown as Mock).mockClear();
       await middleware(req, res, next);
       expect(next).toHaveBeenCalled();
     });
@@ -205,7 +205,7 @@ describe('rateLimiter middleware', () => {
       for (let i = 0; i < 2; i++) {
         const req = mockReq({ ip, path } as Partial<Request>);
         const res = mockRes();
-        const n = jest.fn() as unknown as NextFunction;
+        const n = vi.fn() as unknown as NextFunction;
         await middleware(req, res, n);
         expect(n).toHaveBeenCalled();
       }
@@ -213,7 +213,7 @@ describe('rateLimiter middleware', () => {
       // Third request should be rate limited
       const req = mockReq({ ip, path } as Partial<Request>);
       const res = mockRes();
-      const blockedNext = jest.fn() as unknown as NextFunction;
+      const blockedNext = vi.fn() as unknown as NextFunction;
 
       await middleware(req, res, blockedNext);
 
@@ -233,7 +233,7 @@ describe('rateLimiter middleware', () => {
       const middleware = rateLimiter(config);
       const req = mockReq({ ip: '192.168.4.1', path: '/warn-test' } as Partial<Request>);
       const res = mockRes();
-      const next = jest.fn() as unknown as NextFunction;
+      const next = vi.fn() as unknown as NextFunction;
 
       await middleware(req, res, next);
 

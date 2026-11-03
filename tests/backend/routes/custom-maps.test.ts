@@ -1,16 +1,16 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
 // Mock services
-const mockListMyMaps = jest.fn<AnyFn>();
-const mockListPublishedMaps = jest.fn<AnyFn>();
-const mockGetMap = jest.fn<AnyFn>();
-const mockCreateMap = jest.fn<AnyFn>();
-const mockUpdateMap = jest.fn<AnyFn>();
-const mockDeleteMap = jest.fn<AnyFn>();
+const mockListMyMaps = vi.hoisted(() => vi.fn<AnyFn>());
+const mockListPublishedMaps = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetMap = vi.hoisted(() => vi.fn<AnyFn>());
+const mockCreateMap = vi.hoisted(() => vi.fn<AnyFn>());
+const mockUpdateMap = vi.hoisted(() => vi.fn<AnyFn>());
+const mockDeleteMap = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/custom-maps', () => ({
+vi.mock('../../../backend/src/services/custom-maps', () => ({
   listMyMaps: mockListMyMaps,
   listPublishedMaps: mockListPublishedMaps,
   getMap: mockGetMap,
@@ -19,24 +19,26 @@ jest.mock('../../../backend/src/services/custom-maps', () => ({
   deleteMap: mockDeleteMap,
 }));
 
-const mockValidateCustomMap = jest.fn<AnyFn>();
-jest.mock('@blast-arena/shared', () => ({
+const mockValidateCustomMap = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('@blast-arena/shared', () => ({
   validateCustomMap: mockValidateCustomMap,
 }));
 
 // Mock middleware as pass-through
-const mockAuthMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
-jest.mock('../../../backend/src/middleware/auth', () => ({
+const mockAuthMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
+vi.mock('../../../backend/src/middleware/auth', () => ({
   authMiddleware: mockAuthMiddleware,
 }));
 
-const mockEmailVerifiedMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
-jest.mock('../../../backend/src/middleware/emailVerified', () => ({
+const mockEmailVerifiedMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
+vi.mock('../../../backend/src/middleware/emailVerified', () => ({
   emailVerifiedMiddleware: mockEmailVerifiedMiddleware,
 }));
 
-const mockValidate = jest.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next());
-jest.mock('../../../backend/src/middleware/validation', () => ({
+const mockValidate = vi.hoisted(() =>
+  vi.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next()),
+);
+vi.mock('../../../backend/src/middleware/validation', () => ({
   validate: mockValidate,
 }));
 
@@ -97,7 +99,7 @@ function mockRes() {
 
 describe('Custom Maps Routes', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('Middleware presence', () => {
@@ -154,7 +156,7 @@ describe('Custom Maps Routes', () => {
       const handler = getHandler('get', '/maps/mine');
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockListMyMaps).toHaveBeenCalledWith(1);
       expect(res._json).toEqual({ maps });
@@ -166,7 +168,7 @@ describe('Custom Maps Routes', () => {
       const handler = getHandler('get', '/maps/mine');
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -181,7 +183,7 @@ describe('Custom Maps Routes', () => {
       const handler = getHandler('get', '/maps/published');
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockListPublishedMaps).toHaveBeenCalled();
       expect(res._json).toEqual({ maps });
@@ -196,7 +198,7 @@ describe('Custom Maps Routes', () => {
       const handler = getHandler('get', '/maps/:id');
       const req = mockReq({ params: { id: '5' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetMap).toHaveBeenCalledWith(5);
       expect(res._json).toEqual({ map });
@@ -209,7 +211,7 @@ describe('Custom Maps Routes', () => {
       const handler = getHandler('get', '/maps/:id');
       const req = mockReq({ params: { id: '5' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(res._json).toEqual({ map });
     });
@@ -221,7 +223,7 @@ describe('Custom Maps Routes', () => {
       const handler = getHandler('get', '/maps/:id');
       const req = mockReq({ params: { id: '5' } });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(
@@ -235,7 +237,7 @@ describe('Custom Maps Routes', () => {
       const handler = getHandler('get', '/maps/:id');
       const req = mockReq({ params: { id: '999' } });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(
@@ -247,7 +249,7 @@ describe('Custom Maps Routes', () => {
       const handler = getHandler('get', '/maps/:id');
       const req = mockReq({ params: { id: 'abc' } });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(
@@ -275,7 +277,7 @@ describe('Custom Maps Routes', () => {
         },
       });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockValidateCustomMap).toHaveBeenCalledWith([['empty']], 11, 11, [{ x: 1, y: 1 }]);
       expect(mockCreateMap).toHaveBeenCalledWith(
@@ -308,7 +310,7 @@ describe('Custom Maps Routes', () => {
         },
       });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(
@@ -337,7 +339,7 @@ describe('Custom Maps Routes', () => {
         },
       });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockUpdateMap).toHaveBeenCalledWith(
         10,
@@ -371,7 +373,7 @@ describe('Custom Maps Routes', () => {
         },
       });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(
@@ -383,7 +385,7 @@ describe('Custom Maps Routes', () => {
       const handler = getHandler('put', '/maps/:id');
       const req = mockReq({ params: { id: 'xyz' }, body: {} });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(
@@ -406,7 +408,7 @@ describe('Custom Maps Routes', () => {
         },
       });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(
@@ -423,7 +425,7 @@ describe('Custom Maps Routes', () => {
       const handler = getHandler('delete', '/maps/:id');
       const req = mockReq({ params: { id: '10' } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockDeleteMap).toHaveBeenCalledWith(10, 1);
       expect(res._json).toEqual({ success: true });
@@ -435,7 +437,7 @@ describe('Custom Maps Routes', () => {
       const handler = getHandler('delete', '/maps/:id');
       const req = mockReq({ params: { id: '10' } });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(
@@ -447,7 +449,7 @@ describe('Custom Maps Routes', () => {
       const handler = getHandler('delete', '/maps/:id');
       const req = mockReq({ params: { id: 'bad' } });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(

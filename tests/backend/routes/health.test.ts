@@ -1,22 +1,27 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockExecute = jest.fn<() => Promise<unknown>>();
-const mockPing = jest.fn<() => Promise<string>>();
+const mockExecute = vi.fn<() => Promise<unknown>>();
+const mockPing = vi.fn<() => Promise<string>>();
 
-jest.mock('../../../backend/src/db/connection', () => ({
-  getPool: jest.fn(() => ({
+vi.mock('../../../backend/src/db/connection', () => ({
+  getPool: vi.fn(() => ({
     execute: mockExecute,
   })),
 }));
 
-jest.mock('../../../backend/src/db/redis', () => ({
-  getRedis: jest.fn(() => ({
+vi.mock('../../../backend/src/db/redis', () => ({
+  getRedis: vi.fn(() => ({
     ping: mockPing,
   })),
 }));
 
-const mockLogger = { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() };
-jest.mock('../../../backend/src/utils/logger', () => ({ logger: mockLogger }));
+const mockLogger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}));
+vi.mock('../../../backend/src/utils/logger', () => ({ logger: mockLogger }));
 
 import healthRouter, { BUILD_ID } from '../../../backend/src/routes/health';
 import { Request, Response } from 'express';
@@ -54,8 +59,8 @@ function mockRes() {
       return res;
     },
   };
-  jest.spyOn(res, 'status');
-  jest.spyOn(res, 'json');
+  vi.spyOn(res, 'status');
+  vi.spyOn(res, 'json');
   return res;
 }
 
@@ -64,7 +69,7 @@ describe('GET /health', () => {
 
   beforeEach(() => {
     handler = getHealthHandler();
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('returns 200 with status ok when healthy', async () => {

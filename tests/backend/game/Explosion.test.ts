@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { Explosion } from '../../../backend/src/game/Explosion';
 import { EXPLOSION_DURATION_TICKS } from '@blast-arena/shared';
 import type { Position } from '@blast-arena/shared';

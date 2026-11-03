@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
  * Party Lua scripts answer `'ERR:CODE'` strings and the service maps each to an AppError, the way
@@ -16,14 +16,14 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-const mockEval = jest.fn<AnyFn>();
-const mockGet = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/redis', () => ({
-  getRedis: () => ({ eval: mockEval, get: mockGet, set: jest.fn(), del: jest.fn() }),
+const mockEval = vi.fn<AnyFn>();
+const mockGet = vi.fn<AnyFn>();
+vi.mock('../../../backend/src/db/redis', () => ({
+  getRedis: () => ({ eval: mockEval, get: mockGet, set: vi.fn(), del: vi.fn() }),
 }));
 
-jest.mock('crypto', () => ({
-  ...jest.requireActual<typeof import('crypto')>('crypto'),
+vi.mock('crypto', async () => ({
+  ...(await vi.importActual<typeof import('crypto')>('crypto')),
   randomUUID: () => 'party-uuid',
 }));
 
@@ -52,7 +52,7 @@ async function expectAppError(
 
 describe('party service — Lua error mapping (audit B4)', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('createParty', () => {

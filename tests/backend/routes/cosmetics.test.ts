@@ -1,36 +1,38 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
 // Mock services
-const mockGetAllCosmetics = jest.fn<AnyFn>();
-const mockGetUserCosmetics = jest.fn<AnyFn>();
-const mockGetEquippedCosmetics = jest.fn<AnyFn>();
-const mockEquipCosmetic = jest.fn<AnyFn>();
+const mockGetAllCosmetics = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetUserCosmetics = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetEquippedCosmetics = vi.hoisted(() => vi.fn<AnyFn>());
+const mockEquipCosmetic = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/cosmetics', () => ({
+vi.mock('../../../backend/src/services/cosmetics', () => ({
   getAllCosmetics: mockGetAllCosmetics,
   getUserCosmetics: mockGetUserCosmetics,
   getEquippedCosmetics: mockGetEquippedCosmetics,
   equipCosmetic: mockEquipCosmetic,
 }));
 
-const mockGetAllAchievements = jest.fn<AnyFn>();
-const mockGetUserAchievements = jest.fn<AnyFn>();
+const mockGetAllAchievements = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetUserAchievements = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/achievements', () => ({
+vi.mock('../../../backend/src/services/achievements', () => ({
   getAllAchievements: mockGetAllAchievements,
   getUserAchievements: mockGetUserAchievements,
 }));
 
 // Mock middleware
-const mockAuthMiddleware = jest.fn<AnyFn>((_req, _res, next) => next());
-jest.mock('../../../backend/src/middleware/auth', () => ({
+const mockAuthMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
+vi.mock('../../../backend/src/middleware/auth', () => ({
   authMiddleware: mockAuthMiddleware,
 }));
 
-const mockValidate = jest.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next());
-jest.mock('../../../backend/src/middleware/validation', () => ({
+const mockValidate = vi.hoisted(() =>
+  vi.fn<AnyFn>(() => (_req: any, _res: any, next: any) => next()),
+);
+vi.mock('../../../backend/src/middleware/validation', () => ({
   validate: mockValidate,
 }));
 
@@ -92,7 +94,7 @@ function mockRes() {
 
 describe('Cosmetics Routes', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('Middleware presence', () => {
@@ -150,7 +152,7 @@ describe('Cosmetics Routes', () => {
       const handler = getHandler('get', '/cosmetics');
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetAllCosmetics).toHaveBeenCalledWith(true);
       expect(res._json).toEqual({ cosmetics });
@@ -162,7 +164,7 @@ describe('Cosmetics Routes', () => {
       const handler = getHandler('get', '/cosmetics');
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -177,7 +179,7 @@ describe('Cosmetics Routes', () => {
       const handler = getHandler('get', '/cosmetics/mine');
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetUserCosmetics).toHaveBeenCalledWith(1);
       expect(res._json).toEqual({ cosmetics });
@@ -189,7 +191,7 @@ describe('Cosmetics Routes', () => {
       const handler = getHandler('get', '/cosmetics/mine');
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -204,7 +206,7 @@ describe('Cosmetics Routes', () => {
       const handler = getHandler('get', '/cosmetics/equipped');
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetEquippedCosmetics).toHaveBeenCalledWith(1);
       expect(res._json).toEqual(equipped);
@@ -216,7 +218,7 @@ describe('Cosmetics Routes', () => {
       const handler = getHandler('get', '/cosmetics/equipped');
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -232,7 +234,7 @@ describe('Cosmetics Routes', () => {
       const handler = getHandler('put', '/cosmetics/equip');
       const req = mockReq({ body: { slot: 'eyes', cosmeticId: 3 } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockEquipCosmetic).toHaveBeenCalledWith(1, 'eyes', 3);
       expect(mockGetEquippedCosmetics).toHaveBeenCalledWith(1);
@@ -247,7 +249,7 @@ describe('Cosmetics Routes', () => {
       const handler = getHandler('put', '/cosmetics/equip');
       const req = mockReq({ body: { slot: 'trail', cosmeticId: null } });
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockEquipCosmetic).toHaveBeenCalledWith(1, 'trail', null);
       expect(mockGetEquippedCosmetics).toHaveBeenCalledWith(1);
@@ -260,7 +262,7 @@ describe('Cosmetics Routes', () => {
       const handler = getHandler('put', '/cosmetics/equip');
       const req = mockReq({ body: { slot: 'eyes', cosmeticId: 3 } });
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -278,7 +280,7 @@ describe('Cosmetics Routes', () => {
       const handler = getHandler('get', '/achievements');
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetAllAchievements).toHaveBeenCalledWith(true);
       expect(res._json).toEqual({ achievements });
@@ -290,7 +292,7 @@ describe('Cosmetics Routes', () => {
       const handler = getHandler('get', '/achievements');
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -307,7 +309,7 @@ describe('Cosmetics Routes', () => {
       const handler = getHandler('get', '/achievements/mine');
       const req = mockReq();
       const res = mockRes();
-      await handler(req, res, jest.fn());
+      await handler(req, res, vi.fn());
 
       expect(mockGetUserAchievements).toHaveBeenCalledWith(1);
       expect(res._json).toEqual({ achievements });
@@ -319,7 +321,7 @@ describe('Cosmetics Routes', () => {
       const handler = getHandler('get', '/achievements/mine');
       const req = mockReq();
       const res = mockRes();
-      const next = jest.fn();
+      const next = vi.fn();
       await handler(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));

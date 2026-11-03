@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { z } from 'zod';
 import { validate } from '../../../backend/src/middleware/validation';
 import { Request, Response, NextFunction } from 'express';
@@ -14,8 +14,8 @@ function mockReq(overrides: Partial<Request> = {}): Request {
 
 function mockRes(): Response {
   const res: Partial<Response> = {};
-  res.status = jest.fn<(code: number) => Response>().mockReturnValue(res as Response);
-  res.json = jest.fn<(body: unknown) => Response>().mockReturnValue(res as Response);
+  res.status = vi.fn<(code: number) => Response>().mockReturnValue(res as Response);
+  res.json = vi.fn<(body: unknown) => Response>().mockReturnValue(res as Response);
   return res as Response;
 }
 
@@ -23,7 +23,7 @@ describe('validate middleware', () => {
   let next: NextFunction;
 
   beforeEach(() => {
-    next = jest.fn() as unknown as NextFunction;
+    next = vi.fn() as unknown as NextFunction;
   });
 
   const userSchema = z.object({
@@ -79,7 +79,7 @@ describe('validate middleware', () => {
 
     middleware(req, res, next);
 
-    const jsonCall = (res.json as jest.Mock).mock.calls[0][0] as {
+    const jsonCall = (res.json as Mock).mock.calls[0][0] as {
       details: Array<{ field: string; message: string }>;
     };
     expect(jsonCall.details).toEqual(
@@ -95,7 +95,7 @@ describe('validate middleware', () => {
 
     middleware(req, res, next);
 
-    const jsonCall = (res.json as jest.Mock).mock.calls[0][0] as {
+    const jsonCall = (res.json as Mock).mock.calls[0][0] as {
       details: Array<{ field: string; message: string }>;
     };
     expect(jsonCall.details.length).toBeGreaterThanOrEqual(2);

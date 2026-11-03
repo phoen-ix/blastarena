@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InputBuffer } from '../../../backend/src/game/InputBuffer';
 import { PlayerInput } from '@blast-arena/shared';
 

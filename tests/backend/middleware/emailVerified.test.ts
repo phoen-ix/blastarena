@@ -1,21 +1,26 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
 // Mocks BEFORE imports
 type AnyFn = (...args: any[]) => any;
-const mockQuery = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
 }));
 
-const mockLogger = { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() };
-jest.mock('../../../backend/src/utils/logger', () => ({ logger: mockLogger }));
+const mockLogger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}));
+vi.mock('../../../backend/src/utils/logger', () => ({ logger: mockLogger }));
 
 import { emailVerifiedMiddleware } from '../../../backend/src/middleware/emailVerified';
 
 function createMockRes() {
   const res = {
-    status: jest.fn().mockReturnThis() as jest.Mock,
-    json: jest.fn() as jest.Mock,
+    status: vi.fn().mockReturnThis() as Mock,
+    json: vi.fn() as Mock,
   };
   return res;
 }
@@ -23,13 +28,13 @@ function createMockRes() {
 describe('emailVerifiedMiddleware', () => {
   let mockReq: any;
   let mockRes: ReturnType<typeof createMockRes>;
-  let mockNext: jest.Mock;
+  let mockNext: Mock;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockReq = {};
     mockRes = createMockRes();
-    mockNext = jest.fn();
+    mockNext = vi.fn();
   });
 
   it('should return 401 with UNAUTHORIZED when req.user is undefined', async () => {

@@ -1,18 +1,18 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
-const mockGetFriends = jest.fn<AnyFn>();
-const mockGetPendingRequests = jest.fn<AnyFn>();
-const mockSendFriendRequest = jest.fn<AnyFn>();
-const mockAcceptFriendRequest = jest.fn<AnyFn>();
-const mockDeclineFriendRequest = jest.fn<AnyFn>();
-const mockCancelFriendRequest = jest.fn<AnyFn>();
-const mockRemoveFriend = jest.fn<AnyFn>();
-const mockBlockUser = jest.fn<AnyFn>();
-const mockUnblockUser = jest.fn<AnyFn>();
-const mockGetFriendIds = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/friends', () => ({
+const mockGetFriends = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetPendingRequests = vi.hoisted(() => vi.fn<AnyFn>());
+const mockSendFriendRequest = vi.hoisted(() => vi.fn<AnyFn>());
+const mockAcceptFriendRequest = vi.hoisted(() => vi.fn<AnyFn>());
+const mockDeclineFriendRequest = vi.hoisted(() => vi.fn<AnyFn>());
+const mockCancelFriendRequest = vi.hoisted(() => vi.fn<AnyFn>());
+const mockRemoveFriend = vi.hoisted(() => vi.fn<AnyFn>());
+const mockBlockUser = vi.hoisted(() => vi.fn<AnyFn>());
+const mockUnblockUser = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetFriendIds = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/friends', () => ({
   getFriends: mockGetFriends,
   getPendingRequests: mockGetPendingRequests,
   sendFriendRequest: mockSendFriendRequest,
@@ -24,18 +24,18 @@ jest.mock('../../../backend/src/services/friends', () => ({
   unblockUser: mockUnblockUser,
   getFriendIds: mockGetFriendIds,
 }));
-const mockGetPresence = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/presence', () => ({
+const mockGetPresence = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/presence', () => ({
   getPresence: mockGetPresence,
 }));
-jest.mock('../../../backend/src/utils/socketRateLimit', () => ({
+vi.mock('../../../backend/src/utils/socketRateLimit', () => ({
   createSocketRateLimiter: () => ({
-    isAllowed: jest.fn().mockReturnValue(true),
-    remove: jest.fn(),
+    isAllowed: vi.fn().mockReturnValue(true),
+    remove: vi.fn(),
   }),
 }));
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
 import {
@@ -58,22 +58,22 @@ function createMockSocket(overrides: Record<string, any> = {}) {
       activeRoomCode: undefined,
       ...overrides,
     },
-    on: jest.fn((event: string, handler: Function) => {
+    on: vi.fn((event: string, handler: Function) => {
       handlers[event] = handler;
     }),
-    join: jest.fn(),
-    leave: jest.fn(),
+    join: vi.fn(),
+    leave: vi.fn(),
     _handlers: handlers,
   };
   return socket;
 }
 
 function createMockIO() {
-  const emitFn = jest.fn<AnyFn>();
+  const emitFn = vi.fn<AnyFn>();
   const io: any = {
-    emit: jest.fn<AnyFn>(),
-    to: jest.fn<AnyFn>().mockReturnValue({ emit: emitFn }),
-    in: jest.fn<AnyFn>().mockReturnValue({ fetchSockets: jest.fn<AnyFn>().mockResolvedValue([]) }),
+    emit: vi.fn<AnyFn>(),
+    to: vi.fn<AnyFn>().mockReturnValue({ emit: emitFn }),
+    in: vi.fn<AnyFn>().mockReturnValue({ fetchSockets: vi.fn<AnyFn>().mockResolvedValue([]) }),
     _toEmit: emitFn,
   };
   return io;
@@ -84,7 +84,7 @@ describe('friendHandlers', () => {
   let io: ReturnType<typeof createMockIO>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     socket = createMockSocket();
     io = createMockIO();
     setupFriendHandlers(socket, io);
@@ -99,7 +99,7 @@ describe('friendHandlers', () => {
       };
       mockGetFriends.mockResolvedValue(friends);
       mockGetPendingRequests.mockResolvedValue(pending);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['friend:list'];
       await handler(callback);
@@ -120,7 +120,7 @@ describe('friendHandlers', () => {
       // which leaked ioredis Lua SHAs and 'Database pool not initialized'.
       // (audit CLIENT-ERROR-ALLOWLIST-1)
       mockGetFriends.mockRejectedValue(new Error('DB error'));
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['friend:list'];
       await handler(callback);
@@ -135,7 +135,7 @@ describe('friendHandlers', () => {
   describe('friend:request', () => {
     it('sends request and emits requestReceived to target', async () => {
       mockSendFriendRequest.mockResolvedValue(42);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['friend:request'];
       await handler({ username: 'bob' }, callback);
@@ -154,7 +154,7 @@ describe('friendHandlers', () => {
     });
 
     it('rejects empty username', async () => {
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['friend:request'];
       await handler({ username: '' }, callback);
@@ -172,7 +172,7 @@ describe('friendHandlers', () => {
       mockSendFriendRequest.mockRejectedValue(
         new AppError('User not found', 404, 'USER_NOT_FOUND'),
       );
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['friend:request'];
       await handler({ username: 'ghost' }, callback);
@@ -190,7 +190,7 @@ describe('friendHandlers', () => {
       mockGetFriends.mockResolvedValue([]);
       mockGetPendingRequests.mockResolvedValue({ incoming: [], outgoing: [] });
       mockGetPresence.mockResolvedValue({ status: 'lobby' });
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['friend:accept'];
       await handler({ fromUserId: 5 }, callback);
@@ -208,7 +208,7 @@ describe('friendHandlers', () => {
       mockGetFriends.mockResolvedValue([]);
       mockGetPendingRequests.mockResolvedValue({ incoming: [], outgoing: [] });
       mockGetPresence.mockResolvedValue({ status: 'in_game' });
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['friend:accept'];
       await handler({ fromUserId: 5 }, callback);
@@ -225,7 +225,7 @@ describe('friendHandlers', () => {
       mockGetFriends.mockResolvedValue([]);
       mockGetPendingRequests.mockResolvedValue({ incoming: [], outgoing: [] });
       mockGetPresence.mockResolvedValue(null);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['friend:accept'];
       await handler({ fromUserId: 5 }, callback);
@@ -239,7 +239,7 @@ describe('friendHandlers', () => {
   describe('friend:decline', () => {
     it('calls declineFriendRequest and returns success', async () => {
       mockDeclineFriendRequest.mockResolvedValue(undefined);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['friend:decline'];
       await handler({ fromUserId: 7 }, callback);
@@ -252,7 +252,7 @@ describe('friendHandlers', () => {
   describe('friend:cancel', () => {
     it('calls cancelFriendRequest and returns success', async () => {
       mockCancelFriendRequest.mockResolvedValue(undefined);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['friend:cancel'];
       await handler({ toUserId: 8 }, callback);
@@ -265,7 +265,7 @@ describe('friendHandlers', () => {
   describe('friend:remove', () => {
     it('removes and emits friend:removed to the other user', async () => {
       mockRemoveFriend.mockResolvedValue(undefined);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['friend:remove'];
       await handler({ friendId: 9 }, callback);
@@ -280,7 +280,7 @@ describe('friendHandlers', () => {
   describe('friend:block', () => {
     it('blocks and emits friend:removed to the blocked user', async () => {
       mockBlockUser.mockResolvedValue(undefined);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['friend:block'];
       await handler({ userId: 10 }, callback);
@@ -295,7 +295,7 @@ describe('friendHandlers', () => {
   describe('friend:unblock', () => {
     it('calls unblockUser and returns success', async () => {
       mockUnblockUser.mockResolvedValue(undefined);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const handler = socket._handlers['friend:unblock'];
       await handler({ userId: 11 }, callback);

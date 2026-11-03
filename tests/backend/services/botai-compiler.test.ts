@@ -1,12 +1,12 @@
-import { describe, it, expect, jest } from '@jest/globals';
+import { describe, it, expect, vi } from 'vitest';
 import {
   compileBotAI,
   scanAndBuildAI,
   loadBotAIInSandbox,
 } from '../../../backend/src/services/botai-compiler';
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 describe('botai-compiler', () => {

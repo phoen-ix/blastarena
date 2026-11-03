@@ -1,51 +1,53 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
 }));
 
-const mockGetSetting = jest.fn<AnyFn>();
+const mockGetSetting = vi.hoisted(() => vi.fn<AnyFn>());
 // getRankConfig now lives in the settings service and is re-exported by leaderboard, so the mock
 // has to provide it. Its behaviour is driven by mockGetSetting exactly as the real one is, and it
 // is covered directly in settings.test.ts. (audit RANKCONFIG-DUP-1)
-const mockGetRankConfig = jest.fn<AnyFn>(async () => {
-  const value = await mockGetSetting('rank_tiers');
-  if (!value) return DEFAULT_RANK_CONFIG;
-  try {
-    return JSON.parse(value as string);
-  } catch {
-    return DEFAULT_RANK_CONFIG;
-  }
-});
-jest.mock('../../../backend/src/services/settings', () => ({
+const mockGetRankConfig = vi.hoisted(() =>
+  vi.fn<AnyFn>(async () => {
+    const value = await mockGetSetting('rank_tiers');
+    if (!value) return DEFAULT_RANK_CONFIG;
+    try {
+      return JSON.parse(value as string);
+    } catch {
+      return DEFAULT_RANK_CONFIG;
+    }
+  }),
+);
+vi.mock('../../../backend/src/services/settings', () => ({
   getSetting: mockGetSetting,
   getRankConfig: mockGetRankConfig,
 }));
 
-const mockGetActiveSeason = jest.fn<AnyFn>();
-const mockGetSeasonById = jest.fn<AnyFn>();
-const mockGetUserSeasonHistory = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/season', () => ({
+const mockGetActiveSeason = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetSeasonById = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetUserSeasonHistory = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/season', () => ({
   getActiveSeason: mockGetActiveSeason,
   getSeasonById: mockGetSeasonById,
   getUserSeasonHistory: mockGetUserSeasonHistory,
 }));
 
-const mockGetEquippedCosmetics = jest.fn<AnyFn>();
-const mockGetPlayerCosmeticsForGame = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/cosmetics', () => ({
+const mockGetEquippedCosmetics = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetPlayerCosmeticsForGame = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/cosmetics', () => ({
   getEquippedCosmetics: mockGetEquippedCosmetics,
   getPlayerCosmeticsForGame: mockGetPlayerCosmeticsForGame,
 }));
 
-const mockGetUserAchievementsPublic = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/achievements', () => ({
+const mockGetUserAchievementsPublic = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/achievements', () => ({
   getUserAchievementsPublic: mockGetUserAchievementsPublic,
 }));
 
@@ -60,7 +62,7 @@ import { DEFAULT_RANK_CONFIG, RankConfig } from '@blast-arena/shared';
 
 describe('Leaderboard Service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockGetActiveSeason.mockResolvedValue(null);
     mockGetSeasonById.mockResolvedValue(null);
     mockGetUserSeasonHistory.mockResolvedValue([]);

@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
  * PUT /admin/seasons/:id, /admin/achievements/:id, /admin/cosmetics/:id and /admin/challenges/:id
@@ -12,97 +12,108 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 type AnyFn = (...args: any[]) => any;
 
-const noopService = () =>
-  new Proxy({}, { get: () => jest.fn<AnyFn>().mockResolvedValue(undefined) });
+// `then` stays undefined: vitest awaits a mock factory's result, and a thenable is no module.
+const noopService = vi.hoisted(
+  () => () =>
+    new Proxy(
+      {},
+      {
+        get: (_t, key) =>
+          key === 'then' ? undefined : vi.fn<AnyFn>().mockResolvedValue(undefined),
+      },
+    ),
+);
 
-jest.mock('../../../backend/src/services/admin', () => noopService());
-jest.mock('../../../backend/src/services/replay', () => noopService());
-jest.mock('../../../backend/src/services/settings', () => noopService());
-jest.mock('../../../backend/src/services/botai', () => noopService());
-jest.mock('../../../backend/src/services/enemyai', () => noopService());
-jest.mock('../../../backend/src/services/email', () => noopService());
+vi.mock('../../../backend/src/services/admin', () => noopService());
+vi.mock('../../../backend/src/services/replay', () => noopService());
+vi.mock('../../../backend/src/services/settings', () => noopService());
+vi.mock('../../../backend/src/services/botai', () => noopService());
+vi.mock('../../../backend/src/services/enemyai', () => noopService());
+vi.mock('../../../backend/src/services/email', () => noopService());
 
-const mockUpdateSeason = jest.fn<AnyFn>();
-const mockGetSeasonById = jest.fn<AnyFn>();
-const mockDeleteSeason = jest.fn<AnyFn>();
-const mockActivateSeason = jest.fn<AnyFn>();
-const mockEndSeason = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/season', () => ({
+const mockUpdateSeason = vi.hoisted(() => vi.fn<AnyFn>());
+const mockGetSeasonById = vi.hoisted(() => vi.fn<AnyFn>());
+const mockDeleteSeason = vi.hoisted(() => vi.fn<AnyFn>());
+const mockActivateSeason = vi.hoisted(() => vi.fn<AnyFn>());
+const mockEndSeason = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/season', () => ({
   updateSeason: mockUpdateSeason,
   getSeasonById: mockGetSeasonById,
   deleteSeason: mockDeleteSeason,
   activateSeason: mockActivateSeason,
   endSeason: mockEndSeason,
-  getSeasons: jest.fn(),
-  createSeason: jest.fn(),
+  getSeasons: vi.fn(),
+  createSeason: vi.fn(),
 }));
 
-const mockUpdateAchievement = jest.fn<AnyFn>();
-const mockDeleteAchievement = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/achievements', () => ({
+const mockUpdateAchievement = vi.hoisted(() => vi.fn<AnyFn>());
+const mockDeleteAchievement = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/achievements', () => ({
   updateAchievement: mockUpdateAchievement,
   deleteAchievement: mockDeleteAchievement,
-  getAchievementById: jest.fn<AnyFn>().mockResolvedValue({ id: 1 }),
-  getAllAchievements: jest.fn(),
-  createAchievement: jest.fn(),
+  getAchievementById: vi.fn<AnyFn>().mockResolvedValue({ id: 1 }),
+  getAllAchievements: vi.fn(),
+  createAchievement: vi.fn(),
 }));
 
-const mockUpdateCosmetic = jest.fn<AnyFn>();
-const mockDeleteCosmetic = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/cosmetics', () => ({
+const mockUpdateCosmetic = vi.hoisted(() => vi.fn<AnyFn>());
+const mockDeleteCosmetic = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/cosmetics', () => ({
   updateCosmetic: mockUpdateCosmetic,
   deleteCosmetic: mockDeleteCosmetic,
-  getCosmeticById: jest.fn<AnyFn>().mockResolvedValue({ id: 1 }),
-  getAllCosmetics: jest.fn(),
-  createCosmetic: jest.fn(),
+  getCosmeticById: vi.fn<AnyFn>().mockResolvedValue({ id: 1 }),
+  getAllCosmetics: vi.fn(),
+  createCosmetic: vi.fn(),
 }));
 
-const mockUpdateChallenge = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/challenges', () => ({
+const mockUpdateChallenge = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/challenges', () => ({
   updateChallenge: mockUpdateChallenge,
-  listChallenges: jest.fn(),
-  createChallenge: jest.fn(),
-  deleteChallenge: jest.fn(),
-  activateChallenge: jest.fn(),
-  deactivateChallenge: jest.fn(),
+  listChallenges: vi.fn(),
+  createChallenge: vi.fn(),
+  deleteChallenge: vi.fn(),
+  activateChallenge: vi.fn(),
+  deactivateChallenge: vi.fn(),
 }));
 
-jest.mock('../../../backend/src/game/registry', () => ({
+vi.mock('../../../backend/src/game/registry', () => ({
   getSimulationManager: () => ({}),
-  getIO: () => ({ emit: jest.fn(), to: jest.fn().mockReturnValue({ emit: jest.fn() }) }),
+  getIO: () => ({ emit: vi.fn(), to: vi.fn().mockReturnValue({ emit: vi.fn() }) }),
 }));
-jest.mock('../../../backend/src/game/OpenWorldManager', () => ({
-  openWorldManager: { getStatus: jest.fn(), reloadSettings: jest.fn() },
+vi.mock('../../../backend/src/game/OpenWorldManager', () => ({
+  openWorldManager: { getStatus: vi.fn(), reloadSettings: vi.fn() },
 }));
 
-const mockExecute = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   execute: mockExecute,
-  query: jest.fn(),
+  query: vi.fn(),
 }));
-jest.mock('../../../backend/src/config', () => ({
+vi.mock('../../../backend/src/config', () => ({
   getConfig: () => ({ APP_URL: 'http://localhost:8080' }),
 }));
-jest.mock('../../../backend/src/middleware/auth', () => ({
-  authMiddleware: jest.fn((_req: any, _res: any, next: any) => next()),
+vi.mock('../../../backend/src/middleware/auth', () => ({
+  authMiddleware: vi.fn((_req: any, _res: any, next: any) => next()),
 }));
-jest.mock('../../../backend/src/middleware/admin', () => ({
-  staffMiddleware: jest.fn((_req: any, _res: any, next: any) => next()),
-  adminOnlyMiddleware: jest.fn((_req: any, _res: any, next: any) => next()),
+vi.mock('../../../backend/src/middleware/admin', () => ({
+  staffMiddleware: vi.fn((_req: any, _res: any, next: any) => next()),
+  adminOnlyMiddleware: vi.fn((_req: any, _res: any, next: any) => next()),
 }));
-jest.mock('../../../backend/src/middleware/rateLimiter', () => ({
-  rateLimiter: jest.fn(() => (_req: any, _res: any, next: any) => next()),
+vi.mock('../../../backend/src/middleware/rateLimiter', () => ({
+  rateLimiter: vi.fn(() => (_req: any, _res: any, next: any) => next()),
 }));
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
-jest.mock('multer', () => {
+vi.mock('multer', () => {
   const multerFn = () => ({ single: () => (_req: any, _res: any, next: any) => next() });
   multerFn.memoryStorage = () => ({});
   return { __esModule: true, default: multerFn };
 });
 
 import adminRouter from '../../../backend/src/routes/admin';
+import { getAchievementById } from '../../../backend/src/services/achievements';
+import { getCosmeticById } from '../../../backend/src/services/cosmetics';
 
 type Layer = { handle: Function };
 type RouteLayer = { route?: { path: string; methods: Record<string, boolean>; stack: Layer[] } };
@@ -133,7 +144,7 @@ function mockRes() {
 /** Run the whole inline stack of a route (middleware + handler) like Express would. */
 async function run(method: string, path: string, req: Record<string, unknown>) {
   const res = mockRes();
-  const next = jest.fn();
+  const next = vi.fn();
   const fullReq = { user: { userId: 1, username: 'admin', role: 'admin' }, params: {}, ...req };
   for (const layer of routeStack(method, path)) {
     let advanced = false;
@@ -147,7 +158,7 @@ async function run(method: string, path: string, req: Record<string, unknown>) {
 }
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   mockExecute.mockResolvedValue({ affectedRows: 1, insertId: 1 });
   mockGetSeasonById.mockResolvedValue({ id: 3, name: 'S' });
 });
@@ -243,10 +254,7 @@ describe('PUT /admin/achievements/:id (audit B9)', () => {
 
   it('answers 404 for an unknown id without updating or logging', async () => {
     // It answered 200 with `null`
-    const svc = jest.requireMock<{ getAchievementById: jest.Mock<AnyFn> }>(
-      '../../../backend/src/services/achievements',
-    );
-    svc.getAchievementById.mockResolvedValueOnce(null);
+    vi.mocked(getAchievementById).mockResolvedValueOnce(null);
     const { res } = await run('put', '/admin/achievements/:id', {
       params: { id: '404' },
       body: { sortOrder: 1 },
@@ -299,10 +307,7 @@ describe('PUT /admin/cosmetics/:id (audit B9)', () => {
   });
 
   it('answers 404 for an unknown id without updating or logging', async () => {
-    const svc = jest.requireMock<{ getCosmeticById: jest.Mock<AnyFn> }>(
-      '../../../backend/src/services/cosmetics',
-    );
-    svc.getCosmeticById.mockResolvedValueOnce(null);
+    vi.mocked(getCosmeticById).mockResolvedValueOnce(null);
     const { res } = await run('put', '/admin/cosmetics/:id', {
       params: { id: '404' },
       body: { rarity: 'epic' },

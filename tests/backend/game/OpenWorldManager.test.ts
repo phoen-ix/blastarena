@@ -1,20 +1,20 @@
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-// --- Mock setup (jest.mock is hoisted before imports) ---
+// --- Mock setup (vi.mock is hoisted before imports) ---
 
-jest.mock('../../../backend/src/db/connection', () => ({
-  query: jest.fn(),
-  execute: jest.fn<AnyFn>().mockResolvedValue(undefined),
+vi.mock('../../../backend/src/db/connection', () => ({
+  query: vi.fn(),
+  execute: vi.fn<AnyFn>().mockResolvedValue(undefined),
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-const mockSettings = {
+const mockSettings = vi.hoisted(() => ({
   enabled: true,
   mapWidth: 21,
   mapHeight: 21,
@@ -24,35 +24,39 @@ const mockSettings = {
   respawnDelay: 3,
   afkTimeoutSeconds: 60,
   guestAccess: true,
-};
+}));
 
-jest.mock('../../../backend/src/services/settings', () => ({
-  isOpenWorldEnabled: jest.fn<AnyFn>().mockResolvedValue(true),
-  getOpenWorldSettings: jest.fn<AnyFn>().mockResolvedValue(mockSettings),
+vi.mock('../../../backend/src/services/settings', () => ({
+  isOpenWorldEnabled: vi.fn<AnyFn>().mockResolvedValue(true),
+  getOpenWorldSettings: vi.fn<AnyFn>().mockResolvedValue(mockSettings),
 }));
 
 // Capture the per-tick callback so tests can drive ticks without a real timer loop
 const mockTickRef: { current: ((state: unknown) => void) | null } = { current: null };
-jest.mock('../../../backend/src/game/GameLoop', () => ({
-  GameLoop: jest.fn().mockImplementation((...args: unknown[]) => {
+vi.mock('../../../backend/src/game/GameLoop', () => ({
+  GameLoop: vi.fn().mockImplementation(function (...args: unknown[]) {
     mockTickRef.current = args[1] as (state: unknown) => void;
-    return { start: jest.fn(), stop: jest.fn(), isRunning: jest.fn().mockReturnValue(true) };
+    return { start: vi.fn(), stop: vi.fn(), isRunning: vi.fn().mockReturnValue(true) };
   }),
 }));
 
-jest.mock('../../../backend/src/utils/replayRecorder', () => ({
-  ReplayRecorder: jest.fn().mockImplementation(() => ({
-    setSessionId: jest.fn(),
-    recordTick: jest.fn(),
-    finalize: jest.fn(),
-  })),
+vi.mock('../../../backend/src/utils/replayRecorder', () => ({
+  ReplayRecorder: vi.fn().mockImplementation(function () {
+    return {
+      setSessionId: vi.fn(),
+      recordTick: vi.fn(),
+      finalize: vi.fn(),
+    };
+  }),
 }));
 
-jest.mock('../../../backend/src/utils/gameLogger', () => ({
-  GameLogger: jest.fn().mockImplementation(() => ({
-    log: jest.fn(),
-    logGameOver: jest.fn(),
-  })),
+vi.mock('../../../backend/src/utils/gameLogger', () => ({
+  GameLogger: vi.fn().mockImplementation(function () {
+    return {
+      log: vi.fn(),
+      logGameOver: vi.fn(),
+    };
+  }),
 }));
 
 import { openWorldManager } from '../../../backend/src/game/OpenWorldManager';
@@ -111,7 +115,7 @@ describe('OpenWorldManager', () => {
 
   describe('guest names', () => {
     it('draws them from crypto, not Math.random', () => {
-      const spy = jest.spyOn(Math, 'random');
+      const spy = vi.spyOn(Math, 'random');
       try {
         const res = openWorldManager.handleJoin('sock-guest', 0, '', true);
         expect(res.success).toBe(true);

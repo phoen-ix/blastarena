@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import path from 'path';
 import { resolveInside } from '../../../backend/src/utils/safePath';
 

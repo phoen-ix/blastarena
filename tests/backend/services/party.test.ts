@@ -1,32 +1,32 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
 const store = new Map<string, string>();
 
 const mockRedis = {
-  get: jest.fn<AnyFn>((key: string) => Promise.resolve(store.get(key) || null)),
-  set: jest.fn<AnyFn>((...args: unknown[]) => {
+  get: vi.fn<AnyFn>((key: string) => Promise.resolve(store.get(key) || null)),
+  set: vi.fn<AnyFn>((...args: unknown[]) => {
     store.set(args[0] as string, args[1] as string);
     return Promise.resolve('OK');
   }),
-  del: jest.fn<AnyFn>((key: string) => {
+  del: vi.fn<AnyFn>((key: string) => {
     store.delete(key);
     return Promise.resolve(1);
   }),
-  eval: jest.fn<AnyFn>(),
-  pipeline: jest.fn<AnyFn>(() => {
+  eval: vi.fn<AnyFn>(),
+  pipeline: vi.fn<AnyFn>(() => {
     const ops: Array<() => void> = [];
     const p = {
-      set: jest.fn<AnyFn>((...args: unknown[]) => {
+      set: vi.fn<AnyFn>((...args: unknown[]) => {
         ops.push(() => store.set(args[0] as string, args[1] as string));
         return p;
       }),
-      del: jest.fn<AnyFn>((key: string) => {
+      del: vi.fn<AnyFn>((key: string) => {
         ops.push(() => store.delete(key));
         return p;
       }),
-      exec: jest.fn<AnyFn>(() => {
+      exec: vi.fn<AnyFn>(() => {
         ops.forEach((op) => op());
         return Promise.resolve(ops.map(() => [null, 'OK']));
       }),
@@ -35,21 +35,21 @@ const mockRedis = {
   }),
 };
 
-jest.mock('../../../backend/src/db/redis', () => ({
+vi.mock('../../../backend/src/db/redis', () => ({
   getRedis: () => mockRedis,
 }));
 
 // Mock crypto.randomUUID
-jest.mock('crypto', () => ({
-  ...jest.requireActual<typeof import('crypto')>('crypto'),
-  randomUUID: jest.fn(() => 'test-uuid-1234'),
+vi.mock('crypto', async () => ({
+  ...(await vi.importActual<typeof import('crypto')>('crypto')),
+  randomUUID: vi.fn(() => 'test-uuid-1234'),
 }));
 
 import * as partyService from '../../../backend/src/services/party';
 
 describe('Party Service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     store.clear();
 
     // Faithfully emulate the create/join/leave/kick Lua scripts against the in-memory store so

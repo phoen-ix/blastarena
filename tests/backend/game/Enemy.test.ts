@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Enemy } from '../../../backend/src/game/Enemy';
 import { MOVE_COOLDOWN_BASE, ENEMY_ID_OFFSET } from '@blast-arena/shared';
 import type { EnemyTypeConfig, BossPhaseConfig } from '@blast-arena/shared';

@@ -4,7 +4,7 @@ BlastArena's tests cover the full stack: game logic, backend services, API route
 
 | Stack | Framework | Location |
 |-------|-----------|----------|
-| Backend (incl. `tests/shared`) | Jest + ts-jest | `tests/backend/`, `tests/shared/` |
+| Backend (incl. `tests/shared`) | Vitest (node) | `tests/backend/`, `tests/shared/` |
 | Frontend | Vitest + jsdom | `frontend/tests/` |
 | End to end | Playwright against a throwaway Docker stack | `e2e/` (own npm package; map in `e2e/COVERAGE.md`) |
 
@@ -14,23 +14,22 @@ BlastArena's tests cover the full stack: game logic, backend services, API route
 
 ```bash
 npm test                                                      # All workspaces
-npx jest --config tests/backend/jest.config.ts                # Backend only (from project root)
+npx vitest run --config tests/backend/vitest.config.mts       # Backend only (from project root)
 cd frontend && npx vitest run                                 # Frontend only
-npx jest --config tests/backend/jest.config.ts -- <file>      # Single backend file
-npx jest --config tests/backend/jest.config.ts --watch        # Backend watch mode
+npx vitest run --config tests/backend/vitest.config.mts <file> # Single backend file
+npx vitest --config tests/backend/vitest.config.mts           # Backend watch mode
 cd frontend && npx vitest                                     # Frontend watch mode
 bash scripts/e2e.sh [playwright args]                         # E2E suite (Docker + Node 26)
 ```
 
 ## Test Configuration
 
-**Backend** (`tests/backend/jest.config.ts`):
-- Preset: `ts-jest`; the transform compiles with `backend/tsconfig.json`
+**Backend** (`tests/backend/vitest.config.mts`):
 - Environment: `node`
-- Root dir: the repository root (`rootDir: '../../'`)
-- Test match: `tests/backend/**/*.test.ts` + `tests/shared/**/*.test.ts`
-- Module alias: `@blast-arena/shared` → `<rootDir>/shared/src`
-- Diagnostic override (`diagnostics.ignoreCodes`): TS1378 (top-level await) and TS6133/6192/6196 (unused locals and imports). The workspace tsconfigs enable `noUnusedLocals`/`noUnusedParameters` for `src/`, and test files are exempt so a leftover import cannot fail a suite
+- Root: the repository root
+- Test include: `tests/backend/**/*.test.ts` + `tests/shared/**/*.test.ts`
+- Module alias: `@blast-arena/shared` → `shared/src`
+- Vitest only strips types; `tests/backend/tsconfig.json` type-checks the tests as part of the backend `typecheck` script. It extends `backend/tsconfig.json` with `noUnusedLocals`/`noUnusedParameters` off, so a leftover import cannot fail the check
 
 **Frontend** (`frontend/vitest.config.ts`):
 - Environment: `jsdom` (spec-compliant DOM; DOMPurify 3.4 mis-sanitises under happy-dom)
@@ -51,7 +50,7 @@ tests/
 │   ├── simulation/     batch bot simulation manager and runner
 │   ├── utils/          crypto, rate limiting, log/replay pruning, guest gate, nginx/Compose/Node config guards
 │   └── shared/         XP math
-└── shared/              locale parity, map validation, puzzle helpers, validation (run by backend Jest)
+└── shared/              locale parity, map validation, puzzle helpers, validation (run by the backend config)
 
 frontend/tests/
 ├── art/                 drawn-style painters, art style resolution, explosion pieces
@@ -219,7 +218,7 @@ Migration tooling — the SQL statement splitter and the migration files themsel
 
 ### Utilities & Shared
 
-Backend utilities, config guards (nginx, Compose, Node version) and the shared-package tests. `shared/` rows are `tests/backend/shared/`; `../shared/` rows are the top-level `tests/shared/`, which the backend Jest config also runs.
+Backend utilities, config guards (nginx, Compose, Node version) and the shared-package tests. `shared/` rows are `tests/backend/shared/`; `../shared/` rows are the top-level `tests/shared/`, which the backend Vitest config also runs.
 
 | File | Coverage |
 |------|----------|
@@ -300,27 +299,27 @@ All frontend tests run on Vitest + jsdom. Paths are relative to `frontend/`.
 
 ### 1. Database Mocking
 
-All service tests mock the database connection module. Mocks must be declared **before** importing the module under test (Jest hoists `jest.mock()` calls but the mock factory runs at import time).
+All service tests mock the database connection module. Vitest hoists `vi.mock()` calls and all static imports to the top of the file, so a factory runs before the file's own top-level code: a variable the factory reads at that moment must be created with `vi.hoisted()`. Variables read only later, inside a function the factory returns, need no hoisting. A mocked module the code imports as a default (`import jwt from 'jsonwebtoken'`) needs a `default` key in the factory's result, and a mocked class must be a `function`/`class` implementation, not an arrow (arrows cannot be called with `new`).
 
 ```typescript
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/db/connection', () => ({
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
-  withTransaction: jest.fn<AnyFn>((fn: any) => fn({ query: mockQuery, execute: mockExecute })),
+  withTransaction: vi.fn<AnyFn>((fn: any) => fn({ query: mockQuery, execute: mockExecute })),
 }));
 
-// NOW import the service under test
+// Import the service under test (vi.mock is hoisted above it)
 import { someFunction } from '../../../backend/src/services/someService';
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });
 
 it('queries the database', async () => {
@@ -338,24 +337,24 @@ Services that use Redis (lobby, presence, party) use an in-memory `Map` to simul
 ```typescript
 const store = new Map<string, string>();
 const mockRedis = {
-  get: jest.fn<AnyFn>((key: string) => Promise.resolve(store.get(key) || null)),
-  set: jest.fn<AnyFn>((...args: unknown[]) => {
+  get: vi.fn<AnyFn>((key: string) => Promise.resolve(store.get(key) || null)),
+  set: vi.fn<AnyFn>((...args: unknown[]) => {
     store.set(args[0] as string, args[1] as string);
     return Promise.resolve('OK');
   }),
-  del: jest.fn<AnyFn>((key: string) => { store.delete(key); return Promise.resolve(1); }),
-  scan: jest.fn<AnyFn>((_cursor, _matchKw, pattern) => {
+  del: vi.fn<AnyFn>((key: string) => { store.delete(key); return Promise.resolve(1); }),
+  scan: vi.fn<AnyFn>((_cursor, _matchKw, pattern) => {
     const prefix = pattern.replace('*', '');
     const matched = [...store.keys()].filter(k => k.startsWith(prefix));
     return Promise.resolve(['0', matched]);
   }),
-  mget: jest.fn<AnyFn>((...keys: string[]) =>
+  mget: vi.fn<AnyFn>((...keys: string[]) =>
     Promise.resolve(keys.map(k => store.get(k) || null))
   ),
-  eval: jest.fn<AnyFn>(),
+  eval: vi.fn<AnyFn>(),
 };
 
-jest.mock('../../../backend/src/db/redis', () => ({
+vi.mock('../../../backend/src/db/redis', () => ({
   getRedis: () => mockRedis,
 }));
 ```
@@ -365,10 +364,10 @@ jest.mock('../../../backend/src/db/redis', () => ({
 Route tests mock entire service modules to isolate HTTP handler logic:
 
 ```typescript
-const mockCreateRoom = jest.fn<AnyFn>();
-const mockListRooms = jest.fn<AnyFn>();
+const mockCreateRoom = vi.hoisted(() => vi.fn<AnyFn>());
+const mockListRooms = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/services/lobby', () => ({
+vi.mock('../../../backend/src/services/lobby', () => ({
   createRoom: mockCreateRoom,
   listRooms: mockListRooms,
 }));
@@ -379,16 +378,16 @@ jest.mock('../../../backend/src/services/lobby', () => ({
 Route tests skip auth/validation to test handler logic in isolation:
 
 ```typescript
-jest.mock('../../../backend/src/middleware/auth', () => ({
-  authMiddleware: jest.fn((_req: any, _res: any, next: any) => {
+vi.mock('../../../backend/src/middleware/auth', () => ({
+  authMiddleware: vi.fn((_req: any, _res: any, next: any) => {
     _req.user = { userId: 1, username: 'testuser', role: 'admin' };
     next();
   }),
 }));
 
-jest.mock('../../../backend/src/middleware/admin', () => ({
-  staffMiddleware: jest.fn((_req: any, _res: any, next: any) => next()),
-  adminOnlyMiddleware: jest.fn((_req: any, _res: any, next: any) => next()),
+vi.mock('../../../backend/src/middleware/admin', () => ({
+  staffMiddleware: vi.fn((_req: any, _res: any, next: any) => next()),
+  adminOnlyMiddleware: vi.fn((_req: any, _res: any, next: any) => next()),
 }));
 ```
 
@@ -414,10 +413,10 @@ function findHandler(method: string, path: string) {
 function mockReqRes(body = {}, params = {}, query = {}) {
   const req: any = { body, params, query, user: { userId: 1 } };
   const res: any = {
-    json: jest.fn().mockReturnThis(),
-    status: jest.fn().mockReturnThis(),
+    json: vi.fn().mockReturnThis(),
+    status: vi.fn().mockReturnThis(),
   };
-  const next = jest.fn();
+  const next = vi.fn();
   return { req, res, next };
 }
 ```
@@ -432,19 +431,19 @@ function createMockSocket(overrides: Record<string, unknown> = {}) {
   return {
     id: 'socket-1',
     data: { userId: 1, username: 'testuser', role: 'user', ...overrides },
-    on: jest.fn((event: string, handler: AnyFn) => { handlers[event] = handler; }),
-    join: jest.fn(),
-    leave: jest.fn(),
+    on: vi.fn((event: string, handler: AnyFn) => { handlers[event] = handler; }),
+    join: vi.fn(),
+    leave: vi.fn(),
     _handlers: handlers,  // access captured handlers for direct invocation
   };
 }
 
 function createMockIO() {
-  const emitFn = jest.fn();
+  const emitFn = vi.fn();
   return {
-    emit: jest.fn(),
-    to: jest.fn().mockReturnValue({ emit: emitFn }),
-    in: jest.fn().mockReturnValue({ fetchSockets: jest.fn().mockResolvedValue([]) }),
+    emit: vi.fn(),
+    to: vi.fn().mockReturnValue({ emit: emitFn }),
+    in: vi.fn().mockReturnValue({ fetchSockets: vi.fn().mockResolvedValue([]) }),
     _emitFn: emitFn,
   };
 }
@@ -468,30 +467,30 @@ tests/backend/game/MyNewGameFeature.test.ts
 ### Template for a Service Test
 
 ```typescript
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
-// 1. Declare mocks BEFORE imports
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
+// 1. Mocks the factories read are created with vi.hoisted()
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
 
-jest.mock('../../../backend/src/db/connection', () => ({
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
 }));
 
 // 2. Mock any other dependencies
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }));
 
-// 3. Import the module under test AFTER mocks
+// 3. Import the module under test (vi.mock is hoisted above it)
 import { myFunction } from '../../../backend/src/services/myService';
 
 // 4. Reset mocks between tests
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });
 
 describe('myFunction', () => {
@@ -512,19 +511,19 @@ describe('myFunction', () => {
 ### Template for a Route Test
 
 ```typescript
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type AnyFn = (...args: any[]) => any;
 
 // Mock services
-const mockGetItems = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/myService', () => ({
+const mockGetItems = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/myService', () => ({
   getItems: mockGetItems,
 }));
 
 // Pass-through middleware
-jest.mock('../../../backend/src/middleware/auth', () => ({
-  authMiddleware: jest.fn((_req: any, _res: any, next: any) => {
+vi.mock('../../../backend/src/middleware/auth', () => ({
+  authMiddleware: vi.fn((_req: any, _res: any, next: any) => {
     _req.user = { userId: 1, username: 'test', role: 'user' };
     next();
   }),
@@ -535,7 +534,7 @@ import router from '../../../backend/src/routes/myRoute';
 // Helper to extract handler and create mock req/res
 // ... (see Route Handler Extraction pattern above)
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => vi.clearAllMocks());
 
 describe('GET /my-route', () => {
   it('returns items', async () => {
@@ -549,9 +548,9 @@ describe('GET /my-route', () => {
 
 ### Tests on a Loaded Host
 
-Jest's 5 s default timeout applies to every async test and hook, and the suite also runs on busy hosts (load averages of 50-80 have been seen):
-- Import modules once, at the top of the file, not with `require()`/`import()` inside a test. Code that reads time or keeps module state is driven by a fake clock (`jest.spyOn(Date, 'now')`, see `utils/replayPrune.test.ts`), not by `jest.resetModules()` and a fresh import per test.
-- Real waits (`setTimeout` pauses in the code under test) run on fake timers: `jest.useFakeTimers()`, then `await jest.runAllTimersAsync()` (`simulation/SimulationRunner.test.ts`).
+Vitest's 5 s default timeout applies to every async test and hook, and the suite also runs on busy hosts (load averages of 50-80 have been seen):
+- Import modules once, at the top of the file, not with `require()`/`import()` inside a test. Code that reads time or keeps module state is driven by a fake clock (`vi.spyOn(Date, 'now')`, see `utils/replayPrune.test.ts`), not by `vi.resetModules()` and a fresh import per test.
+- Real waits (`setTimeout` pauses in the code under test) run on fake timers: `vi.useFakeTimers()`, then `await vi.runAllTimersAsync()` (`simulation/SimulationRunner.test.ts`).
 - No `expect()` inside a loop of thousands of iterations: count in the loop, assert once after it (`game/PowerUpDrops.test.ts`).
 - Size fixtures are sparse files (`fs.truncateSync(file, size)`): `stat` reports the size, nothing is written.
 - Unavoidable one-time work (the esbuild service process, the first isolate, the first HTTP request) goes in a `beforeAll` with its own budget and a comment saying why (`services/botai-sandbox.test.ts`, `middleware/csrf.test.ts`).
@@ -561,7 +560,7 @@ Jest's 5 s default timeout applies to every async test and hook, and the suite a
 Game tests typically instantiate real `GameStateManager` objects rather than mocking. Inputs go through the manager's `inputBuffer`, exactly as socket input does, and `processTick()` advances one tick:
 
 ```typescript
-import { it, expect } from '@jest/globals';
+import { it, expect } from 'vitest';
 import { GameStateManager } from '../../../backend/src/game/GameState';
 import type { Direction, PlayerInput } from '@blast-arena/shared';
 

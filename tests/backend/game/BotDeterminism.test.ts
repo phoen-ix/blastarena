@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { GameStateManager } from '../../../backend/src/game/GameState';
 import { BotAI } from '../../../backend/src/game/BotAI';
 import { SeededRandom } from '../../../backend/src/game/SeededRandom';

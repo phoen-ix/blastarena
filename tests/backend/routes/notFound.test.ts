@@ -1,23 +1,23 @@
-import { describe, it, expect, jest, beforeAll, afterAll } from '@jest/globals';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import http from 'http';
 import type { AddressInfo } from 'net';
 import fs from 'fs';
 import path from 'path';
 
 // This test exercises routing and headers only; the data layers must never be touched.
-jest.mock('../../../backend/src/db/connection', () => ({
-  query: jest.fn(async () => []),
-  execute: jest.fn(async () => ({ affectedRows: 0, insertId: 0 })),
-  withTransaction: jest.fn(async () => undefined),
-  createPool: jest.fn(async () => undefined),
-  getPool: jest.fn(() => ({ execute: jest.fn(async () => [[], []]) })),
+vi.mock('../../../backend/src/db/connection', () => ({
+  query: vi.fn(async () => []),
+  execute: vi.fn(async () => ({ affectedRows: 0, insertId: 0 })),
+  withTransaction: vi.fn(async () => undefined),
+  createPool: vi.fn(async () => undefined),
+  getPool: vi.fn(() => ({ execute: vi.fn(async () => [[], []]) })),
 }));
-jest.mock('../../../backend/src/db/redis', () => ({
-  getRedis: jest.fn(() => ({ ping: jest.fn(async () => 'PONG') })),
-  createRedisClient: jest.fn(async () => undefined),
+vi.mock('../../../backend/src/db/redis', () => ({
+  getRedis: vi.fn(() => ({ ping: vi.fn(async () => 'PONG') })),
+  createRedisClient: vi.fn(async () => undefined),
 }));
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
 import { createApp } from '../../../backend/src/app';

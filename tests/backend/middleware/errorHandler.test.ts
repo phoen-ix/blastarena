@@ -1,11 +1,11 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
-jest.mock('../../../backend/src/utils/logger', () => ({
+vi.mock('../../../backend/src/utils/logger', () => ({
   logger: {
-    error: jest.fn(),
-    warn: jest.fn(),
-    info: jest.fn(),
-    debug: jest.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
   },
 }));
 
@@ -14,10 +14,10 @@ import { logger } from '../../../backend/src/utils/logger';
 import { Request, Response, NextFunction } from 'express';
 
 const mockLogger = logger as unknown as {
-  error: jest.Mock;
-  warn: jest.Mock;
-  info: jest.Mock;
-  debug: jest.Mock;
+  error: Mock;
+  warn: Mock;
+  info: Mock;
+  debug: Mock;
 };
 
 function mockReq(overrides: Partial<Request> = {}): Request {
@@ -30,16 +30,16 @@ function mockReq(overrides: Partial<Request> = {}): Request {
 
 function mockRes(): Response {
   const res: Partial<Response> = {};
-  res.status = jest.fn<(code: number) => Response>().mockReturnValue(res as Response);
-  res.json = jest.fn<(body: unknown) => Response>().mockReturnValue(res as Response);
+  res.status = vi.fn<(code: number) => Response>().mockReturnValue(res as Response);
+  res.json = vi.fn<(body: unknown) => Response>().mockReturnValue(res as Response);
   return res as Response;
 }
 
 describe('errorHandler middleware', () => {
-  const next = jest.fn() as unknown as NextFunction;
+  const next = vi.fn() as unknown as NextFunction;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('returns custom statusCode and code for AppError', () => {
@@ -274,7 +274,7 @@ describe('errorHandler middleware', () => {
     errorHandler(err, mockReq(), res, next);
 
     expect(res.status).toHaveBeenCalledWith(415);
-    expect(JSON.stringify((res.json as jest.Mock).mock.calls[0])).not.toContain('incorrect header');
+    expect(JSON.stringify((res.json as Mock).mock.calls[0])).not.toContain('incorrect header');
   });
 
   it('maps an oversized body to 413', () => {
@@ -332,7 +332,7 @@ describe('errorHandler middleware', () => {
   it('hands back to Express once the response has started', () => {
     const res = mockRes();
     (res as unknown as { headersSent: boolean }).headersSent = true;
-    const nextFn = jest.fn();
+    const nextFn = vi.fn();
     const err = new AppError('too late', 400);
 
     errorHandler(err, mockReq(), res, nextFn as unknown as NextFunction);

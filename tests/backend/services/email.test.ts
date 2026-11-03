@@ -1,40 +1,42 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
 // ── Mock: nodemailer ────────────────────────────────────────────────────────
 
-const mockSendMail = jest.fn<AnyFn>();
-const mockCreateTransport = jest.fn<AnyFn>().mockReturnValue({ sendMail: mockSendMail });
-jest.mock('nodemailer', () => ({
+const mockSendMail = vi.hoisted(() => vi.fn<AnyFn>());
+const mockCreateTransport = vi.hoisted(() =>
+  vi.fn<AnyFn>().mockReturnValue({ sendMail: mockSendMail }),
+);
+vi.mock('nodemailer', () => ({
   default: { createTransport: mockCreateTransport },
   __esModule: true,
 }));
 
 // ── Mock: config ────────────────────────────────────────────────────────────
 
-const mockGetConfig = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/config', () => ({
+const mockGetConfig = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/config', () => ({
   getConfig: mockGetConfig,
 }));
 
 // ── Mock: logger ────────────────────────────────────────────────────────────
 
-const mockLogger = {
-  info: jest.fn(),
-  warn: jest.fn(),
-  debug: jest.fn(),
-  error: jest.fn(),
-};
-jest.mock('../../../backend/src/utils/logger', () => ({
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+  error: vi.fn(),
+}));
+vi.mock('../../../backend/src/utils/logger', () => ({
   logger: mockLogger,
 }));
 
 // ── Mock: settings ──────────────────────────────────────────────────────────
 
-const mockGetEmailSettings = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/settings', () => ({
+const mockGetEmailSettings = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/settings', () => ({
   getEmailSettings: mockGetEmailSettings,
 }));
 
@@ -56,7 +58,7 @@ function resolveKey(key: string): string {
   return val as unknown as string;
 }
 
-jest.mock('../../../backend/src/i18n', () => ({
+vi.mock('../../../backend/src/i18n', () => ({
   getFixedT: () => resolveKey,
 }));
 
@@ -102,7 +104,7 @@ function setupDbSettings(overrides: Record<string, unknown> = {}) {
 
 describe('email service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     // Always invalidate transporter cache between tests so each test starts fresh
     invalidateTransporter();
     // Default: env config with SMTP configured, no DB overrides
@@ -735,7 +737,7 @@ describe('email service', () => {
         'Failed to send email',
       );
 
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       mockSendMail.mockRejectedValue(err);
 
       try {
@@ -748,7 +750,7 @@ describe('email service', () => {
         'Failed to send email',
       );
 
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       mockSendMail.mockRejectedValue(err);
 
       try {

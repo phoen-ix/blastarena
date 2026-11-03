@@ -2,7 +2,7 @@
  * The migration runner against a real MariaDB — the only suite here that is not mocked. It runs
  * when REQUIRE_DB_TESTS=1 (CI and fleet set it, with a MariaDB service and the DB_* settings) and
  * is skipped otherwise. Locally, against any throwaway MariaDB:
- *   REQUIRE_DB_TESTS=1 DB_PORT=3317 DB_PASSWORD=… npx jest --config tests/backend/jest.config.ts migrationLock
+ *   REQUIRE_DB_TESTS=1 DB_PORT=3317 DB_PASSWORD=… npx vitest run --config tests/backend/vitest.config.mts migrationLock
  *
  * runMigrations() holds a GET_LOCK advisory lock while it reads the applied-set and applies what
  * is missing. Without it, two backends starting together both saw the same file as pending and
@@ -13,15 +13,15 @@
  * fs.readFileSync are stubbed for the migrations directory only. Their bodies are deliberately not
  * idempotent, so running any of them twice is visible.
  */
-import { describe, it, expect, jest, beforeAll, afterAll, afterEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { randomBytes } from 'crypto';
 import mysql from 'mysql2/promise';
 import type { RowDataPacket } from 'mysql2';
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 import { loadConfig, getConfig } from '../../../backend/src/config';
@@ -47,13 +47,11 @@ type AnyFn = (...args: unknown[]) => unknown;
 function stubMigrationFiles(): void {
   const readdir = fs.readdirSync as unknown as AnyFn;
   const readFile = fs.readFileSync as unknown as AnyFn;
-  jest
-    .spyOn(fs, 'readdirSync')
-    .mockImplementation(((dir: unknown, ...rest: unknown[]) =>
-      path.resolve(String(dir)) === MIGRATIONS_DIR
-        ? Object.keys(FAKE)
-        : readdir(dir, ...rest)) as unknown as typeof fs.readdirSync);
-  jest.spyOn(fs, 'readFileSync').mockImplementation(((file: unknown, ...rest: unknown[]) => {
+  vi.spyOn(fs, 'readdirSync').mockImplementation(((dir: unknown, ...rest: unknown[]) =>
+    path.resolve(String(dir)) === MIGRATIONS_DIR
+      ? Object.keys(FAKE)
+      : readdir(dir, ...rest)) as unknown as typeof fs.readdirSync);
+  vi.spyOn(fs, 'readFileSync').mockImplementation(((file: unknown, ...rest: unknown[]) => {
     const name = path.relative(MIGRATIONS_DIR, path.resolve(String(file)));
     return name in FAKE ? FAKE[name] : readFile(file, ...rest);
   }) as unknown as typeof fs.readFileSync);
@@ -86,7 +84,7 @@ describeDb('migration runner lock (MariaDB)', () => {
     lockName = `blast_arena_migrations_${getConfig().DB_NAME}`.slice(0, 64);
   });
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
   afterAll(async () => {
     await execute(`DROP TABLE IF EXISTS ${TABLE}`);

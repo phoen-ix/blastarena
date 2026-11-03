@@ -1,14 +1,14 @@
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { GameStateManager } from '../../../backend/src/game/GameState';
 import { GameLoop } from '../../../backend/src/game/GameLoop';
 
 describe('GameLoop', () => {
   let gameState: GameStateManager;
-  let onTick: jest.Mock;
-  let onGameOver: jest.Mock;
+  let onTick: Mock;
+  let onGameOver: Mock;
 
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     gameState = new GameStateManager({
       mapWidth: 15,
       mapHeight: 13,
@@ -17,12 +17,12 @@ describe('GameLoop', () => {
     });
     gameState.addPlayer(1, 'player1', null);
     gameState.addPlayer(2, 'player2', null);
-    onTick = jest.fn();
-    onGameOver = jest.fn();
+    onTick = vi.fn();
+    onGameOver = vi.fn();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('should start and stop the game loop', () => {
@@ -41,10 +41,10 @@ describe('GameLoop', () => {
     const loop = new GameLoop(gameState, onTick, onGameOver, 20);
     loop.start();
 
-    jest.advanceTimersByTime(50); // 1 tick at 20 tps
+    vi.advanceTimersByTime(50); // 1 tick at 20 tps
     expect(onTick).toHaveBeenCalled();
 
-    jest.advanceTimersByTime(200); // 4 more ticks
+    vi.advanceTimersByTime(200); // 4 more ticks
     expect(onTick.mock.calls.length).toBeGreaterThanOrEqual(4);
 
     loop.stop();
@@ -53,18 +53,18 @@ describe('GameLoop', () => {
   it('should stop after 10 consecutive tick errors (circuit breaker)', () => {
     const loop = new GameLoop(gameState, onTick, onGameOver, 20, true);
     // Skip countdown so processTick runs immediately
-    const processTickSpy = jest.spyOn(gameState, 'processTick').mockImplementation(() => {
+    const processTickSpy = vi.spyOn(gameState, 'processTick').mockImplementation(() => {
       throw new Error('simulated tick failure');
     });
 
     loop.start();
 
     // Advance through 9 errors — loop should still be running
-    jest.advanceTimersByTime(50 * 9);
+    vi.advanceTimersByTime(50 * 9);
     expect(loop.isRunning()).toBe(true);
 
     // 10th error triggers circuit breaker
-    jest.advanceTimersByTime(50);
+    vi.advanceTimersByTime(50);
     expect(loop.isRunning()).toBe(false);
     expect(onGameOver).toHaveBeenCalledTimes(1);
 
@@ -74,7 +74,7 @@ describe('GameLoop', () => {
   it('should reset error counter on successful tick', () => {
     const loop = new GameLoop(gameState, onTick, onGameOver, 20, true);
     let callCount = 0;
-    const processTickSpy = jest.spyOn(gameState, 'processTick').mockImplementation(() => {
+    const processTickSpy = vi.spyOn(gameState, 'processTick').mockImplementation(() => {
       callCount++;
       // Fail for first 5 calls, then succeed, then fail for 5 more
       if (callCount <= 5 || (callCount > 6 && callCount <= 11)) {
@@ -86,7 +86,7 @@ describe('GameLoop', () => {
     loop.start();
 
     // 5 errors + 1 success + 5 errors = 11 ticks, counter never reaches 10
-    jest.advanceTimersByTime(50 * 11);
+    vi.advanceTimersByTime(50 * 11);
     expect(loop.isRunning()).toBe(true);
 
     loop.stop();
@@ -104,7 +104,7 @@ describe('GameLoop', () => {
 
     // Advance and verify onTick is not called double the expected rate
     const callsBefore = onTick.mock.calls.length;
-    jest.advanceTimersByTime(50); // 1 tick
+    vi.advanceTimersByTime(50); // 1 tick
     const callsAfter = onTick.mock.calls.length;
     // Should only get roughly 1 new tick, not 2 (from duplicate intervals)
     expect(callsAfter - callsBefore).toBeLessThanOrEqual(2);
@@ -117,7 +117,7 @@ describe('GameLoop', () => {
 
     // Mock processTick to mark game as finished after a few ticks
     let tickCount = 0;
-    const processTickSpy = jest.spyOn(gameState, 'processTick').mockImplementation(() => {
+    const processTickSpy = vi.spyOn(gameState, 'processTick').mockImplementation(() => {
       tickCount++;
       if (tickCount >= 3) {
         gameState.status = 'finished';
@@ -126,7 +126,7 @@ describe('GameLoop', () => {
 
     loop.start();
     // Advance enough ticks for the game to finish
-    jest.advanceTimersByTime(50 * 5);
+    vi.advanceTimersByTime(50 * 5);
 
     expect(onGameOver).toHaveBeenCalledTimes(1);
     expect(loop.isRunning()).toBe(false);
@@ -158,14 +158,14 @@ describe('GameLoop', () => {
     loop.start();
 
     // Let a few ticks fire
-    jest.advanceTimersByTime(150);
+    vi.advanceTimersByTime(150);
     const callsBeforeStop = onTick.mock.calls.length;
     expect(callsBeforeStop).toBeGreaterThan(0);
 
     loop.stop();
 
     // Advance more time - no new ticks should fire
-    jest.advanceTimersByTime(500);
+    vi.advanceTimersByTime(500);
     expect(onTick.mock.calls.length).toBe(callsBeforeStop);
   });
 

@@ -1,19 +1,19 @@
-import { describe, it, expect, jest, beforeAll, afterAll } from '@jest/globals';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import http from 'http';
 import type { AddressInfo } from 'net';
 
 // The DB/Redis layers must never be touched by this test — it only exercises routing.
-jest.mock('../../../backend/src/db/connection', () => ({
-  query: jest.fn(async () => []),
-  execute: jest.fn(async () => ({ affectedRows: 0, insertId: 0 })),
-  withTransaction: jest.fn(async () => undefined),
-  createPool: jest.fn(async () => undefined),
-  getPool: jest.fn(() => ({})),
+vi.mock('../../../backend/src/db/connection', () => ({
+  query: vi.fn(async () => []),
+  execute: vi.fn(async () => ({ affectedRows: 0, insertId: 0 })),
+  withTransaction: vi.fn(async () => undefined),
+  createPool: vi.fn(async () => undefined),
+  getPool: vi.fn(() => ({})),
 }));
 
-jest.mock('../../../backend/src/db/redis', () => ({
-  getRedis: jest.fn(() => ({})),
-  createRedisClient: jest.fn(async () => undefined),
+vi.mock('../../../backend/src/db/redis', () => ({
+  getRedis: vi.fn(() => ({})),
+  createRedisClient: vi.fn(async () => undefined),
 }));
 
 import express from 'express';

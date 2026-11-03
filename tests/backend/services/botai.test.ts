@@ -1,27 +1,27 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
 // ── DB mocks ────────────────────────────────────────────────────────────────
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
 }));
 
 // ── Compiler mock ───────────────────────────────────────────────────────────
-const mockCompileBotAI = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/botai-compiler', () => ({
+const mockCompileBotAI = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/botai-compiler', () => ({
   compileBotAI: mockCompileBotAI,
 }));
 
 // ── Registry mock ───────────────────────────────────────────────────────────
-const mockLoadAI = jest.fn<AnyFn>();
-const mockUnloadAI = jest.fn<AnyFn>();
-const mockReloadAI = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/services/botai-registry', () => ({
+const mockLoadAI = vi.fn<AnyFn>();
+const mockUnloadAI = vi.fn<AnyFn>();
+const mockReloadAI = vi.fn<AnyFn>();
+vi.mock('../../../backend/src/services/botai-registry', () => ({
   getBotAIRegistry: () => ({
     loadAI: mockLoadAI,
     unloadAI: mockUnloadAI,
@@ -30,12 +30,12 @@ jest.mock('../../../backend/src/services/botai-registry', () => ({
 }));
 
 // ── FS mock ─────────────────────────────────────────────────────────────────
-const mockMkdirSync = jest.fn<AnyFn>();
-const mockWriteFileSync = jest.fn<AnyFn>();
-const mockExistsSync = jest.fn<AnyFn>();
-const mockReadFileSync = jest.fn<AnyFn>();
-const mockRmSync = jest.fn<AnyFn>();
-jest.mock('fs', () => ({
+const mockMkdirSync = vi.fn<AnyFn>();
+const mockWriteFileSync = vi.fn<AnyFn>();
+const mockExistsSync = vi.fn<AnyFn>();
+const mockReadFileSync = vi.fn<AnyFn>();
+const mockRmSync = vi.fn<AnyFn>();
+vi.mock('fs', () => ({
   mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
   writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
@@ -52,14 +52,14 @@ jest.mock('fs', () => ({
 
 // ── UUID mock ───────────────────────────────────────────────────────────────
 const FIXED_UUID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
-jest.mock('crypto', () => ({
-  ...jest.requireActual<typeof import('crypto')>('crypto'),
+vi.mock('crypto', async () => ({
+  ...(await vi.importActual<typeof import('crypto')>('crypto')),
   randomUUID: () => FIXED_UUID,
 }));
 
 // ── Logger mock ─────────────────────────────────────────────────────────────
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
 import {
@@ -94,7 +94,7 @@ function makeRow(overrides: Record<string, unknown> = {}) {
 
 describe('BotAI Service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // ── rowToEntry mapping (tested via public functions) ────────────────────

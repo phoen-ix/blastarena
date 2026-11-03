@@ -1,40 +1,42 @@
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-const mockDispose = jest.fn();
-const mockRunFast = jest.fn<AnyFn>();
-const mockRunRealtime = jest.fn<AnyFn>();
-const mockSetStateCallback = jest.fn();
+const mockDispose = vi.fn();
+const mockRunFast = vi.fn<AnyFn>();
+const mockRunRealtime = vi.fn<AnyFn>();
+const mockSetStateCallback = vi.fn();
 
-jest.mock('../../../backend/src/simulation/SimulationGame', () => ({
-  SimulationGame: jest.fn().mockImplementation(() => ({
-    setStateCallback: mockSetStateCallback,
-    runFast: mockRunFast,
-    runRealtime: mockRunRealtime,
-    dispose: mockDispose,
-    cancel: jest.fn(),
-    getTick: () => 0,
-    getMaxTicks: () => 100,
-    getState: () => ({}),
-  })),
+vi.mock('../../../backend/src/simulation/SimulationGame', () => ({
+  SimulationGame: vi.fn().mockImplementation(function () {
+    return {
+      setStateCallback: mockSetStateCallback,
+      runFast: mockRunFast,
+      runRealtime: mockRunRealtime,
+      dispose: mockDispose,
+      cancel: vi.fn(),
+      getTick: () => 0,
+      getMaxTicks: () => 100,
+      getState: () => ({}),
+    };
+  }),
 }));
 
-jest.mock('../../../backend/src/game/registry', () => ({
+vi.mock('../../../backend/src/game/registry', () => ({
   getIO: () => {
     throw new Error('no io in tests');
   },
 }));
 
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-jest.mock('fs', () => ({
-  existsSync: jest.fn().mockReturnValue(true),
-  mkdirSync: jest.fn(),
-  writeFileSync: jest.fn(),
+vi.mock('fs', () => ({
+  existsSync: vi.fn().mockReturnValue(true),
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
 }));
 
 import { SimulationRunner } from '../../../backend/src/simulation/SimulationRunner';
@@ -77,11 +79,11 @@ const result = (gameIndex: number) => ({
  */
 describe('SimulationRunner isolate disposal', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('disposes the game when it completes normally', async () => {
@@ -109,9 +111,9 @@ describe('SimulationRunner isolate disposal', () => {
       .mockRejectedValueOnce(new Error('boom'));
 
     // The runner pauses 500 ms between games; fake timers skip the pauses.
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     const run = new SimulationRunner(config({ totalGames: 5 }), 'batch-mid').run();
-    await jest.runAllTimersAsync();
+    await vi.runAllTimersAsync();
     await run;
 
     // Two successes plus the failing one — no isolate left behind.

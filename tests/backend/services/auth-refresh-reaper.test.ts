@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
  * cleanupExpiredRefreshTokens used to run one
@@ -9,32 +9,32 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const mockQuery = jest.fn<(...args: any[]) => Promise<any>>();
-const mockExecute = jest.fn<(...args: any[]) => Promise<any>>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<(...args: any[]) => Promise<any>>());
+const mockExecute = vi.hoisted(() => vi.fn<(...args: any[]) => Promise<any>>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
-  withTransaction: jest.fn(),
+  withTransaction: vi.fn(),
 }));
-jest.mock('../../../backend/src/utils/crypto', () => ({
-  hashPassword: jest.fn(),
-  comparePassword: jest.fn(),
-  generateToken: jest.fn(),
-  hashToken: jest.fn(),
-  hashEmail: jest.fn(),
-  generateEmailHint: jest.fn(),
+vi.mock('../../../backend/src/utils/crypto', () => ({
+  hashPassword: vi.fn(),
+  comparePassword: vi.fn(),
+  generateToken: vi.fn(),
+  hashToken: vi.fn(),
+  hashEmail: vi.fn(),
+  generateEmailHint: vi.fn(),
   scrubEmailError: (e: unknown) => e,
 }));
-jest.mock('../../../backend/src/services/email', () => ({
-  sendVerificationEmail: jest.fn(),
-  sendPasswordResetEmail: jest.fn(),
-  sendEmailTakenRegistrationWarning: jest.fn(),
+vi.mock('../../../backend/src/services/email', () => ({
+  sendVerificationEmail: vi.fn(),
+  sendPasswordResetEmail: vi.fn(),
+  sendEmailTakenRegistrationWarning: vi.fn(),
 }));
-jest.mock('../../../backend/src/config', () => ({
+vi.mock('../../../backend/src/config', () => ({
   getConfig: () => ({ JWT_SECRET: 'x'.repeat(32), EMAIL_PEPPER: 'y'.repeat(32) }),
 }));
-jest.mock('../../../backend/src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+vi.mock('../../../backend/src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -44,7 +44,7 @@ const CHUNK = 10000;
 
 describe('cleanupExpiredRefreshTokens (audit E8)', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('runs two separate indexed deletes, never an OR across both columns', async () => {

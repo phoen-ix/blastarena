@@ -1,12 +1,12 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any;
 
-const mockQuery = jest.fn<AnyFn>();
-const mockExecute = jest.fn<AnyFn>();
-const mockWithTransaction = jest.fn<AnyFn>();
-jest.mock('../../../backend/src/db/connection', () => ({
+const mockQuery = vi.hoisted(() => vi.fn<AnyFn>());
+const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
+const mockWithTransaction = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/db/connection', () => ({
   query: mockQuery,
   execute: mockExecute,
   withTransaction: mockWithTransaction,
@@ -26,11 +26,11 @@ import {
 
 describe('Season Service', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockWithTransaction.mockImplementation(async (fn: AnyFn) => {
       const conn = {
-        query: jest.fn<AnyFn>(),
-        execute: jest.fn<AnyFn>(),
+        query: vi.fn<AnyFn>(),
+        execute: vi.fn<AnyFn>(),
       };
       return fn(conn);
     });
@@ -328,10 +328,10 @@ describe('Season Service', () => {
   describe('activateSeason', () => {
     it('should use withTransaction to deactivate all and activate target', async () => {
       // conn.execute resolves to mysql2's [rows, fields]
-      const connExecute = jest.fn<AnyFn>();
+      const connExecute = vi.fn<AnyFn>();
       connExecute.mockResolvedValueOnce([[{ id: 7 }], []]).mockResolvedValue([{}, []]);
       mockWithTransaction.mockImplementation(async (fn: AnyFn) =>
-        fn({ query: jest.fn<AnyFn>(), execute: connExecute }),
+        fn({ query: vi.fn<AnyFn>(), execute: connExecute }),
       );
 
       await activateSeason(7);
@@ -358,10 +358,10 @@ describe('Season Service', () => {
 
     it('changes nothing and answers 404 for an unknown id', async () => {
       // It used to switch every season off and none on
-      const connExecute = jest.fn<AnyFn>();
+      const connExecute = vi.fn<AnyFn>();
       connExecute.mockResolvedValueOnce([[], []]);
       mockWithTransaction.mockImplementation(async (fn: AnyFn) =>
-        fn({ query: jest.fn<AnyFn>(), execute: connExecute }),
+        fn({ query: vi.fn<AnyFn>(), execute: connExecute }),
       );
 
       await expect(activateSeason(99)).rejects.toMatchObject({ statusCode: 404 });
@@ -373,10 +373,10 @@ describe('Season Service', () => {
 
   describe('endSeason', () => {
     function activeSeasonConn() {
-      const connExecute = jest.fn<AnyFn>();
+      const connExecute = vi.fn<AnyFn>();
       connExecute.mockResolvedValueOnce([[{ is_active: 1 }], []]).mockResolvedValue([{}, []]);
       mockWithTransaction.mockImplementation(async (fn: AnyFn) =>
-        fn({ query: jest.fn<AnyFn>(), execute: connExecute }),
+        fn({ query: vi.fn<AnyFn>(), execute: connExecute }),
       );
       return connExecute;
     }
@@ -406,10 +406,10 @@ describe('Season Service', () => {
 
     it('resets nobody for an unknown or an already ended season', async () => {
       // Ending one used to reset every player's Elo all the same
-      const connExecute = jest.fn<AnyFn>();
+      const connExecute = vi.fn<AnyFn>();
       connExecute.mockResolvedValueOnce([[], []]).mockResolvedValueOnce([[{ is_active: 0 }], []]);
       mockWithTransaction.mockImplementation(async (fn: AnyFn) =>
-        fn({ query: jest.fn<AnyFn>(), execute: connExecute }),
+        fn({ query: vi.fn<AnyFn>(), execute: connExecute }),
       );
 
       await expect(endSeason(99, 'hard')).rejects.toMatchObject({ statusCode: 404 });

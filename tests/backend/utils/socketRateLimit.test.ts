@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createSocketRateLimiter,
   createRateLimiters,
@@ -6,11 +6,11 @@ import {
 
 describe('createSocketRateLimiter', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('should allow the first call', () => {
@@ -39,7 +39,7 @@ describe('createSocketRateLimiter', () => {
     expect(limiter.isAllowed('socket-1')).toBe(true);
     expect(limiter.isAllowed('socket-1')).toBe(false);
 
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
 
     expect(limiter.isAllowed('socket-1')).toBe(true);
     expect(limiter.isAllowed('socket-1')).toBe(true);
@@ -75,7 +75,7 @@ describe('createSocketRateLimiter', () => {
     limiter.isAllowed('stale-socket');
     limiter.isAllowed('fresh-socket');
 
-    jest.advanceTimersByTime(2500);
+    vi.advanceTimersByTime(2500);
 
     // Make fresh-socket recent so it survives cleanup
     limiter.isAllowed('fresh-socket');
@@ -90,11 +90,11 @@ describe('createSocketRateLimiter', () => {
 
 describe('createRateLimiters', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('should return all expected limiter functions', () => {

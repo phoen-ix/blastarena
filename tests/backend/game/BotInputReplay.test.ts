@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { GameStateManager } from '../../../backend/src/game/GameState';
 import type { Player } from '../../../backend/src/game/Player';
 import type { PlayerInput } from '@blast-arena/shared';

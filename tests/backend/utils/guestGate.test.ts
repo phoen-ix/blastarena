@@ -1,4 +1,4 @@
-import { describe, it, expect, jest } from '@jest/globals';
+import { describe, it, expect, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import {
@@ -48,7 +48,7 @@ describe('guest packet gate', () => {
   });
 
   it('answers the ack callback when blocking, so the client does not hang', () => {
-    const ack = jest.fn();
+    const ack = vi.fn();
     expect(allowGuestPacket(['room:create', { name: 'x' }, ack])).toBe(false);
     expect(ack).toHaveBeenCalledWith({ success: false, error: 'Sign in to use this feature' });
   });
@@ -58,7 +58,7 @@ describe('guest packet gate', () => {
   });
 
   it('does not treat a trailing ack on an allowed event as a reason to block', () => {
-    const ack = jest.fn();
+    const ack = vi.fn();
     expect(allowGuestPacket(['openworld:join', {}, ack])).toBe(true);
     expect(ack).not.toHaveBeenCalled();
   });

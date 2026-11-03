@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { CollisionSystem } from '../../../backend/src/game/CollisionSystem';
 import { TileType } from '@blast-arena/shared';
 

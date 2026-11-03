@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { PowerUp } from '../../../backend/src/game/PowerUp';
 import type { PowerUpType } from '@blast-arena/shared';
 
