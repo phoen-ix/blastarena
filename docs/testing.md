@@ -107,7 +107,7 @@ Business logic layer — DB/Redis-backed services are tested with mocked databas
 
 | File | Coverage |
 |------|----------|
-| `services/campaign.test.ts` | Worlds/levels CRUD (level create with an unknown world → 400 WORLD_NOT_FOUND, not a foreign-key 500), reorder, summary queries skip heavy JSON columns, batched progress lookup (two queries for any number of worlds), next-level logic, JSON field mapping |
+| `services/campaign.test.ts` | Worlds/levels CRUD (level create with an unknown world → 400 WORLD_NOT_FOUND, not a foreign-key 500), reorder, update/reorder/delete report whether a row matched, summary queries skip heavy JSON columns, batched progress lookup (two queries for any number of worlds), next-level logic, JSON field mapping |
 | `services/email.test.ts` | SMTP config, send verification/reset/change/test emails, transporter caching, env vs DB config priority |
 | `services/cosmetics.test.ts` | CRUD, equip/unequip, batch game fetch, default unlock, campaign star unlocks, getPlayerCosmeticsForGame |
 | `services/admin.test.ts` | User CRUD (duplicate-entry race → 409), role change and deactivation (unknown user → 404, nothing changed or logged), password reset, server stats, match history/detail, active rooms with their players (id and name only), audit log, toasts/banners, account cleanup preview/execute |
@@ -116,7 +116,7 @@ Business logic layer — DB/Redis-backed services are tested with mocked databas
 | `services/elo.test.ts` | Expected score, K-factor scaling, FFA pairwise calc, team calc, processMatchElo, bot filtering |
 | `services/enemyai.test.ts` | Full CRUD, file upload/download, compilation on upload, registry load/unload on activate/deactivate, built-in handling, audit logging |
 | `services/replay.test.ts` | List (paginate before stat)/read/delete/placements, gzip decompression, file discovery, cached async directory index with TTL, campaign replay delete |
-| `services/enemy-type.test.ts` | CRUD, bulk config fetch, JSON config parsing, isBoss extraction |
+| `services/enemy-type.test.ts` | CRUD (update/delete report whether a row matched), bulk config fetch, JSON config parsing, isBoss extraction |
 | `services/leaderboard.test.ts` | Pagination (limit cap 100), season vs all-time Elo source, privacy filtering, getRankForElo with/without sub-tiers, public profile, user rank |
 | `services/campaign-progress.test.ts` | User state, level progress, star calculation, attempt/completion recording |
 | `services/friends.test.ts` | Send (MAX_FRIENDS, mutual request auto-accepts, deadlock → 409)/accept/decline/cancel/remove/block/unblock, getFriends with presence, isBlocked, search |
@@ -157,7 +157,7 @@ HTTP endpoint tests — Express route handlers tested with mocked services and p
 | File | Coverage |
 |------|----------|
 | `routes/admin.test.ts` | Public settings/banner/active-AI endpoints, settings (registration, recordings, game/simulation defaults, default art style, email + test send), users, matches (incl. bulk delete; unknown match → 404, nothing deleted or logged), rooms, audit log, announcements, replays, simulations, bot-ai, account cleanup, staff vs admin middleware |
-| `routes/campaign.test.ts` | Worlds/levels/enemies CRUD, reorder, progress, import/export with conflict resolution (an enemy-type use-existing AI must exist: 400 AI_NOT_FOUND; a level import checks the world before creating anything), param validation, middleware presence, router completeness, an audit entry per admin mutation |
+| `routes/campaign.test.ts` | Worlds/levels/enemies CRUD, reorder, progress, import/export with conflict resolution (an enemy-type use-existing AI must exist: 400 AI_NOT_FOUND; a level import checks the world before creating anything), param validation, middleware presence, router completeness, an audit entry per admin mutation; an unknown id on a world/level/enemy-type update, reorder or delete → 404, nothing logged |
 | `routes/auth.test.ts` | Register (uniform result, registration toggle), login, logout, refresh, verify email, forgot/reset password, cookie flags from APP_URL, local co-op P2 login (incl. 2FA), rate-limit/validation middleware |
 | `routes/user.test.ts` | Profile CRUD, email change (admin direct vs confirmation), password validation, confirm-email public endpoint (redirect, rate limited), TOTP route rate limiters |
 | `routes/custom-maps.test.ts` | CRUD endpoints, validateCustomMap integration, Zod schema enforcement, ownership checks, auth + email-verified middleware |
@@ -174,7 +174,7 @@ HTTP endpoint tests — Express route handlers tested with mocked services and p
 
 ### Socket Handlers
 
-Socket.io event handler tests — handlers tested with mock socket/io objects and captured callback invocations. `socket.ts` itself is guarded by AST scans (`socket-audit-fixes`, `socket-await-guard`).
+Socket.io event handler tests — handlers tested with mock socket/io objects and captured callback invocations. `socket.ts` itself is guarded by AST scans (`socket-audit-fixes`, `socket-await-guard`); `simStart` drives one of its handlers at runtime.
 
 | File | Coverage |
 |------|----------|
@@ -182,6 +182,7 @@ Socket.io event handler tests — handlers tested with mock socket/io objects an
 | `handlers/friendHandlers.test.ts` | All 8 friend:* events (internal errors masked), notifyFriendsOnline/Offline, limiter cleanup |
 | `handlers/dmHandlers.test.ts` | dm:send (mode/role checks, validation, dm:receive emission, always acks incl. failed lookup and rate limit), dm:read (mark read, read receipt) |
 | `handlers/socket-audit-fixes.test.ts` | AST guards on `socket.ts`: admin:kick leaves immediately, per-user campaign:levelComplete, guest name sanitising, sim runner cleanup, rate limits on lobby/admin events, limiter cleanup on disconnect, no dynamic import() |
+| `handlers/simStart.test.ts` | `sim:start` through the real `createSocketServer` (socket.io faked): the payload is checked with the REST route's `simulationConfigSchema`; invalid → `Invalid input` ack, no batch, nothing logged |
 | `handlers/lobbyHandlers.test.ts` | lobby:chat mode enforcement (disabled/admin_only/staff), message truncation, empty/non-string messages dropped |
 | `handlers/socket-await-guard.test.ts` | AST scan of `socket.ts` + `handlers/`: no `await` outside a `try` in any socket.on handler, connection listeners registered synchronously |
 

@@ -304,8 +304,9 @@ describe('Campaign Service', () => {
       expect(params).toEqual(['New', 'Desc', 'lava', true, 3]);
     });
 
-    it('should no-op when updates is empty', async () => {
-      await updateWorld(1, {});
+    it('should not write when updates is empty, only report whether the world exists', async () => {
+      mockQuery.mockResolvedValueOnce([]);
+      await expect(updateWorld(1, {})).resolves.toBe(false);
 
       expect(mockExecute).not.toHaveBeenCalled();
     });
@@ -962,8 +963,9 @@ describe('Campaign Service', () => {
       expect(params[1]).toBe(10);
     });
 
-    it('should no-op when data is empty', async () => {
-      await updateLevel(10, {});
+    it('should not write when data is empty, only report whether the level exists', async () => {
+      mockQuery.mockResolvedValueOnce([]);
+      await expect(updateLevel(10, {})).resolves.toBe(false);
 
       expect(mockExecute).not.toHaveBeenCalled();
     });
@@ -1077,6 +1079,21 @@ describe('Campaign Service', () => {
         [3, 10],
       );
     });
+  });
+
+  // The routes answer 404 (and log nothing) on false
+  it.each([
+    ['updateWorld', () => updateWorld(1, { name: 'X' })],
+    ['deleteWorld', () => deleteWorld(1)],
+    ['reorderWorld', () => reorderWorld(1, 0)],
+    ['updateLevel', () => updateLevel(1, { name: 'X' })],
+    ['deleteLevel', () => deleteLevel(1)],
+    ['reorderLevel', () => reorderLevel(1, 0)],
+  ])('%s reports whether a row matched', async (_name, call) => {
+    mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
+    await expect(call()).resolves.toBe(true);
+    mockExecute.mockResolvedValueOnce({ affectedRows: 0 });
+    await expect(call()).resolves.toBe(false);
   });
 
   describe('getNextLevel', () => {

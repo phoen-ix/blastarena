@@ -133,10 +133,14 @@ export async function createWorld(
   return result.insertId;
 }
 
+/**
+ * False when no world has this id. mysql2 sets FOUND_ROWS, so `affectedRows` counts matched rows:
+ * saving unchanged values still reports the row.
+ */
 export async function updateWorld(
   id: number,
   updates: Partial<{ name: string; description: string; theme: string; isPublished: boolean }>,
-): Promise<void> {
+): Promise<boolean> {
   const sets: string[] = [];
   const params: (string | boolean | number)[] = [];
 
@@ -157,17 +161,28 @@ export async function updateWorld(
     params.push(updates.isPublished);
   }
 
-  if (sets.length === 0) return;
+  if (sets.length === 0) return (await getWorld(id)) !== null;
   params.push(id);
-  await execute(`UPDATE campaign_worlds SET ${sets.join(', ')} WHERE id = ?`, params);
+  const result = await execute(
+    `UPDATE campaign_worlds SET ${sets.join(', ')} WHERE id = ?`,
+    params,
+  );
+  return result.affectedRows > 0;
 }
 
-export async function deleteWorld(id: number): Promise<void> {
-  await execute(`DELETE FROM campaign_worlds WHERE id = ?`, [id]);
+/** False when no world has this id. */
+export async function deleteWorld(id: number): Promise<boolean> {
+  const result = await execute(`DELETE FROM campaign_worlds WHERE id = ?`, [id]);
+  return result.affectedRows > 0;
 }
 
-export async function reorderWorld(id: number, newOrder: number): Promise<void> {
-  await execute(`UPDATE campaign_worlds SET sort_order = ? WHERE id = ?`, [newOrder, id]);
+/** False when no world has this id. */
+export async function reorderWorld(id: number, newOrder: number): Promise<boolean> {
+  const result = await execute(`UPDATE campaign_worlds SET sort_order = ? WHERE id = ?`, [
+    newOrder,
+    id,
+  ]);
+  return result.affectedRows > 0;
 }
 
 // --- Levels ---
@@ -319,7 +334,8 @@ export async function createLevel(
   return result.insertId;
 }
 
-export async function updateLevel(id: number, data: Partial<CampaignLevel>): Promise<void> {
+/** False when no level has this id. */
+export async function updateLevel(id: number, data: Partial<CampaignLevel>): Promise<boolean> {
   const sets: string[] = [];
   const params: unknown[] = [];
 
@@ -370,17 +386,28 @@ export async function updateLevel(id: number, data: Partial<CampaignLevel>): Pro
     }
   }
 
-  if (sets.length === 0) return;
+  if (sets.length === 0) return (await getLevel(id)) !== null;
   params.push(id);
-  await execute(`UPDATE campaign_levels SET ${sets.join(', ')} WHERE id = ?`, params);
+  const result = await execute(
+    `UPDATE campaign_levels SET ${sets.join(', ')} WHERE id = ?`,
+    params,
+  );
+  return result.affectedRows > 0;
 }
 
-export async function deleteLevel(id: number): Promise<void> {
-  await execute(`DELETE FROM campaign_levels WHERE id = ?`, [id]);
+/** False when no level has this id. */
+export async function deleteLevel(id: number): Promise<boolean> {
+  const result = await execute(`DELETE FROM campaign_levels WHERE id = ?`, [id]);
+  return result.affectedRows > 0;
 }
 
-export async function reorderLevel(id: number, newOrder: number): Promise<void> {
-  await execute(`UPDATE campaign_levels SET sort_order = ? WHERE id = ?`, [newOrder, id]);
+/** False when no level has this id. */
+export async function reorderLevel(id: number, newOrder: number): Promise<boolean> {
+  const result = await execute(`UPDATE campaign_levels SET sort_order = ? WHERE id = ?`, [
+    newOrder,
+    id,
+  ]);
+  return result.affectedRows > 0;
 }
 
 /** Get the next level in the same world (for "Next Level" button) */

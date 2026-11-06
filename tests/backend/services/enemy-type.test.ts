@@ -430,10 +430,18 @@ describe('Enemy Type Service', () => {
       expect(args[args.length - 1]).toBe(77);
     });
 
-    it('should no-op when updates object is empty', async () => {
-      await updateEnemyType(5, {});
+    it('should not write when updates object is empty, only report whether the type exists', async () => {
+      mockQuery.mockResolvedValueOnce([]);
+      await expect(updateEnemyType(5, {})).resolves.toBe(false);
 
       expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it('should report whether a row matched', async () => {
+      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
+      await expect(updateEnemyType(5, { name: 'A' })).resolves.toBe(true);
+      mockExecute.mockResolvedValueOnce({ affectedRows: 0 });
+      await expect(updateEnemyType(999, { name: 'A' })).resolves.toBe(false);
     });
 
     it('should JSON.stringify the config in update', async () => {
@@ -472,10 +480,10 @@ describe('Enemy Type Service', () => {
       );
     });
 
-    it('should not throw when deleting non-existent id', async () => {
+    it('should report false, not throw, when deleting non-existent id', async () => {
       mockExecute.mockResolvedValue({ affectedRows: 0 });
 
-      await expect(deleteEnemyType(999)).resolves.toBeUndefined();
+      await expect(deleteEnemyType(999)).resolves.toBe(false);
     });
   });
 });

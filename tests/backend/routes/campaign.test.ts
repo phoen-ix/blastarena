@@ -614,7 +614,7 @@ describe('PUT /admin/campaign/worlds/:id', () => {
   const handler = getHandler('put', '/admin/campaign/worlds/:id');
 
   it('updates a world and returns success', async () => {
-    mockUpdateWorld.mockResolvedValue(undefined);
+    mockUpdateWorld.mockResolvedValue(true);
 
     const req = mockReq({
       params: { id: '3' },
@@ -655,7 +655,7 @@ describe('DELETE /admin/campaign/worlds/:id', () => {
   const handler = getHandler('delete', '/admin/campaign/worlds/:id');
 
   it('deletes a world and returns success', async () => {
-    mockDeleteWorld.mockResolvedValue(undefined);
+    mockDeleteWorld.mockResolvedValue(true);
 
     const req = mockReq({ params: { id: '5' } });
     const res = mockRes();
@@ -693,7 +693,7 @@ describe('PUT /admin/campaign/worlds/:id/order', () => {
   const handler = getHandler('put', '/admin/campaign/worlds/:id/order');
 
   it('reorders a world and returns success', async () => {
-    mockReorderWorld.mockResolvedValue(undefined);
+    mockReorderWorld.mockResolvedValue(true);
 
     const req = mockReq({ params: { id: '2' }, body: { sortOrder: 5 } });
     const res = mockRes();
@@ -895,7 +895,7 @@ describe('PUT /admin/campaign/levels/:id', () => {
   const handler = getHandler('put', '/admin/campaign/levels/:id');
 
   it('updates a level and returns success', async () => {
-    mockUpdateLevel.mockResolvedValue(undefined);
+    mockUpdateLevel.mockResolvedValue(true);
 
     const req = mockReq({
       params: { id: '10' },
@@ -936,7 +936,7 @@ describe('DELETE /admin/campaign/levels/:id', () => {
   const handler = getHandler('delete', '/admin/campaign/levels/:id');
 
   it('deletes a level and returns success', async () => {
-    mockDeleteLevel.mockResolvedValue(undefined);
+    mockDeleteLevel.mockResolvedValue(true);
 
     const req = mockReq({ params: { id: '10' } });
     const res = mockRes();
@@ -974,7 +974,7 @@ describe('PUT /admin/campaign/levels/:id/order', () => {
   const handler = getHandler('put', '/admin/campaign/levels/:id/order');
 
   it('reorders a level and returns success', async () => {
-    mockReorderLevel.mockResolvedValue(undefined);
+    mockReorderLevel.mockResolvedValue(true);
 
     const req = mockReq({ params: { id: '10' }, body: { sortOrder: 3 } });
     const res = mockRes();
@@ -1093,7 +1093,7 @@ describe('PUT /admin/campaign/enemy-types/:id', () => {
   const handler = getHandler('put', '/admin/campaign/enemy-types/:id');
 
   it('updates an enemy type and returns success', async () => {
-    mockUpdateEnemyType.mockResolvedValue(undefined);
+    mockUpdateEnemyType.mockResolvedValue(true);
 
     const req = mockReq({
       params: { id: '5' },
@@ -1138,7 +1138,7 @@ describe('DELETE /admin/campaign/enemy-types/:id', () => {
   const handler = getHandler('delete', '/admin/campaign/enemy-types/:id');
 
   it('deletes an enemy type and returns success', async () => {
-    mockDeleteEnemyType.mockResolvedValue(undefined);
+    mockDeleteEnemyType.mockResolvedValue(true);
 
     const req = mockReq({ params: { id: '5' } });
     const res = mockRes();
@@ -2299,7 +2299,7 @@ describe('parseIntParam validation', () => {
   });
 
   it('handles negative numbers as valid numeric IDs', async () => {
-    mockDeleteWorld.mockResolvedValue(undefined);
+    mockDeleteWorld.mockResolvedValue(true);
 
     const handler = getHandler('delete', '/admin/campaign/worlds/:id');
     const req = mockReq({ params: { id: '-1' } });
@@ -2399,6 +2399,8 @@ describe('campaign admin routes write the audit log', () => {
     req: Record<string, any>;
     setup?: () => void;
     log: [string, string, number, string | null];
+    /** Update/delete routes: the service call that reports whether a row matched. */
+    missing?: [ReturnType<typeof vi.fn<AnyFn>>, string];
   }> = [
     {
       method: 'post',
@@ -2417,18 +2419,21 @@ describe('campaign admin routes write the audit log', () => {
         4,
         JSON.stringify({ fields: ['name', 'isPublished'] }),
       ],
+      missing: [mockUpdateWorld, 'World not found'],
     },
     {
       method: 'put',
       path: '/admin/campaign/worlds/:id/order',
       req: { params: { id: '4' }, body: { sortOrder: 2 } },
       log: ['campaign_world_update', 'campaign_world', 4, JSON.stringify({ sortOrder: 2 })],
+      missing: [mockReorderWorld, 'World not found'],
     },
     {
       method: 'delete',
       path: '/admin/campaign/worlds/:id',
       req: { params: { id: '4' } },
       log: ['campaign_world_delete', 'campaign_world', 4, null],
+      missing: [mockDeleteWorld, 'World not found'],
     },
     {
       method: 'post',
@@ -2447,18 +2452,21 @@ describe('campaign admin routes write the audit log', () => {
       path: '/admin/campaign/levels/:id',
       req: { params: { id: '9' }, body: { name: 'L2' } },
       log: ['campaign_level_update', 'campaign_level', 9, JSON.stringify({ name: 'L2' })],
+      missing: [mockUpdateLevel, 'Level not found'],
     },
     {
       method: 'put',
       path: '/admin/campaign/levels/:id/order',
       req: { params: { id: '9' }, body: { sortOrder: 1 } },
       log: ['campaign_level_update', 'campaign_level', 9, JSON.stringify({ sortOrder: 1 })],
+      missing: [mockReorderLevel, 'Level not found'],
     },
     {
       method: 'delete',
       path: '/admin/campaign/levels/:id',
       req: { params: { id: '9' } },
       log: ['campaign_level_delete', 'campaign_level', 9, null],
+      missing: [mockDeleteLevel, 'Level not found'],
     },
     {
       method: 'post',
@@ -2489,12 +2497,14 @@ describe('campaign admin routes write the audit log', () => {
       path: '/admin/campaign/enemy-types/:id',
       req: { params: { id: '6' }, body: { name: 'E2', config: {} } },
       log: ['enemy_type_update', 'enemy_type', 6, JSON.stringify({ name: 'E2' })],
+      missing: [mockUpdateEnemyType, 'Enemy type not found'],
     },
     {
       method: 'delete',
       path: '/admin/campaign/enemy-types/:id',
       req: { params: { id: '6' } },
       log: ['enemy_type_delete', 'enemy_type', 6, null],
+      missing: [mockDeleteEnemyType, 'Enemy type not found'],
     },
     {
       method: 'post',
@@ -2517,7 +2527,7 @@ describe('campaign admin routes write the audit log', () => {
       mockUpdateEnemyType,
       mockDeleteEnemyType,
     ]) {
-      m.mockResolvedValue(undefined);
+      m.mockResolvedValue(true);
     }
     mockGetWorld.mockResolvedValue({ id: 3 });
   });
@@ -2529,6 +2539,21 @@ describe('campaign admin routes write the audit log', () => {
     expect(next).not.toHaveBeenCalled();
     expect(mockLogAdminAction).toHaveBeenCalledWith(1, ...log);
   });
+
+  it.each(cases.filter((c) => c.missing))(
+    '$method $path: unknown id → 404, nothing logged',
+    async ({ method, path, req, missing }) => {
+      const [service, error] = missing!;
+      service.mockResolvedValue(false);
+      const res = mockRes();
+      const next = vi.fn();
+      await getHandler(method, path)(mockReq({ user: { userId: 1 }, ...req }), res, next);
+      expect(next).not.toHaveBeenCalled();
+      expect(res._status).toBe(404);
+      expect(res._json).toEqual({ error });
+      expect(mockLogAdminAction).not.toHaveBeenCalled();
+    },
+  );
 
   it('lists the enemy types a level import created', async () => {
     mockCreateEnemyType.mockResolvedValue(31);

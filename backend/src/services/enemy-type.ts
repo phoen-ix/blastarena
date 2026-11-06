@@ -56,10 +56,11 @@ export async function createEnemyType(
   return result.insertId;
 }
 
+/** False when no enemy type has this id. */
 export async function updateEnemyType(
   id: number,
   updates: Partial<{ name: string; description: string; config: EnemyTypeConfig }>,
-): Promise<void> {
+): Promise<boolean> {
   const sets: string[] = [];
   const params: unknown[] = [];
 
@@ -78,11 +79,17 @@ export async function updateEnemyType(
     params.push(updates.config.isBoss);
   }
 
-  if (sets.length === 0) return;
+  if (sets.length === 0) return (await getEnemyType(id)) !== null;
   params.push(id);
-  await execute(`UPDATE campaign_enemy_types SET ${sets.join(', ')} WHERE id = ?`, params);
+  const result = await execute(
+    `UPDATE campaign_enemy_types SET ${sets.join(', ')} WHERE id = ?`,
+    params,
+  );
+  return result.affectedRows > 0;
 }
 
-export async function deleteEnemyType(id: number): Promise<void> {
-  await execute(`DELETE FROM campaign_enemy_types WHERE id = ?`, [id]);
+/** False when no enemy type has this id. */
+export async function deleteEnemyType(id: number): Promise<boolean> {
+  const result = await execute(`DELETE FROM campaign_enemy_types WHERE id = ?`, [id]);
+  return result.affectedRows > 0;
 }

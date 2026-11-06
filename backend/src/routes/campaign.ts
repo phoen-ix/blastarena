@@ -319,7 +319,8 @@ router.put(
   async (req, res, next) => {
     try {
       const id = parseIntParam(param(req.params.id), 'id');
-      await campaignService.updateWorld(id, req.body);
+      if (!(await campaignService.updateWorld(id, req.body)))
+        return res.status(404).json({ error: 'World not found' });
       await logAdminAction(
         req.user!.userId,
         'campaign_world_update',
@@ -341,7 +342,8 @@ router.delete(
   async (req, res, next) => {
     try {
       const id = parseIntParam(param(req.params.id), 'id');
-      await campaignService.deleteWorld(id);
+      if (!(await campaignService.deleteWorld(id)))
+        return res.status(404).json({ error: 'World not found' });
       await logAdminAction(req.user!.userId, 'campaign_world_delete', 'campaign_world', id, null);
       res.json({ success: true });
     } catch (err) {
@@ -358,7 +360,8 @@ router.put(
   async (req, res, next) => {
     try {
       const id = parseIntParam(param(req.params.id), 'id');
-      await campaignService.reorderWorld(id, req.body.sortOrder);
+      if (!(await campaignService.reorderWorld(id, req.body.sortOrder)))
+        return res.status(404).json({ error: 'World not found' });
       await logAdminAction(
         req.user!.userId,
         'campaign_world_update',
@@ -437,7 +440,8 @@ router.put(
   async (req, res, next) => {
     try {
       const id = parseIntParam(param(req.params.id), 'id');
-      await campaignService.updateLevel(id, req.body);
+      if (!(await campaignService.updateLevel(id, req.body)))
+        return res.status(404).json({ error: 'Level not found' });
       await logAdminAction(
         req.user!.userId,
         'campaign_level_update',
@@ -459,7 +463,8 @@ router.delete(
   async (req, res, next) => {
     try {
       const id = parseIntParam(param(req.params.id), 'id');
-      await campaignService.deleteLevel(id);
+      if (!(await campaignService.deleteLevel(id)))
+        return res.status(404).json({ error: 'Level not found' });
       await logAdminAction(req.user!.userId, 'campaign_level_delete', 'campaign_level', id, null);
       res.json({ success: true });
     } catch (err) {
@@ -476,7 +481,8 @@ router.put(
   async (req, res, next) => {
     try {
       const id = parseIntParam(param(req.params.id), 'id');
-      await campaignService.reorderLevel(id, req.body.sortOrder);
+      if (!(await campaignService.reorderLevel(id, req.body.sortOrder)))
+        return res.status(404).json({ error: 'Level not found' });
       await logAdminAction(
         req.user!.userId,
         'campaign_level_update',
@@ -532,7 +538,8 @@ router.put(
   async (req, res, next) => {
     try {
       const id = parseIntParam(param(req.params.id), 'id');
-      await enemyTypeService.updateEnemyType(id, req.body);
+      if (!(await enemyTypeService.updateEnemyType(id, req.body)))
+        return res.status(404).json({ error: 'Enemy type not found' });
       await logAdminAction(
         req.user!.userId,
         'enemy_type_update',
@@ -554,7 +561,8 @@ router.delete(
   async (req, res, next) => {
     try {
       const id = parseIntParam(param(req.params.id), 'id');
-      await enemyTypeService.deleteEnemyType(id);
+      if (!(await enemyTypeService.deleteEnemyType(id)))
+        return res.status(404).json({ error: 'Enemy type not found' });
       await logAdminAction(req.user!.userId, 'enemy_type_delete', 'enemy_type', id, null);
       res.json({ success: true });
     } catch (err) {
