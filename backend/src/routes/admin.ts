@@ -866,7 +866,7 @@ const emailSettingsSchema = z.object({
   smtpPort: z.number().int().min(1).max(65535).optional(),
   smtpUser: z.string().max(255).optional(),
   smtpPassword: z.string().max(255).optional(),
-  fromEmail: z.union([z.email().max(255), z.literal('')]).optional(),
+  fromEmail: z.email().max(255).optional(),
   fromName: z.string().max(100).optional(),
 });
 
@@ -884,8 +884,8 @@ router.get('/admin/settings/email_settings', adminOnlyMiddleware, async (_req, r
       smtpPort: dbSettings.smtpPort ?? config.SMTP_PORT,
       smtpUser: dbSettings.smtpUser ?? config.SMTP_USER,
       smtpPassword: (dbSettings.smtpPassword ?? config.SMTP_PASSWORD) ? PASSWORD_MASK : '',
-      fromEmail: dbSettings.fromEmail ?? config.SMTP_FROM_EMAIL,
-      fromName: dbSettings.fromName ?? config.SMTP_FROM_NAME,
+      fromEmail: dbSettings.fromEmail || config.SMTP_FROM_EMAIL,
+      fromName: dbSettings.fromName || config.SMTP_FROM_NAME,
     };
 
     res.json({ settings: effective });

@@ -79,8 +79,10 @@ const DEFAULT_CONFIG = {
   SMTP_PORT: 587,
   SMTP_USER: 'user@example.com',
   SMTP_PASSWORD: 'secret',
-  SMTP_FROM_EMAIL: 'noreply@example.com',
+  SMTP_FROM_EMAIL: 'noreply@blast.test',
   SMTP_FROM_NAME: 'BlastArena',
+  SMTP_EHLO_NAME: '',
+  SMTP_REQUIRE_TLS: true,
   APP_URL: 'https://blast.example.com',
 };
 
@@ -89,8 +91,10 @@ const EMPTY_SMTP_CONFIG = {
   SMTP_PORT: 587,
   SMTP_USER: '',
   SMTP_PASSWORD: '',
-  SMTP_FROM_EMAIL: 'noreply@example.com',
+  SMTP_FROM_EMAIL: 'noreply@blast.test',
   SMTP_FROM_NAME: 'BlastArena',
+  SMTP_EHLO_NAME: '',
+  SMTP_REQUIRE_TLS: true,
   APP_URL: 'https://blast.example.com',
 };
 
@@ -153,6 +157,11 @@ describe('email service', () => {
         host: 'smtp.example.com',
         port: 587,
         secure: false,
+        requireTLS: true,
+        name: 'blast.test',
+        connectionTimeout: 10_000,
+        greetingTimeout: 10_000,
+        socketTimeout: 30_000,
         auth: {
           user: 'user@example.com',
           pass: 'secret',
@@ -177,6 +186,36 @@ describe('email service', () => {
 
       expect(mockCreateTransport).toHaveBeenCalledWith(
         expect.objectContaining({ secure: false, port: 2525 }),
+      );
+    });
+
+    it('does not require STARTTLS on port 465 (implicit TLS)', async () => {
+      setupConfig({ SMTP_PORT: 465 });
+
+      await sendTestEmail('test@example.com');
+
+      expect(mockCreateTransport).toHaveBeenCalledWith(
+        expect.objectContaining({ secure: true, requireTLS: false }),
+      );
+    });
+
+    it('allows plaintext only when SMTP_REQUIRE_TLS is false', async () => {
+      mockGetConfig.mockReturnValue({ ...DEFAULT_CONFIG, SMTP_REQUIRE_TLS: false });
+
+      await sendTestEmail('test@example.com');
+
+      expect(mockCreateTransport).toHaveBeenCalledWith(
+        expect.objectContaining({ requireTLS: false }),
+      );
+    });
+
+    it('uses SMTP_EHLO_NAME as the EHLO name when set', async () => {
+      setupConfig({ SMTP_EHLO_NAME: 'mail.blast.test' });
+
+      await sendTestEmail('test@example.com');
+
+      expect(mockCreateTransport).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'mail.blast.test' }),
       );
     });
 
@@ -205,21 +244,23 @@ describe('email service', () => {
         smtpPort: 465,
         smtpUser: 'dbuser@example.com',
         smtpPassword: 'dbsecret',
-        fromEmail: 'db-noreply@example.com',
+        fromEmail: 'db-noreply@blast.test',
         fromName: 'DB BlastArena',
       });
 
       await sendTestEmail('test@example.com');
 
-      expect(mockCreateTransport).toHaveBeenCalledWith({
-        host: 'db-smtp.example.com',
-        port: 465,
-        secure: true,
-        auth: {
-          user: 'dbuser@example.com',
-          pass: 'dbsecret',
-        },
-      });
+      expect(mockCreateTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          host: 'db-smtp.example.com',
+          port: 465,
+          secure: true,
+          auth: {
+            user: 'dbuser@example.com',
+            pass: 'dbsecret',
+          },
+        }),
+      );
     });
 
     it('falls back to env config when DB settings are undefined/null', async () => {
@@ -234,15 +275,17 @@ describe('email service', () => {
 
       await sendTestEmail('test@example.com');
 
-      expect(mockCreateTransport).toHaveBeenCalledWith({
-        host: 'smtp.example.com',
-        port: 587,
-        secure: false,
-        auth: {
-          user: 'user@example.com',
-          pass: 'secret',
-        },
-      });
+      expect(mockCreateTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          host: 'smtp.example.com',
+          port: 587,
+          secure: false,
+          auth: {
+            user: 'user@example.com',
+            pass: 'secret',
+          },
+        }),
+      );
     });
 
     it('uses partial DB overrides (some fields from DB, rest from env)', async () => {
@@ -253,15 +296,17 @@ describe('email service', () => {
 
       await sendTestEmail('test@example.com');
 
-      expect(mockCreateTransport).toHaveBeenCalledWith({
-        host: 'custom-host.com',
-        port: 587,
-        secure: false,
-        auth: {
-          user: 'user@example.com',
-          pass: 'secret',
-        },
-      });
+      expect(mockCreateTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          host: 'custom-host.com',
+          port: 587,
+          secure: false,
+          auth: {
+            user: 'user@example.com',
+            pass: 'secret',
+          },
+        }),
+      );
     });
   });
 
@@ -407,7 +452,7 @@ describe('email service', () => {
 
       expect(mockSendMail).toHaveBeenCalledWith(
         expect.objectContaining({
-          from: '"BlastArena" <noreply@example.com>',
+          from: { name: 'BlastArena', address: 'noreply@blast.test' },
         }),
       );
     });
@@ -423,7 +468,7 @@ describe('email service', () => {
 
       expect(mockSendMail).toHaveBeenCalledWith(
         expect.objectContaining({
-          from: '"Custom Blast" <custom@blast.com>',
+          from: { name: 'Custom Blast', address: 'custom@blast.com' },
         }),
       );
     });
@@ -643,12 +688,48 @@ describe('email service', () => {
       expect(callArgs.html).toContain('SMTP configuration is working correctly');
     });
 
+    it('sends a plain-text part and a full HTML document', async () => {
+      await sendTestEmail('admin@example.com');
+
+      const callArgs = mockSendMail.mock.calls[0][0];
+      expect(callArgs.text).toContain('SMTP configuration is working correctly');
+      expect(callArgs.text).not.toContain('<');
+      expect(callArgs.html).toMatch(/^<html><body>[\s\S]*<\/body><\/html>$/);
+    });
+
+    it('marks the mail as auto-generated', async () => {
+      await sendTestEmail('admin@example.com');
+
+      expect(mockSendMail).toHaveBeenCalledWith(
+        expect.objectContaining({ headers: { 'Auto-Submitted': 'auto-generated' } }),
+      );
+    });
+
+    it('refuses to send from the example.com placeholder sender', async () => {
+      setupConfig({ SMTP_FROM_EMAIL: 'noreply@example.com' });
+
+      await expect(sendTestEmail('admin@example.com')).rejects.toThrow(/placeholder sender/);
+      expect(mockSendMail).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the env sender when the DB from email is empty', async () => {
+      setupDbSettings({ fromEmail: '', fromName: '' });
+
+      await sendTestEmail('admin@example.com');
+
+      expect(mockSendMail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          from: { name: 'BlastArena', address: 'noreply@blast.test' },
+        }),
+      );
+    });
+
     it('uses correct from field', async () => {
       await sendTestEmail('admin@example.com');
 
       expect(mockSendMail).toHaveBeenCalledWith(
         expect.objectContaining({
-          from: '"BlastArena" <noreply@example.com>',
+          from: { name: 'BlastArena', address: 'noreply@blast.test' },
         }),
       );
     });
@@ -787,12 +868,12 @@ describe('email service', () => {
     it('DB settings take priority over env config', async () => {
       setupConfig({
         SMTP_HOST: 'env-smtp.example.com',
-        SMTP_FROM_EMAIL: 'env@example.com',
+        SMTP_FROM_EMAIL: 'env@blast.test',
         SMTP_FROM_NAME: 'EnvName',
       });
       setupDbSettings({
         smtpHost: 'db-smtp.example.com',
-        fromEmail: 'db@example.com',
+        fromEmail: 'db@blast.test',
         fromName: 'DbName',
       });
 
@@ -803,7 +884,7 @@ describe('email service', () => {
       );
       expect(mockSendMail).toHaveBeenCalledWith(
         expect.objectContaining({
-          from: '"DbName" <db@example.com>',
+          from: { name: 'DbName', address: 'db@blast.test' },
         }),
       );
     });
@@ -811,7 +892,7 @@ describe('email service', () => {
     it('env config used when DB settings return empty object', async () => {
       setupConfig({
         SMTP_HOST: 'env-smtp.example.com',
-        SMTP_FROM_EMAIL: 'env@example.com',
+        SMTP_FROM_EMAIL: 'env@blast.test',
         SMTP_FROM_NAME: 'EnvName',
       });
       setupDbSettings({});
@@ -823,7 +904,7 @@ describe('email service', () => {
       );
       expect(mockSendMail).toHaveBeenCalledWith(
         expect.objectContaining({
-          from: '"EnvName" <env@example.com>',
+          from: { name: 'EnvName', address: 'env@blast.test' },
         }),
       );
     });
@@ -995,6 +1076,17 @@ describe('email service', () => {
 
       const html = mockSendMail.mock.calls[0][0].html;
       expect(html).toContain(`/api/auth/verify-email/${specialToken}`);
+    });
+
+    it('plain-text parts carry the same links', async () => {
+      await sendVerificationEmail('u@x.com', 'v1');
+      await sendEmailChangeEmail('u@x.com', 'c1');
+      await sendPasswordResetEmail('u@x.com', 'r1');
+
+      const texts = mockSendMail.mock.calls.map((c) => c[0].text);
+      expect(texts[0]).toContain('https://game.blast.io/api/auth/verify-email/v1');
+      expect(texts[1]).toContain('https://game.blast.io/api/user/confirm-email/c1');
+      expect(texts[2]).toContain('https://game.blast.io/reset-password?token=r1');
     });
 
     it('URLs contain clickable anchor tags', async () => {

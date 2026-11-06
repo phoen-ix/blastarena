@@ -29,6 +29,8 @@ export JWT_SECRET=e2e-jwt-not-a-secret-aaaaaaaaaaaaaaaaaaaaaaaaaa
 export EMAIL_PEPPER=e2e-pepper-not-a-secret-aaaaaaaaaaaaaaaaaaaaaa
 export TOTP_ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
 export SMTP_HOST=mailpit SMTP_PORT=1025 SMTP_USER=e2e SMTP_PASSWORD=e2e
+# Mailpit offers no STARTTLS; the backend refuses the placeholder example.com sender.
+export SMTP_REQUIRE_TLS=false SMTP_FROM_EMAIL=noreply@blastarena.test
 export APP_URL=http://127.0.0.1:$PORT_BASE
 export E2E_BASE_URL=$APP_URL
 export E2E_MAILPIT_URL=http://127.0.0.1:$MAILPIT_PORT

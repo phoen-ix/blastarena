@@ -25,8 +25,8 @@ async function getResolvedEmailConfig(): Promise<ResolvedEmailConfig> {
     port: dbSettings.smtpPort ?? config.SMTP_PORT,
     user: dbSettings.smtpUser ?? config.SMTP_USER,
     password: dbSettings.smtpPassword ?? config.SMTP_PASSWORD,
-    fromEmail: dbSettings.fromEmail ?? config.SMTP_FROM_EMAIL,
-    fromName: dbSettings.fromName ?? config.SMTP_FROM_NAME,
+    fromEmail: dbSettings.fromEmail || config.SMTP_FROM_EMAIL,
+    fromName: dbSettings.fromName || config.SMTP_FROM_NAME,
   };
 }
 
@@ -39,10 +39,17 @@ async function getTransporter(): Promise<Transporter | null> {
   }
 
   if (!transporter) {
+    const config = getConfig();
+    const secure = emailConfig.port === 465;
     transporter = nodemailer.createTransport({
       host: emailConfig.host,
       port: emailConfig.port,
-      secure: emailConfig.port === 465,
+      secure,
+      requireTLS: !secure && config.SMTP_REQUIRE_TLS,
+      name: config.SMTP_EHLO_NAME || emailConfig.fromEmail.split('@')[1],
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 30_000,
       auth: emailConfig.user
         ? {
             user: emailConfig.user,
@@ -59,7 +66,7 @@ export function invalidateTransporter(): void {
   transporter = null;
 }
 
-async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+async function sendEmail(to: string, subject: string, html: string, text: string): Promise<void> {
   const emailConfig = await getResolvedEmailConfig();
   const transport = await getTransporter();
 
@@ -78,11 +85,18 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
   }
 
   try {
+    if (emailConfig.fromEmail.endsWith('@example.com')) {
+      throw new Error(
+        `Refusing to send email from the placeholder sender ${emailConfig.fromEmail}: set SMTP_FROM_EMAIL or the From Email admin setting`,
+      );
+    }
     await transport.sendMail({
-      from: `"${emailConfig.fromName}" <${emailConfig.fromEmail}>`,
+      from: { name: emailConfig.fromName, address: emailConfig.fromEmail },
       to,
       subject,
-      html,
+      headers: { 'Auto-Submitted': 'auto-generated' },
+      text,
+      html: `<html><body>${html}</body></html>`,
     });
     logger.info({ to: recipient, subject }, 'Email sent');
   } catch (err) {
@@ -108,6 +122,7 @@ export async function sendVerificationEmail(
     <p><a href="${url}">${url}</a></p>
     <p>${t('email:verification.ignore')}</p>
   `,
+    `${t('email:verification.heading')}\n\n${t('email:verification.body')}\n${url}\n\n${t('email:verification.ignore')}\n`,
   );
 }
 
@@ -130,6 +145,7 @@ export async function sendEmailChangeEmail(
     <p>${t('email:emailChange.expires')}</p>
     <p>${t('email:emailChange.ignore')}</p>
   `,
+    `${t('email:emailChange.heading')}\n\n${t('email:emailChange.body')}\n\n${t('email:emailChange.action')}\n${url}\n\n${t('email:emailChange.expires')}\n\n${t('email:emailChange.ignore')}\n`,
   );
 }
 
@@ -151,6 +167,7 @@ export async function sendPasswordResetEmail(
     <p>${t('email:passwordReset.expires')}</p>
     <p>${t('email:passwordReset.ignore')}</p>
   `,
+    `${t('email:passwordReset.heading')}\n\n${t('email:passwordReset.body')}\n${url}\n\n${t('email:passwordReset.expires')}\n\n${t('email:passwordReset.ignore')}\n`,
   );
 }
 
@@ -171,6 +188,7 @@ export async function sendEmailTakenRegistrationWarning(
     <p><a href="${resetUrl}">${resetUrl}</a></p>
     <p>${t('email:registrationWarning.ignore')}</p>
   `,
+    `${t('email:registrationWarning.heading')}\n\n${t('email:registrationWarning.body')}\n\n${t('email:registrationWarning.resetHint')}\n${resetUrl}\n\n${t('email:registrationWarning.ignore')}\n`,
   );
 }
 
@@ -184,6 +202,7 @@ export async function sendEmailTakenChangeWarning(email: string, language = 'en'
     <p>${t('email:emailChangeWarning.body')}</p>
     <p>${t('email:emailChangeWarning.ignore')}</p>
   `,
+    `${t('email:emailChangeWarning.heading')}\n\n${t('email:emailChangeWarning.body')}\n\n${t('email:emailChangeWarning.ignore')}\n`,
   );
 }
 
@@ -196,5 +215,6 @@ export async function sendTestEmail(to: string, language = 'en'): Promise<void> 
     <h1>${t('email:test.heading')}</h1>
     <p>${t('email:test.body')}</p>
   `,
+    `${t('email:test.heading')}\n\n${t('email:test.body')}\n`,
   );
 }
