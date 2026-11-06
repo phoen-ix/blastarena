@@ -72,6 +72,11 @@ vi.mock('../../../backend/src/services/campaign-progress', () => ({
   getUserState: mockGetUserState,
 }));
 
+const mockLogAdminAction = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/admin-audit', () => ({
+  logAdminAction: mockLogAdminAction,
+}));
+
 // Middleware pass-throughs
 const mockAuthMiddleware = vi.hoisted(() => vi.fn<AnyFn>((_req, _res, next) => next()));
 
@@ -2383,5 +2388,174 @@ describe('Router completeness', () => {
     for (const path of expectedPaths) {
       expect(registeredPaths).toContain(path);
     }
+  });
+});
+
+// Every admin mutation here writes an audit entry (CLAUDE.md: every admin action is audit-logged).
+describe('campaign admin routes write the audit log', () => {
+  const cases: Array<{
+    method: string;
+    path: string;
+    req: Record<string, any>;
+    setup?: () => void;
+    log: [string, string, number, string | null];
+  }> = [
+    {
+      method: 'post',
+      path: '/admin/campaign/worlds',
+      req: { body: { name: 'W' } },
+      setup: () => mockCreateWorld.mockResolvedValue(4),
+      log: ['campaign_world_create', 'campaign_world', 4, JSON.stringify({ name: 'W' })],
+    },
+    {
+      method: 'put',
+      path: '/admin/campaign/worlds/:id',
+      req: { params: { id: '4' }, body: { name: 'W2', isPublished: true } },
+      log: [
+        'campaign_world_update',
+        'campaign_world',
+        4,
+        JSON.stringify({ fields: ['name', 'isPublished'] }),
+      ],
+    },
+    {
+      method: 'put',
+      path: '/admin/campaign/worlds/:id/order',
+      req: { params: { id: '4' }, body: { sortOrder: 2 } },
+      log: ['campaign_world_update', 'campaign_world', 4, JSON.stringify({ sortOrder: 2 })],
+    },
+    {
+      method: 'delete',
+      path: '/admin/campaign/worlds/:id',
+      req: { params: { id: '4' } },
+      log: ['campaign_world_delete', 'campaign_world', 4, null],
+    },
+    {
+      method: 'post',
+      path: '/admin/campaign/levels',
+      req: { body: { worldId: 4, name: 'L' } },
+      setup: () => mockCreateLevel.mockResolvedValue(9),
+      log: [
+        'campaign_level_create',
+        'campaign_level',
+        9,
+        JSON.stringify({ worldId: 4, name: 'L' }),
+      ],
+    },
+    {
+      method: 'put',
+      path: '/admin/campaign/levels/:id',
+      req: { params: { id: '9' }, body: { name: 'L2' } },
+      log: ['campaign_level_update', 'campaign_level', 9, JSON.stringify({ name: 'L2' })],
+    },
+    {
+      method: 'put',
+      path: '/admin/campaign/levels/:id/order',
+      req: { params: { id: '9' }, body: { sortOrder: 1 } },
+      log: ['campaign_level_update', 'campaign_level', 9, JSON.stringify({ sortOrder: 1 })],
+    },
+    {
+      method: 'delete',
+      path: '/admin/campaign/levels/:id',
+      req: { params: { id: '9' } },
+      log: ['campaign_level_delete', 'campaign_level', 9, null],
+    },
+    {
+      method: 'post',
+      path: '/admin/campaign/levels/import',
+      req: {
+        body: {
+          worldId: 3,
+          level: { _format: 'blast-arena-level', _version: 1, name: 'Imp', tiles: [['empty']] },
+        },
+      },
+      setup: () => mockCreateLevel.mockResolvedValue(20),
+      log: [
+        'campaign_level_import',
+        'campaign_level',
+        20,
+        JSON.stringify({ worldId: 3, name: 'Imp', createdEnemyTypes: [] }),
+      ],
+    },
+    {
+      method: 'post',
+      path: '/admin/campaign/enemy-types',
+      req: { body: { name: 'E', config: {} } },
+      setup: () => mockCreateEnemyType.mockResolvedValue(6),
+      log: ['enemy_type_create', 'enemy_type', 6, JSON.stringify({ name: 'E' })],
+    },
+    {
+      method: 'put',
+      path: '/admin/campaign/enemy-types/:id',
+      req: { params: { id: '6' }, body: { name: 'E2', config: {} } },
+      log: ['enemy_type_update', 'enemy_type', 6, JSON.stringify({ name: 'E2' })],
+    },
+    {
+      method: 'delete',
+      path: '/admin/campaign/enemy-types/:id',
+      req: { params: { id: '6' } },
+      log: ['enemy_type_delete', 'enemy_type', 6, null],
+    },
+    {
+      method: 'post',
+      path: '/admin/campaign/enemy-types/import',
+      req: { body: { name: 'E', description: '', config: {} } },
+      setup: () => mockCreateEnemyType.mockResolvedValue(7),
+      log: ['enemy_type_import', 'enemy_type', 7, JSON.stringify({ name: 'E', enemyAiId: null })],
+    },
+  ];
+
+  beforeEach(() => {
+    // Earlier suites leave rejecting implementations behind (clearAllMocks keeps them)
+    for (const m of [
+      mockUpdateWorld,
+      mockDeleteWorld,
+      mockReorderWorld,
+      mockUpdateLevel,
+      mockDeleteLevel,
+      mockReorderLevel,
+      mockUpdateEnemyType,
+      mockDeleteEnemyType,
+    ]) {
+      m.mockResolvedValue(undefined);
+    }
+    mockGetWorld.mockResolvedValue({ id: 3 });
+  });
+
+  it.each(cases)('$method $path', async ({ method, path, req, setup, log }) => {
+    setup?.();
+    const next = vi.fn();
+    await getHandler(method, path)(mockReq({ user: { userId: 1 }, ...req }), mockRes(), next);
+    expect(next).not.toHaveBeenCalled();
+    expect(mockLogAdminAction).toHaveBeenCalledWith(1, ...log);
+  });
+
+  it('lists the enemy types a level import created', async () => {
+    mockCreateEnemyType.mockResolvedValue(31);
+    mockCreateLevel.mockResolvedValue(21);
+    await getHandler('post', '/admin/campaign/levels/import')(
+      mockReq({
+        user: { userId: 1 },
+        body: {
+          worldId: 3,
+          level: {
+            name: 'B',
+            tiles: [['empty']],
+            enemyPlacements: [{ enemyTypeId: 7, x: 1, y: 1 }],
+          },
+          enemyTypes: [{ originalId: 7, name: 'E', config: {} }],
+          enemyIdMap: { '7': 'create' },
+        },
+      }),
+      mockRes(),
+      vi.fn(),
+    );
+    expect(mockLogAdminAction).toHaveBeenCalledWith(
+      1,
+      'campaign_level_import',
+      'campaign_level',
+      21,
+      JSON.stringify({ worldId: 3, name: 'B', createdEnemyTypes: [31] }),
+    );
   });
 });

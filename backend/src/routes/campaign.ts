@@ -18,6 +18,7 @@ import {
   TileType,
 } from '@blast-arena/shared';
 import { param } from '../utils/params';
+import { logAdminAction } from '../services/admin-audit';
 
 interface BundledEnemyType {
   originalId: number;
@@ -296,6 +297,13 @@ router.post(
         theme || 'classic',
         userId,
       );
+      await logAdminAction(
+        userId,
+        'campaign_world_create',
+        'campaign_world',
+        id,
+        JSON.stringify({ name }),
+      );
       res.status(201).json({ id });
     } catch (err) {
       next(err);
@@ -312,6 +320,13 @@ router.put(
     try {
       const id = parseIntParam(param(req.params.id), 'id');
       await campaignService.updateWorld(id, req.body);
+      await logAdminAction(
+        req.user!.userId,
+        'campaign_world_update',
+        'campaign_world',
+        id,
+        JSON.stringify({ fields: Object.keys(req.body) }),
+      );
       res.json({ success: true });
     } catch (err) {
       next(err);
@@ -327,6 +342,7 @@ router.delete(
     try {
       const id = parseIntParam(param(req.params.id), 'id');
       await campaignService.deleteWorld(id);
+      await logAdminAction(req.user!.userId, 'campaign_world_delete', 'campaign_world', id, null);
       res.json({ success: true });
     } catch (err) {
       next(err);
@@ -343,6 +359,13 @@ router.put(
     try {
       const id = parseIntParam(param(req.params.id), 'id');
       await campaignService.reorderWorld(id, req.body.sortOrder);
+      await logAdminAction(
+        req.user!.userId,
+        'campaign_world_update',
+        'campaign_world',
+        id,
+        JSON.stringify({ sortOrder: req.body.sortOrder }),
+      );
       res.json({ success: true });
     } catch (err) {
       next(err);
@@ -376,6 +399,13 @@ router.post(
       const userId = req.user!.userId;
       const worldId = parseIntParam(String(req.body.worldId ?? req.query.worldId ?? ''), 'worldId');
       const id = await campaignService.createLevel(worldId, req.body, userId);
+      await logAdminAction(
+        userId,
+        'campaign_level_create',
+        'campaign_level',
+        id,
+        JSON.stringify({ worldId, name: req.body.name }),
+      );
       res.status(201).json({ id });
     } catch (err) {
       next(err);
@@ -408,6 +438,13 @@ router.put(
     try {
       const id = parseIntParam(param(req.params.id), 'id');
       await campaignService.updateLevel(id, req.body);
+      await logAdminAction(
+        req.user!.userId,
+        'campaign_level_update',
+        'campaign_level',
+        id,
+        JSON.stringify({ name: req.body.name }),
+      );
       res.json({ success: true });
     } catch (err) {
       next(err);
@@ -423,6 +460,7 @@ router.delete(
     try {
       const id = parseIntParam(param(req.params.id), 'id');
       await campaignService.deleteLevel(id);
+      await logAdminAction(req.user!.userId, 'campaign_level_delete', 'campaign_level', id, null);
       res.json({ success: true });
     } catch (err) {
       next(err);
@@ -439,6 +477,13 @@ router.put(
     try {
       const id = parseIntParam(param(req.params.id), 'id');
       await campaignService.reorderLevel(id, req.body.sortOrder);
+      await logAdminAction(
+        req.user!.userId,
+        'campaign_level_update',
+        'campaign_level',
+        id,
+        JSON.stringify({ sortOrder: req.body.sortOrder }),
+      );
       res.json({ success: true });
     } catch (err) {
       next(err);
@@ -471,6 +516,7 @@ router.post(
       const userId = req.user!.userId;
       const { name, description, config } = req.body;
       const id = await enemyTypeService.createEnemyType(name, description || '', config, userId);
+      await logAdminAction(userId, 'enemy_type_create', 'enemy_type', id, JSON.stringify({ name }));
       res.status(201).json({ id });
     } catch (err) {
       next(err);
@@ -487,6 +533,13 @@ router.put(
     try {
       const id = parseIntParam(param(req.params.id), 'id');
       await enemyTypeService.updateEnemyType(id, req.body);
+      await logAdminAction(
+        req.user!.userId,
+        'enemy_type_update',
+        'enemy_type',
+        id,
+        JSON.stringify({ name: req.body.name }),
+      );
       res.json({ success: true });
     } catch (err) {
       next(err);
@@ -502,6 +555,7 @@ router.delete(
     try {
       const id = parseIntParam(param(req.params.id), 'id');
       await enemyTypeService.deleteEnemyType(id);
+      await logAdminAction(req.user!.userId, 'enemy_type_delete', 'enemy_type', id, null);
       res.json({ success: true });
     } catch (err) {
       next(err);
@@ -756,6 +810,7 @@ router.post(
 
       // Phase 2: Remap enemy IDs
       const idMap = new Map<number, number>();
+      const createdEnemyTypes: number[] = [];
 
       if (enemyIdMap) {
         for (const [origIdStr, action] of Object.entries(enemyIdMap)) {
@@ -773,6 +828,7 @@ router.post(
                 userId,
               );
               idMap.set(origId, newId);
+              createdEnemyTypes.push(newId);
             }
           } else if (typeof action === 'number') {
             idMap.set(origId, action);
@@ -802,6 +858,13 @@ router.post(
       };
 
       const levelId = await campaignService.createLevel(worldId, newLevelData, userId);
+      await logAdminAction(
+        userId,
+        'campaign_level_import',
+        'campaign_level',
+        levelId,
+        JSON.stringify({ worldId, name: levelData.name, createdEnemyTypes }),
+      );
       res.status(201).json({ id: levelId });
     } catch (err) {
       next(err);
@@ -875,6 +938,13 @@ router.post(
       }
 
       const id = await enemyTypeService.createEnemyType(name, description || '', config, userId);
+      await logAdminAction(
+        userId,
+        'enemy_type_import',
+        'enemy_type',
+        id,
+        JSON.stringify({ name, enemyAiId: config.enemyAiId ?? null }),
+      );
       res.status(201).json({ id });
     } catch (err) {
       next(err);

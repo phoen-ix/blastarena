@@ -126,7 +126,7 @@ Business logic layer — DB/Redis-backed services are tested with mocked databas
 | `services/botai-sandbox.test.ts` | Source scan, global access blocking, vm sandbox, import blocking, eval/Function blocking, constructor-walk escapes, infinite-loop timeout |
 | `services/lobby.test.ts` | Room CRUD via Redis, room index (no keyspace SCAN, self-heals expired keys), full active rooms with players, join (atomic Lua) errors, leave + host transfer, ready toggle, single-DEL delete |
 | `services/party.test.ts` | Create/join/leave/kick/disband, Lua script atomic join with the exclusivity check inside the script, invite CRUD |
-| `services/settings.test.ts` | Get/set, recording toggle, game/simulation defaults JSON, rank config fallback, getSetting read cache (misses cached, writes visible immediately) |
+| `services/settings.test.ts` | Get/set, recording toggle, game/simulation defaults JSON, rank config fallback, getSetting read cache (misses cached, writes visible immediately), open-world AFK timeout clamped to 600 s on read |
 | `services/user.test.ts` | Profile (real booleans for the 0/1 TINYINT columns), username change (duplicate race → 409), email change request/confirm/cancel (no enumeration, token expiry), direct email update, password change revokes all refresh tokens |
 | `services/messages.test.ts` | sendMessage (friendship/block checks, empty input, truncation), getConversation (pagination), getConversationList (unread counts, capped), markRead |
 | `services/party-errors.test.ts` | Lua reply → AppError mapping for create/join/kick, generic 409 fallback, plain-string replies only, exclusivity check inside the script, ReplyError stays masked |
@@ -134,7 +134,7 @@ Business logic layer — DB/Redis-backed services are tested with mocked databas
 | `services/botai-registry.test.ts` | Built-in always registered, initialize loads active uploads (skips missing files), uploads kept for the isolate (no in-process eval), isolate-backed createInstance with built-in fallback, unload/reload |
 | `services/enemyai-registry.test.ts` | Initialize, loadAI trusted (built-in, in-process) vs untrusted (isolate only, whoever uploaded it), createInstance, unload/reload |
 | `services/enemyai-compiler.test.ts` | compileEnemyAI with decide() validation, DUMMY_TYPE_CONFIG passed to the constructor, export patterns, scan errors propagated |
-| `services/admin-audit-actions.test.ts` | Source scan: every `logAdminAction()` call passes a literal action listed in `ADMIN_AUDIT_ACTIONS` (the Logs filter list), every listed action is written somewhere, no duplicates |
+| `services/admin-audit-actions.test.ts` | Source scan: every `logAdminAction()` call passes a literal action listed in `ADMIN_AUDIT_ACTIONS` (the Logs filter list), every listed action is written somewhere, no duplicates; every mutating `admin:*`/`sim:*` socket handler calls `logAdminAction` |
 | `services/lua-interpolation.test.ts` | Source scan: no `*_LUA` script in `services/` contains an un-interpolated TS constant (one test per script + a non-vacuity check) |
 | `services/pagination-total-order.test.ts` | Source scan: every `LIMIT ? OFFSET ?` query in `services/` ends its ORDER BY on a unique key (one test per query + a non-vacuity check) |
 | `services/isolated-ai-runner.test.ts` | IsolatedAIRunner: constructor-walk escape blocked, infinite loops time out (bot + enemy), live-object API fidelity + canMoveTo parity, seeded enemy RNG, disposal (the many-runners smoke test tolerates a cold-call timeout on a loaded machine), incremental tile sync |
@@ -157,7 +157,7 @@ HTTP endpoint tests — Express route handlers tested with mocked services and p
 | File | Coverage |
 |------|----------|
 | `routes/admin.test.ts` | Public settings/banner/active-AI endpoints, settings (registration, recordings, game/simulation defaults, default art style, email + test send), users, matches (incl. bulk delete; unknown match → 404, nothing deleted or logged), rooms, audit log, announcements, replays, simulations, bot-ai, account cleanup, staff vs admin middleware |
-| `routes/campaign.test.ts` | Worlds/levels/enemies CRUD, reorder, progress, import/export with conflict resolution (an enemy-type use-existing AI must exist: 400 AI_NOT_FOUND; a level import checks the world before creating anything), param validation, middleware presence, router completeness |
+| `routes/campaign.test.ts` | Worlds/levels/enemies CRUD, reorder, progress, import/export with conflict resolution (an enemy-type use-existing AI must exist: 400 AI_NOT_FOUND; a level import checks the world before creating anything), param validation, middleware presence, router completeness, an audit entry per admin mutation |
 | `routes/auth.test.ts` | Register (uniform result, registration toggle), login, logout, refresh, verify email, forgot/reset password, cookie flags from APP_URL, local co-op P2 login (incl. 2FA), rate-limit/validation middleware |
 | `routes/user.test.ts` | Profile CRUD, email change (admin direct vs confirmation), password validation, confirm-email public endpoint (redirect, rate limited), TOTP route rate limiters |
 | `routes/custom-maps.test.ts` | CRUD endpoints, validateCustomMap integration, Zod schema enforcement, ownership checks, auth + email-verified middleware |

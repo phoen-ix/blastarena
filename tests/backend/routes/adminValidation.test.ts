@@ -337,6 +337,20 @@ describe('PUT /admin/challenges/:id (audit B9)', () => {
     expect(mockUpdateChallenge).toHaveBeenCalledWith(2, { title: 'Weekend Brawl' });
   });
 
+  it('audit-logs the edit with the changed fields', async () => {
+    await run('put', '/admin/challenges/:id', {
+      params: { id: '2' },
+      body: { title: 'Weekend Brawl' },
+    });
+    expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO admin_actions'), [
+      1,
+      'challenge_update',
+      'challenge',
+      2,
+      JSON.stringify({ fields: ['title'] }),
+    ]);
+  });
+
   it('rejects a malformed date', async () => {
     const { res } = await run('put', '/admin/challenges/:id', {
       params: { id: '2' },

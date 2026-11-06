@@ -97,7 +97,7 @@ test('message, kick and close a waiting room', async ({ page }) => {
 
     // Close (admin only): a second room disappears from the list.
     const second = `Closing ${uid()}`;
-    await openRoom(socket, second);
+    const code2 = await openRoom(socket, second);
     const row2 = page.getByRole('row').filter({ hasText: second });
     await expect(row2).toBeVisible();
     const closed = next<{ reason: string }>(socket, 'admin:kicked');
@@ -108,6 +108,16 @@ test('message, kick and close a waiting room', async ({ page }) => {
       .click();
     expect((await closed).reason).toBe('Room closed by admin');
     await expect(row2).toHaveCount(0);
+
+    // All three are in the audit log.
+    const logged = (action: string, target: number, room: string) =>
+      sql(
+        `SELECT COUNT(*) FROM admin_actions WHERE action = '${action}' AND target_id = ${target} AND details LIKE '%"roomCode":"${room}"%'`,
+      ).trim();
+    expect(logged('room_message', 0, code)).toBe('1');
+    expect(logged('kick_player', account.id, code)).toBe('1');
+    // The list updates before the close is logged
+    await expect.poll(() => logged('close_room', 0, code2)).toBe('1');
   } finally {
     socket.disconnect();
   }

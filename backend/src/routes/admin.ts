@@ -1340,6 +1340,7 @@ router.delete('/admin/replays/:matchId', adminOnlyMiddleware, async (req, res, n
       res.status(404).json({ error: 'Replay not found' });
       return;
     }
+    await logAdminAction(req.user!.userId, 'delete_replay', 'match', matchId, null);
     res.json({ message: 'Replay deleted' });
   } catch (err) {
     next(err);
@@ -1379,7 +1380,15 @@ router.get('/admin/campaign-replays/:sessionId', fsReadLimiter, async (req, res,
 
 router.delete('/admin/campaign-replays/:sessionId', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    await replayService.deleteCampaignReplay(param(req.params.sessionId));
+    const sessionId = param(req.params.sessionId);
+    await replayService.deleteCampaignReplay(sessionId);
+    await logAdminAction(
+      req.user!.userId,
+      'delete_campaign_replay',
+      'campaign_replay',
+      0,
+      JSON.stringify({ sessionId }),
+    );
     res.json({ message: 'Campaign replay deleted' });
   } catch (err) {
     next(err);
@@ -1491,28 +1500,51 @@ router.post(
   '/admin/simulations',
   adminOnlyMiddleware,
   validate(simulationConfigSchema),
-  (req, res) => {
-    const mgr = getSimulationManager();
-    const result = mgr.startBatch(req.body as SimulationConfig, req.user!.userId);
-    if ('error' in result) {
-      res.status(429).json(result);
-      return;
+  async (req, res, next) => {
+    try {
+      const config = req.body as SimulationConfig;
+      const result = getSimulationManager().startBatch(config, req.user!.userId);
+      if ('error' in result) {
+        res.status(429).json(result);
+        return;
+      }
+      await logAdminAction(
+        req.user!.userId,
+        'simulation_start',
+        'simulation',
+        0,
+        JSON.stringify({
+          batchId: result.batchId,
+          gameMode: config.gameMode,
+          totalGames: config.totalGames,
+        }),
+      );
+      res.status(201).json(result);
+    } catch (err) {
+      next(err);
     }
-    res.status(201).json(result);
   },
 );
 
 router.delete('/admin/simulations/:batchId', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const mgr = getSimulationManager();
+    const batchId = param(req.params.batchId);
     // Try cancelling if running
-    mgr.cancelBatch(param(req.params.batchId));
+    mgr.cancelBatch(batchId);
     // Delete from disk and memory
-    const deleted = await mgr.deleteBatch(param(req.params.batchId));
+    const deleted = await mgr.deleteBatch(batchId);
     if (!deleted) {
       res.status(404).json({ error: 'Batch not found' });
       return;
     }
+    await logAdminAction(
+      req.user!.userId,
+      'simulation_delete',
+      'simulation',
+      0,
+      JSON.stringify({ batchId }),
+    );
     res.json({ message: 'Batch deleted' });
   } catch (err) {
     next(err);
@@ -2529,6 +2561,13 @@ router.put(
       if (Number.isNaN(id))
         return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
       await challengesService.updateChallenge(id, req.body);
+      await logAdminAction(
+        req.user!.userId,
+        'challenge_update',
+        'challenge',
+        id,
+        JSON.stringify({ fields: Object.keys(req.body) }),
+      );
       res.json({ message: 'Challenge updated' });
     } catch (err) {
       next(err);

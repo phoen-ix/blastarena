@@ -259,8 +259,10 @@ Level design, tiles and enemy behaviour: [Campaign System](campaign.md).
 **Admin** → **Logs** lists admin actions with **Date**, **Admin**, **Action**, **Target Type**,
 **Target ID** and **Details**, newest first. Click a row to read the full details.
 **Filter by action** narrows the list to one kind of action: it offers every action the server
-records (accounts, announcements, settings, matches, seasons, achievements, cosmetics, challenges,
-bot and enemy AIs); **All** shows everything. Settings changes are recorded as **Update Setting**,
+records (accounts, announcements, settings, matches and replays, room kicks, closes and messages,
+simulations, seasons, achievements, cosmetics, challenges, campaign worlds, levels and enemy types,
+bot and enemy AIs); **All** shows everything. Reordering a world or level is recorded as **Edit
+World** or **Edit Level**. Settings changes are recorded as **Update Setting**,
 rank tier changes as **Update Rank Tiers**.
 
 ## Backups and updates

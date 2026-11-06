@@ -32,6 +32,8 @@ function literals(node: ts.Expression): string[] | null {
 
 const written: string[] = [];
 const dynamic: string[] = [];
+/** Staff socket events (`admin:*`, `sim:*`): event -> does the handler call logAdminAction? */
+const staffSocketEvents = new Map<string, boolean>();
 for (const file of tsFiles(SRC)) {
   const sf = ts.createSourceFile(
     file,
@@ -40,6 +42,18 @@ for (const file of tsFiles(SRC)) {
     true,
   );
   const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === 'on' &&
+      node.expression.expression.getText(sf) === 'socket' &&
+      ts.isStringLiteral(node.arguments[0]) &&
+      /^(admin|sim):/.test(node.arguments[0].text) &&
+      node.arguments[1]
+    ) {
+      const body = node.arguments[1].getText(sf);
+      staffSocketEvents.set(node.arguments[0].text, body.includes('logAdminAction('));
+    }
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
@@ -71,6 +85,21 @@ describe('audited admin actions', () => {
   it('every listed action is written somewhere (no dead filter options)', () => {
     const used = new Set(written);
     expect(ADMIN_AUDIT_ACTIONS.filter((a) => !used.has(a))).toEqual([]);
+  });
+
+  it('every staff socket event that changes something writes an audit entry', () => {
+    // Read-only: they only join or leave a socket room to watch.
+    const readOnly = new Set([
+      'admin:spectate',
+      'admin:unspectate',
+      'sim:spectate',
+      'sim:unspectate',
+    ]);
+    expect(staffSocketEvents.size).toBeGreaterThan(readOnly.size);
+    const unlogged = [...staffSocketEvents]
+      .filter(([event, logs]) => !logs && !readOnly.has(event))
+      .map(([event]) => event);
+    expect(unlogged).toEqual([]);
   });
 
   it('lists each action once', () => {

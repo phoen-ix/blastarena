@@ -28,7 +28,7 @@ A lobby view (sidebar → Admin, shown to admin and moderator roles). Tabs a mod
 - `staffMiddleware` (admin+moderator) and `adminOnlyMiddleware` (admin only) for route protection
 - `backend/src/game/registry.ts` — singleton for RoomManager/IO access from admin service
 - Admin socket events: `admin:kick`, `admin:closeRoom`, `admin:spectate`, `admin:unspectate`, `admin:roomMessage`, `admin:toast`, `admin:banner`, `admin:kicked`
-- All admin actions logged to `admin_actions` table for audit. `target_id` is `INT NOT NULL` — use `0` for bulk operations without a specific target
+- All admin actions logged to `admin_actions` table for audit, REST routes and the mutating `admin:*`/`sim:*` socket events alike (`admin:kick`, `admin:closeRoom`, `admin:roomMessage`, `sim:start`, `sim:cancel`; `tests/backend/services/admin-audit-actions.test.ts` checks the sockets). `target_id` is `INT NOT NULL` — use `0` for bulk operations without a specific target, and for targets without an integer id (the room code, simulation batch id or campaign replay session id goes in `details`)
 - Deactivated users blocked from login and token refresh
 - Self-protection: admins cannot deactivate/delete themselves
 - Public endpoint `GET /admin/announcements/banner` (no auth)

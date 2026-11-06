@@ -59,6 +59,7 @@ import { verifyAccessToken } from './middleware/auth';
 import { UserRow } from './db/types';
 import { verifyLocalCoopSocketToken } from './services/auth';
 import { openWorldManager } from './game/OpenWorldManager';
+import { logAdminAction } from './services/admin-audit';
 
 type TypedServer = Server<
   ClientToServerEvents,
@@ -1147,6 +1148,13 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         }
         broadcastRoomList();
 
+        await logAdminAction(
+          socket.data.userId,
+          'kick_player',
+          'user',
+          parsed.userId,
+          JSON.stringify({ roomCode: parsed.roomCode, reason: parsed.reason ?? null }),
+        );
         logger.info(
           { admin: socket.data.username, targetUserId: parsed.userId, roomCode: parsed.roomCode },
           'Admin kicked player',
@@ -1193,6 +1201,14 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         roomManager.removeRoom(parsed.roomCode);
         await lobbyService.deleteRoom(parsed.roomCode);
         broadcastRoomList();
+
+        await logAdminAction(
+          socket.data.userId,
+          'close_room',
+          'room',
+          0,
+          JSON.stringify({ roomCode: parsed.roomCode, players: sockets.length }),
+        );
 
         logger.info(
           { admin: socket.data.username, roomCode: parsed.roomCode },
@@ -1267,6 +1283,13 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           message: sanitizedMessage,
           from: socket.data.username,
         });
+        await logAdminAction(
+          socket.data.userId,
+          'room_message',
+          'room',
+          0,
+          JSON.stringify({ roomCode: parsed.roomCode, message: sanitizedMessage }),
+        );
         logger.info(
           { admin: socket.data.username, roomCode: parsed.roomCode },
           'Admin sent room message',
@@ -1278,55 +1301,84 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     });
 
     // Simulation: start batch
-    socket.on('sim:start', (config, callback) => {
+    socket.on('sim:start', async (config, callback) => {
       if (socket.data.role !== 'admin') {
         return callback({ success: false, error: 'Admin access required' });
       }
 
-      const mgr = getSimulationManager();
-      const result = mgr.startBatch(config, socket.data.userId);
-      if ('error' in result) {
-        return callback({ success: false, error: result.error });
-      }
+      try {
+        const mgr = getSimulationManager();
+        const result = mgr.startBatch(config, socket.data.userId);
+        if ('error' in result) {
+          return callback({ success: false, error: result.error });
+        }
 
-      if (result.queued) {
-        logger.info(
-          {
-            admin: socket.data.username,
+        await logAdminAction(
+          socket.data.userId,
+          'simulation_start',
+          'simulation',
+          0,
+          JSON.stringify({
             batchId: result.batchId,
-            queuePosition: result.queuePosition,
+            gameMode: config.gameMode,
             totalGames: config.totalGames,
-          },
-          'Admin queued simulation batch',
+          }),
         );
-        callback({
-          success: true,
-          batchId: result.batchId,
-          queued: true,
-          queuePosition: result.queuePosition,
-        });
-      } else {
-        // Progress/result/completed events reach this admin through the `sim:admin` room, which
-        // SimulationManager wires for every batch. The three per-socket runner.on() listeners
-        // that used to live here closed over the socket and were never removed, pinning both
-        // the finished runner (with its full result array) and the disconnected socket for the
-        // lifetime of the process. (audit B6)
-        logger.info(
-          { admin: socket.data.username, batchId: result.batchId, totalGames: config.totalGames },
-          'Admin started simulation batch',
-        );
-        callback({ success: true, batchId: result.batchId });
+
+        if (result.queued) {
+          logger.info(
+            {
+              admin: socket.data.username,
+              batchId: result.batchId,
+              queuePosition: result.queuePosition,
+              totalGames: config.totalGames,
+            },
+            'Admin queued simulation batch',
+          );
+          callback({
+            success: true,
+            batchId: result.batchId,
+            queued: true,
+            queuePosition: result.queuePosition,
+          });
+        } else {
+          // Progress/result/completed events reach this admin through the `sim:admin` room, which
+          // SimulationManager wires for every batch. The three per-socket runner.on() listeners
+          // that used to live here closed over the socket and were never removed, pinning both
+          // the finished runner (with its full result array) and the disconnected socket for the
+          // lifetime of the process. (audit B6)
+          logger.info(
+            { admin: socket.data.username, batchId: result.batchId, totalGames: config.totalGames },
+            'Admin started simulation batch',
+          );
+          callback({ success: true, batchId: result.batchId });
+        }
+      } catch (err: unknown) {
+        callback({ success: false, error: clientError(err) });
       }
     });
 
     // Simulation: cancel batch
-    socket.on('sim:cancel', (data, callback) => {
+    socket.on('sim:cancel', async (data, callback) => {
       if (socket.data.role !== 'admin') {
         return callback({ success: false, error: 'Admin access required' });
       }
 
-      const success = getSimulationManager().cancelBatch(data.batchId);
-      callback({ success, error: success ? undefined : 'Batch not found or not running' });
+      try {
+        const success = getSimulationManager().cancelBatch(data.batchId);
+        if (success) {
+          await logAdminAction(
+            socket.data.userId,
+            'simulation_cancel',
+            'simulation',
+            0,
+            JSON.stringify({ batchId: data.batchId }),
+          );
+        }
+        callback({ success, error: success ? undefined : 'Batch not found or not running' });
+      } catch (err: unknown) {
+        callback({ success: false, error: clientError(err) });
+      }
     });
 
     // Simulation: spectate

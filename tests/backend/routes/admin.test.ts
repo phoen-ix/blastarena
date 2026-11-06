@@ -50,11 +50,13 @@ vi.mock('../../../backend/src/services/admin', () => ({
 const mockListReplays = vi.hoisted(() => vi.fn<AnyFn>());
 const mockGetReplay = vi.hoisted(() => vi.fn<AnyFn>());
 const mockDeleteReplay = vi.hoisted(() => vi.fn<AnyFn>());
+const mockDeleteCampaignReplay = vi.hoisted(() => vi.fn<AnyFn>());
 
 vi.mock('../../../backend/src/services/replay', () => ({
   listReplays: mockListReplays,
   getReplay: mockGetReplay,
   deleteReplay: mockDeleteReplay,
+  deleteCampaignReplay: mockDeleteCampaignReplay,
 }));
 
 // --- settingsService ---
@@ -1786,6 +1788,13 @@ describe('DELETE /admin/replays/:matchId', () => {
     await handler(req, res, vi.fn());
     expect(mockDeleteReplay).toHaveBeenCalledWith(5);
     expect(res._json).toEqual({ message: 'Replay deleted' });
+    expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO admin_actions'), [
+      1,
+      'delete_replay',
+      'match',
+      5,
+      null,
+    ]);
   });
 
   it('returns 404 when replay not found', async () => {
@@ -1795,6 +1804,7 @@ describe('DELETE /admin/replays/:matchId', () => {
     await handler(req, res, vi.fn());
     expect(res._status).toBe(404);
     expect(res._json).toEqual({ error: 'Replay not found' });
+    expect(mockExecute).not.toHaveBeenCalled();
   });
 
   it('has adminOnlyMiddleware in route stack', () => {
@@ -1811,6 +1821,25 @@ describe('DELETE /admin/replays/:matchId', () => {
     const next = vi.fn();
     await handler(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
+  });
+});
+
+describe('DELETE /admin/campaign-replays/:sessionId', () => {
+  const handler = getHandler('delete', '/admin/campaign-replays/:sessionId');
+
+  it('deletes the campaign replay and audit-logs the session id', async () => {
+    mockDeleteCampaignReplay.mockResolvedValue(true);
+    const res = mockRes();
+    await handler(mockReq({ params: { sessionId: 'abc-123' } }), res, vi.fn());
+    expect(mockDeleteCampaignReplay).toHaveBeenCalledWith('abc-123');
+    expect(res._json).toEqual({ message: 'Campaign replay deleted' });
+    expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO admin_actions'), [
+      1,
+      'delete_campaign_replay',
+      'campaign_replay',
+      0,
+      JSON.stringify({ sessionId: 'abc-123' }),
+    ]);
   });
 });
 
@@ -1961,35 +1990,43 @@ describe('GET /admin/simulations/:batchId/replay/:gameIndex', () => {
 describe('POST /admin/simulations', () => {
   const handler = getHandler('post', '/admin/simulations');
 
-  it('starts batch and returns 201 on success', () => {
+  it('starts batch and returns 201 on success', async () => {
     const result = { batchId: 'batch-123', totalGames: 10 };
     mockStartBatch.mockReturnValue(result);
     const req = mockReq({ body: { gameMode: 'ffa', botCount: 4 } });
     const res = mockRes();
-    handler(req, res, vi.fn());
+    await handler(req, res, vi.fn());
     expect(mockStartBatch).toHaveBeenCalledWith({ gameMode: 'ffa', botCount: 4 }, 1);
     expect(res._status).toBe(201);
     expect(res._json).toEqual(result);
+    expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO admin_actions'), [
+      1,
+      'simulation_start',
+      'simulation',
+      0,
+      JSON.stringify({ batchId: 'batch-123', gameMode: 'ffa' }),
+    ]);
   });
 
-  it('returns 429 when queue is full', () => {
+  it('returns 429 when queue is full', async () => {
     const result = { error: 'Queue is full, maximum 10 batches' };
     mockStartBatch.mockReturnValue(result);
     const req = mockReq({ body: { gameMode: 'ffa', botCount: 4 } });
     const res = mockRes();
-    handler(req, res, vi.fn());
+    await handler(req, res, vi.fn());
     expect(res._status).toBe(429);
     expect(res._json).toEqual(result);
+    expect(mockExecute).not.toHaveBeenCalled();
   });
 
-  it('passes correct admin user ID to startBatch', () => {
+  it('passes correct admin user ID to startBatch', async () => {
     mockStartBatch.mockReturnValue({ batchId: 'b1' });
     const req = mockReq({
       user: { userId: 77, username: 'admin', role: 'admin' },
       body: { gameMode: 'teams' },
     });
     const res = mockRes();
-    handler(req, res, vi.fn());
+    await handler(req, res, vi.fn());
     expect(mockStartBatch).toHaveBeenCalledWith({ gameMode: 'teams' }, 77);
   });
 
@@ -2010,6 +2047,13 @@ describe('DELETE /admin/simulations/:batchId', () => {
     expect(mockCancelBatch).toHaveBeenCalledWith('batch-123');
     expect(mockDeleteBatch).toHaveBeenCalledWith('batch-123');
     expect(res._json).toEqual({ message: 'Batch deleted' });
+    expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO admin_actions'), [
+      1,
+      'simulation_delete',
+      'simulation',
+      0,
+      JSON.stringify({ batchId: 'batch-123' }),
+    ]);
   });
 
   it('returns 404 when batch not found for deletion', async () => {
