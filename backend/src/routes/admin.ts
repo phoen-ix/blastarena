@@ -36,6 +36,7 @@ import {
   DEFAULT_ART_STYLE,
   isArtStyleId,
   OPENWORLD_MAX_PLAYERS_CAP,
+  OPENWORLD_MAX_AFK_TIMEOUT,
 } from '@blast-arena/shared';
 import multer from 'multer';
 import { AppError } from '../middleware/errorHandler';
@@ -535,7 +536,7 @@ const openWorldSettingsSchema = z
       .refine((n) => n % 2 === 1, 'mapHeight must be an odd number'),
     wallDensity: z.number().min(0).max(0.9),
     respawnDelay: z.number().int().min(0).max(60),
-    afkTimeoutSeconds: z.number().int().min(0).max(3600),
+    afkTimeoutSeconds: z.number().int().min(0).max(OPENWORLD_MAX_AFK_TIMEOUT),
   })
   .partial();
 

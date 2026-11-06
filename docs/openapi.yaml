@@ -2240,7 +2240,7 @@ paths:
           in: query
           schema:
             type: string
-          description: Filter by action type
+          description: Filter by action type, one of `ADMIN_AUDIT_ACTIONS` (`shared/src/constants/adminActions.ts`)
       responses:
         '200':
           description: Paginated admin action log
@@ -7530,7 +7530,7 @@ components:
         afkTimeoutSeconds:
           type: integer
           minimum: 0
-          maximum: 3600
+          maximum: 600
           description: Inactivity kick timeout in seconds (0 disables it)
 
     # ---- Admin ----
@@ -7611,6 +7611,7 @@ components:
           type: string
         action:
           type: string
+          description: One of `ADMIN_AUDIT_ACTIONS` (`shared/src/constants/adminActions.ts`)
         target_type:
           type: string
         target_id:
@@ -7642,6 +7643,16 @@ components:
         status:
           type: string
           enum: [waiting, playing]
+        players:
+          type: array
+          description: The room's players (the Rooms tab's per-player Kick sends the id)
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              username:
+                type: string
 
     AnnouncementBanner:
       type: object

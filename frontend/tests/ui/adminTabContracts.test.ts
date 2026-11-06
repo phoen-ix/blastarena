@@ -139,6 +139,7 @@ const FIXTURES: Record<string, unknown> = {
       maxPlayers: 8,
       gameMode: 'ffa',
       status: 'waiting',
+      players: [{ id: 41, username: 'ann' }],
     },
   ],
   // GET /admin/matches → adminService.getMatchHistory(): raw rows plus paging
@@ -302,7 +303,7 @@ describe('admin tabs render the backend response shapes', () => {
   it('Rooms', async () => {
     const tab = new RoomsTab(notes(), socket, 'admin');
     await tab.render(parent);
-    expectRendered('QWER', 'Friday night');
+    expectRendered('QWER', 'Friday night', 'ann', '#41');
     tab.destroy();
   });
 

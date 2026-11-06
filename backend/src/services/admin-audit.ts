@@ -1,4 +1,5 @@
 import { execute } from '../db/connection';
+import type { AdminAuditAction } from '@blast-arena/shared';
 
 /**
  * Append one row to the admin audit log.
@@ -13,7 +14,7 @@ import { execute } from '../db/connection';
  */
 export async function logAdminAction(
   adminId: number,
-  action: string,
+  action: AdminAuditAction,
   targetType: string,
   targetId: number,
   details: string | null,

@@ -26,7 +26,8 @@ const noopService = vi.hoisted(
 
 vi.mock('../../../backend/src/services/admin', () => noopService());
 vi.mock('../../../backend/src/services/replay', () => noopService());
-vi.mock('../../../backend/src/services/settings', () => noopService());
+const mockSetSetting = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/services/settings', () => ({ setSetting: mockSetSetting }));
 vi.mock('../../../backend/src/services/botai', () => noopService());
 vi.mock('../../../backend/src/services/enemyai', () => noopService());
 vi.mock('../../../backend/src/services/email', () => noopService());
@@ -81,7 +82,7 @@ vi.mock('../../../backend/src/game/registry', () => ({
   getIO: () => ({ emit: vi.fn(), to: vi.fn().mockReturnValue({ emit: vi.fn() }) }),
 }));
 vi.mock('../../../backend/src/game/OpenWorldManager', () => ({
-  openWorldManager: { getStatus: vi.fn(), reloadSettings: vi.fn() },
+  openWorldManager: { getStatus: vi.fn(), reloadSettings: vi.fn(), handleSettingsChange: vi.fn() },
 }));
 
 const mockExecute = vi.hoisted(() => vi.fn<AnyFn>());
@@ -112,6 +113,7 @@ vi.mock('multer', () => {
 });
 
 import adminRouter from '../../../backend/src/routes/admin';
+import { OPENWORLD_MAX_AFK_TIMEOUT } from '@blast-arena/shared';
 import { getAchievementById } from '../../../backend/src/services/achievements';
 import { getCosmeticById } from '../../../backend/src/services/cosmetics';
 
@@ -352,5 +354,34 @@ describe('PUT /admin/challenges/:id (audit B9)', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.body).toMatchObject({ code: 'INVALID_ID' });
+  });
+});
+
+// The AFK timeout shipped as 0-600 s (input, README); the later schema allowed 3600 by mistake.
+describe('PUT /admin/settings/open_world afkTimeoutSeconds', () => {
+  it.each([0, OPENWORLD_MAX_AFK_TIMEOUT])('accepts %i s', async (afkTimeoutSeconds) => {
+    const { res, next } = await run('put', '/admin/settings/open_world', {
+      body: { afkTimeoutSeconds },
+    });
+    expect(next).not.toHaveBeenCalled();
+    expect(res.body).toEqual({ message: 'Open world settings updated' });
+    expect(mockSetSetting).toHaveBeenCalledWith(
+      'open_world_afk_timeout',
+      String(afkTimeoutSeconds),
+    );
+  });
+
+  it.each([OPENWORLD_MAX_AFK_TIMEOUT + 1, 3600, -1])('rejects %i s', async (afkTimeoutSeconds) => {
+    const { res } = await run('put', '/admin/settings/open_world', {
+      body: { afkTimeoutSeconds },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(mockSetSetting).not.toHaveBeenCalled();
+    expect(mockExecute).not.toHaveBeenCalled(); // nothing saved, nothing audit-logged
+  });
+
+  it('the limit is 600 s', () => {
+    expect(OPENWORLD_MAX_AFK_TIMEOUT).toBe(600);
   });
 });

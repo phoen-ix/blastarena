@@ -2365,6 +2365,18 @@
       background: var(--bg-hover);
     }
 
+    .admin-room-player {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .admin-room-player-id {
+      color: var(--text-dim);
+      font-size: 12px;
+    }
+
     .admin-search {
       display: flex;
       gap: 12px;

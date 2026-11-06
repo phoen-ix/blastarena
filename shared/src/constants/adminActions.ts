@@ -1,0 +1,51 @@
+/**
+ * Every `admin_actions.action` the backend writes. `logAdminAction()` accepts only these, and the
+ * Logs tab offers one filter option per entry (`admin:logs.actions.<action>` labels).
+ * `tests/backend/services/admin-audit-actions.test.ts` fails on an entry no call site writes.
+ */
+export const ADMIN_AUDIT_ACTIONS = [
+  'create_user',
+  'role_change',
+  'deactivate',
+  'reactivate',
+  'delete',
+  'bulk_delete',
+  'reset_password',
+  'reset_totp',
+  'revoke_sessions',
+  'revoke_all_sessions',
+  'toast',
+  'set_banner',
+  'clear_banner',
+  'update_setting',
+  'settings_update',
+  'delete_match',
+  'delete_all_matches',
+  'season_create',
+  'season_update',
+  'season_delete',
+  'season_activate',
+  'season_end',
+  'achievement_create',
+  'achievement_update',
+  'achievement_delete',
+  'achievement_import',
+  'cosmetic_create',
+  'cosmetic_update',
+  'cosmetic_delete',
+  'cosmetic_import',
+  'challenge_create',
+  'challenge_delete',
+  'challenge_activate',
+  'challenge_deactivate',
+  'upload_ai',
+  'update_ai',
+  'reupload_ai',
+  'delete_ai',
+  'upload_enemy_ai',
+  'update_enemy_ai',
+  'reupload_enemy_ai',
+  'delete_enemy_ai',
+] as const;
+
+export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];

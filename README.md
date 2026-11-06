@@ -312,8 +312,8 @@ Separate from Elo.
 | Dashboard | Admin | Stats, server settings (recordings, registration, email/SMTP, chat modes, XP multiplier, default theme and art style, open world, GitHub/imprint display), game/simulation defaults (incl. puzzle tiles, spectator actions), revoke all sessions |
 | Users | Staff | Search and 2FA status (staff); roles, deactivate, delete (simple confirmation), password reset, revoke sessions, 2FA reset, bulk account cleanup (unverified/inactive/deactivated) (admin) |
 | Matches | Staff | History, per-player stats, replay viewer (staff); delete (admin) |
-| Rooms | Staff | Live rooms, spectate, message, kick (staff); force close (admin) |
-| Logs | Admin | Audit trail with filters, click-to-expand detail rows |
+| Rooms | Staff | Live rooms with their players, spectate, message, kick a listed player (staff); force close (admin) |
+| Logs | Admin | Audit trail filterable by every audited action, click-to-expand detail rows |
 | Simulations | Admin | Batch bot-only games (1-1000), fast/realtime, queue |
 | AI | Admin | Upload/manage custom bot AI and enemy AI implementations |
 | Announcements | Admin | Toast broadcasts, persistent banners |

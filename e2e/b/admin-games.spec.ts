@@ -15,9 +15,10 @@ import {
 } from './support';
 import type { Page } from '@playwright/test';
 
-/* Admin > Rooms (live list, message, kick, close, spectate) against rooms a player opened over
- * Socket.io, and Admin > Matches (list, details, replay, delete): a match played against a bot and
- * finished matches written as history. */
+/* Admin > Rooms (live list with each room's players, message, per-player kick, also as a
+ * moderator, close, spectate) against rooms players opened over Socket.io, and Admin > Matches
+ * (list, details, replay, delete): a match played against a bot and finished matches written as
+ * history. */
 
 async function player(): Promise<{ account: Account; socket: Socket }> {
   const account = await createUser();
@@ -82,14 +83,12 @@ test('message, kick and close a waiting room', async ({ page }) => {
     await expect(page.locator('.toast').filter({ hasText: 'Message sent' })).toBeVisible();
     expect((await message).message).toBe('Please keep it friendly');
 
-    // Kick: needs a user id.
-    await row.getByRole('button', { name: 'Kick' }).click();
-    const kick = page.getByRole('dialog', { name: `Kick Player from Room ${code}` });
-    await kick.getByRole('button', { name: 'Kick' }).click();
-    await expect(
-      page.locator('.toast').filter({ hasText: 'Please enter a valid user ID' }),
-    ).toBeVisible();
-    await kick.getByLabel('Player User ID').fill(String(account.id));
+    // Kick: each player is listed by name and id, with a Kick of their own.
+    await expect(row).toContainText(`${account.username} #${account.id}`);
+    await row.getByRole('button', { name: `Kick ${account.username}` }).click();
+    const kick = page.getByRole('dialog', {
+      name: `Kick ${account.username} from Room ${code}`,
+    });
     await kick.getByLabel('Reason (optional)').fill('AFK');
     const kicked = next<{ reason: string }>(socket, 'admin:kicked');
     await kick.getByRole('button', { name: 'Kick' }).click();
@@ -111,6 +110,39 @@ test('message, kick and close a waiting room', async ({ page }) => {
     await expect(row2).toHaveCount(0);
   } finally {
     socket.disconnect();
+  }
+});
+
+test('a moderator kicks one player; the room stays for the other', async ({ page }) => {
+  const host = await player();
+  const guest = await player();
+  try {
+    const name = `Mod ${uid()}`;
+    const code = await openRoom(host.socket, name);
+    const joined = await new Promise<{ success: boolean }>((r) =>
+      guest.socket.emit('room:join', { code }, r),
+    );
+    expect(joined.success).toBe(true);
+    await lobby(page, await createUser('moderator', 'm'));
+    await adminTab(page, 'Rooms');
+    const row = page.getByRole('row').filter({ hasText: name });
+    await expect(row).toContainText('2/4');
+    await expect(row.getByRole('button', { name: 'Close' })).toHaveCount(0);
+
+    const kicked = next<{ reason: string }>(guest.socket, 'admin:kicked');
+    await row.getByRole('button', { name: `Kick ${guest.account.username}` }).click();
+    await page
+      .getByRole('dialog', { name: `Kick ${guest.account.username} from Room ${code}` })
+      .getByRole('button', { name: 'Kick' })
+      .click();
+    expect((await kicked).reason).toBe('Kicked by admin');
+    // The list follows live: the guest is gone, the host is still there.
+    await expect(row).toContainText('1/4');
+    await expect(row).not.toContainText(guest.account.username);
+    await expect(row).toContainText(host.account.username);
+  } finally {
+    host.socket.disconnect();
+    guest.socket.disconnect();
   }
 });
 

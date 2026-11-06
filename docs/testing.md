@@ -103,14 +103,14 @@ Core game mechanics — most of these drive the server-authoritative game state 
 
 ### Services
 
-Business logic layer — DB/Redis-backed services are tested with mocked database and Redis; the AI compiler, sandbox and isolate suites run the real compilers and isolates. The `lua-interpolation` and `pagination-total-order` suites scan the service sources instead, and `aiGuideExamples` compiles the code samples in the AI guides.
+Business logic layer — DB/Redis-backed services are tested with mocked database and Redis; the AI compiler, sandbox and isolate suites run the real compilers and isolates. The `admin-audit-actions`, `lua-interpolation` and `pagination-total-order` suites scan the service sources instead, and `aiGuideExamples` compiles the code samples in the AI guides.
 
 | File | Coverage |
 |------|----------|
 | `services/campaign.test.ts` | Worlds/levels CRUD (level create with an unknown world → 400 WORLD_NOT_FOUND, not a foreign-key 500), reorder, summary queries skip heavy JSON columns, batched progress lookup (two queries for any number of worlds), next-level logic, JSON field mapping |
 | `services/email.test.ts` | SMTP config, send verification/reset/change/test emails, transporter caching, env vs DB config priority |
 | `services/cosmetics.test.ts` | CRUD, equip/unequip, batch game fetch, default unlock, campaign star unlocks, getPlayerCosmeticsForGame |
-| `services/admin.test.ts` | User CRUD (duplicate-entry race → 409), role change and deactivation (unknown user → 404, nothing changed or logged), password reset, server stats, match history/detail, audit log, toasts/banners, account cleanup preview/execute |
+| `services/admin.test.ts` | User CRUD (duplicate-entry race → 409), role change and deactivation (unknown user → 404, nothing changed or logged), password reset, server stats, match history/detail, active rooms with their players (id and name only), audit log, toasts/banners, account cleanup preview/execute |
 | `services/achievements.test.ts` | CRUD, all 4 condition types (cumulative/per-game/mode-specific/campaign), unlock + reward flow, bounded query volume |
 | `services/botai.test.ts` | Upload, compile, update, reupload, delete, registry lifecycle, built-in protection, source download |
 | `services/elo.test.ts` | Expected score, K-factor scaling, FFA pairwise calc, team calc, processMatchElo, bot filtering |
@@ -124,7 +124,7 @@ Business logic layer — DB/Redis-backed services are tested with mocked databas
 | `services/season.test.ts` | CRUD (unknown ids → 404, a single moved date checked against the stored other end), activate (unknown id → 404, nothing changed), end with hard/soft reset (unknown → 404, already ended → 409 SEASON_NOT_ACTIVE, no Elo reset), boolean isActive, user history |
 | `services/custom-maps.test.ts` | Full CRUD, JSON parsing with safeJsonParse fallback, snake_case→camelCase mapping, ownership enforcement, delete blocked by an active challenge |
 | `services/botai-sandbox.test.ts` | Source scan, global access blocking, vm sandbox, import blocking, eval/Function blocking, constructor-walk escapes, infinite-loop timeout |
-| `services/lobby.test.ts` | Room CRUD via Redis, room index (no keyspace SCAN, self-heals expired keys), join (atomic Lua) errors, leave + host transfer, ready toggle, single-DEL delete |
+| `services/lobby.test.ts` | Room CRUD via Redis, room index (no keyspace SCAN, self-heals expired keys), full active rooms with players, join (atomic Lua) errors, leave + host transfer, ready toggle, single-DEL delete |
 | `services/party.test.ts` | Create/join/leave/kick/disband, Lua script atomic join with the exclusivity check inside the script, invite CRUD |
 | `services/settings.test.ts` | Get/set, recording toggle, game/simulation defaults JSON, rank config fallback, getSetting read cache (misses cached, writes visible immediately) |
 | `services/user.test.ts` | Profile (real booleans for the 0/1 TINYINT columns), username change (duplicate race → 409), email change request/confirm/cancel (no enumeration, token expiry), direct email update, password change revokes all refresh tokens |
@@ -134,6 +134,7 @@ Business logic layer — DB/Redis-backed services are tested with mocked databas
 | `services/botai-registry.test.ts` | Built-in always registered, initialize loads active uploads (skips missing files), uploads kept for the isolate (no in-process eval), isolate-backed createInstance with built-in fallback, unload/reload |
 | `services/enemyai-registry.test.ts` | Initialize, loadAI trusted (built-in, in-process) vs untrusted (isolate only, whoever uploaded it), createInstance, unload/reload |
 | `services/enemyai-compiler.test.ts` | compileEnemyAI with decide() validation, DUMMY_TYPE_CONFIG passed to the constructor, export patterns, scan errors propagated |
+| `services/admin-audit-actions.test.ts` | Source scan: every `logAdminAction()` call passes a literal action listed in `ADMIN_AUDIT_ACTIONS` (the Logs filter list), every listed action is written somewhere, no duplicates |
 | `services/lua-interpolation.test.ts` | Source scan: no `*_LUA` script in `services/` contains an un-interpolated TS constant (one test per script + a non-vacuity check) |
 | `services/pagination-total-order.test.ts` | Source scan: every `LIMIT ? OFFSET ?` query in `services/` ends its ORDER BY on a unique key (one test per query + a non-vacuity check) |
 | `services/isolated-ai-runner.test.ts` | IsolatedAIRunner: constructor-walk escape blocked, infinite loops time out (bot + enemy), live-object API fidelity + canMoveTo parity, seeded enemy RNG, disposal (the many-runners smoke test tolerates a cold-call timeout on a loaded machine), incremental tile sync |
@@ -161,7 +162,7 @@ HTTP endpoint tests — Express route handlers tested with mocked services and p
 | `routes/user.test.ts` | Profile CRUD, email change (admin direct vs confirmation), password validation, confirm-email public endpoint (redirect, rate limited), TOTP route rate limiters |
 | `routes/custom-maps.test.ts` | CRUD endpoints, validateCustomMap integration, Zod schema enforcement, ownership checks, auth + email-verified middleware |
 | `routes/leaderboard.test.ts` | Leaderboard/season pagination with clamping, rank tiers, public profile (400/404), user rank (auth required) |
-| `routes/adminValidation.test.ts` | Zod validation on admin season/achievement/cosmetic/challenge updates: partial bodies, malformed fields → 400, unknown fields stripped, non-numeric :id → 400 INVALID_ID; unknown achievement/cosmetic id → 404 (nothing updated or logged), cosmetics accept the level_milestone unlock type |
+| `routes/adminValidation.test.ts` | Zod validation on admin season/achievement/cosmetic/challenge updates: partial bodies, malformed fields → 400, unknown fields stripped, non-numeric :id → 400 INVALID_ID; unknown achievement/cosmetic id → 404 (nothing updated or logged), cosmetics accept the level_milestone unlock type; open-world AFK timeout 0–600 s (601/3600/-1 → 400, nothing saved) |
 | `routes/cosmetics.test.ts` | Cosmetics list, user cosmetics/equipped, equip/unequip, achievements list + user achievements, auth/validation middleware |
 | `routes/messages.test.ts` | Conversation list, paginated history (limit cap 50, param clamping), mark read, non-numeric userId → 400, auth + email-verified middleware |
 | `routes/docs.test.ts` | Public/staff doc serving, path traversal prevention, whitelist enforcement, middleware presence |
@@ -265,7 +266,7 @@ All frontend tests run on Vitest + jsdom. Paths are relative to `frontend/`.
 | `tests/ui/adminTabContracts.test.ts` | Dashboard, Users, Rooms, Matches, Announcements, Achievements/cosmetics, Campaign and Simulations tabs render fixtures shaped like their backend handlers' responses, with no error |
 | `tests/game/spriteInterpolation.test.ts` | Enemies move per rendered frame at a frame-rate-independent speed, HP bar follows and redraws only on HP change; enemies and players jump (not slide) when the target moves further than a step, never while walking fast; short way over the open-world seam; Classic spawn-protection flicker; a player's look is kept through a knockout |
 | `tests/scenes/replayAndSpectatorExits.test.ts` | Closing a replay reopens its admin tab/view, leaving a spectated simulation sends sim:unspectate and reopens the batch, replay deaths (with cause) feed the HUD kill feed, a seek clears it, listeners removed on shutdown |
-| `tests/ui/adminTabs.test.ts` | ChallengesTab ({ maps } shape, load error, aria-checked revert on failed save), SeasonsTab paging + unsaved tier edits, LogsTab single listener, AITab authenticated download |
+| `tests/ui/adminTabs.test.ts` | ChallengesTab ({ maps } shape, load error, aria-checked revert on failed save), SeasonsTab paging + unsaved tier edits, LogsTab single listener + a filter option and English label per audited action, RoomsTab players (name + id, escaped) with per-player Kick (moderator: no Close), `room:list` reloads `/admin/rooms`, stale reloads dropped, AITab authenticated download |
 | `tests/ui/partyState.test.ts` | PartyBar fetches the current party on build and after reconnect, PartyView follows the bar (create/leave sync both ways), no disband toast for the leaver |
 | `tests/game/styledTileMap.test.ts` | Drawn-style tile map: floor frames carry the shadows of W/N/NW blocks, wall frames connect to neighbours, tile diffs destroy (reported, shadows cleared), crack in place and drop in crates, blocks y-sort, animated hazards stay on the ground, gates switch between block and ground |
 | `tests/art/artStyleManager.test.ts` | Art style resolution: Classic until the admin default arrives, the player's own pick wins, unknown values ignored, fetch failure keeps Classic, picks stored and cleared, admin broadcasts only reach players without a pick, ready() times out |

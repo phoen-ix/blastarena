@@ -1,6 +1,7 @@
 import { ApiClient } from '../../network/ApiClient';
 import { escapeHtml, setHtml } from '../../utils/html';
 import { t } from '../../i18n';
+import { ADMIN_AUDIT_ACTIONS } from '@blast-arena/shared';
 
 /** Admin action log row as returned by GET /admin/actions (snake_case DB columns). */
 interface AdminActionEntry {
@@ -80,13 +81,7 @@ export class LogsTab {
           <label style="color:var(--text-dim);font-size:13px;" for="action-filter">${t('admin:logs.filterByAction')}</label>
           <select id="action-filter" aria-label="${t('admin:logs.filterByAction')}">
             <option value="">${t('admin:logs.filterAll')}</option>
-            <option value="role_change" ${this.actionFilter === 'role_change' ? 'selected' : ''}>${t('admin:logs.filterRoleChange')}</option>
-            <option value="deactivate" ${this.actionFilter === 'deactivate' ? 'selected' : ''}>${t('admin:logs.filterDeactivate')}</option>
-            <option value="reactivate" ${this.actionFilter === 'reactivate' ? 'selected' : ''}>${t('admin:logs.filterReactivate')}</option>
-            <option value="delete" ${this.actionFilter === 'delete' ? 'selected' : ''}>${t('admin:logs.filterDelete')}</option>
-            <option value="toast" ${this.actionFilter === 'toast' ? 'selected' : ''}>${t('admin:logs.filterToast')}</option>
-            <option value="set_banner" ${this.actionFilter === 'set_banner' ? 'selected' : ''}>${t('admin:logs.filterSetBanner')}</option>
-            <option value="clear_banner" ${this.actionFilter === 'clear_banner' ? 'selected' : ''}>${t('admin:logs.filterClearBanner')}</option>
+            ${ADMIN_AUDIT_ACTIONS.map((a) => `<option value="${a}" ${this.actionFilter === a ? 'selected' : ''}>${t(`admin:logs.actions.${a}`)}</option>`).join('')}
           </select>
         </div>
         <table class="admin-table">

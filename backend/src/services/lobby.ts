@@ -91,7 +91,8 @@ export async function getRoom(code: string): Promise<Room | null> {
   return parseRoom(data);
 }
 
-export async function listRooms(): Promise<RoomListItem[]> {
+/** Waiting and playing rooms, in full (the admin Rooms tab needs the players). */
+export async function listActiveRooms(): Promise<Room[]> {
   const redis = getRedis();
 
   // Room codes come from the index rather than a keyspace SCAN.
@@ -99,7 +100,7 @@ export async function listRooms(): Promise<RoomListItem[]> {
   if (codes.length === 0) return [];
 
   const values = await redis.mget(...codes.map((c) => `room:${c}`));
-  const rooms: RoomListItem[] = [];
+  const rooms: Room[] = [];
   const stale: string[] = [];
 
   for (let i = 0; i < codes.length; i++) {
@@ -111,18 +112,7 @@ export async function listRooms(): Promise<RoomListItem[]> {
       continue;
     }
     const room = parseRoom(data);
-    if (room.status === 'waiting' || room.status === 'playing') {
-      rooms.push({
-        code: room.code,
-        name: room.name,
-        host: room.host.username,
-        playerCount: room.players.length,
-        maxPlayers: room.config.maxPlayers,
-        gameMode: room.config.gameMode,
-        status: room.status === 'waiting' ? 'waiting' : 'playing',
-        customMapName: room.customMapName,
-      });
-    }
+    if (room.status === 'waiting' || room.status === 'playing') rooms.push(room);
   }
 
   if (stale.length > 0) {
@@ -130,6 +120,19 @@ export async function listRooms(): Promise<RoomListItem[]> {
   }
 
   return rooms;
+}
+
+export async function listRooms(): Promise<RoomListItem[]> {
+  return (await listActiveRooms()).map((room) => ({
+    code: room.code,
+    name: room.name,
+    host: room.host.username,
+    playerCount: room.players.length,
+    maxPlayers: room.config.maxPlayers,
+    gameMode: room.config.gameMode,
+    status: room.status === 'waiting' ? 'waiting' : 'playing',
+    customMapName: room.customMapName,
+  }));
 }
 
 // Lua script for atomic join: reads room, validates, adds player, writes back

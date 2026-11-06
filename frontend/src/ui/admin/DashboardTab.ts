@@ -15,6 +15,7 @@ import {
   THEME_IDS,
   THEME_NAMES,
   ROOM_MAP_SIZES,
+  OPENWORLD_MAX_AFK_TIMEOUT,
 } from '@blast-arena/shared';
 import type { ThemeId, ArtStyleId } from '@blast-arena/shared';
 import { DEFAULT_ART_STYLE, isArtStyleId } from '@blast-arena/shared';
@@ -346,7 +347,7 @@ export class DashboardTab {
         </div>
         <div class="setting-item">
           <span class="setting-item-label">${t('admin:dashboard.openWorld.afkTimeout')}</span>
-          <input id="ow-afk-timeout" aria-label="${escapeAttr(t('admin:dashboard.openWorld.afkTimeout'))}" type="number" min="0" max="600" value="${this.owSettings.afkTimeoutSeconds}" class="admin-select" style="width:70px;" title="${escapeAttr(t('admin:dashboard.openWorld.afkTimeoutHint'))}">
+          <input id="ow-afk-timeout" aria-label="${escapeAttr(t('admin:dashboard.openWorld.afkTimeout'))}" type="number" min="0" max="${OPENWORLD_MAX_AFK_TIMEOUT}" value="${this.owSettings.afkTimeoutSeconds}" class="admin-select" style="width:70px;" title="${escapeAttr(t('admin:dashboard.openWorld.afkTimeoutHint'))}">
         </div>
         <div class="setting-item">
           <button id="ow-save-btn" class="btn btn-primary" style="padding:6px 16px;font-size:13px;">${t('admin:dashboard.openWorld.save')}</button>

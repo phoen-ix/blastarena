@@ -1,7 +1,7 @@
 import { query, execute, isDuplicateKeyError } from '../db/connection';
 import { logAdminAction } from './admin-audit';
 import { AppError } from '../middleware/errorHandler';
-import { UserRole, RoomListItem, ReplayData, getErrorMessage } from '@blast-arena/shared';
+import { UserRole, AdminRoomListItem, ReplayData, getErrorMessage } from '@blast-arena/shared';
 import { logger } from '../utils/logger';
 import { getRoomManager, getIO } from '../game/registry';
 import { hashPassword, hashEmail, generateEmailHint } from '../utils/crypto';
@@ -435,17 +435,19 @@ export async function getAdminActions(page: number = 1, limit: number = 20, acti
   return { actions: rows, total: countRow.total, page, limit };
 }
 
-export async function getActiveRooms() {
+export async function getActiveRooms(): Promise<AdminRoomListItem[]> {
   try {
-    const rooms = await lobbyService.listRooms();
-    return rooms.map((r: RoomListItem) => ({
+    const rooms = await lobbyService.listActiveRooms();
+    return rooms.map((r) => ({
       code: r.code,
       name: r.name,
-      host: r.host,
-      playerCount: r.playerCount,
-      maxPlayers: r.maxPlayers,
-      gameMode: r.gameMode,
-      status: r.status,
+      host: r.host.username,
+      playerCount: r.players.length,
+      maxPlayers: r.config.maxPlayers,
+      gameMode: r.config.gameMode,
+      status: r.status === 'waiting' ? 'waiting' : 'playing',
+      // Id and name only: the Kick action needs the id, nothing else of the user leaves the server.
+      players: r.players.map((p) => ({ id: p.user.id, username: p.user.username })),
     }));
   } catch (err) {
     // Redis down: an empty list is the right answer for the dashboard, but not silently — this

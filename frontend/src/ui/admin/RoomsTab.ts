@@ -1,7 +1,7 @@
 import { ApiClient } from '../../network/ApiClient';
 import { SocketClient } from '../../network/SocketClient';
 import { NotificationUI } from '../NotificationUI';
-import { GameState, RoomListItem, UserRole, gameModeName } from '@blast-arena/shared';
+import { AdminRoomListItem, GameState, UserRole, gameModeName } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
@@ -15,8 +15,11 @@ export class RoomsTab {
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
   // Live updates: the server broadcasts `room:list` to the lobby room on every room mutation, so
   // subscribe to that instead of polling /admin/rooms every 5 s. The interval stays as a 60 s
-  // safety net for a missed broadcast. (audit F7)
-  private roomListHandler: ((rooms: RoomListItem[]) => void) | null = null;
+  // safety net for a missed broadcast. (audit F7) The broadcast goes to every player and carries
+  // no player ids, so it only triggers a reload of /admin/rooms, which does.
+  private roomListHandler: (() => void) | null = null;
+  // Reloads can overlap; only the newest one may render.
+  private loadSeq = 0;
 
   constructor(notifications: NotificationUI, socketClient: SocketClient, role: UserRole) {
     this.notifications = notifications;
@@ -29,7 +32,7 @@ export class RoomsTab {
     this.container = container;
     parent.appendChild(container);
 
-    this.roomListHandler = (rooms) => this.renderRooms(rooms);
+    this.roomListHandler = () => this.loadRooms();
     this.socketClient.on('room:list', this.roomListHandler);
     // Idempotent server-side join. The tab lives inside the lobby shell, which subscribed on
     // mount and unsubscribes on hide; `socket.leave` is not ref-counted, so this tab must NOT
@@ -58,12 +61,13 @@ export class RoomsTab {
 
   private async loadRooms(): Promise<void> {
     if (!this.container) return;
+    const seq = ++this.loadSeq;
 
     try {
-      const rooms = await ApiClient.get<RoomListItem[]>('/admin/rooms');
-      this.renderRooms(rooms);
+      const rooms = await ApiClient.get<AdminRoomListItem[]>('/admin/rooms');
+      if (seq === this.loadSeq) this.renderRooms(rooms);
     } catch {
-      if (!this.container) return;
+      if (!this.container || seq !== this.loadSeq) return;
       setHtml(
         this.container,
         `<div style="color:var(--danger);">${t('admin:rooms.loadFailed')}</div>`,
@@ -71,7 +75,7 @@ export class RoomsTab {
     }
   }
 
-  private renderRooms(rooms: RoomListItem[]): void {
+  private renderRooms(rooms: AdminRoomListItem[]): void {
     if (!this.container) return;
     const isAdmin = this.role === 'admin';
 
@@ -92,17 +96,28 @@ export class RoomsTab {
           <tbody>
             ${rooms
               .map(
-                (r: RoomListItem) => `
+                (r) => `
               <tr>
                 <td style="font-family:monospace;">${escapeHtml(r.code)}</td>
                 <td>${escapeHtml(r.name)}</td>
                 <td>${escapeHtml(t(gameModeName(r.gameMode), { defaultValue: r.gameMode }))}</td>
-                <td>${t('admin:rooms.playerCount', { current: r.playerCount, max: r.maxPlayers })}</td>
+                <td>
+                  ${t('admin:rooms.playerCount', { current: r.playerCount, max: r.maxPlayers })}
+                  ${r.players
+                    .map(
+                      (p) => `
+                    <div class="admin-room-player">
+                      <span>${escapeHtml(p.username)}</span>
+                      <span class="admin-room-player-id">#${p.id}</span>
+                      <button class="btn-warn btn-sm" data-action="kick" data-code="${escapeAttr(r.code)}" data-user-id="${p.id}" data-username="${escapeAttr(p.username)}" aria-label="${escapeAttr(t('admin:rooms.kickUserAria', { username: p.username }))}">${t('admin:rooms.kickBtn')}</button>
+                    </div>`,
+                    )
+                    .join('')}
+                </td>
                 <td><span class="badge badge-${r.status === 'playing' ? 'admin' : 'active'}">${r.status === 'playing' ? t('ui:rooms.statusPlaying') : t('ui:rooms.statusWaiting')}</span></td>
                 <td style="display:flex;gap:4px;flex-wrap:wrap;">
                   <button class="btn btn-secondary btn-sm" data-action="spectate" data-code="${escapeAttr(r.code)}">${t('admin:rooms.spectateBtn')}</button>
                   <button class="btn btn-secondary btn-sm" data-action="message" data-code="${escapeAttr(r.code)}">${t('admin:rooms.messageBtn')}</button>
-                  <button class="btn-warn btn-sm" data-action="kick" data-code="${escapeAttr(r.code)}">${t('admin:rooms.kickBtn')}</button>
                   ${isAdmin ? `<button class="btn-danger btn-sm" data-action="close" data-code="${escapeAttr(r.code)}">${t('admin:rooms.closeBtn')}</button>` : ''}
                 </td>
               </tr>
@@ -137,7 +152,7 @@ export class RoomsTab {
     } else if (action === 'message') {
       this.showMessageModal(code);
     } else if (action === 'kick') {
-      this.showKickModal(code);
+      this.showKickModal(code, Number(target.dataset.userId), target.dataset.username ?? '');
     } else if (action === 'close') {
       this.showCloseConfirmation(code);
     }
@@ -206,37 +221,18 @@ export class RoomsTab {
     });
   }
 
-  private async showKickModal(code: string): Promise<void> {
-    // Fetch room details to get player list
-    let rooms: RoomListItem[];
-    try {
-      rooms = await ApiClient.get<RoomListItem[]>('/admin/rooms');
-    } catch {
-      this.notifications.error(t('admin:rooms.fetchRoomFailed'));
-      return;
-    }
-
-    const room = rooms.find((r: RoomListItem) => r.code === code);
-    if (!room) {
-      this.notifications.error(t('admin:rooms.roomNotFound'));
-      return;
-    }
-
-    // We need more detail about players. For now, show a simple input for user ID.
-    // The room list endpoint returns playerCount but not player details.
-    // Let's ask for the player to kick by prompting.
+  private showKickModal(code: string, userId: number, username: string): void {
+    const title = t('admin:rooms.kickUserTitle', { username, code });
     const { overlay, content, close } = createModal({
-      ariaLabel: t('admin:rooms.kickPlayerTitle', { code }),
+      ariaLabel: title,
       style: 'max-width:400px;',
       parent: document.getElementById('ui-overlay')!,
     });
     setHtml(
       content,
       `
-      <h2 style="margin-bottom:12px;">${t('admin:rooms.kickPlayerTitle', { code: escapeHtml(code) })}</h2>
-      <label for="kick-user-id" style="color:var(--text-dim);font-size:13px;">${t('admin:rooms.playerUserIdLabel')}</label>
-      <input type="number" class="admin-input" id="kick-user-id" placeholder="${escapeAttr(t('admin:rooms.enterUserIdPlaceholder'))}" style="margin-top:6px;">
-      <label for="kick-reason" style="color:var(--text-dim);font-size:13px;margin-top:8px;display:block;">${t('admin:rooms.reasonLabel')}</label>
+      <h2 style="margin-bottom:12px;">${escapeHtml(title)}</h2>
+      <label for="kick-reason" style="color:var(--text-dim);font-size:13px;display:block;">${t('admin:rooms.reasonLabel')}</label>
       <input type="text" class="admin-input" id="kick-reason" placeholder="${escapeAttr(t('admin:rooms.reasonPlaceholder'))}" style="margin-top:6px;">
       <div class="modal-actions" style="margin-top:16px;">
         <button class="btn btn-secondary" id="kick-cancel">${t('admin:rooms.cancelBtn')}</button>
@@ -247,12 +243,7 @@ export class RoomsTab {
 
     overlay.querySelector('#kick-cancel')!.addEventListener('click', close);
     overlay.querySelector('#kick-confirm')!.addEventListener('click', () => {
-      const userId = parseInt((overlay.querySelector('#kick-user-id') as HTMLInputElement).value);
       const reason = (overlay.querySelector('#kick-reason') as HTMLInputElement).value;
-      if (!userId || isNaN(userId)) {
-        this.notifications.error(t('admin:rooms.invalidUserId'));
-        return;
-      }
       close();
       this.socketClient.emit('admin:kick', { roomCode: code, userId, reason }, (res) => {
         if (res.success) {

@@ -102,14 +102,14 @@ Only accounts with the **user** role are ever included, and never your own.
 ## Moderating live rooms
 
 **Admin** → **Rooms** lists every open room with **Code**, **Name**, **Mode**, **Players** and
-**Status** (waiting or playing); it updates live.
+**Status** (waiting or playing); it updates live. **Players** shows the count and each player's
+name and user ID (`#42`), each with its own **Kick** button.
 
 - **Spectate**: watch a running match (a waiting room has nothing to show yet). Press Escape, or
   Start on a gamepad, to come back to the Rooms tab.
 - **Message**: type a message and click **Send**; everyone in the room, waiting or playing, sees it.
-- **Kick**: enter the **Player User ID** and an optional **Reason**, then click **Kick**. The player
-  is removed at once and gets the reason. The admin tabs do not list user IDs, so you need it from
-  elsewhere (for example the **Target ID** of an earlier entry in the [audit log](#reading-the-audit-log)).
+- **Kick** (next to a player): enter an optional **Reason**, then click **Kick**. The player is
+  removed at once and gets the reason.
 - **Close** (admins only): confirm **Close Room** to end the room and remove every player.
 
 ## Reviewing matches and replays
@@ -152,7 +152,7 @@ most changes live.
 | **XP Multiplier** | 0 to 10, click **Save**. |
 | **Default Theme**, **Default Art Style** | What players see until they pick their own in Settings. |
 | **Display GitHub Link**, **Display Imprint** | Links in the login footer and on the Help tab bar; edit the text in **Imprint Text** and click **Save Imprint**. |
-| **Open World** | **Enabled**, **Guest Access**, **Max Players**, **Round Time (s)**, **Map Width**/**Map Height** (odd numbers), **Wall Density**, **Respawn Delay (s)**, **AFK Timeout (s)** (0 = disabled); click **Save Open World Settings**. |
+| **Open World** | **Enabled**, **Guest Access**, **Max Players**, **Round Time (s)**, **Map Width**/**Map Height** (odd numbers), **Wall Density**, **Respawn Delay (s)**, **AFK Timeout (s)** (0–600, 0 = disabled); click **Save Open World Settings**. |
 | **Email / SMTP Settings** | Host, port, user, password, sender; **Save**, **Reset to Defaults** (back to the `.env` values) and **Send Test** to an address you enter. |
 | **Game Creation Defaults**, **Simulation Defaults** | Expand to preset the Create Room and New Simulation forms; **Save** or **Reset to Defaults**. |
 
@@ -258,8 +258,10 @@ Level design, tiles and enemy behaviour: [Campaign System](campaign.md).
 
 **Admin** → **Logs** lists admin actions with **Date**, **Admin**, **Action**, **Target Type**,
 **Target ID** and **Details**, newest first. Click a row to read the full details.
-**Filter by action** narrows the list to role changes, (de)activations, deletions, toasts and
-banner changes; pick **All** for everything else.
+**Filter by action** narrows the list to one kind of action: it offers every action the server
+records (accounts, announcements, settings, matches, seasons, achievements, cosmetics, challenges,
+bot and enemy AIs); **All** shows everything. Settings changes are recorded as **Update Setting**,
+rank tier changes as **Update Rank Tiers**.
 
 ## Backups and updates
 

@@ -25,6 +25,7 @@ export * from './constants/xp';
 export * from './constants/themes';
 export * from './constants/artStyles';
 export * from './constants/campaignThemes';
+export * from './constants/adminActions';
 export * from './utils/grid';
 export * from './utils/wrap';
 export * from './utils/puzzle';

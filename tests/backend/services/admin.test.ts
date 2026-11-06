@@ -50,9 +50,9 @@ vi.mock('../../../backend/src/services/replay', () => ({
   getReplayPlacements: mockGetReplayPlacements,
 }));
 
-const mockListRooms = vi.hoisted(() => vi.fn<AnyFn>());
+const mockListActiveRooms = vi.hoisted(() => vi.fn<AnyFn>());
 vi.mock('../../../backend/src/services/lobby', () => ({
-  listRooms: mockListRooms,
+  listActiveRooms: mockListActiveRooms,
 }));
 
 const mockUnlockDefaultCosmetics = vi.hoisted(() => vi.fn<AnyFn>().mockResolvedValue(undefined));
@@ -693,19 +693,29 @@ describe('admin service', () => {
   // ── getActiveRooms ──────────────────────────────────────────────────
 
   describe('getActiveRooms', () => {
-    it('returns mapped room list from lobby service', async () => {
-      const rooms = [
+    it('maps each room and lists its players by id and name only', async () => {
+      const alice = {
+        id: 7,
+        username: 'alice',
+        role: 'user',
+        language: 'en',
+        emailVerified: true,
+        twoFactorEnabled: false,
+      };
+      mockListActiveRooms.mockResolvedValueOnce([
         {
           code: 'ABC123',
           name: 'Fun Room',
-          host: 'alice',
-          playerCount: 3,
-          maxPlayers: 4,
-          gameMode: 'ffa',
-          status: 'waiting' as const,
+          host: alice,
+          players: [
+            { user: alice, ready: false, team: null },
+            { user: { ...alice, id: 9, username: 'bob' }, ready: true, team: 1 },
+          ],
+          config: { maxPlayers: 4, gameMode: 'ffa' },
+          status: 'waiting',
+          createdAt: new Date(),
         },
-      ];
-      mockListRooms.mockResolvedValueOnce(rooms);
+      ]);
 
       const result = await getActiveRooms();
 
@@ -714,16 +724,20 @@ describe('admin service', () => {
           code: 'ABC123',
           name: 'Fun Room',
           host: 'alice',
-          playerCount: 3,
+          playerCount: 2,
           maxPlayers: 4,
           gameMode: 'ffa',
           status: 'waiting',
+          players: [
+            { id: 7, username: 'alice' },
+            { id: 9, username: 'bob' },
+          ],
         },
       ]);
     });
 
     it('returns empty array when lobby service throws', async () => {
-      mockListRooms.mockRejectedValueOnce(new Error('Redis connection failed'));
+      mockListActiveRooms.mockRejectedValueOnce(new Error('Redis connection failed'));
 
       const result = await getActiveRooms();
 
@@ -731,7 +745,7 @@ describe('admin service', () => {
     });
 
     it('returns empty array when no rooms exist', async () => {
-      mockListRooms.mockResolvedValueOnce([]);
+      mockListActiveRooms.mockResolvedValueOnce([]);
 
       const result = await getActiveRooms();
 

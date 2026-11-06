@@ -80,7 +80,7 @@ Part a (player side: landing, lobby views, rooms, matches, open world, social, s
 | `get /admin/matches` | ✅ | admin-games.spec.ts › match history: details and delete |
 | `get /admin/matches/:x` | ✅ | admin-games.spec.ts › match history: details and delete |
 | `get /admin/replays/:x` | ✅ | admin-games.spec.ts › a played match: details, watch its replay, back to Matches |
-| `get /admin/rooms` | ✅ | admin-games.spec.ts › message, kick and close a waiting room |
+| `get /admin/rooms` | ✅ | admin-games.spec.ts › message, kick and close a waiting room; admin-games.spec.ts › a moderator kicks one player; the room stays for the other |
 | `get /admin/seasons` | ✅ | admin-content.spec.ts › seasons: create, activate, end with a soft reset, delete |
 | `get /admin/settings/challenges_enabled` | ✅ | admin-content.spec.ts › challenges: toggle, create, activate, deactivate, delete |
 | `get /admin/settings/default_art_style` | ✅ | admin-dashboard.spec.ts › toggles and chat modes save and survive a reload (the Dashboard loads it; reload re-reads it) |
@@ -164,7 +164,7 @@ Part a (player side: landing, lobby views, rooms, matches, open world, social, s
 | `putForm /admin/ai/:x/upload` | ✅ | admin-ai.spec.ts › bot AI: refused source, upload, toggle, edit, re-upload, download, delete (Re-upload) |
 | `putForm /admin/enemy-ai/:x/upload` | ✅ | admin-ai.spec.ts › enemy AI: upload, toggle, re-upload, download, delete (Re-upload) |
 | `socket admin:closeRoom` | ✅ | admin-games.spec.ts › message, kick and close a waiting room |
-| `socket admin:kick` | ✅ | admin-games.spec.ts › message, kick and close a waiting room |
+| `socket admin:kick` | ✅ | admin-games.spec.ts › message, kick and close a waiting room; admin-games.spec.ts › a moderator kicks one player; the room stays for the other |
 | `socket admin:roomMessage` | ✅ | admin-games.spec.ts › message, kick and close a waiting room |
 | `socket admin:spectate` | ✅ | admin-games.spec.ts › spectate a running match and come back |
 | `socket admin:unspectate` | ✅ | admin-games.spec.ts › spectate a running match and come back |
@@ -272,7 +272,7 @@ Part a (player side: landing, lobby views, rooms, matches, open world, social, s
 | Flow | | Test |
 |---|---|---|
 | Admin panel as admin (12 tabs, each renders, no page error / 5xx) | ✅ | admin-sweep.spec.ts › an admin opens all 12 tabs |
-| Admin panel as moderator (Users, Matches, Rooms read-only; admin-only API 403) | ✅ | admin-sweep.spec.ts › a moderator gets the staff tabs and nothing admin-only |
+| Admin panel as moderator (Users read-only, Matches, Rooms with Kick but no Close; admin-only API 403) | ✅ | admin-sweep.spec.ts › a moderator gets the staff tabs and nothing admin-only; admin-games.spec.ts › a moderator kicks one player; the room stays for the other |
 | Admin panel as player (no Admin entry; API 403) and guest (API 401) | ✅ | admin-sweep.spec.ts › a player has no Admin entry and the API refuses |
 | Register: empty fields, short password, bad username, taken username (409) | ✅ | account.spec.ts › register and verify › the form checks its fields before and on the server |
 | Register → unverified login → verification screen → "not yet" → mail link → signed in; link single-use (400) | ✅ | account.spec.ts › register and verify › register, get stuck at verification, verify by mail, play |

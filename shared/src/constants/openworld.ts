@@ -26,6 +26,7 @@ export const OPENWORLD_STATS_FLUSH_TICKS = 10 * TICK_RATE; // 10 seconds
 
 // AFK timeout
 export const OPENWORLD_DEFAULT_AFK_TIMEOUT = 60; // seconds
+export const OPENWORLD_MAX_AFK_TIMEOUT = 600; // seconds; the admin range is 0 (off) to this
 export const OPENWORLD_AFK_CHECK_TICKS = 5 * TICK_RATE; // check every 5 seconds
 
 // Info broadcast interval

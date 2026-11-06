@@ -74,6 +74,7 @@ import {
   createRoom,
   getRoom,
   listRooms,
+  listActiveRooms,
   joinRoom,
   leaveRoom,
   deleteRoom,
@@ -396,6 +397,14 @@ describe('lobby service', () => {
 
       expect(rooms).toHaveLength(1);
       expect(rooms[0].name).toBe('Active Room');
+    });
+
+    it('listActiveRooms returns the full rooms, players included', async () => {
+      await createRoom(makeUser(1, 'alice') as any, 'Full', makeConfig() as any);
+
+      const rooms = await listActiveRooms();
+
+      expect(rooms.map((r) => r.players.map((p) => p.user.username))).toEqual([['alice']]);
     });
   });
 
