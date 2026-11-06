@@ -60,6 +60,7 @@ import { UserRow } from './db/types';
 import { verifyLocalCoopSocketToken } from './services/auth';
 import { openWorldManager } from './game/OpenWorldManager';
 import { logAdminAction } from './services/admin-audit';
+import { simulationConfigSchema } from './routes/admin';
 
 type TypedServer = Server<
   ClientToServerEvents,
@@ -1305,6 +1306,12 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       if (socket.data.role !== 'admin') {
         return callback({ success: false, error: 'Admin access required' });
       }
+
+      // Same schema as POST /admin/simulations: the socket path used to hand the raw payload to
+      // startBatch.
+      const parsed = validateSocket(simulationConfigSchema, config, callback);
+      if (!parsed) return;
+      config = parsed;
 
       try {
         const mgr = getSimulationManager();

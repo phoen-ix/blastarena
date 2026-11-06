@@ -110,7 +110,7 @@ On disconnect, the server:
 
 | Event | Payload | Description | Auth |
 |-------|---------|-------------|------|
-| `sim:start` | `SimulationConfig` + callback | Start a simulation batch. May be queued if another is running. Progress/result/completed events are broadcast to the `sim:admin` room (every connected admin), whether the batch started immediately or from the queue | admin only |
+| `sim:start` | `SimulationConfig` + callback | Start a simulation batch (validated like `POST /admin/simulations`; invalid → `{ success: false, error: 'Invalid input' }`). May be queued if another is running. Progress/result/completed events are broadcast to the `sim:admin` room (every connected admin), whether the batch started immediately or from the queue | admin only |
 | `sim:cancel` | `{ batchId: string }` + callback | Cancel a running simulation batch | admin only |
 | `sim:spectate` | `{ batchId: string }` + callback | Start spectating a simulation. Socket joins `sim:{batchId}`, receives current game state immediately | admin only |
 | `sim:unspectate` | `{ batchId: string }` | Stop spectating a simulation. Socket leaves `sim:{batchId}` | admin only |

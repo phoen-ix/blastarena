@@ -1397,7 +1397,7 @@ router.delete('/admin/campaign-replays/:sessionId', adminOnlyMiddleware, async (
 
 // --- Simulations ---
 
-const simulationConfigSchema = z.object({
+export const simulationConfigSchema = z.object({
   gameMode: z.enum([
     'ffa',
     'teams',
