@@ -39,7 +39,7 @@ services:
       args:
         VITE_E2E_HOOKS: ${VITE_E2E_HOOKS:-}
     ports: !override
-      - "127.0.0.1:${PORT_BASE:-24200}:80"
+      - '127.0.0.1:${PORT_BASE:-24200}:80'
 
   mailpit:
     image: axllent/mailpit:v1.33.0
@@ -49,6 +49,6 @@ services:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
     ports:
-      - "127.0.0.1:${MAILPIT_PORT:-24205}:8025"
+      - '127.0.0.1:${MAILPIT_PORT:-24205}:8025'
     networks:
       - internal
