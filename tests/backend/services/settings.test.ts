@@ -20,8 +20,9 @@ import {
   setGameDefaults,
   getSimulationDefaults,
   setSimulationDefaults,
+  getOpenWorldSettings,
 } from '../../../backend/src/services/settings';
-import { DEFAULT_RANK_CONFIG } from '@blast-arena/shared';
+import { DEFAULT_RANK_CONFIG, OPENWORLD_MAX_AFK_TIMEOUT } from '@blast-arena/shared';
 import type { RankConfig } from '@blast-arena/shared';
 
 describe('Settings Service', () => {
@@ -199,6 +200,24 @@ describe('Settings Service', () => {
     it('should return DEFAULT_RANK_CONFIG when the setting is an empty string', async () => {
       mockQuery.mockResolvedValue([{ setting_value: '' }]);
       expect(await getRankConfig()).toEqual(DEFAULT_RANK_CONFIG);
+    });
+  });
+
+  describe('getOpenWorldSettings', () => {
+    const afk = (value: string) => [
+      { setting_key: 'open_world_afk_timeout', setting_value: value },
+    ];
+
+    it('clamps an AFK timeout saved under the old 3600 s limit', async () => {
+      mockQuery.mockResolvedValue(afk('3600'));
+      expect((await getOpenWorldSettings()).afkTimeoutSeconds).toBe(OPENWORLD_MAX_AFK_TIMEOUT);
+    });
+
+    it('keeps an in-range AFK timeout, including 0 (off)', async () => {
+      mockQuery.mockResolvedValue(afk('120'));
+      expect((await getOpenWorldSettings()).afkTimeoutSeconds).toBe(120);
+      mockQuery.mockResolvedValue(afk('0'));
+      expect((await getOpenWorldSettings()).afkTimeoutSeconds).toBe(0);
     });
   });
 

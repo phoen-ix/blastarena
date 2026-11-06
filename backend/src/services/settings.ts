@@ -13,6 +13,7 @@ import {
   OPENWORLD_DEFAULT_MAX_PLAYERS,
   OPENWORLD_DEFAULT_ROUND_TIME,
   OPENWORLD_DEFAULT_AFK_TIMEOUT,
+  OPENWORLD_MAX_AFK_TIMEOUT,
   OPENWORLD_RESPAWN_TICKS,
   TICK_RATE,
 } from '@blast-arena/shared';
@@ -223,7 +224,12 @@ export async function getOpenWorldSettings(): Promise<OpenWorldSettings> {
     mapHeight: num('open_world_map_height', OPENWORLD_DEFAULT_MAP_HEIGHT),
     wallDensity: num('open_world_wall_density', OPENWORLD_DEFAULT_WALL_DENSITY),
     respawnDelay: num('open_world_respawn_delay', OPENWORLD_RESPAWN_TICKS / TICK_RATE),
-    afkTimeoutSeconds: num('open_world_afk_timeout', OPENWORLD_DEFAULT_AFK_TIMEOUT),
+    // Clamped: values saved under the old 3600 s limit would otherwise still apply in-game and
+    // fail the admin form's validation on every save until lowered by hand.
+    afkTimeoutSeconds: Math.min(
+      OPENWORLD_MAX_AFK_TIMEOUT,
+      num('open_world_afk_timeout', OPENWORLD_DEFAULT_AFK_TIMEOUT),
+    ),
   };
 }
 
