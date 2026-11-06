@@ -15,7 +15,7 @@ A multiplayer bomb arena game for the browser, built with Phaser and Node.js. 2�
   <img src="docs/screenshots/admin-dashboard.png" alt="The admin dashboard: server statistics, server settings and open-world settings" width="400">
 </p>
 
-Every screen, with a sentence each: [screenshot gallery](docs/screenshots/README.md). The landing page [in German](docs/screenshots/menu-landing.de.png); the lobby [on a phone](docs/screenshots/lobby-openworld.mobile.png).
+Every screen, with a sentence each: [screenshot gallery](docs/screenshots/README.md). Step by step: [admin guide](docs/admin-guide.md). The landing page [in German](docs/screenshots/menu-landing.de.png); the lobby [on a phone](docs/screenshots/lobby-openworld.mobile.png).
 
 **Contents:** [Quick Start](#quick-start) · [Game Modes](#game-modes) · [Controls](#controls) · [Power-Ups](#power-ups) · [Map Features](#map-features) · [Open World](#open-world-mode-wip) · [Campaign](#campaign) · [Custom Maps](#custom-maps) · [Bot AI](#bot-ai) · [Progression](#progression) · [Social](#social-features) · [Look & Feel](#look--feel) · [Account & Security](#account--security) · [Admin Panel](#admin-panel) · [Replays](#game-replays) · [In-Game Help](#in-game-help--documentation) · [Languages](#internationalization) · [Architecture](#architecture) · [Tech Stack](#tech-stack) · [Testing](#testing--linting) · [Documentation](#documentation)
 
@@ -310,9 +310,9 @@ Separate from Elo.
 | Tab | Access | Key Features |
 |-----|--------|-------------|
 | Dashboard | Admin | Stats, server settings (recordings, registration, email/SMTP, chat modes, XP multiplier, default theme and art style, open world, GitHub/imprint display), game/simulation defaults (incl. puzzle tiles, spectator actions), revoke all sessions |
-| Users | Staff | Search, roles, deactivate, delete (simple confirmation), password reset, revoke sessions, 2FA status & reset, bulk account cleanup (unverified/inactive/deactivated) |
-| Matches | Staff | History, per-player stats, replay viewer, delete |
-| Rooms | Staff | Live rooms, spectate, kick, force close |
+| Users | Staff | Search and 2FA status (staff); roles, deactivate, delete (simple confirmation), password reset, revoke sessions, 2FA reset, bulk account cleanup (unverified/inactive/deactivated) (admin) |
+| Matches | Staff | History, per-player stats, replay viewer (staff); delete (admin) |
+| Rooms | Staff | Live rooms, spectate, message, kick (staff); force close (admin) |
 | Logs | Admin | Audit trail with filters, click-to-expand detail rows |
 | Simulations | Admin | Batch bot-only games (1-1000), fast/realtime, queue |
 | AI | Admin | Upload/manage custom bot AI and enemy AI implementations |
@@ -320,11 +320,12 @@ Separate from Elo.
 | Campaign | Admin | Worlds, levels (visual editor), enemy types, JSON export/import, campaign replays |
 | Seasons | Admin | Season CRUD, activate, end the active season (hard/soft Elo reset), rank tier config with color pickers |
 | Achievements | Admin | Achievement CRUD (4 condition types), cosmetic CRUD (4 types), reward linking, JSON export/import |
-| Challenges | Admin | Map challenge CRUD, activate/deactivate, global toggle, published map selection |
+| Challenges | Admin | Create, activate/deactivate and delete map challenges, global toggle, published map selection |
 
 - **Imprint & GitHub links:** admin-toggled; shown in the login page footer and on the right of the Help tab bar.
   - The imprint text is edited in the Dashboard and opens as a modal on login or as a tab in Help.
 - **Audit log:** every admin action is logged. See [docs/admin-and-systems.md](docs/admin-and-systems.md).
+- **How to:** roles, account management, moderation, seasons, challenges and the other tasks step by step in the [admin guide](docs/admin-guide.md).
 
 ## Game Replays
 
@@ -346,7 +347,7 @@ Full-page Help view accessible from the lobby sidebar. Seven tabs with role-base
 | Map Features | All | Reinforced walls, dynamic events, hazard tiles with Canvas2D tile previews, theme variant showcase (all 9 campaign themes) |
 | Guides | All | Rendered markdown docs: Campaign, Replays, Bot AI, Enemy AI (collapsible sections) |
 | Level Editor | Staff | Visual tile reference (27 tile types with Canvas2D icons) + campaign system docs |
-| Admin Docs | Staff | Admin systems, infrastructure, testing, performance, bot AI internals, API reference |
+| Admin Docs | Staff | Admin guide, admin systems, infrastructure, testing, performance, bot AI internals, API reference |
 
 The backend serves the documentation from `docs/` (bind-mounted in dev, baked into the image for production); the client renders the markdown with `marked`.
 
@@ -500,6 +501,7 @@ bash scripts/docs-screenshots.sh /tmp/shots # or anywhere else
 - [Bot AI Internals](docs/bot-ai-internals.md) — built-in BotAI decision engine
 - [Enemy AI Developer Guide](docs/enemy-ai-guide.md) — writing custom campaign enemy AIs
 - [Campaign System](docs/campaign.md) — enemies, levels, editor, progress
+- [Admin guide](docs/admin-guide.md) — staff roles and admin tasks, step by step
 - [Admin Panel & Systems](docs/admin-and-systems.md) — admin tabs, simulations, accounts
 - [Replay System](docs/replay-system.md) — recording, playback, controls
 - [Socket.io Events](docs/socket-events.md) — real-time event reference

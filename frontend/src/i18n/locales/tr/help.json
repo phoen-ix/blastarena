@@ -181,6 +181,7 @@
   },
 
   "staffDocs": {
+    "adminGuide": "Yönetici Kılavuzu",
     "adminSystems": "Yönetici Paneli ve Sistemler",
     "infrastructure": "Altyapı ve Güvenlik",
     "testing": "Test",

@@ -186,6 +186,24 @@ describe('Docs Routes', () => {
       expect(res._sent).toBe('# Admin Guide');
     });
 
+    it('serves the admin guide to staff only', async () => {
+      mockReadFile.mockResolvedValue('# BlastArena admin guide');
+
+      const staffRes = mockRes();
+      await getHandler('get', '/docs/admin/:filename')(
+        mockReq({ params: { filename: 'admin-guide.md' } }),
+        staffRes,
+      );
+      expect(staffRes._sent).toBe('# BlastArena admin guide');
+
+      const publicRes = mockRes();
+      await getHandler('get', '/docs/:filename')(
+        mockReq({ params: { filename: 'admin-guide.md' } }),
+        publicRes,
+      );
+      expect(publicRes._status).toBe(400);
+    });
+
     it('returns 400 for a filename not in STAFF_DOCS', async () => {
       const handler = getHandler('get', '/docs/admin/:filename');
       const req = mockReq({ params: { filename: 'campaign.md' } });

@@ -181,6 +181,7 @@
   },
 
   "staffDocs": {
+    "adminGuide": "Beheerdershandleiding",
     "adminSystems": "Beheerderspaneel & systemen",
     "infrastructure": "Infrastructuur & beveiliging",
     "testing": "Testen",

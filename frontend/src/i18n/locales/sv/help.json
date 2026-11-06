@@ -181,6 +181,7 @@
   },
 
   "staffDocs": {
+    "adminGuide": "Adminguide",
     "adminSystems": "Adminpanel & system",
     "infrastructure": "Infrastruktur & säkerhet",
     "testing": "Testning",

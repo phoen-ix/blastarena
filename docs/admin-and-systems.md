@@ -1,5 +1,7 @@
 # Admin Panel & Systems
 
+Developer view of the admin panel. Step-by-step staff tasks: [admin guide](admin-guide.md).
+
 ## Admin Panel
 
 A lobby view (sidebar → Admin, shown to admin and moderator roles). Tabs a moderator may not use are hidden.
@@ -8,8 +10,8 @@ A lobby view (sidebar → Admin, shown to admin and moderator roles). Tabs a mod
 
 | Tab | Access | Features |
 |-----|--------|----------|
-| Dashboard | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings: recordings toggle, registration toggle, party chat mode, default theme, default art style, email/SMTP config, game defaults, simulation defaults |
-| Users | Admin + Mod | Search and paginated table for both roles. Every change is admin only: role change, deactivate/reactivate, delete (type-to-confirm), create user, password reset, 2FA reset, session revocation, bulk cleanup of unverified/inactive/deactivated accounts. Role changes, deactivation and session revocation ask for confirmation |
+| Dashboard | Admin | 5 stat cards (users, active 24h, matches, rooms, online) with 30s auto-refresh. Server Settings: recordings, registration and spectator game master toggles, chat modes (party, lobby, DMs, emotes, spectator), XP multiplier, default theme, default art style, GitHub link and imprint, open world, email/SMTP config, game defaults, simulation defaults; Danger Zone: revoke all sessions |
+| Users | Admin + Mod | Search and paginated table for both roles. Every change is admin only: role change, deactivate/reactivate, delete (confirmation dialog), create user, password reset, 2FA reset, session revocation, bulk cleanup of unverified/inactive/deactivated accounts. Role changes, deactivation and session revocation ask for confirmation |
 | Matches | Admin + Mod | Paginated history, per-player stats modal. Admin delete per row / delete all (cleans up replay files) |
 | Rooms | Admin + Mod | Active rooms, updated live by the `room:list` broadcast (60s safety refresh). Spectate opens a spectator view of the match (Escape or gamepad Start goes back to the Rooms tab); send message (any room, waiting or running), kick player, force close (admin only) |
 | Logs | Admin | Audit trail of all admin actions with action type filter |
@@ -19,7 +21,7 @@ A lobby view (sidebar → Admin, shown to admin and moderator roles). Tabs a mod
 | Campaign | Admin | Create/edit worlds, levels (visual editor), and enemy types; campaign replays |
 | Seasons | Admin | Create, activate (with confirmation), end the active season with a hard/soft Elo reset, delete; rank tier editor |
 | Achievements | Admin | Create/edit achievements with conditions and cosmetic rewards |
-| Challenges | Admin | Weekly community-map challenges: create/edit, activate/deactivate, delete; global on/off toggle |
+| Challenges | Admin | Weekly community-map challenges: create, activate/deactivate, delete (no edit in the UI; `PUT /admin/challenges/:id` exists); global on/off toggle |
 
 ### Backend Details
 

@@ -9,6 +9,7 @@ const router = Router();
 
 const PUBLIC_DOCS = ['campaign.md', 'replay-system.md', 'bot-ai-guide.md', 'enemy-ai-guide.md'];
 const STAFF_DOCS = [
+  'admin-guide.md',
   'admin-and-systems.md',
   'infrastructure.md',
   'testing.md',

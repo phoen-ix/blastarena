@@ -68,6 +68,7 @@ function getGuideDocs() {
 
 function getStaffDocs() {
   return [
+    { filename: 'admin-guide.md', title: t('help:staffDocs.adminGuide') },
     { filename: 'admin-and-systems.md', title: t('help:staffDocs.adminSystems') },
     { filename: 'infrastructure.md', title: t('help:staffDocs.infrastructure') },
     { filename: 'testing.md', title: t('help:staffDocs.testing') },
@@ -582,7 +583,7 @@ export class HelpUI {
         .join(''),
     );
 
-    // Each doc is fetched the first time its <details> is opened, not all six up front (~300 KB
+    // Each doc is fetched the first time its <details> is opened, not all seven up front (~300 KB
     // of markdown + the OpenAPI spec for a tab most visits never expand), and goes through
     // fetchAndParseDoc so the per-instance markdownCache serves repeat opens. (audit F7)
     const sections = this.contentEl.querySelectorAll<HTMLDetailsElement>('.help-guide-section');
