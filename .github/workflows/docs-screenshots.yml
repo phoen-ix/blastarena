@@ -3,9 +3,10 @@ name: Docs screenshots
 # Regenerates the README and gallery screenshots (docs/screenshots/*.png): builds the production
 # images, starts the throwaway docs stack, seeds the demo (e2e/docs/seed.ts) and runs the tour
 # (e2e/docs/tour.spec.ts) - all through scripts/docs-screenshots.sh. The PNGs come back as the
-# `docs-screenshots` artifact; this workflow never commits. Unzip it into docs/screenshots/,
-# optimise them (`oxipng -o 4 --strip safe`; the script does it where oxipng is on PATH, the runner
-# has none), look at the diff and commit yourself. Unchanged screens come out byte-identical.
+# `docs-screenshots` artifact, already optimised (the script runs `oxipng -o 4 --strip safe`; the
+# job installs a pinned oxipng release for it); this workflow never commits. Unzip it into
+# docs/screenshots/, look at the diff and commit yourself. Unchanged screens come out
+# byte-identical.
 #
 # Manual only: screenshots are regenerated on purpose, when a screen worth showing changed. The
 # same tour runs as a render check in ci.yml (`docs-tour`), whose PNGs are thrown away.
@@ -37,6 +38,20 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
+
+      # A pinned release, checked against its sha256 (the runner has no oxipng). Keep the version
+      # in step with the one used locally: another oxipng version may compress to other bytes.
+      - name: Install oxipng
+        env:
+          OXIPNG_VERSION: 10.2.1
+          OXIPNG_SHA256: 1813750ef592c5350ca79c88f98b2c0876d05c826dc7156245256d4255c1ad17
+        run: |
+          name=oxipng-$OXIPNG_VERSION-x86_64-unknown-linux-musl
+          curl -fsSLo "$RUNNER_TEMP/$name.tar.gz" \
+            "https://github.com/oxipng/oxipng/releases/download/v$OXIPNG_VERSION/$name.tar.gz"
+          echo "$OXIPNG_SHA256  $RUNNER_TEMP/$name.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$name.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/$name" >> "$GITHUB_PATH"
 
       - name: Run the docs tour
         env:
