@@ -9,7 +9,7 @@
     "build": "npm run build --workspace=@blast-arena/shared && tsc",
     "start": "node dist/index.js",
     "predev": "npm run copy-locales",
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --conditions=source src/index.ts",
     "typecheck": "tsc --noEmit && tsc -p ../tests/backend/tsconfig.json",
     "test": "cd .. && npx vitest run --config tests/backend/vitest.config.mts"
   },

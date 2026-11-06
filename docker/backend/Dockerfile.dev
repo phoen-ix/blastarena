@@ -30,4 +30,6 @@ RUN chmod +x /entrypoint.sh
 EXPOSE 3000
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["npx", "tsx", "watch", "backend/src/index.ts"]
+# `source`: the shared package from its TypeScript (shared/package.json exports), so the mounted
+# ./shared is live and never a stale shared/dist left on the host.
+CMD ["npx", "tsx", "watch", "--conditions=source", "backend/src/index.ts"]
