@@ -55,6 +55,16 @@ async function shoot(
   await page.evaluate(() => document.fonts.ready);
   await expect(page.locator('#toast-container .toast')).toHaveCount(0, { timeout: 15_000 });
   await page.mouse.move(0, 0);
+  // A click scrolls its target into view; the document sometimes stayed a few px down after one.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  // Before the tall measurement: the strip kept free for the dock is part of the scroll height.
+  const hideChat = opts.chat
+    ? null
+    : await page.addStyleTag({
+        // The dock and the strip the lobby keeps free for it.
+        content:
+          '.lobby-chat { display: none !important; } .has-lobby-chat .main-body { padding-bottom: 0 !important; }',
+      });
   const vp = page.viewportSize()!;
   if (opts.tall) {
     // The view scrolls in .main-body or in a panel inside it (settings, help, profile).
@@ -80,13 +90,6 @@ async function shoot(
       el.removeAttribute('id');
     });
   }
-  const hideChat = opts.chat
-    ? null
-    : await page.addStyleTag({
-        // The dock and the strip the lobby keeps free for it.
-        content:
-          '.lobby-chat { display: none !important; } .has-lobby-chat .main-body { padding-bottom: 0 !important; }',
-      });
   // A beat for layout and the canvas to settle.
   await page.waitForTimeout(500);
   await page.screenshot({
