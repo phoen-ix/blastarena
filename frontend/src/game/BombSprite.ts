@@ -192,26 +192,16 @@ export class BombSpriteRenderer {
           });
         }
 
-        if (isRemote) {
-          // Remote bombs: pulsing scale + slow alpha blink (blue texture distinguishes them)
+        // Pulse (off with the Animations setting, like the drawn styles' bombs). Remote bombs
+        // also blink slowly; their blue texture tells them apart.
+        if (settings.animations) {
           const tween = this.scene.tweens.add({
             targets: sprite,
             scaleX: 1.15 * b,
             scaleY: 1.15 * b,
-            alpha: 0.5,
-            duration: 600,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut',
-          });
-          this.pulseTweens.set(bomb.id, tween);
-        } else {
-          // Normal/pierce bombs: pulsing scale
-          const tween = this.scene.tweens.add({
-            targets: sprite,
-            scaleX: 1.15 * b,
-            scaleY: 1.15 * b,
-            duration: 300,
+            ...(isRemote
+              ? { alpha: 0.5, duration: 600, ease: 'Sine.easeInOut' }
+              : { duration: 300 }),
             yoyo: true,
             repeat: -1,
           });

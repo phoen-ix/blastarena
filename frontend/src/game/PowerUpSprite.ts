@@ -65,15 +65,17 @@ export class PowerUpRenderer {
         const sprite = fit(this.scene.add.sprite(px, py, `powerup_${powerUp.type}`));
         sprite.setDepth(DEPTH.POWERUP);
 
-        // Floating animation
-        this.scene.tweens.add({
-          targets: sprite,
-          y: sprite.y - 4,
-          duration: 600,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut',
-        });
+        // Floating animation (off with the Animations setting, like the drawn styles' bob)
+        if (getSettings().animations) {
+          this.scene.tweens.add({
+            targets: sprite,
+            y: sprite.y - 4,
+            duration: 600,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+          });
+        }
 
         this.sprites.set(powerUp.id, sprite);
       }
