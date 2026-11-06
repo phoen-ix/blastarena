@@ -28,6 +28,9 @@ services:
       # Every spec and the seed reach the API from one address; the production default
       # (1000/min per IP, app.ts) is sized for players, not a parallel test suite.
       API_RATE_LIMIT_PER_MIN: 1000000
+      # One fixed open-world arena and guest-name sequence (random in production): the docs
+      # tour's landing and guest shots repeat run to run.
+      OPEN_WORLD_SEED: 20260615
     healthcheck:
       interval: 5s
 

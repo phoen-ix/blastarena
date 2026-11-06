@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type WebSocketRoute } from '@playwright/test';
 
 import { ADMIN, CHALLENGE, HERO, MAPS, PASSWORD, resetRateLimits, seedDemo } from './seed';
 
@@ -27,31 +27,50 @@ test.beforeEach(async ({ page }) => {
   pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e));
   await page.clock.setFixedTime(new Date('2026-06-15T10:00:00+02:00'));
-  // Seeded Math.random: particles, shakes and other client-side randomness repeat run to run.
-  await page.addInitScript(() => {
-    let s = 0x2f6b1d3;
-    Math.random = () => {
-      s = (s + 0x6d2b79f5) | 0;
-      let t = Math.imul(s ^ (s >>> 15), 1 | s);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  });
+  await page.addInitScript(seedRandom);
 });
+
+/** Seeded Math.random: particles, shakes and other client-side randomness repeat run to run. */
+function seedRandom(): void {
+  let s = 0x2f6b1d3;
+  Math.random = () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** A multiple of the clock's 16 ms frame grid and of the timed blinks' periods (bomb fuse spark
+ * 220 ms, spawn flicker 180 ms). */
+const FRAME_PHASE = 7920;
 
 test.afterEach(() => {
   expect(pageErrors.map((e) => e.message)).toEqual([]);
 });
 
-/** `tall`: grow the viewport to the scrolling lobby panel's full height (capped) first - the
+/** `canvas`: settle the Phaser canvas first. It draws on requestAnimationFrame and reads
+ * performance.now, both the page clock's: pause the clock, jump to a fixed phase and render 2 s of
+ * frames, so camera and sprite lerps come to rest and timed blinks show the same frame every run.
+ * `tall`: grow the viewport to the scrolling lobby panel's full height (capped) first - the
  * lobby is a fixed-height layout, so a plain full-page shot would only show the first screen.
  * `freezeTimers`: the lobby's open-world round clock shows a fixed time.
  * `chat`: keep the collapsed Lobby Chat dock, which is hidden otherwise (it covers buttons). */
 async function shoot(
   page: Page,
   name: string,
-  opts: { tall?: boolean; freezeTimers?: boolean; chat?: boolean } = {},
+  opts: { canvas?: boolean; tall?: boolean; freezeTimers?: boolean; chat?: boolean } = {},
 ): Promise<void> {
+  if (opts.canvas) {
+    // +1 s: a running clock has moved on since Date.now(), and pausing in the past throws.
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
+    const now = await page.evaluate(() => performance.now());
+    await page.evaluate(seedRandom);
+    // The last frame lands on a multiple of FRAME_PHASE (+8 keeps it clear of the grid edge).
+    const jump = Math.ceil((((-now - 2000) % FRAME_PHASE) + FRAME_PHASE) % FRAME_PHASE);
+    await page.clock.fastForward(jump + 8);
+    await page.clock.runFor(2000);
+  }
   await page.evaluate(() => document.fonts.ready);
   await expect(page.locator('#toast-container .toast')).toHaveCount(0, { timeout: 15_000 });
   await page.mouse.move(0, 0);
@@ -99,6 +118,41 @@ async function shoot(
   });
   await hideChat?.evaluate((el) => el.remove());
   if (opts.tall) await page.setViewportSize(vp);
+  if (opts.canvas) await page.clock.resume();
+}
+
+/** Shows a fixed text in a live HUD element: the HUD keeps writing to the detached original. */
+async function freezeText(page: Page, selector: string, text: string): Promise<void> {
+  await page.locator(selector).evaluate((el, value) => {
+    const copy = el.cloneNode() as HTMLElement;
+    copy.textContent = value;
+    el.replaceWith(copy);
+  }, text);
+}
+
+/** Holds the server's `game:*` events from the first `game:state` at `tick` on, so a match shot
+ * shows that tick whenever it is taken (the engine is deterministic per tick, the wall clock is
+ * not). Call before the page connects; `release()` delivers the held events in order. */
+async function holdMatchAtTick(page: Page, tick: number) {
+  let held: [WebSocketRoute, string][] | null = null;
+  await page.routeWebSocket(/\/socket\.io\//, (ws) => {
+    const server = ws.connectToServer();
+    server.onMessage((msg) => {
+      const text = typeof msg === 'string' ? msg : '';
+      if (held && text.startsWith('42["game:')) return void held.push([ws, text]);
+      ws.send(msg);
+      const at = text.startsWith('42["game:state"') && /"tick":(\d+)/.exec(text);
+      if (at && Number(at[1]) >= tick) held = [];
+    });
+  });
+  return {
+    reached: () => expect.poll(() => held !== null, { timeout: 60_000 }).toBe(true),
+    release: () => {
+      for (const [ws, msg] of held ?? []) ws.send(msg);
+      held = null;
+      tick = Infinity;
+    },
+  };
 }
 
 async function landing(page: Page): Promise<void> {
@@ -149,8 +203,9 @@ async function press(page: Page, selector: string): Promise<void> {
 test('landing', async ({ page }) => {
   await landing(page);
   await expect(page.locator('#menu-guest-btn')).toBeVisible();
-  await page.waitForTimeout(1500);
-  await shoot(page, 'menu-landing');
+  // Past the guest's 3 s spawn protection (it flickers).
+  await page.waitForTimeout(3500);
+  await shoot(page, 'menu-landing', { canvas: true });
 });
 
 test('landing (German)', async ({ browser }) => {
@@ -159,8 +214,8 @@ test('landing (German)', async ({ browser }) => {
   page.on('pageerror', (e) => pageErrors.push(e));
   await page.goto('/');
   await expect(page.locator('#menu-login-btn')).toHaveText(/Anmelden/);
-  await page.waitForTimeout(1500);
-  await shoot(page, 'menu-landing.de');
+  await page.waitForTimeout(3500);
+  await shoot(page, 'menu-landing.de', { canvas: true });
   await ctx.close();
 });
 
@@ -187,10 +242,12 @@ test('open world as a guest', async ({ page }) => {
   await page.click('#menu-guest-btn');
   await expect(page.locator('.hud-auth-bar')).toBeVisible();
   await expect(page.locator('.hud-ow-board')).toBeVisible();
-  // The first game key docks the landing title; the guest takes a step.
-  await page.keyboard.press('ArrowRight');
-  await page.waitForTimeout(2000);
-  await shoot(page, 'openworld-guest');
+  // No step: how far a key press moves the guest depends on when it falls between server ticks.
+  // The wait outlasts the 3 s spawn protection (counted from the landing's join).
+  await page.waitForTimeout(3500);
+  // The round clock counts from the backend's start.
+  await freezeText(page, '#hud-timer', '4:10');
+  await shoot(page, 'openworld-guest', { canvas: true });
 });
 
 test('lobby: open world and rooms', async ({ page }) => {
@@ -364,6 +421,12 @@ test('campaign level', async ({ page }) => {
 // Last: it adds a real match to the history the admin and progress shots show.
 test('create room and play a match', async ({ page }) => {
   test.setTimeout(300_000);
+  const match = await holdMatchAtTick(page, 220);
+  // Particles off (a graphics setting): the fuse sparks are emitted on a schedule that starts
+  // when the bomb's sprite does, which no clock control can pin.
+  await page.addInitScript(() =>
+    localStorage.setItem('blast-arena-settings', JSON.stringify({ particles: false })),
+  );
   await lobby(page, HERO.username);
   await openView(page, 'rooms');
   await page.click('#create-room-btn');
@@ -387,8 +450,9 @@ test('create room and play a match', async ({ page }) => {
   await shoot(page, 'room-waiting');
   await press(page, '[data-action="start"]');
   await expect(page.locator('.hud-players')).toBeVisible();
-  await page.waitForTimeout(12_000);
-  await shoot(page, 'game-match');
+  await match.reached();
+  await shoot(page, 'game-match', { canvas: true });
+  match.release();
   // Round time 60 s: the match ends on the clock if the bots do not finish it first.
   await expect(page.locator('.hud-container')).toHaveCount(0, { timeout: 120_000 });
   await page.waitForTimeout(2500);

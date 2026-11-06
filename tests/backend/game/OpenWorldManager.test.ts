@@ -26,6 +26,9 @@ const mockSettings = vi.hoisted(() => ({
   guestAccess: true,
 }));
 
+const mockConfig = vi.hoisted(() => ({ OPEN_WORLD_SEED: undefined as number | undefined }));
+vi.mock('../../../backend/src/config', () => ({ getConfig: () => mockConfig }));
+
 vi.mock('../../../backend/src/services/settings', () => ({
   isOpenWorldEnabled: vi.fn<AnyFn>().mockResolvedValue(true),
   getOpenWorldSettings: vi.fn<AnyFn>().mockResolvedValue(mockSettings),
@@ -124,6 +127,39 @@ describe('OpenWorldManager', () => {
       } finally {
         spy.mockRestore();
       }
+    });
+  });
+
+  describe('OPEN_WORLD_SEED (e2e/docs overlay)', () => {
+    afterEach(() => {
+      mockConfig.OPEN_WORLD_SEED = undefined;
+    });
+
+    /** A fresh init (as on a backend start), then the map seed and three guest names. */
+    async function boot(seed: number | undefined) {
+      openWorldManager.shutdown();
+      mockConfig.OPEN_WORLD_SEED = seed;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await openWorldManager.init(io as any);
+      const names = [1, 2, 3].map(
+        (i) => openWorldManager.handleJoin(`sock-${seed}-${i}`, 0, '', true).username,
+      );
+      const res = openWorldManager.handleJoin(`sock-${seed}-4`, 0, '', true);
+      return { mapSeed: res.state!.map.seed, names };
+    }
+
+    it('fixes the arena and the guest-name sequence across restarts', async () => {
+      const a = await boot(4242);
+      const b = await boot(4242);
+      expect(a.mapSeed).toBe(4242);
+      expect(b).toEqual(a);
+      expect(new Set(a.names).size).toBe(3);
+    });
+
+    it('leaves both random when unset', async () => {
+      const seeds = new Set<number>();
+      for (let i = 0; i < 3; i++) seeds.add((await boot(undefined)).mapSeed);
+      expect(seeds.size).toBeGreaterThan(1);
     });
   });
 

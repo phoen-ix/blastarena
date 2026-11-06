@@ -492,6 +492,7 @@ bash scripts/docs-screenshots.sh /tmp/shots # or anywhere else
 
 - **Stack:** the production images in a throwaway stack (`docker-compose.yml` + `docker-compose.e2e.yml`, project `blastarena_docs`, nginx on `127.0.0.1:${PORT_BASE:-24200}`, no host data directories).
 - **Run:** seeds through the API (`e2e/docs/seed.ts`), runs `e2e/docs/tour.spec.ts`, and tears everything down. The tour asserts each screen before it shoots, so it doubles as a render check.
+- **Reproducible:** a fixed open-world seed (`OPEN_WORLD_SEED` in the overlay), a fixed browser clock and `Math.random`, game canvases rendered on a paused clock, and the match shot held at one game tick; with `oxipng` on PATH the PNGs are optimised too, so an unchanged screen comes out byte-identical.
 - **Needs** Docker and Node 26; run `npx playwright install chromium` in `e2e/` once.
 - **On GitHub**, the manual **Docs screenshots** workflow produces the same PNGs as an artifact.
 

@@ -20,6 +20,8 @@ import {
 } from '@blast-arena/shared';
 import { GameStateManager, GameConfig } from './GameState';
 import { GameLoop } from './GameLoop';
+import { SeededRandom } from './SeededRandom';
+import { getConfig } from '../config';
 import {
   OpenWorldSettings,
   getOpenWorldSettings,
@@ -109,6 +111,9 @@ class OpenWorldManager {
   private settings: OpenWorldSettings | null = null;
   private enabled: boolean = false;
   private freezeTick: number | null = null;
+  /** OPEN_WORLD_SEED (e2e/docs overlay only): every round's map and the guest names repeat. */
+  private fixedSeed: number | undefined;
+  private guestNameRng: SeededRandom | null = null;
 
   // Batched stat tracking
   private pendingStats: Map<number, PendingStats> = new Map();
@@ -121,6 +126,8 @@ class OpenWorldManager {
 
   async init(io: TypedServer): Promise<void> {
     this.io = io;
+    this.fixedSeed = getConfig().OPEN_WORLD_SEED;
+    this.guestNameRng = this.fixedSeed ? new SeededRandom(this.fixedSeed) : null;
     const enabled = await isOpenWorldEnabled();
     if (!enabled) {
       logger.info('Open world disabled by admin setting');
@@ -147,6 +154,7 @@ class OpenWorldManager {
     const config: GameConfig = {
       mapWidth: this.settings.mapWidth,
       mapHeight: this.settings.mapHeight,
+      mapSeed: this.fixedSeed,
       gameMode: 'open_world',
       roundTime: this.settings.roundTime,
       wallDensity: this.settings.wallDensity,
@@ -410,7 +418,8 @@ class OpenWorldManager {
     if (isGuest) {
       userId = OPENWORLD_GUEST_ID_START - this.guestCounter++;
       if (!username) {
-        username = `Guest_${ADJECTIVES[randomInt(ADJECTIVES.length)]}${randomInt(100)}`;
+        const pick = (n: number) => this.guestNameRng?.nextInt(n) ?? randomInt(n);
+        username = `Guest_${ADJECTIVES[pick(ADJECTIVES.length)]}${pick(100)}`;
       }
     }
 

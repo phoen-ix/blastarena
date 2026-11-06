@@ -4,7 +4,8 @@ name: Docs screenshots
 # images, starts the throwaway docs stack, seeds the demo (e2e/docs/seed.ts) and runs the tour
 # (e2e/docs/tour.spec.ts) - all through scripts/docs-screenshots.sh. The PNGs come back as the
 # `docs-screenshots` artifact; this workflow never commits. Unzip it into docs/screenshots/,
-# look at the diff, optimise (oxipng) and commit yourself.
+# optimise them (`oxipng -o 4 --strip safe`; the script does it where oxipng is on PATH, the runner
+# has none), look at the diff and commit yourself. Unchanged screens come out byte-identical.
 #
 # Manual only: screenshots are regenerated on purpose, when a screen worth showing changed. The
 # same tour runs as a render check in ci.yml (`docs-tour`), whose PNGs are thrown away.

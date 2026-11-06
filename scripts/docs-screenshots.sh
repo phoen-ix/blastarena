@@ -48,4 +48,10 @@ cd "$ROOT/e2e"
 [ -d node_modules ] || npm ci --no-audit --no-fund
 DOCS_SCREENSHOT_DIR=$OUT PLAYWRIGHT_OUTPUT_DIR=$ARTIFACTS/test-results \
   npx playwright test -c playwright.docs.config.ts
+# Lossless and deterministic: an unchanged screen comes out byte-identical to the committed PNG.
+if command -v oxipng >/dev/null; then
+  oxipng -q -o 4 --strip safe "$OUT"/*.png
+else
+  echo "oxipng not on PATH: PNGs left unoptimised" >&2
+fi
 echo "screenshots: $OUT"
