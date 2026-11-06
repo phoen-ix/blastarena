@@ -81,8 +81,6 @@ const DEFAULT_CONFIG = {
   SMTP_PASSWORD: 'secret',
   SMTP_FROM_EMAIL: 'noreply@blast.test',
   SMTP_FROM_NAME: 'BlastArena',
-  SMTP_EHLO_NAME: '',
-  SMTP_REQUIRE_TLS: true,
   APP_URL: 'https://blast.example.com',
 };
 
@@ -93,8 +91,6 @@ const EMPTY_SMTP_CONFIG = {
   SMTP_PASSWORD: '',
   SMTP_FROM_EMAIL: 'noreply@blast.test',
   SMTP_FROM_NAME: 'BlastArena',
-  SMTP_EHLO_NAME: '',
-  SMTP_REQUIRE_TLS: true,
   APP_URL: 'https://blast.example.com',
 };
 
@@ -158,6 +154,7 @@ describe('email service', () => {
         port: 587,
         secure: false,
         requireTLS: true,
+        ignoreTLS: false,
         name: 'blast.test',
         connectionTimeout: 10_000,
         greetingTimeout: 10_000,
@@ -169,48 +166,51 @@ describe('email service', () => {
       });
     });
 
-    it('sets secure=true when port is 465', async () => {
+    it('defaults Security to implicit TLS on port 465', async () => {
       setupConfig({ SMTP_PORT: 465 });
 
       await sendTestEmail('test@example.com');
 
       expect(mockCreateTransport).toHaveBeenCalledWith(
-        expect.objectContaining({ secure: true, port: 465 }),
+        expect.objectContaining({ port: 465, secure: true, requireTLS: false, ignoreTLS: false }),
       );
     });
 
-    it('sets secure=false when port is not 465', async () => {
+    it('defaults Security to required STARTTLS on any other port', async () => {
       setupConfig({ SMTP_PORT: 2525 });
 
       await sendTestEmail('test@example.com');
 
       expect(mockCreateTransport).toHaveBeenCalledWith(
-        expect.objectContaining({ secure: false, port: 2525 }),
+        expect.objectContaining({ port: 2525, secure: false, requireTLS: true, ignoreTLS: false }),
       );
     });
 
-    it('does not require STARTTLS on port 465 (implicit TLS)', async () => {
-      setupConfig({ SMTP_PORT: 465 });
+    it.each([
+      ['starttls', { secure: false, requireTLS: true, ignoreTLS: false }],
+      ['tls', { secure: true, requireTLS: false, ignoreTLS: false }],
+      ['none', { secure: false, requireTLS: false, ignoreTLS: true }],
+    ])('maps the Security setting %s to nodemailer', async (smtpSecurity, expected) => {
+      // Port 465 would default to tls: the stored setting wins.
+      setupDbSettings({ smtpPort: 465, smtpSecurity });
+
+      await sendTestEmail('test@example.com');
+
+      expect(mockCreateTransport).toHaveBeenCalledWith(expect.objectContaining(expected));
+    });
+
+    it('uses the EHLO Name setting when set', async () => {
+      setupDbSettings({ ehloName: 'mail.blast.test' });
 
       await sendTestEmail('test@example.com');
 
       expect(mockCreateTransport).toHaveBeenCalledWith(
-        expect.objectContaining({ secure: true, requireTLS: false }),
+        expect.objectContaining({ name: 'mail.blast.test' }),
       );
     });
 
-    it('allows plaintext only when SMTP_REQUIRE_TLS is false', async () => {
-      mockGetConfig.mockReturnValue({ ...DEFAULT_CONFIG, SMTP_REQUIRE_TLS: false });
-
-      await sendTestEmail('test@example.com');
-
-      expect(mockCreateTransport).toHaveBeenCalledWith(
-        expect.objectContaining({ requireTLS: false }),
-      );
-    });
-
-    it('uses SMTP_EHLO_NAME as the EHLO name when set', async () => {
-      setupConfig({ SMTP_EHLO_NAME: 'mail.blast.test' });
+    it('uses the From Email domain as the EHLO name when the setting is empty', async () => {
+      setupDbSettings({ ehloName: '', fromEmail: 'noreply@mail.blast.test' });
 
       await sendTestEmail('test@example.com');
 

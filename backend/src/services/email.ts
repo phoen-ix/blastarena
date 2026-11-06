@@ -4,6 +4,7 @@ import { logger } from '../utils/logger';
 import { getEmailSettings } from './settings';
 import { getFixedT } from '../i18n';
 import { generateEmailHint, scrubEmailError } from '../utils/crypto';
+import { defaultSmtpSecurity, type SmtpSecurity } from '@blast-arena/shared';
 
 let transporter: Transporter | null = null;
 
@@ -12,6 +13,8 @@ interface ResolvedEmailConfig {
   port: number;
   user: string;
   password: string;
+  security: SmtpSecurity;
+  ehloName: string;
   fromEmail: string;
   fromName: string;
 }
@@ -19,13 +22,17 @@ interface ResolvedEmailConfig {
 async function getResolvedEmailConfig(): Promise<ResolvedEmailConfig> {
   const config = getConfig();
   const dbSettings = await getEmailSettings();
+  const port = dbSettings.smtpPort ?? config.SMTP_PORT;
+  const fromEmail = dbSettings.fromEmail || config.SMTP_FROM_EMAIL;
 
   return {
     host: dbSettings.smtpHost ?? config.SMTP_HOST,
-    port: dbSettings.smtpPort ?? config.SMTP_PORT,
+    port,
     user: dbSettings.smtpUser ?? config.SMTP_USER,
     password: dbSettings.smtpPassword ?? config.SMTP_PASSWORD,
-    fromEmail: dbSettings.fromEmail || config.SMTP_FROM_EMAIL,
+    security: dbSettings.smtpSecurity ?? defaultSmtpSecurity(port),
+    ehloName: dbSettings.ehloName || fromEmail.split('@')[1],
+    fromEmail,
     fromName: dbSettings.fromName || config.SMTP_FROM_NAME,
   };
 }
@@ -39,14 +46,13 @@ async function getTransporter(): Promise<Transporter | null> {
   }
 
   if (!transporter) {
-    const config = getConfig();
-    const secure = emailConfig.port === 465;
     transporter = nodemailer.createTransport({
       host: emailConfig.host,
       port: emailConfig.port,
-      secure,
-      requireTLS: !secure && config.SMTP_REQUIRE_TLS,
-      name: config.SMTP_EHLO_NAME || emailConfig.fromEmail.split('@')[1],
+      secure: emailConfig.security === 'tls',
+      requireTLS: emailConfig.security === 'starttls',
+      ignoreTLS: emailConfig.security === 'none',
+      name: emailConfig.ehloName,
       connectionTimeout: 10_000,
       greetingTimeout: 10_000,
       socketTimeout: 30_000,

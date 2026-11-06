@@ -586,6 +586,16 @@
     "smtpPort": "SMTP-port",
     "smtpUser": "SMTP-användare",
     "smtpPassword": "SMTP-lösenord",
+    "smtpSecurity": "Säkerhet",
+    "smtpSecurityOptions": {
+      "starttls": "STARTTLS (krävs)",
+      "tls": "TLS (implicit)",
+      "none": "Ingen (klartext)"
+    },
+    "smtpSecurityHint": "STARTTLS för port 587, TLS för port 465. Ingen skickar inloggningsuppgifter i klartext: bara för en lokal e-postfångare.",
+    "ehloName": "EHLO-namn",
+    "ehloNamePlaceholder": "mail.example.com",
+    "ehloNameHint": "Värdnamn i SMTP-hälsningen. Tomt: domänen i avsändaradressen.",
     "fromEmail": "Avsändarmail",
     "fromName": "Avsändarnamn",
     "smtpHostPlaceholder": "smtp.example.com",

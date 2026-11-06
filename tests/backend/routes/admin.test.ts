@@ -195,6 +195,9 @@ vi.mock('multer', () => {
 import adminRouter from '../../../backend/src/routes/admin';
 import { adminOnlyMiddleware } from '../../../backend/src/middleware/admin';
 
+// Every schema the router passed to validate(), captured before beforeEach clears the mock.
+const validatedSchemas = mockValidate.mock.calls.map((c) => c[0]);
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -759,6 +762,8 @@ describe('GET /admin/settings/email_settings', () => {
         smtpPort: 587,
         smtpUser: 'user@example.com',
         smtpPassword: '••••••••',
+        smtpSecurity: 'starttls',
+        ehloName: '',
         fromEmail: 'noreply@example.com',
         fromName: 'BlastArena',
       },
@@ -771,6 +776,7 @@ describe('GET /admin/settings/email_settings', () => {
       smtpPort: 465,
       smtpUser: 'dbuser@example.com',
       smtpPassword: 'dbpass',
+      ehloName: 'mail.example.com',
       fromEmail: 'db@example.com',
       fromName: 'DBBlast',
     });
@@ -783,6 +789,8 @@ describe('GET /admin/settings/email_settings', () => {
         smtpPort: 465,
         smtpUser: 'dbuser@example.com',
         smtpPassword: '••••••••',
+        smtpSecurity: 'tls',
+        ehloName: 'mail.example.com',
         fromEmail: 'db@example.com',
         fromName: 'DBBlast',
       },
@@ -823,6 +831,30 @@ describe('GET /admin/settings/email_settings', () => {
 
 describe('PUT /admin/settings/email_settings', () => {
   const handler = getHandler('put', '/admin/settings/email_settings');
+
+  describe('schema', () => {
+    const schema = validatedSchemas.find((sc) => sc?.shape?.smtpSecurity);
+
+    it.each(['starttls', 'tls', 'none'])('accepts Security %s', (smtpSecurity) => {
+      expect(schema.safeParse({ smtpSecurity }).success).toBe(true);
+    });
+
+    it('rejects an unknown Security mode', () => {
+      expect(schema.safeParse({ smtpSecurity: 'ssl' }).success).toBe(false);
+      expect(schema.safeParse({ smtpSecurity: true }).success).toBe(false);
+    });
+
+    it('accepts a hostname as EHLO name and rejects anything else', () => {
+      expect(schema.safeParse({ ehloName: 'mail.example.com' }).success).toBe(true);
+      expect(schema.safeParse({ ehloName: 'not a host' }).success).toBe(false);
+      expect(schema.safeParse({ ehloName: 'mail@example.com' }).success).toBe(false);
+      expect(
+        schema.safeParse({
+          ehloName: `${'a'.repeat(60)}.`.repeat(5) + 'com', // 308 characters
+        }).success,
+      ).toBe(false);
+    });
+  });
 
   it('updates email settings and returns success', async () => {
     mockGetEmailSettings.mockResolvedValue({});

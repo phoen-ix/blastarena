@@ -153,7 +153,7 @@ most changes live.
 | **Default Theme**, **Default Art Style** | What players see until they pick their own in Settings. |
 | **Display GitHub Link**, **Display Imprint** | Links in the login footer and on the Help tab bar; edit the text in **Imprint Text** and click **Save Imprint**. |
 | **Open World** | **Enabled**, **Guest Access**, **Max Players**, **Round Time (s)**, **Map Width**/**Map Height** (odd numbers), **Wall Density**, **Respawn Delay (s)**, **AFK Timeout (s)** (0–600, 0 = disabled); click **Save Open World Settings**. |
-| **Email / SMTP Settings** | Host, port, user, password, sender; **Save**, **Reset to Defaults** (back to the `.env` values) and **Send Test** to an address you enter. |
+| **Email / SMTP Settings** | Host, port, user, password, **Security** (**STARTTLS (required)**, **TLS (implicit)** or **None (plaintext)**, only for a local mail catcher; unset it follows the port: TLS on 465, else STARTTLS), **EHLO Name** (empty: the From Email domain), sender; **Save**, **Reset to Defaults** (back to the `.env` values, Security from the port, EHLO from the sender) and **Send Test** to an address you enter. |
 | **Game Creation Defaults**, **Simulation Defaults** | Expand to preset the Create Room and New Simulation forms; **Save** or **Reset to Defaults**. |
 
 At the bottom, **Danger Zone** → **Revoke All Sessions** logs out every user except you: type

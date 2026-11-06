@@ -16,8 +16,9 @@ import {
   THEME_NAMES,
   ROOM_MAP_SIZES,
   OPENWORLD_MAX_AFK_TIMEOUT,
+  SMTP_SECURITY_MODES,
 } from '@blast-arena/shared';
-import type { ThemeId, ArtStyleId } from '@blast-arena/shared';
+import type { ThemeId, ArtStyleId, SmtpSecurity } from '@blast-arena/shared';
 import { DEFAULT_ART_STYLE, isArtStyleId } from '@blast-arena/shared';
 import { availableStyles } from '../../art/registry';
 
@@ -718,6 +719,18 @@ export class DashboardTab {
               </div>
             </div>
             <div class="form-group">
+              <label for="email-smtpSecurity">${t('admin:dashboard.smtpSecurity')}</label>
+              <select id="email-smtpSecurity" class="admin-select" aria-describedby="email-smtpSecurity-hint">
+                ${SMTP_SECURITY_MODES.map((m) => `<option value="${m}"${s.smtpSecurity === m ? ' selected' : ''}>${t(`admin:dashboard.smtpSecurityOptions.${m}`)}</option>`).join('')}
+              </select>
+              <div id="email-smtpSecurity-hint" class="settings-hint">${t('admin:dashboard.smtpSecurityHint')}</div>
+            </div>
+            <div class="form-group">
+              <label for="email-ehloName">${t('admin:dashboard.ehloName')}</label>
+              <input type="text" id="email-ehloName" value="${escapeAttr(s.ehloName ?? '')}" placeholder="${escapeAttr(t('admin:dashboard.ehloNamePlaceholder'))}" aria-describedby="email-ehloName-hint">
+              <div id="email-ehloName-hint" class="settings-hint">${t('admin:dashboard.ehloNameHint')}</div>
+            </div>
+            <div class="form-group">
               <label for="email-fromEmail">${t('admin:dashboard.fromEmail')}</label>
               <input type="text" id="email-fromEmail" value="${escapeAttr(s.fromEmail ?? '')}" placeholder="${escapeAttr(t('admin:dashboard.fromEmailPlaceholder'))}">
             </div>
@@ -774,6 +787,10 @@ export class DashboardTab {
       if (user) settings.smtpUser = user;
       const password = (card.querySelector('#email-smtpPassword') as HTMLInputElement).value;
       settings.smtpPassword = password; // Send as-is: masked value preserves, empty clears, new value updates
+      settings.smtpSecurity = (card.querySelector('#email-smtpSecurity') as HTMLSelectElement)
+        .value as SmtpSecurity;
+      const ehloName = (card.querySelector('#email-ehloName') as HTMLInputElement).value.trim();
+      if (ehloName) settings.ehloName = ehloName;
       const fromEmail = (card.querySelector('#email-fromEmail') as HTMLInputElement).value.trim();
       if (fromEmail) settings.fromEmail = fromEmail;
       const fromName = (card.querySelector('#email-fromName') as HTMLInputElement).value.trim();

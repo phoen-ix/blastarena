@@ -586,6 +586,16 @@
     "smtpPort": "SMTP-Port",
     "smtpUser": "SMTP-Benutzer",
     "smtpPassword": "SMTP-Passwort",
+    "smtpSecurity": "Sicherheit",
+    "smtpSecurityOptions": {
+      "starttls": "STARTTLS (erforderlich)",
+      "tls": "TLS (implizit)",
+      "none": "Keine (Klartext)"
+    },
+    "smtpSecurityHint": "STARTTLS für Port 587, TLS für Port 465. Keine sendet Zugangsdaten im Klartext: nur für einen lokalen Mail-Catcher.",
+    "ehloName": "EHLO-Name",
+    "ehloNamePlaceholder": "mail.example.com",
+    "ehloNameHint": "Hostname im SMTP-Gruß. Leer: die Domain der Absender-E-Mail.",
     "fromEmail": "Absender-E-Mail",
     "fromName": "Absendername",
     "smtpHostPlaceholder": "smtp.beispiel.de",

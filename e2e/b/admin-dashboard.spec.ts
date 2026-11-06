@@ -169,6 +169,8 @@ test('email settings: save, send a test mail, reset', { tag: '@global' }, async 
     await page.getByRole('button', { name: /Email \/ SMTP Settings/ }).click();
     const host = page.getByLabel('SMTP Host');
     await expect(host).toHaveValue('mailpit');
+    // Seeded by scripts/e2e.sh: Mailpit has no STARTTLS.
+    await expect(page.getByLabel('Security')).toHaveValue('none');
     await page.getByLabel('From Name').fill('BlastArena E2E');
     await page.locator('#email-body').getByRole('button', { name: 'Save', exact: true }).click();
     await toast(page, 'Email settings saved');
@@ -189,8 +191,10 @@ test('email settings: save, send a test mail, reset', { tag: '@global' }, async 
     await page.getByRole('button', { name: /Email \/ SMTP Settings/ }).click();
     // Back to the stack's .env values.
     await expect(page.getByLabel('From Name')).not.toHaveValue('BlastArena E2E');
+    // Unset Security follows the port: 1025 is not 465, so STARTTLS.
+    await expect(page.getByLabel('Security')).toHaveValue('starttls');
   } finally {
-    await ok('PUT', '/admin/settings/email_settings', token, {});
+    await ok('PUT', '/admin/settings/email_settings', token, { smtpSecurity: 'none' });
   }
 });
 

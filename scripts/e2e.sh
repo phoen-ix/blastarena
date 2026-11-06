@@ -29,8 +29,8 @@ export JWT_SECRET=e2e-jwt-not-a-secret-aaaaaaaaaaaaaaaaaaaaaaaaaa
 export EMAIL_PEPPER=e2e-pepper-not-a-secret-aaaaaaaaaaaaaaaaaaaaaa
 export TOTP_ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
 export SMTP_HOST=mailpit SMTP_PORT=1025 SMTP_USER=e2e SMTP_PASSWORD=e2e
-# Mailpit offers no STARTTLS; the backend refuses the placeholder example.com sender.
-export SMTP_REQUIRE_TLS=false SMTP_FROM_EMAIL=noreply@blastarena.test
+# The backend refuses the placeholder example.com sender.
+export SMTP_FROM_EMAIL=noreply@blastarena.test
 export APP_URL=http://127.0.0.1:$PORT_BASE
 export E2E_BASE_URL=$APP_URL
 export E2E_MAILPIT_URL=http://127.0.0.1:$MAILPIT_PORT
@@ -50,6 +50,10 @@ trap teardown EXIT
 
 compose build
 compose up -d --wait --wait-timeout 600
+# Mailpit offers no STARTTLS: Security "none", stored as the admin page saves it (the email
+# settings spec restores this after its reset).
+compose exec -T db mariadb -ublast_user -p"$DB_PASSWORD" blast_arena -e \
+  "INSERT INTO server_settings (setting_key, setting_value) VALUES ('email_settings', '{\"smtpSecurity\":\"none\"}') ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
 
 cd "$ROOT/e2e"
 [ -d node_modules ] || npm ci --no-audit --no-fund

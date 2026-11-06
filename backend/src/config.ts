@@ -56,8 +56,6 @@ const configSchema = z.object({
   SMTP_PASSWORD: z.string().default(''),
   SMTP_FROM_EMAIL: z.string().default('noreply@example.com'),
   SMTP_FROM_NAME: z.string().default('BlastArena'),
-  SMTP_EHLO_NAME: z.string().default(''),
-  SMTP_REQUIRE_TLS: z.stringbool().default(true),
 
   APP_URL: z.string().default('http://localhost:8080'),
   LOG_LEVEL: z.string().default('info'),

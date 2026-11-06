@@ -7531,10 +7531,19 @@ components:
           type: string
           maxLength: 255
           description: Masked in GET responses
+        smtpSecurity:
+          type: string
+          enum: [starttls, tls, none]
+          description: '`starttls` requires STARTTLS, `tls` is implicit TLS, `none` is plaintext (local catchers only). Unset: `tls` on port 465, else `starttls`; GET returns the effective value.'
+        ehloName:
+          type: string
+          format: hostname
+          maxLength: 253
+          description: EHLO hostname; unset (GET returns an empty string) means the From Email domain
         fromEmail:
           type: string
+          format: email
           maxLength: 255
-          description: An email address, or an empty string
         fromName:
           type: string
           maxLength: 100

@@ -108,7 +108,7 @@ Business logic layer — DB/Redis-backed services are tested with mocked databas
 | File | Coverage |
 |------|----------|
 | `services/campaign.test.ts` | Worlds/levels CRUD (level create with an unknown world → 400 WORLD_NOT_FOUND, not a foreign-key 500), reorder, update/reorder/delete report whether a row matched, summary queries skip heavy JSON columns, batched progress lookup (two queries for any number of worlds), next-level logic, JSON field mapping |
-| `services/email.test.ts` | SMTP config, send verification/reset/change/test emails, transporter caching, env vs DB config priority |
+| `services/email.test.ts` | SMTP config, Security modes → secure/requireTLS/ignoreTLS, EHLO name, send verification/reset/change/test emails, transporter caching, env vs DB config priority |
 | `services/cosmetics.test.ts` | CRUD, equip/unequip, batch game fetch, default unlock, campaign star unlocks, getPlayerCosmeticsForGame |
 | `services/admin.test.ts` | User CRUD (duplicate-entry race → 409), role change and deactivation (unknown user → 404, nothing changed or logged), password reset, server stats, match history/detail, active rooms with their players (id and name only), audit log, toasts/banners, account cleanup preview/execute |
 | `services/achievements.test.ts` | CRUD, all 4 condition types (cumulative/per-game/mode-specific/campaign), unlock + reward flow, bounded query volume |

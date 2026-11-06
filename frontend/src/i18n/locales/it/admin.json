@@ -586,6 +586,16 @@
     "smtpPort": "Porta SMTP",
     "smtpUser": "Utente SMTP",
     "smtpPassword": "Password SMTP",
+    "smtpSecurity": "Sicurezza",
+    "smtpSecurityOptions": {
+      "starttls": "STARTTLS (obbligatorio)",
+      "tls": "TLS (implicito)",
+      "none": "Nessuna (testo in chiaro)"
+    },
+    "smtpSecurityHint": "STARTTLS per la porta 587, TLS per la porta 465. Nessuna invia le credenziali in chiaro: solo per un catcher di posta locale.",
+    "ehloName": "Nome EHLO",
+    "ehloNamePlaceholder": "mail.example.com",
+    "ehloNameHint": "Nome host inviato nel saluto SMTP. Vuoto: il dominio dell'email mittente.",
     "fromEmail": "Email mittente",
     "fromName": "Nome mittente",
     "smtpHostPlaceholder": "smtp.esempio.com",

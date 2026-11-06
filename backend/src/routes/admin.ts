@@ -37,6 +37,8 @@ import {
   isArtStyleId,
   OPENWORLD_MAX_PLAYERS_CAP,
   OPENWORLD_MAX_AFK_TIMEOUT,
+  SMTP_SECURITY_MODES,
+  defaultSmtpSecurity,
 } from '@blast-arena/shared';
 import multer from 'multer';
 import { AppError } from '../middleware/errorHandler';
@@ -866,6 +868,8 @@ const emailSettingsSchema = z.object({
   smtpPort: z.number().int().min(1).max(65535).optional(),
   smtpUser: z.string().max(255).optional(),
   smtpPassword: z.string().max(255).optional(),
+  smtpSecurity: z.enum(SMTP_SECURITY_MODES).optional(),
+  ehloName: z.hostname().max(253).optional(),
   fromEmail: z.email().max(255).optional(),
   fromName: z.string().max(100).optional(),
 });
@@ -879,11 +883,14 @@ router.get('/admin/settings/email_settings', adminOnlyMiddleware, async (_req, r
     const config = getConfig();
     const dbSettings = await settingsService.getEmailSettings();
 
+    const smtpPort = dbSettings.smtpPort ?? config.SMTP_PORT;
     const effective: EmailSettings = {
       smtpHost: dbSettings.smtpHost ?? config.SMTP_HOST,
-      smtpPort: dbSettings.smtpPort ?? config.SMTP_PORT,
+      smtpPort,
       smtpUser: dbSettings.smtpUser ?? config.SMTP_USER,
       smtpPassword: (dbSettings.smtpPassword ?? config.SMTP_PASSWORD) ? PASSWORD_MASK : '',
+      smtpSecurity: dbSettings.smtpSecurity ?? defaultSmtpSecurity(smtpPort),
+      ehloName: dbSettings.ehloName ?? '',
       fromEmail: dbSettings.fromEmail || config.SMTP_FROM_EMAIL,
       fromName: dbSettings.fromName || config.SMTP_FROM_NAME,
     };

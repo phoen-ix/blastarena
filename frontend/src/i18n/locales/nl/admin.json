@@ -586,6 +586,16 @@
     "smtpPort": "SMTP-poort",
     "smtpUser": "SMTP-gebruiker",
     "smtpPassword": "SMTP-wachtwoord",
+    "smtpSecurity": "Beveiliging",
+    "smtpSecurityOptions": {
+      "starttls": "STARTTLS (vereist)",
+      "tls": "TLS (impliciet)",
+      "none": "Geen (platte tekst)"
+    },
+    "smtpSecurityHint": "STARTTLS voor poort 587, TLS voor poort 465. Geen verstuurt inloggegevens onversleuteld: alleen voor een lokale mailcatcher.",
+    "ehloName": "EHLO-naam",
+    "ehloNamePlaceholder": "mail.example.com",
+    "ehloNameHint": "Hostnaam in de SMTP-begroeting. Leeg: het domein van het afzenderadres.",
     "fromEmail": "Afzender-e-mail",
     "fromName": "Afzendernaam",
     "smtpHostPlaceholder": "smtp.voorbeeld.nl",

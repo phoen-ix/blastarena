@@ -586,6 +586,16 @@
     "smtpPort": "SMTP Portu",
     "smtpUser": "SMTP Kullanıcısı",
     "smtpPassword": "SMTP Şifresi",
+    "smtpSecurity": "Güvenlik",
+    "smtpSecurityOptions": {
+      "starttls": "STARTTLS (zorunlu)",
+      "tls": "TLS (örtük)",
+      "none": "Yok (düz metin)"
+    },
+    "smtpSecurityHint": "Port 587 için STARTTLS, port 465 için TLS. Yok, kimlik bilgilerini şifresiz gönderir: yalnızca yerel bir posta yakalayıcı için.",
+    "ehloName": "EHLO Adı",
+    "ehloNamePlaceholder": "mail.example.com",
+    "ehloNameHint": "SMTP selamlamasında gönderilen ana bilgisayar adı. Boş: gönderen e-postasının alan adı.",
     "fromEmail": "Gönderen E-posta",
     "fromName": "Gönderen Ad",
     "smtpHostPlaceholder": "smtp.ornek.com",
