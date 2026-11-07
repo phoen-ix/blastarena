@@ -64,6 +64,12 @@ COPY docker/nginx/security-headers.conf /etc/nginx/security-headers.conf
 COPY docker/nginx/502.html /usr/share/nginx/html/502.html
 COPY docker/nginx/502.js /usr/share/nginx/html/502.js
 
+# Runs as the image's unprivileged nginx user: it owns the temp dirs under
+# /var/cache/nginx, the pid file lives in /tmp (nginx.conf), and Docker lets a
+# non-root process bind port 80 in a container (ip_unprivileged_port_start=0).
+RUN chown -R nginx:nginx /var/cache/nginx
+USER nginx
+
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
