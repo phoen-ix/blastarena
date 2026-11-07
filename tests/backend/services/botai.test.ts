@@ -33,22 +33,24 @@ vi.mock('../../../backend/src/services/botai-registry', () => ({
 const mockMkdirSync = vi.fn<AnyFn>();
 const mockWriteFileSync = vi.fn<AnyFn>();
 const mockExistsSync = vi.fn<AnyFn>();
-const mockReadFileSync = vi.fn<AnyFn>();
 const mockRmSync = vi.fn<AnyFn>();
 vi.mock('fs', () => ({
   mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
   writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
-  readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
   rmSync: (...args: unknown[]) => mockRmSync(...args),
   default: {
     mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
     writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
     existsSync: (...args: unknown[]) => mockExistsSync(...args),
-    readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
     rmSync: (...args: unknown[]) => mockRmSync(...args),
   },
 }));
+const mockReadFile = vi.fn<AnyFn>();
+vi.mock('fs/promises', () => ({
+  readFile: (...args: unknown[]) => mockReadFile(...args),
+}));
+const enoent = () => Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
 
 // ── UUID mock ───────────────────────────────────────────────────────────────
 const FIXED_UUID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
@@ -679,37 +681,28 @@ describe('BotAI Service', () => {
     it('should read primary path for builtin AI when it exists', async () => {
       mockQuery.mockResolvedValue([makeRow({ is_builtin: true })]);
       const builtinContent = Buffer.from('// Built-in AI source');
-      mockExistsSync.mockReturnValue(true);
-      mockReadFileSync.mockReturnValue(builtinContent);
+      mockReadFile.mockResolvedValue(builtinContent);
 
       const result = await downloadSource('builtin-id');
 
-      expect(result).not.toBeNull();
-      expect(result!.filename).toBe('BotAI.ts');
-      expect(result!.content).toBe(builtinContent);
-      // Should have checked primary path first and found it
-      expect(mockExistsSync).toHaveBeenCalled();
-      expect(mockReadFileSync).toHaveBeenCalled();
+      expect(result).toEqual({ filename: 'BotAI.ts', content: builtinContent });
+      expect(mockReadFile).toHaveBeenCalledTimes(1);
     });
 
     it('should fall back to secondary path for builtin AI when primary does not exist', async () => {
       mockQuery.mockResolvedValue([makeRow({ is_builtin: true })]);
       const builtinContent = Buffer.from('// Fallback source');
-      // First call (primary) returns false, second (fallback) returns true
-      mockExistsSync.mockReturnValueOnce(false).mockReturnValueOnce(true);
-      mockReadFileSync.mockReturnValue(builtinContent);
+      mockReadFile.mockImplementationOnce(enoent).mockResolvedValueOnce(builtinContent);
 
       const result = await downloadSource('builtin-id');
 
-      expect(result).not.toBeNull();
-      expect(result!.filename).toBe('BotAI.ts');
-      expect(result!.content).toBe(builtinContent);
-      expect(mockExistsSync).toHaveBeenCalledTimes(2);
+      expect(result).toEqual({ filename: 'BotAI.ts', content: builtinContent });
+      expect(mockReadFile).toHaveBeenCalledTimes(2);
     });
 
     it('should return null for builtin AI when neither path exists', async () => {
       mockQuery.mockResolvedValue([makeRow({ is_builtin: true })]);
-      mockExistsSync.mockReturnValue(false);
+      mockReadFile.mockImplementation(enoent);
 
       const result = await downloadSource('builtin-id');
 
@@ -719,34 +712,37 @@ describe('BotAI Service', () => {
     it('should read custom AI source from AI directory', async () => {
       mockQuery.mockResolvedValue([makeRow({ is_builtin: false, filename: 'custom.ts' })]);
       const customContent = Buffer.from('// Custom AI');
-      mockExistsSync.mockReturnValue(true);
-      mockReadFileSync.mockReturnValue(customContent);
+      mockReadFile.mockResolvedValue(customContent);
 
       const result = await downloadSource('uuid-1');
 
-      expect(result).not.toBeNull();
-      expect(result!.filename).toBe('custom.ts');
-      expect(result!.content).toBe(customContent);
-      expect(mockExistsSync).toHaveBeenCalledWith(expect.stringContaining('source.ts'));
+      expect(result).toEqual({ filename: 'custom.ts', content: customContent });
+      expect(mockReadFile).toHaveBeenCalledWith(expect.stringContaining('source.ts'));
     });
 
     it('should return null for custom AI when source file is missing', async () => {
       mockQuery.mockResolvedValue([makeRow({ is_builtin: false })]);
-      mockExistsSync.mockReturnValue(false);
+      mockReadFile.mockImplementation(enoent);
 
       const result = await downloadSource('uuid-1');
 
       expect(result).toBeNull();
     });
 
+    it('passes on read errors other than a missing file', async () => {
+      mockQuery.mockResolvedValue([makeRow({ is_builtin: false })]);
+      mockReadFile.mockRejectedValue(Object.assign(new Error('EACCES'), { code: 'EACCES' }));
+
+      await expect(downloadSource('uuid-1')).rejects.toThrow('EACCES');
+    });
+
     it('never builds a path outside the AI directory from the id', async () => {
       // The id comes from the URL; MariaDB's PAD SPACE / case-insensitive match means the row
       // lookup alone does not pin it to the stored value.
       mockQuery.mockResolvedValue([makeRow({ is_builtin: false })]);
-      mockExistsSync.mockReturnValue(true);
 
       await expect(downloadSource('../../etc')).rejects.toThrow(/escapes/);
-      expect(mockReadFileSync).not.toHaveBeenCalled();
+      expect(mockReadFile).not.toHaveBeenCalled();
     });
   });
 });

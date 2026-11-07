@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import { readFile } from 'fs/promises';
 import { resolveInside } from '../utils/safePath';
 import { randomUUID } from 'crypto';
 import { BotAIEntry } from '@blast-arena/shared';
@@ -231,6 +232,16 @@ export async function deleteAI(id: string, adminId: number): Promise<void> {
   logger.info({ aiId: id, name: rows[0].name }, 'Custom BotAI deleted');
 }
 
+/** The file's bytes, or null when it doesn't exist. */
+async function readIfExists(file: string): Promise<Buffer | null> {
+  try {
+    return await readFile(file);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw err;
+  }
+}
+
 export async function downloadSource(
   id: string,
 ): Promise<{ filename: string; content: Buffer } | null> {
@@ -238,25 +249,12 @@ export async function downloadSource(
   if (rows.length === 0) return null;
 
   if (rows[0].is_builtin) {
-    // Read the built-in BotAI.ts source file
-    let sourcePath = BUILTIN_SOURCE_PATH;
-    if (!fs.existsSync(sourcePath)) {
-      sourcePath = BUILTIN_SOURCE_FALLBACK;
-    }
-    if (!fs.existsSync(sourcePath)) {
-      return null;
-    }
-    return {
-      filename: 'BotAI.ts',
-      content: fs.readFileSync(sourcePath),
-    };
+    // The built-in BotAI.ts source
+    const content =
+      (await readIfExists(BUILTIN_SOURCE_PATH)) ?? (await readIfExists(BUILTIN_SOURCE_FALLBACK));
+    return content && { filename: 'BotAI.ts', content };
   }
 
-  const sourcePath = resolveInside(AI_BASE_DIR, id, 'source.ts');
-  if (!fs.existsSync(sourcePath)) return null;
-
-  return {
-    filename: rows[0].filename,
-    content: fs.readFileSync(sourcePath),
-  };
+  const content = await readIfExists(resolveInside(AI_BASE_DIR, id, 'source.ts'));
+  return content && { filename: rows[0].filename, content };
 }
