@@ -71,4 +71,10 @@ describe('TOTP encryption against the validated key shape', () => {
     const encrypted = encryptTotpSecret('JBSWY3DPEHPK3PXP', VALID_KEY);
     expect(() => decryptTotpSecret(encrypted, other)).toThrow('Failed to decrypt 2FA secret');
   });
+
+  it('rejects a truncated auth tag', () => {
+    const [iv, tag, data] = encryptTotpSecret('JBSWY3DPEHPK3PXP', VALID_KEY).split(':');
+    const truncated = [iv, tag.slice(0, 24), data].join(':');
+    expect(() => decryptTotpSecret(truncated, VALID_KEY)).toThrow('Failed to decrypt 2FA secret');
+  });
 });

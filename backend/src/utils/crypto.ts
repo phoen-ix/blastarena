@@ -27,7 +27,7 @@ export function hashEmail(email: string, pepper: string): string {
 export function encryptTotpSecret(secret: string, keyHex: string): string {
   const key = Buffer.from(keyHex, 'hex');
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
   const encrypted = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
   const authTag = cipher.getAuthTag();
   return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
@@ -42,7 +42,8 @@ export function decryptTotpSecret(encrypted: string, keyHex: string): string {
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
     const ciphertext = Buffer.from(ciphertextHex, 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    if (authTag.length !== 16) throw new Error('auth tag must be 16 bytes');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
     decipher.setAuthTag(authTag);
     return decipher.update(ciphertext, undefined, 'utf8') + decipher.final('utf8');
   } catch {
