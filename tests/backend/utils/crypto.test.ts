@@ -148,4 +148,13 @@ describe('scrubEmailError', () => {
     expect(scrubEmailError('plain string with a@b.com').message).toContain('a***@b***.com');
     expect(scrubEmailError(undefined).message).toBe('undefined');
   });
+
+  it('leaves a long run without an address untouched (no polynomial backtracking)', () => {
+    const run = '!'.repeat(10_000);
+    expect(scrubEmailError(new Error(run)).message).toBe(run.slice(0, 300));
+    expect(scrubEmailError(new Error(`${run} a@b.com`)).message).toBe(run.slice(0, 300));
+    expect(scrubEmailError(new Error('<a@b.com>,c@d.org;e@f.net')).message).toBe(
+      '<a***@b***.com>,c***@d***.org;e***@f***.net',
+    );
+  });
 });

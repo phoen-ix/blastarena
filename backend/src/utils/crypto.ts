@@ -90,8 +90,17 @@ export function generateEmailHint(email: string): string {
  * (audit EMAIL-LOG-1)
  */
 export function scrubEmailError(err: unknown): { name?: string; code?: string; message: string } {
+  // A linear scan over delimited tokens rather than `/[^\s<>@,;]+@[^\s<>@,;]+/g`, whose two
+  // unbounded classes backtrack quadratically on a long run without an `@` (CodeQL js/polynomial-redos).
   const maskAddresses = (text: string): string =>
-    text.replace(/[^\s<>@,;]+@[^\s<>@,;]+/g, (address) => generateEmailHint(address));
+    text
+      .split(/([\s<>,;]+)/)
+      .map((token) => {
+        const at = token.indexOf('@');
+        const single = at > 0 && at < token.length - 1 && !token.includes('@', at + 1);
+        return single ? generateEmailHint(token) : token;
+      })
+      .join('');
 
   if (err instanceof Error) {
     const e = err as Error & { code?: unknown };
