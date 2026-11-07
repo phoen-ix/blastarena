@@ -71,6 +71,7 @@ vi.mock('../../../backend/src/utils/logger', () => ({
 }));
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+import jwt from 'jsonwebtoken';
 import * as authService from '../../../backend/src/services/auth';
 import { AppError } from '../../../backend/src/middleware/errorHandler';
 import { verifyAccessToken } from '../../../backend/src/middleware/auth';
@@ -531,6 +532,33 @@ describe('Auth Service', () => {
       const token = authService.generateLocalCoopTotpToken(10, 3, 6);
       expect(authService.verifyLocalCoopTotpToken(token, 3)).toEqual({ userId: 10, duration: 6 });
       expect(authService.verifyLocalCoopTotpToken(token, 4)).toBeNull();
+    });
+
+    it('refuses tokens signed with any algorithm but HS256', async () => {
+      const secret = 'test-secret-key-that-is-at-least-32-chars-long';
+      const hs512 = (claims: object) => jwt.sign(claims, secret, { algorithm: 'HS512' });
+      expect(
+        authService.verifyLocalCoopToken(
+          hs512({ userId: 10, username: 'p2', purpose: 'local-coop-p2' }),
+        ),
+      ).toBeNull();
+      expect(
+        authService.verifyLocalCoopSocketToken(
+          hs512({ userId: 10, username: 'p2', purpose: 'local-coop-socket' }),
+        ),
+      ).toBeNull();
+      expect(
+        authService.verifyLocalCoopTotpToken(
+          hs512({ userId: 10, hostUserId: 3, duration: 6, purpose: 'local-coop-totp' }),
+          3,
+        ),
+      ).toBeNull();
+      await expect(
+        authService.completeTotpLogin(
+          hs512({ userId: 10, username: 'testuser', role: 'admin', purpose: 'totp-challenge' }),
+          '123456',
+        ),
+      ).rejects.toMatchObject({ code: 'INVALID_TOKEN' });
     });
   });
 });

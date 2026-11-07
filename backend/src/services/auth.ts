@@ -64,7 +64,7 @@ export function generateLocalCoopToken(
 export function verifyLocalCoopToken(token: string): { userId: number; username: string } | null {
   try {
     const config = getConfig();
-    const decoded = jwt.verify(token, config.JWT_SECRET) as {
+    const decoded = jwt.verify(token, config.JWT_SECRET, { algorithms: ['HS256'] }) as {
       userId: number;
       username: string;
       purpose?: string;
@@ -93,7 +93,7 @@ export function verifyLocalCoopTotpToken(
   hostUserId: number,
 ): { userId: number; duration: number } | null {
   try {
-    const decoded = jwt.verify(token, getConfig().JWT_SECRET) as {
+    const decoded = jwt.verify(token, getConfig().JWT_SECRET, { algorithms: ['HS256'] }) as {
       userId: number;
       hostUserId: number;
       duration: number;
@@ -118,7 +118,7 @@ export function verifyLocalCoopSocketToken(
 ): { userId: number; username: string } | null {
   try {
     const config = getConfig();
-    const decoded = jwt.verify(token, config.JWT_SECRET) as {
+    const decoded = jwt.verify(token, config.JWT_SECRET, { algorithms: ['HS256'] }) as {
       userId: number;
       username: string;
       purpose?: string;
@@ -319,7 +319,7 @@ export async function completeTotpLogin(
 
   let decoded: { userId: number; username: string; role: string; purpose?: string };
   try {
-    decoded = jwt.verify(totpToken, config.JWT_SECRET) as typeof decoded;
+    decoded = jwt.verify(totpToken, config.JWT_SECRET, { algorithms: ['HS256'] }) as typeof decoded;
   } catch {
     throw new AppError('Invalid or expired 2FA token', 401, 'INVALID_TOKEN');
   }
