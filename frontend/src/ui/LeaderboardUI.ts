@@ -58,7 +58,7 @@ export class LeaderboardUI {
       const val = (e.target as HTMLSelectElement).value;
       this.currentSeasonId = val ? parseInt(val, 10) : null;
       this.currentPage = 1;
-      this.loadLeaderboard();
+      void this.loadLeaderboard();
     });
 
     this.unbindEmbeddedListeners();
@@ -254,14 +254,14 @@ export class LeaderboardUI {
     paginationEl.querySelector('#lb-prev')?.addEventListener('click', () => {
       if (this.currentPage > 1) {
         this.currentPage--;
-        this.loadLeaderboard();
+        void this.loadLeaderboard();
       }
     });
 
     paginationEl.querySelector('#lb-next')?.addEventListener('click', () => {
       if (this.currentPage < totalPages) {
         this.currentPage++;
-        this.loadLeaderboard();
+        void this.loadLeaderboard();
       }
     });
   }

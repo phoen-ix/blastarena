@@ -679,11 +679,11 @@ export class HelpUI {
       const target = e.target as HTMLElement;
       const tabId = target.getAttribute('data-tab');
       if (tabId === 'imprint') {
-        this.showImprintTab();
+        void this.showImprintTab();
         return;
       }
       if (tabId && tabId !== this.activeTabId) {
-        this.switchTab(tabId);
+        void this.switchTab(tabId);
       }
     });
 

@@ -646,7 +646,7 @@ export class SettingsUI {
       try {
         await ApiClient.delete('/user/account', { password });
         closeModal();
-        this.authManager.logout();
+        void this.authManager.logout();
       } catch (err: unknown) {
         btn.disabled = false;
         btn.textContent = t('settings.account.deleteModal.confirm');
@@ -890,7 +890,7 @@ export class SettingsUI {
     );
 
     // Load and populate buddy settings
-    this.loadBuddySettings();
+    void this.loadBuddySettings();
 
     // Theme picker clicks
     this.contentEl.querySelector('#theme-picker')!.addEventListener('click', (e: Event) => {
@@ -936,7 +936,7 @@ export class SettingsUI {
     if (langSelect) {
       langSelect.addEventListener('change', () => {
         const lang = langSelect.value;
-        i18n.changeLanguage(lang);
+        void i18n.changeLanguage(lang);
         // Persist to DB for logged-in users
         ApiClient.put('/user/language', { language: lang }).catch(() => {});
       });
@@ -1121,10 +1121,10 @@ export class SettingsUI {
     };
 
     this.contentEl.querySelector('#privacy-public-profile')!.addEventListener('change', (e) => {
-      savePrivacy('isProfilePublic', (e.target as HTMLInputElement).checked);
+      void savePrivacy('isProfilePublic', (e.target as HTMLInputElement).checked);
     });
     this.contentEl.querySelector('#privacy-accept-friends')!.addEventListener('change', (e) => {
-      savePrivacy('acceptFriendRequests', (e.target as HTMLInputElement).checked);
+      void savePrivacy('acceptFriendRequests', (e.target as HTMLInputElement).checked);
     });
   }
 
@@ -1341,7 +1341,7 @@ export class SettingsUI {
     this.container.querySelector('#settings-tab-bar')!.addEventListener('click', (e: Event) => {
       const target = e.target as HTMLElement;
       if (target.dataset.tab && target.dataset.tab !== this.activeTabId) {
-        this.switchTab(target.dataset.tab);
+        void this.switchTab(target.dataset.tab);
       }
     });
 

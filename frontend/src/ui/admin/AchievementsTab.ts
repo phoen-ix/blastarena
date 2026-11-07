@@ -131,13 +131,13 @@ export class AchievementsTab {
     this.container.querySelector('#ach-view-achievements')!.addEventListener('click', () => {
       if (this.currentView !== 'achievements') {
         this.currentView = 'achievements';
-        this.renderView();
+        void this.renderView();
       }
     });
     this.container.querySelector('#ach-view-cosmetics')!.addEventListener('click', () => {
       if (this.currentView !== 'cosmetics') {
         this.currentView = 'cosmetics';
-        this.renderView();
+        void this.renderView();
       }
     });
 
@@ -199,7 +199,7 @@ export class AchievementsTab {
       this.showAchievementModal();
     });
     content.querySelector('#ach-export-all')?.addEventListener('click', () => {
-      this.exportAllAchievements();
+      void this.exportAllAchievements();
     });
     content.querySelector('#ach-import')?.addEventListener('click', () => {
       this.showImportAchievementsModal();

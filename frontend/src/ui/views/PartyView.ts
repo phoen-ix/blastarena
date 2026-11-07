@@ -49,7 +49,7 @@ export class PartyView implements ILobbyView {
       this.renderView();
     });
     this.setupSocketListeners();
-    this.loadChatMode();
+    void this.loadChatMode();
   }
 
   private get party(): Party | null {

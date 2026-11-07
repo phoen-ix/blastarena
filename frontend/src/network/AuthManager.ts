@@ -86,7 +86,7 @@ export class AuthManager {
     this.currentUser = response.user;
     // Sync i18n language with user's stored preference
     if (response.user.language && response.user.language !== i18n.language) {
-      i18n.changeLanguage(response.user.language);
+      void i18n.changeLanguage(response.user.language);
     }
     this.notify();
   }

@@ -25,7 +25,7 @@ export class LobbyChatPanel {
     this.currentUserRole = userRole;
     this.container = document.createElement('div');
     this.setupSocketListeners();
-    this.loadChatMode();
+    void this.loadChatMode();
   }
 
   private async loadChatMode(): Promise<void> {

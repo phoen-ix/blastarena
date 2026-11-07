@@ -168,13 +168,13 @@ export class MatchHistoryView implements ILobbyView {
     this.container.querySelector('#mh-prev')?.addEventListener('click', () => {
       if (this.page > 1) {
         this.page--;
-        this.loadPage();
+        void this.loadPage();
       }
     });
     this.container.querySelector('#mh-next')?.addEventListener('click', () => {
       if (this.page < totalPages) {
         this.page++;
-        this.loadPage();
+        void this.loadPage();
       }
     });
   }

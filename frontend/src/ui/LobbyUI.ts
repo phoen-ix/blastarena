@@ -105,7 +105,7 @@ export class LobbyUI {
     // Re-render on language change
     this.languageChangedHandler = () => {
       this.render();
-      this.navigateTo(this.activeViewId);
+      void this.navigateTo(this.activeViewId);
     };
     window.addEventListener('language-changed', this.languageChangedHandler);
 
@@ -120,11 +120,11 @@ export class LobbyUI {
     });
 
     // Navigate to initial view
-    this.navigateTo(this.initialView || 'rooms', this.initialViewOptions || undefined);
+    void this.navigateTo(this.initialView || 'rooms', this.initialViewOptions || undefined);
   }
 
   showView(viewId: string, options?: Record<string, unknown>): void {
-    this.navigateTo(viewId, options);
+    void this.navigateTo(viewId, options);
   }
 
   hide(): void {
@@ -279,7 +279,7 @@ export class LobbyUI {
         return new FriendsView(
           deps,
           (userId: number, username: string) => {
-            this.navigateTo('messages', { userId, username });
+            void this.navigateTo('messages', { userId, username });
           },
           (room) => this.enterRoom(room),
         );
@@ -504,7 +504,7 @@ export class LobbyUI {
     this.loadSidebarBadges();
     // The admin banner sits above every view (it used to show only above the room list, and the
     // lobby opens on Open World); admin:banner updates it live (LobbyScene).
-    this.loadBanner();
+    void this.loadBanner();
   }
 
   private async loadBanner(): Promise<void> {
@@ -571,7 +571,7 @@ export class LobbyUI {
       if (profileEl) {
         profileEl.addEventListener('click', () => {
           const user = this.authManager.getUser();
-          if (user) this.navigateTo('profile', { userId: user.id });
+          if (user) void this.navigateTo('profile', { userId: user.id });
         });
       }
     }
@@ -586,7 +586,7 @@ export class LobbyUI {
         this.socketClient.disconnect();
         this.authManager.clearGuest();
       } else {
-        this.authManager.logout();
+        void this.authManager.logout();
       }
       this.hide();
     });
@@ -630,7 +630,7 @@ export class LobbyUI {
     // /user/rank needs a session. A guest's 401 went through the refresh path and ended in
     // authManager.logout(), which bounced the guest out of the lobby to the menu.
     if (this.authManager.isGuest || !this.authManager.getAccessToken()) return;
-    import('../network/ApiClient').then(({ ApiClient }) => {
+    void import('../network/ApiClient').then(({ ApiClient }) => {
       ApiClient.get<{ rankTier: string; rankColor: string; level?: number }>('/user/rank')
         .then((rank) => {
           const sidebarLevel = this.container.querySelector('#sidebar-level') as HTMLElement;
@@ -662,7 +662,7 @@ export class LobbyUI {
       ],
       onBack: () => {
         if (this.activeViewId !== 'openWorld') {
-          this.navigateTo('openWorld');
+          void this.navigateTo('openWorld');
         }
       },
     });

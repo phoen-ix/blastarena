@@ -59,7 +59,7 @@ export class PartyBar {
     this.container.style.display = 'none';
     this.setupSocketListeners();
     this.socketClient.onReconnect(this.reconnectHandler);
-    this.loadChatMode();
+    void this.loadChatMode();
     this.syncParty();
   }
 

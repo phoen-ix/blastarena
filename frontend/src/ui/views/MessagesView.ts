@@ -60,7 +60,7 @@ export class MessagesView implements ILobbyView {
     };
 
     this.setupSocketListeners();
-    this.loadDMMode();
+    void this.loadDMMode();
   }
 
   async render(container: HTMLElement): Promise<void> {
@@ -242,7 +242,7 @@ export class MessagesView implements ILobbyView {
     const conv = this.conversations.find((c) => c.userId === userId);
     if (conv) conv.unreadCount = 0;
     this.renderView();
-    this.loadMessages(userId);
+    void this.loadMessages(userId);
     this.deps.socketClient.emit('dm:read', { fromUserId: userId });
   }
 

@@ -34,7 +34,7 @@ export class ProfileView implements ILobbyView {
       const profile = await ApiClient.get<PublicProfile>(`/user/${this.userId}/public`);
       this.renderProfile(profile);
       if (this.isOwnProfile) {
-        this.loadAchievementProgress();
+        void this.loadAchievementProgress();
       }
     } catch {
       this.renderPrivate();

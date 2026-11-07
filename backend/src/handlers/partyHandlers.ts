@@ -50,10 +50,10 @@ function setUserPartyMembership(io: TypedServer, userId: number, partyId: string
     const s = io.sockets.sockets.get(id);
     if (!s) continue;
     if (s.data.activePartyId && s.data.activePartyId !== partyId) {
-      s.leave(`party:${s.data.activePartyId}`);
+      void s.leave(`party:${s.data.activePartyId}`);
     }
     s.data.activePartyId = partyId ?? undefined;
-    if (partyId) s.join(`party:${partyId}`);
+    if (partyId) void s.join(`party:${partyId}`);
   }
 }
 

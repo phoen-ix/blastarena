@@ -60,7 +60,7 @@ class AudioManagerImpl {
     if (!this.ctx || !this.generator) return false;
     if (!getSettings().sound) return false;
     if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      void this.ctx.resume();
     }
     return this.ctx.state !== 'closed';
   }

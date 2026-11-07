@@ -80,7 +80,7 @@ export class UsersTab {
       this.searchTimeout = setTimeout(() => {
         this.search = searchInput.value;
         this.page = 1;
-        this.loadUsers();
+        void this.loadUsers();
       }, 300);
     });
 

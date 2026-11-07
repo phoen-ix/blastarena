@@ -543,7 +543,7 @@ export function showLocalCoopModal(
         render();
         return;
       }
-      tryLogin(username, password);
+      void tryLogin(username, password);
     });
 
     // Allow Enter key to submit
@@ -602,7 +602,7 @@ export function showLocalCoopModal(
         render();
         return;
       }
-      verifyTotp(code);
+      void verifyTotp(code);
     });
     codeInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') verifyBtn.click();

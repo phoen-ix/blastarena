@@ -409,7 +409,7 @@ export class GameLogger {
 
   logGameOver(winnerId: number | null, placements: Record<string, unknown>[]): void {
     this.log('game_over', { winnerId, placements });
-    this.close();
+    void this.close();
   }
 
   /**

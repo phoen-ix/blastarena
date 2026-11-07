@@ -36,6 +36,17 @@ export default tseslint.config(
     },
   },
 
+  // Type-aware rules (each workspace's tsconfig.json covers its src/)
+  {
+    files: ['{shared,backend,frontend}/src/**/*.ts'],
+    languageOptions: {
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+    },
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'error',
+    },
+  },
+
   // Backend-specific: prefer logger over console
   {
     files: ['backend/src/**/*.ts'],

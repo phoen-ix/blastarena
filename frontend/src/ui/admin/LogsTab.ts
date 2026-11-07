@@ -42,7 +42,7 @@ export class LogsTab {
     const target = e.target as HTMLElement;
     if (target.dataset.page) {
       this.page = parseInt(target.dataset.page);
-      this.loadActions();
+      void this.loadActions();
       return;
     }
     const logRow = target.closest('.log-row') as HTMLElement | null;
@@ -128,7 +128,7 @@ export class LogsTab {
       filterSelect.addEventListener('change', () => {
         this.actionFilter = filterSelect.value;
         this.page = 1;
-        this.loadActions();
+        void this.loadActions();
       });
     } catch {
       if (!this.container) return;

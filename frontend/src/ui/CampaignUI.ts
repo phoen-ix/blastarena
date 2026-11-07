@@ -535,7 +535,7 @@ export class CampaignUI {
       startBtn.textContent = t('campaign:buttons.start');
       startBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.startLevel(level.id);
+        void this.startLevel(level.id);
       });
       btnArea.appendChild(startBtn);
 
@@ -553,7 +553,7 @@ export class CampaignUI {
         coopBtn.textContent = t('campaign:buttons.coop');
         coopBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          this.startLevel(level.id, true);
+          void this.startLevel(level.id, true);
         });
         btnArea.appendChild(coopBtn);
       }
@@ -711,7 +711,7 @@ export class CampaignUI {
         if (config.p2Identity) {
           game.registry.set('localCoopP2Identity', config.p2Identity);
         }
-        this.startLevel(levelId, false, true);
+        void this.startLevel(levelId, false, true);
       },
       () => {
         /* cancel — do nothing */
@@ -726,7 +726,7 @@ export class CampaignUI {
         game.registry.set('localCoopConfig', config);
         game.registry.set('buddyMode', true);
         game.registry.set('buddyConfig', config.buddySettings);
-        this.startLevel(levelId, false, true, true);
+        void this.startLevel(levelId, false, true, true);
       },
       () => {
         /* cancel — do nothing */

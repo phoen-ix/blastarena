@@ -733,7 +733,7 @@ export class GameRoom {
     // The log stream is otherwise only closed on the natural game-over path (logGameOver), so an
     // admin-closed or reaped room left its file descriptor open forever. close() is idempotent.
     // (audit ROOM-REAP-1)
-    this.gameState.gameLogger?.close();
+    void this.gameState.gameLogger?.close();
   }
 
   isRunning(): boolean {

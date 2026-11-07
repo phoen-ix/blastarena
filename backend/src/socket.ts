@@ -341,7 +341,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         logger.warn({ err: getErrorMessage(err) }, 'Presence update failed');
       });
     const joinable = status === 'in_lobby' ? extra.roomCode : undefined;
-    for (const userId of real) notifyFriendsOnline(io, userId, status, joinable);
+    for (const userId of real) void notifyFriendsOnline(io, userId, status, joinable);
   }
 
   /** Clean up stale room membership (e.g. player refreshed during a game) */
@@ -363,7 +363,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       existingGameRoom.handlePlayerDisconnect(socket.data.userId);
     }
     await lobbyService.leaveRoom(existingRoom, socket.data.userId);
-    socket.leave(`room:${existingRoom}`);
+    void socket.leave(`room:${existingRoom}`);
   }
 
   /**
@@ -392,7 +392,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       const existingPartyId = await partyService.getPlayerParty(socket.data.userId);
       if (existingPartyId) {
         socket.data.activePartyId = existingPartyId;
-        socket.join(`party:${existingPartyId}`);
+        void socket.join(`party:${existingPartyId}`);
       }
 
       const existingRoomCode = await lobbyService.getPlayerRoom(socket.data.userId);
@@ -400,7 +400,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         const gameRoom = roomManager.getRoom(existingRoomCode);
         if (gameRoom && gameRoom.isRunning() && gameRoom.isPlayerDisconnected(socket.data.userId)) {
           // Rejoin socket room and resume game
-          socket.join(`room:${existingRoomCode}`);
+          void socket.join(`room:${existingRoomCode}`);
           socket.data.activeRoomCode = existingRoomCode;
           gameRoom.handlePlayerReconnect(socket.data.userId);
           // Send current game state so client can resume
@@ -447,11 +447,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     // (audit LOBBY-BROADCAST-1)
     socket.on('lobby:subscribe', () => {
       if (!lobbySubscribeLimiter.isAllowed(socket.id)) return; // audit B16
-      socket.join(LOBBY_ROOM);
+      void socket.join(LOBBY_ROOM);
     });
     socket.on('lobby:unsubscribe', () => {
       if (!lobbySubscribeLimiter.isAllowed(socket.id)) return; // audit B16
-      socket.leave(LOBBY_ROOM);
+      void socket.leave(LOBBY_ROOM);
     });
 
     // Guest connections only need open world handlers — skip room/lobby/friend setup
@@ -477,16 +477,16 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     } else {
       // Auto-join admin room for simulation broadcasts
       if (socket.data.role === 'admin') {
-        socket.join('sim:admin');
+        void socket.join('sim:admin');
       }
 
       // Join role-based room for scoped admin broadcasts
       if (socket.data.role === 'admin' || socket.data.role === 'moderator') {
-        socket.join('role:staff');
+        void socket.join('role:staff');
       }
 
       // Join user-specific room for friend/party notifications
-      socket.join(`user:${socket.data.userId}`);
+      void socket.join(`user:${socket.data.userId}`);
 
       // Set online presence and notify friends — for the first tab only; a second tab must not
       // overwrite "in game" with "in lobby".
@@ -537,7 +537,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           // Re-persist with the name attached
           await lobbyService.updateRoom(room.code, room);
         }
-        socket.join(`room:${room.code}`);
+        void socket.join(`room:${room.code}`);
         socket.data.activeRoomCode = room.code;
         callback({ success: true, room });
         broadcastRoomList();
@@ -568,7 +568,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         await cleanupStaleRoom(socket);
 
         const room = await lobbyService.joinRoom(data.code, currentUser);
-        socket.join(`room:${room.code}`);
+        void socket.join(`room:${room.code}`);
         socket.data.activeRoomCode = room.code;
         socket
           .to(`room:${room.code}`)
@@ -602,7 +602,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         }
 
         const room = await lobbyService.leaveRoom(roomCode, socket.data.userId);
-        socket.leave(`room:${roomCode}`);
+        void socket.leave(`room:${roomCode}`);
         socket.data.activeRoomCode = undefined;
         if (room) {
           io.to(`room:${roomCode}`).emit('room:playerLeft', socket.data.userId);
@@ -1238,7 +1238,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         return callback({ success: false, error: 'Game not running in this room' });
       }
 
-      socket.join(`room:${parsed.roomCode}`);
+      void socket.join(`room:${parsed.roomCode}`);
       logger.info(
         { admin: socket.data.username, roomCode: parsed.roomCode },
         'Admin spectating room',
@@ -1255,7 +1255,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       if (!parsed) return;
       // Never pull a player out of their own room.
       if (socket.data.activeRoomCode === parsed.roomCode) return;
-      socket.leave(`room:${parsed.roomCode}`);
+      void socket.leave(`room:${parsed.roomCode}`);
     });
 
     // Admin: send message to room — any existing room, waiting or running. It used to require the
@@ -1399,7 +1399,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         return callback({ success: false, error: 'Batch not found or not running' });
       }
 
-      socket.join(`sim:${data.batchId}`);
+      void socket.join(`sim:${data.batchId}`);
 
       // Send current game state immediately so spectator can init the scene
       const currentState = runner.getCurrentGameState();
@@ -1416,7 +1416,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Simulation: stop spectating
     socket.on('sim:unspectate', (data) => {
-      socket.leave(`sim:${data.batchId}`);
+      void socket.leave(`sim:${data.batchId}`);
     });
 
     // Campaign: start level (solo, online co-op, or local co-op)
@@ -1433,7 +1433,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           campaignManager.endSession(socket.data.activeCampaignSession);
           socket.data.activeCampaignSession = undefined;
           const campaignRoom = `campaign:${socket.data.userId}`;
-          socket.leave(campaignRoom);
+          void socket.leave(campaignRoom);
         }
 
         // Every service used by this handler is resolved once, up front. Two of them
@@ -1689,10 +1689,10 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
               // Clean up sessions
               if (partnerSocket) {
                 partnerSocket.data.activeCampaignSession = undefined;
-                partnerSocket.leave(campaignRoom);
+                void partnerSocket.leave(campaignRoom);
               }
               socket.data.activeCampaignSession = undefined;
-              socket.leave(campaignRoom);
+              void socket.leave(campaignRoom);
               campaignManager.endSession(game.sessionId);
               publishPresence(
                 userIds.filter((uid) => !game.hasDeparted(uid)),
@@ -1722,10 +1722,10 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
               if (partnerSocket) {
                 partnerSocket.data.activeCampaignSession = undefined;
-                partnerSocket.leave(campaignRoom);
+                void partnerSocket.leave(campaignRoom);
               }
               socket.data.activeCampaignSession = undefined;
-              socket.leave(campaignRoom);
+              void socket.leave(campaignRoom);
               campaignManager.endSession(game.sessionId);
               publishPresence(
                 userIds.filter((uid) => !game.hasDeparted(uid)),
@@ -1768,11 +1768,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         }
 
         // Join campaign room
-        socket.join(campaignRoom);
+        void socket.join(campaignRoom);
         socket.data.activeCampaignSession = game.sessionId;
 
         if (partnerSocket) {
-          partnerSocket.join(campaignRoom);
+          void partnerSocket.join(campaignRoom);
           partnerSocket.data.activeCampaignSession = game.sessionId;
         }
 
@@ -1946,7 +1946,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         const campaignRoom = `campaign:${game.userIds[0]}`;
         socket.to(campaignRoom).emit('campaign:partnerLeft', { reason: 'quit' });
         socket.to(campaignRoom).emit('campaign:pauseState', { paused: false });
-        socket.leave(campaignRoom);
+        void socket.leave(campaignRoom);
       } else {
         campaignManager.endSession(sessionId);
       }
@@ -1981,7 +1981,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       );
 
       if (result.success) {
-        socket.join('openworld');
+        void socket.join('openworld');
         socket.data.inOpenWorld = true;
         if (isGuest && result.playerId !== undefined && result.username) {
           socket.data.userId = result.playerId;
@@ -2015,7 +2015,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     socket.on('openworld:leave', () => {
       if (socket.data.inOpenWorld) {
         openWorldManager.handleLeave(socket.id);
-        socket.leave('openworld');
+        void socket.leave('openworld');
         socket.data.inOpenWorld = false;
       }
     });
@@ -2112,7 +2112,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           presenceService.removePresence(socket.data.userId).catch((err) => {
             logger.warn({ err: getErrorMessage(err) }, 'Presence update failed');
           });
-          notifyFriendsOffline(io, socket.data.userId);
+          void notifyFriendsOffline(io, socket.data.userId);
         }
 
         // Handle party disconnect (leave/disband) — unless another tab is still in the party
@@ -2199,7 +2199,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
   const shutdown = () => {
     clearInterval(cleanupInterval);
     clearInterval(presenceInterval);
-    openWorldManager.shutdown();
+    void openWorldManager.shutdown();
   };
   process.once('SIGTERM', shutdown);
   process.once('SIGINT', shutdown);

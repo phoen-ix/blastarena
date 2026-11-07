@@ -130,7 +130,7 @@ export class CampaignGame {
     const reason = result === 'completed' ? 'Level completed' : 'Game over';
     const winnerId = result === 'completed' ? this.userIds[0] : null;
 
-    this.gameState.gameLogger?.close();
+    void this.gameState.gameLogger?.close();
 
     this.replayRecorder.finalize({
       winnerId,

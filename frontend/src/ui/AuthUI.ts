@@ -41,7 +41,7 @@ export class AuthUI {
     // Bound once: the overlay outlives every render, and binding this per render stacked one
     // listener per form switch.
     this.overlay.addEventListener('click', this.closeLangDropdownOnOutsideClick);
-    this.loadPublicSettings();
+    void this.loadPublicSettings();
     this.render();
   }
 
@@ -209,7 +209,7 @@ export class AuthUI {
 
     this.overlay.querySelector('#login-btn')!.addEventListener('click', () => this.handleLogin());
     this.overlay.querySelector('#login-password')!.addEventListener('keydown', (e) => {
-      if ((e as KeyboardEvent).key === 'Enter') this.handleLogin();
+      if ((e as KeyboardEvent).key === 'Enter') void this.handleLogin();
     });
     this.overlay.querySelector('#switch-register')?.addEventListener('click', () => {
       this.mode = 'register';
@@ -221,7 +221,7 @@ export class AuthUI {
     });
     this.overlay.querySelector('#auth-imprint-link')?.addEventListener('click', (e) => {
       e.preventDefault();
-      this.showImprint();
+      void this.showImprint();
     });
     this.bindLanguagePicker();
 
@@ -294,7 +294,7 @@ export class AuthUI {
 
     this.overlay.querySelector('#reg-btn')!.addEventListener('click', () => this.handleRegister());
     this.overlay.querySelector('#reg-password')!.addEventListener('keydown', (e) => {
-      if ((e as KeyboardEvent).key === 'Enter') this.handleRegister();
+      if ((e as KeyboardEvent).key === 'Enter') void this.handleRegister();
     });
     this.overlay.querySelector('#switch-login')!.addEventListener('click', () => {
       this.mode = 'login';
@@ -461,7 +461,7 @@ export class AuthUI {
       .querySelector('#totp-btn')!
       .addEventListener('click', () => this.handleTotpVerify());
     this.overlay.querySelector('#totp-code')!.addEventListener('keydown', (e) => {
-      if ((e as KeyboardEvent).key === 'Enter') this.handleTotpVerify();
+      if ((e as KeyboardEvent).key === 'Enter') void this.handleTotpVerify();
     });
     this.overlay.querySelector('#switch-login-back')!.addEventListener('click', () => {
       this.mode = 'login';
@@ -603,7 +603,7 @@ export class AuthUI {
       .querySelector('#reset-btn')!
       .addEventListener('click', () => this.handleResetPassword());
     this.overlay.querySelector('#reset-confirm')!.addEventListener('keydown', (e) => {
-      if ((e as KeyboardEvent).key === 'Enter') this.handleResetPassword();
+      if ((e as KeyboardEvent).key === 'Enter') void this.handleResetPassword();
     });
     this.overlay.querySelector('#switch-login-back')!.addEventListener('click', () => {
       this.mode = 'login';

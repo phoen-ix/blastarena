@@ -221,7 +221,7 @@ export class LevelEditorScene extends Phaser.Scene {
 
     // Load enemy types
     const session = ++this.sessionId;
-    this.loadData().then(() => {
+    void this.loadData().then(() => {
       // Scene stopped or restarted while loading — nothing below may touch it. (audit C6)
       if (session !== this.sessionId || !this.scene.isActive()) return;
       this.buildGrid();

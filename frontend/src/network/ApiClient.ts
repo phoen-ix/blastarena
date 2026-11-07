@@ -114,7 +114,7 @@ class ApiClientClass {
       // before login) has none, and logging out here threw open-world guests out of the lobby
       // on the first auth-only request.
       if (carriedToken) {
-        this.authManager.logout();
+        void this.authManager.logout();
         throw new ApiError('Session expired', 401, 'TOKEN_EXPIRED');
       }
     }

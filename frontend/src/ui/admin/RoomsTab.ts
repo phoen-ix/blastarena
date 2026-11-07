@@ -248,7 +248,7 @@ export class RoomsTab {
       this.socketClient.emit('admin:kick', { roomCode: code, userId, reason }, (res) => {
         if (res.success) {
           this.notifications.success(t('admin:rooms.playerKicked'));
-          this.loadRooms();
+          void this.loadRooms();
         } else {
           this.notifications.error(res.error || t('admin:rooms.failedToKick'));
         }
@@ -280,7 +280,7 @@ export class RoomsTab {
       this.socketClient.emit('admin:closeRoom', { roomCode: code }, (res) => {
         if (res.success) {
           this.notifications.success(t('admin:rooms.roomClosed'));
-          this.loadRooms();
+          void this.loadRooms();
         } else {
           this.notifications.error(res.error || t('admin:rooms.failedToClose'));
         }

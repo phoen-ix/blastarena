@@ -89,7 +89,7 @@ async function main(): Promise<void> {
     } catch (err) {
       logger.error({ err }, 'Open world shutdown failed');
     }
-    io.close();
+    void io.close();
     httpServer.close();
     try {
       await getPool().end();

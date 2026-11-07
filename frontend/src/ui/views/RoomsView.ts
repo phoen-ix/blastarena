@@ -42,7 +42,7 @@ export class RoomsView implements ILobbyView {
     list.addEventListener('click', (e) => {
       const card = (e.target as HTMLElement).closest('.room-card') as HTMLElement | null;
       if (card?.dataset.code) {
-        this.joinRoom(card.dataset.code);
+        void this.joinRoom(card.dataset.code);
       }
     });
     list.addEventListener('keydown', (ev) => {
@@ -51,14 +51,14 @@ export class RoomsView implements ILobbyView {
       const card = (e.target as HTMLElement).closest('.room-card') as HTMLElement | null;
       if (card?.dataset.code) {
         e.preventDefault();
-        this.joinRoom(card.dataset.code);
+        void this.joinRoom(card.dataset.code);
       }
     });
 
     if (this.cachedRooms) {
       this.renderRooms(this.cachedRooms);
     } else {
-      this.loadRooms();
+      void this.loadRooms();
     }
   }
 

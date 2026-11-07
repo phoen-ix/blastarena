@@ -63,7 +63,7 @@ async function boot(): Promise<Phaser.Game> {
   document.addEventListener('keydown', initAudio);
 
   // Initialize theme manager (async, fetches admin default if no user preference)
-  themeManager.initialize();
+  void themeManager.initialize();
   // Same for the arena art style; MenuScene waits for it before starting the landing arena.
   void artStyleManager.initialize();
 
@@ -78,7 +78,7 @@ async function boot(): Promise<Phaser.Game> {
   return game;
 }
 
-boot();
+void boot();
 
 // Named export of the `let` so importers get a LIVE binding to the instance assigned inside the
 // async boot(). A `export default game` would snapshot `undefined` (boot() runs after this line),

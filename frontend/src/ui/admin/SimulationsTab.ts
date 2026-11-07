@@ -70,7 +70,7 @@ export class SimulationsTab {
     if (this.container !== container) return;
     if (this.refreshInterval) clearInterval(this.refreshInterval);
     this.refreshInterval = setInterval(() => {
-      if (this.viewMode === 'list') this.loadBatchList();
+      if (this.viewMode === 'list') void this.loadBatchList();
     }, 5000);
   }
 
@@ -94,7 +94,7 @@ export class SimulationsTab {
   private handleProgress = (data: SimulationBatchStatus) => {
     this.activeBatch = data;
     if (this.viewMode === 'list') {
-      this.loadBatchList();
+      void this.loadBatchList();
     } else if (this.viewMode === 'detail' && this.detailBatchId === data.batchId) {
       this.renderDetailView(data);
     }
@@ -114,7 +114,7 @@ export class SimulationsTab {
 
   private handleQueueUpdate = () => {
     if (this.viewMode === 'list') {
-      this.loadBatchList();
+      void this.loadBatchList();
     }
   };
 
@@ -124,10 +124,10 @@ export class SimulationsTab {
       t('admin:simulations.batchCompleted', { count: data.status.gamesCompleted }),
     );
     if (this.viewMode === 'list') {
-      this.loadBatchList();
+      void this.loadBatchList();
     } else if (this.detailBatchId === data.batchId) {
       // Reload: results of games that ended before this view subscribed are only on the server.
-      this.showBatchDetail(data.batchId);
+      void this.showBatchDetail(data.batchId);
     }
   };
 
@@ -171,7 +171,7 @@ export class SimulationsTab {
       );
 
       this.container.querySelector('#sim-new-batch')?.addEventListener('click', () => {
-        this.showConfigModal();
+        void this.showConfigModal();
       });
 
       this.container.addEventListener('click', this.handleListClick);
@@ -271,7 +271,7 @@ export class SimulationsTab {
       this.socketClient.emit('sim:cancel', { batchId }, (res) => {
         if (res.success) {
           this.notifications.success(t('admin:simulations.notifications.removedFromQueue'));
-          this.loadBatchList();
+          void this.loadBatchList();
         } else {
           this.notifications.error(res.error || t('admin:simulations.errors.removeFailed'));
         }
@@ -281,7 +281,7 @@ export class SimulationsTab {
         try {
           await ApiClient.delete(`/admin/simulations/${batchId}`);
           this.notifications.success(t('admin:simulations.notifications.deleted'));
-          this.loadBatchList();
+          void this.loadBatchList();
         } catch {
           this.notifications.error(t('admin:simulations.errors.deleteFailed'));
         }
@@ -378,7 +378,7 @@ export class SimulationsTab {
       this.renderDetailView(status);
     } catch {
       this.notifications.error(t('admin:simulations.errors.detailLoadFailed'));
-      this.loadBatchList();
+      void this.loadBatchList();
     }
   }
 
@@ -487,7 +487,7 @@ export class SimulationsTab {
       this.detailPage = 1;
       this.detailSortKey = 'gameIndex';
       this.detailSortAsc = true;
-      this.loadBatchList();
+      void this.loadBatchList();
     });
 
     this.container.querySelector('#sim-detail-spectate')?.addEventListener('click', () => {
@@ -604,7 +604,7 @@ export class SimulationsTab {
       btn.addEventListener('click', () => {
         const gameIndex = parseInt((btn as HTMLElement).dataset.gameIndex!);
         if (this.detailBatchId != null && !isNaN(gameIndex)) {
-          this.launchSimulationReplay(this.detailBatchId, gameIndex);
+          void this.launchSimulationReplay(this.detailBatchId, gameIndex);
         }
       });
     });
@@ -929,7 +929,7 @@ export class SimulationsTab {
               count: config.totalGames,
             }),
           );
-          this.loadBatchList();
+          void this.loadBatchList();
         } else {
           this.notifications.success(
             t('admin:simulations.notifications.started', { count: config.totalGames }),
@@ -940,7 +940,7 @@ export class SimulationsTab {
             this.startSpectating(batchId);
           } else {
             // For fast mode: show detail view with progress
-            this.showBatchDetail(batchId);
+            void this.showBatchDetail(batchId);
           }
         }
       });

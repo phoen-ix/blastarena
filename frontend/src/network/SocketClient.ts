@@ -56,7 +56,7 @@ export class SocketClient {
     this.socket.on('connect', () => {
       console.log('Socket connected');
       this.hideOverlay();
-      this.checkBuild();
+      void this.checkBuild();
       this.notifyConnected();
     });
 

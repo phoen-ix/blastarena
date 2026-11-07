@@ -195,7 +195,7 @@ export class FriendsView implements ILobbyView {
         }
         case 'search': {
           const input = this.container?.querySelector('#friend-search-input') as HTMLInputElement;
-          if (input) this.handleSearch(input.value);
+          if (input) void this.handleSearch(input.value);
           break;
         }
       }
@@ -205,7 +205,7 @@ export class FriendsView implements ILobbyView {
     this.keydownHandler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.id === 'friend-search-input' && e.key === 'Enter') {
-        this.handleSearch((target as HTMLInputElement).value);
+        void this.handleSearch((target as HTMLInputElement).value);
       }
     };
     this.container.addEventListener('keydown', this.keydownHandler);

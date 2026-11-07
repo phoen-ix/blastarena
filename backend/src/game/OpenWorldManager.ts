@@ -544,7 +544,7 @@ class OpenWorldManager {
       const socket = this.io?.sockets.sockets.get(socketId);
       if (socket) {
         socket.emit('openworld:afkKick');
-        socket.leave('openworld');
+        void socket.leave('openworld');
         socket.data.inOpenWorld = false;
       }
 

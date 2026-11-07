@@ -149,19 +149,19 @@ export class CampaignTab {
     this.container.querySelector('#camp-view-worlds')!.addEventListener('click', () => {
       if (this.viewMode !== 'worlds') {
         this.viewMode = 'worlds';
-        this.renderView();
+        void this.renderView();
       }
     });
     this.container.querySelector('#camp-view-enemies')!.addEventListener('click', () => {
       if (this.viewMode !== 'enemies') {
         this.viewMode = 'enemies';
-        this.renderView();
+        void this.renderView();
       }
     });
     this.container.querySelector('#camp-view-replays')!.addEventListener('click', () => {
       if (this.viewMode !== 'replays') {
         this.viewMode = 'replays';
-        this.renderView();
+        void this.renderView();
       }
     });
 
@@ -1557,13 +1557,13 @@ export class CampaignTab {
       content.querySelector('#camp-replays-prev')?.addEventListener('click', () => {
         if (this.campaignReplaysPage > 1) {
           this.campaignReplaysPage--;
-          this.loadCampaignReplays();
+          void this.loadCampaignReplays();
         }
       });
       content.querySelector('#camp-replays-next')?.addEventListener('click', () => {
         if (this.campaignReplaysPage < totalPages) {
           this.campaignReplaysPage++;
-          this.loadCampaignReplays();
+          void this.loadCampaignReplays();
         }
       });
 
@@ -1639,7 +1639,7 @@ export class CampaignTab {
       try {
         await ApiClient.delete(`/admin/campaign-replays/${sessionId}`);
         this.notifications.success(t('admin:campaign.replays.replayDeleted'));
-        this.loadCampaignReplays();
+        void this.loadCampaignReplays();
       } catch (err: unknown) {
         this.notifications.error(getErrorMessage(err));
       }

@@ -195,7 +195,7 @@ export class AdminUI {
     this.container.querySelector('#admin-tab-bar')!.addEventListener('click', (e: Event) => {
       const target = e.target as HTMLElement;
       if (target.dataset.tab && target.dataset.tab !== this.activeTabId) {
-        this.switchTab(target.dataset.tab);
+        void this.switchTab(target.dataset.tab);
       }
     });
 

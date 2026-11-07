@@ -1216,7 +1216,7 @@ export class HUDScene extends Phaser.Scene {
     this.spectatorChat = new SpectatorChat(socketClient, user.role);
     const uiOverlay = document.getElementById('ui-overlay');
     if (uiOverlay) {
-      this.spectatorChat.mount(uiOverlay);
+      void this.spectatorChat.mount(uiOverlay);
       this.spectatorChatMounted = true;
     }
   }

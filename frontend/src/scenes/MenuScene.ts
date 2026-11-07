@@ -151,11 +151,11 @@ export class MenuScene extends Phaser.Scene {
     }
 
     // Try auto-login first
-    this.authManager.tryAutoLogin().then((success) => {
+    void this.authManager.tryAutoLogin().then((success) => {
       if (success) {
         this.onAuthenticated();
       } else {
-        this.showLanding();
+        void this.showLanding();
       }
     });
   }
