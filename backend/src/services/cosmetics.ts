@@ -2,6 +2,7 @@ import { query, execute } from '../db/connection';
 import { Cosmetic, CosmeticType, EquippedCosmetics, PlayerCosmeticData } from '@blast-arena/shared';
 import { CosmeticRow, UserCosmeticRow, UserEquippedCosmeticsRow, CountRow } from '../db/types';
 import { RowDataPacket } from 'mysql2';
+import type { PoolConnection, ResultSetHeader } from 'mysql2/promise';
 import { AppError } from '../middleware/errorHandler';
 
 function toCosmetic(row: CosmeticRow): Cosmetic {
@@ -35,29 +36,39 @@ export async function getCosmeticById(id: number): Promise<Cosmetic | null> {
   return rows.length > 0 ? toCosmetic(rows[0]) : null;
 }
 
-export async function createCosmetic(data: {
-  name: string;
-  type: CosmeticType;
-  config: Record<string, unknown>;
-  rarity?: string;
-  unlockType?: string;
-  unlockRequirement?: Record<string, unknown> | null;
-  sortOrder?: number;
-}): Promise<Cosmetic> {
-  const result = await execute(
-    `INSERT INTO cosmetics (name, type, config, rarity, unlock_type, unlock_requirement, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [
-      data.name,
-      data.type,
-      JSON.stringify(data.config),
-      data.rarity ?? 'common',
-      data.unlockType ?? 'achievement',
-      data.unlockRequirement ? JSON.stringify(data.unlockRequirement) : null,
-      data.sortOrder ?? 0,
-    ],
-  );
-
+/** `conn`: run inside that transaction (an import creating several rows at once). */
+export async function createCosmetic(
+  data: {
+    name: string;
+    type: CosmeticType;
+    config: Record<string, unknown>;
+    rarity?: string;
+    unlockType?: string;
+    unlockRequirement?: Record<string, unknown> | null;
+    sortOrder?: number;
+  },
+  conn?: PoolConnection,
+): Promise<Cosmetic> {
+  const sql = `INSERT INTO cosmetics (name, type, config, rarity, unlock_type, unlock_requirement, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`;
+  const params = [
+    data.name,
+    data.type,
+    JSON.stringify(data.config),
+    data.rarity ?? 'common',
+    data.unlockType ?? 'achievement',
+    data.unlockRequirement ? JSON.stringify(data.unlockRequirement) : null,
+    data.sortOrder ?? 0,
+  ];
+  if (conn) {
+    // Read back on the same connection: the row is not visible to the pool until commit
+    const [result] = await conn.execute<ResultSetHeader>(sql, params);
+    const [rows] = await conn.execute<CosmeticRow[]>('SELECT * FROM cosmetics WHERE id = ?', [
+      result.insertId,
+    ]);
+    return toCosmetic(rows[0]);
+  }
+  const result = await execute(sql, params);
   return (await getCosmeticById(result.insertId))!;
 }
 
@@ -115,8 +126,10 @@ export async function updateCosmetic(
   await execute(`UPDATE cosmetics SET ${sets.join(', ')} WHERE id = ?`, params);
 }
 
-export async function deleteCosmetic(id: number): Promise<void> {
-  await execute('DELETE FROM cosmetics WHERE id = ?', [id]);
+/** False when no row has this id. */
+export async function deleteCosmetic(id: number): Promise<boolean> {
+  const result = await execute('DELETE FROM cosmetics WHERE id = ?', [id]);
+  return result.affectedRows > 0;
 }
 
 export async function getUserCosmetics(userId: number): Promise<Cosmetic[]> {

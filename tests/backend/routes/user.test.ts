@@ -405,6 +405,27 @@ describe('User routes', () => {
       expect(res._json).toBeNull();
     });
 
+    it('redirects with emailChanged=false for an invalid or expired link', async () => {
+      const { AppError } = await import('../../../backend/src/middleware/errorHandler');
+      mockConfirmEmailChange.mockRejectedValue(new AppError('Link expired', 400, 'TOKEN_EXPIRED'));
+
+      const req = mockReq({ params: { token: 'expired' } });
+      const res = mockRes();
+      const next = vi.fn();
+      await handler(req, res, next);
+
+      expect(res._redirect).toBe('http://localhost:8080?emailChanged=false');
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('passes unexpected errors on', async () => {
+      const boom = new Error('db down');
+      mockConfirmEmailChange.mockRejectedValue(boom);
+      const next = vi.fn();
+      await handler(mockReq({ params: { token: 't' } }), mockRes(), next);
+      expect(next).toHaveBeenCalledWith(boom);
+    });
+
     it('is rate limited (audit B15)', () => {
       const stack = (userRouter as any).stack as RouteLayer[];
       const layer = stack.find(

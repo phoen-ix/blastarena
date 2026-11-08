@@ -62,12 +62,12 @@
       "emailLabel": "E-post *",
       "emailPlaceholder": "användare@example.com",
       "passwordLabel": "Lösenord *",
-      "passwordPlaceholder": "Minst 6 tecken",
+      "passwordPlaceholder": "Minst {{min}} tecken",
       "roleLabel": "Roll",
       "cancel": "Avbryt",
       "submit": "Skapa",
       "errorRequired": "Användarnamn, e-post och lösenord krävs",
-      "errorPasswordLength": "Lösenord måste vara minst 6 tecken",
+      "errorPasswordLength": "Lösenord måste vara minst {{min}} tecken",
       "successMessage": "Användare \"{{username}}\" skapad"
     },
     "resetPasswordModal": {
@@ -75,13 +75,13 @@
       "title": "Återställ lösenord",
       "description": "Ange ett nytt lösenord för <strong style=\"color:var(--text);\">{{username}}</strong>. De kommer loggas ut och måste logga in med det nya lösenordet.",
       "newPasswordLabel": "Nytt lösenord",
-      "newPasswordPlaceholder": "Minst 6 tecken",
+      "newPasswordPlaceholder": "Minst {{min}} tecken",
       "confirmPasswordLabel": "Bekräfta lösenord",
       "confirmPasswordPlaceholder": "Ange lösenord igen",
       "cancel": "Avbryt",
       "submit": "Återställ lösenord",
       "errorRequired": "Lösenord krävs",
-      "errorPasswordLength": "Lösenord måste vara minst 6 tecken",
+      "errorPasswordLength": "Lösenord måste vara minst {{min}} tecken",
       "errorPasswordMismatch": "Lösenorden matchar inte",
       "successMessage": "Lösenord återställt för \"{{username}}\""
     },
@@ -269,7 +269,8 @@
     "prevPage": "Föreg",
     "nextPage": "Nästa",
     "pageInfo": "Sida {{page}} av {{totalPages}} ({{total}} åtgärder)",
-    "failedToLoad": "Kunde inte ladda adminåtgärder"
+    "failedToLoad": "Kunde inte ladda adminåtgärder",
+    "deletedAdmin": "(raderat konto)"
   },
   "ai": {
     "botManagement": "Bot-AI-hantering",
@@ -699,7 +700,9 @@
       "save": "Spara inställningar för öppen värld",
       "saved": "Inställningar för öppen värld sparade",
       "saveFailed": "Kunde inte spara inställningar för öppen värld"
-    }
+    },
+    "settingsLoadFailed": "De här inställningarna kunde inte läsas in och är låsta så att en sparning inte skriver över dem: {{settings}}. Ladda om fliken för att försöka igen.",
+    "settingLoadFailedHint": "Kunde inte läsas in. Ladda om fliken för att redigera inställningen."
   },
   "seasons": {
     "sectionTitle": "Säsongshantering",
@@ -941,6 +944,14 @@
       "cancel": "Avbryt",
       "import": "Importera",
       "importSuccess": "Bana importerad framgångsrikt"
+    },
+    "enemyAiConflict": {
+      "title": "Medföljande fiende-AI",
+      "hint": "Den här fiendetypen har en egen AI \"{{name}}\". Välj hur den ska importeras.",
+      "createNew": "Skapa en ny fiende-AI \"{{name}}\" från den medföljande koden",
+      "useExisting": "Använd den befintliga AI:n \"{{name}}\" (ID {{id}})",
+      "skip": "Importera utan AI (använder sitt rörelsemönster)",
+      "unresolved": "Servern behöver fortfarande ett beslut om den medföljande AI:n. Inget importerades."
     },
     "deleteModal": {
       "entityLabels": {

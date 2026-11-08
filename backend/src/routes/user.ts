@@ -18,6 +18,7 @@ import {
   validatePassword,
 } from '@blast-arena/shared';
 import { param } from '../utils/params';
+import { AppError } from '../middleware/errorHandler';
 
 const router = Router();
 
@@ -264,6 +265,9 @@ router.get(
       await userService.confirmEmailChange(param(req.params.token));
       res.redirect(`${getConfig().APP_URL}?emailChanged=true`);
     } catch (err) {
+      // An expired or already-used link (often opened by a mail scanner first) lands in the app
+      // with a message instead of raw JSON, as /auth/verify-email does.
+      if (err instanceof AppError) return res.redirect(`${getConfig().APP_URL}?emailChanged=false`);
       next(err);
     }
   },

@@ -78,10 +78,11 @@ const FIXTURES: Record<string, unknown> = {
   '/admin/settings/spectator_chat_mode': { mode: 'disabled' },
   '/admin/settings/xp_multiplier': { multiplier: 1.5 },
   '/admin/settings/default_theme': { theme: 'inferno' },
+  '/admin/settings/default_art_style': { style: 'classic' },
   '/admin/settings/game_defaults': { defaults: { gameMode: 'teams', roundTime: 240 } },
   '/admin/settings/simulation_defaults': { defaults: { botCount: 4, totalGames: 10 } },
   '/admin/ai/active': { ais: [ai] },
-  '/admin/settings/imprint': { enabled: true, text: 'Imprint text' },
+  '/admin/settings/imprint/raw': { enabled: true, text: 'Imprint text' },
   '/admin/settings/display_github': { enabled: true },
   '/admin/settings/spectator_actions_enabled': { enabled: true },
   // GET /admin/settings/email_settings → { settings }, the password masked

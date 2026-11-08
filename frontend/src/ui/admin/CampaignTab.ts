@@ -6,6 +6,7 @@ import {
   CampaignLevelSummary,
   EnemyTypeEntry,
   EnemyTypeConfig,
+  EnemyBombConfig,
   EnemySpriteConfig,
   EnemyBodyShape,
   EnemyEyeStyle,
@@ -41,6 +42,38 @@ const THEME_OPTIONS = ['forest', 'desert', 'ice', 'volcano', 'void', 'castle', '
 function getWinConditionLabel(wc: CampaignWinCondition): string {
   return t(`admin:campaign.winConditions.${wc}`, { defaultValue: wc });
 }
+
+/** A stored colour (an import can carry anything) as a value <input type="color"> accepts. */
+function colorAttr(value: unknown, fallback: string): string {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+}
+
+/** A stored number (an import can carry anything) as an escaped attribute value. */
+function numAttr(value: unknown, fallback: number): string {
+  return escapeAttr(String(typeof value === 'number' && Number.isFinite(value) ? value : fallback));
+}
+
+/**
+ * Bomb settings for an enemy that gets "Can bomb" ticked without any: the backend only lets an
+ * enemy bomb with a bombConfig (Enemy.canPlaceBomb). Same values as the seeded Bombotron.
+ */
+const DEFAULT_ENEMY_BOMB_CONFIG: EnemyBombConfig = {
+  fireRange: 2,
+  cooldownTicks: 60,
+  trigger: 'proximity',
+  proximityRange: 4,
+};
+
+/** Phase 1 of POST /admin/campaign/enemy-types/import for a type that bundles its own AI. */
+interface EnemyAiImportConflict {
+  aiName: string;
+  existingId?: string;
+  existingName?: string;
+}
+
+type EnemyImportResponse =
+  | { id: number; needsResolution?: undefined }
+  | { needsResolution: true; conflict: EnemyAiImportConflict };
 
 function defaultEnemyConfig(): EnemyTypeConfig {
   return {
@@ -254,9 +287,9 @@ export class CampaignTab {
         <td>${publishBadge}</td>
         <td>
           <div class="camp-order-cell">
-            <button class="btn-sm btn-ghost camp-order-up" data-id="${world.id}" title="${t('admin:campaign.worlds.moveUp')}" aria-label="${t('admin:campaign.worlds.moveUp')}">&#9650;</button>
+            <button class="btn-sm btn-ghost camp-order-up" data-id="${world.id}" title="${escapeAttr(t('admin:campaign.worlds.moveUp'))}" aria-label="${escapeAttr(t('admin:campaign.worlds.moveUp'))}">&#9650;</button>
             <span class="camp-order-value">${world.sortOrder}</span>
-            <button class="btn-sm btn-ghost camp-order-down" data-id="${world.id}" title="${t('admin:campaign.worlds.moveDown')}" aria-label="${t('admin:campaign.worlds.moveDown')}">&#9660;</button>
+            <button class="btn-sm btn-ghost camp-order-down" data-id="${world.id}" title="${escapeAttr(t('admin:campaign.worlds.moveDown'))}" aria-label="${escapeAttr(t('admin:campaign.worlds.moveDown'))}">&#9660;</button>
           </div>
         </td>
         <td>
@@ -333,9 +366,9 @@ export class CampaignTab {
       <tr data-level-id="${level.id}">
         <td>
           <div class="camp-level-order-cell">
-            <button class="btn-sm btn-ghost camp-level-order-up camp-level-order-btn" data-id="${level.id}" title="${t('admin:campaign.worlds.moveUp')}" aria-label="${t('admin:campaign.worlds.moveUp')}">&#9650;</button>
+            <button class="btn-sm btn-ghost camp-level-order-up camp-level-order-btn" data-id="${level.id}" title="${escapeAttr(t('admin:campaign.worlds.moveUp'))}" aria-label="${escapeAttr(t('admin:campaign.worlds.moveUp'))}">&#9650;</button>
             <span class="camp-level-order-value">${level.sortOrder}</span>
-            <button class="btn-sm btn-ghost camp-level-order-down camp-level-order-btn" data-id="${level.id}" title="${t('admin:campaign.worlds.moveDown')}" aria-label="${t('admin:campaign.worlds.moveDown')}">&#9660;</button>
+            <button class="btn-sm btn-ghost camp-level-order-down camp-level-order-btn" data-id="${level.id}" title="${escapeAttr(t('admin:campaign.worlds.moveDown'))}" aria-label="${escapeAttr(t('admin:campaign.worlds.moveDown'))}">&#9660;</button>
           </div>
         </td>
         <td>${escapeHtml(level.name)}</td>
@@ -348,8 +381,8 @@ export class CampaignTab {
         <td>
           <div class="camp-btn-group">
             <button class="btn-sm btn-primary camp-edit-level" data-id="${level.id}" data-world-id="${level.worldId}">${t('admin:campaign.levels.editBtn')}</button>
-            <button class="btn-sm btn-secondary camp-export-level" data-id="${level.id}" data-name="${escapeAttr(level.name)}" title="${t('admin:campaign.levels.exportTitle')}">${t('admin:campaign.levels.exportBtn')}</button>
-            <button class="btn-sm btn-secondary camp-export-bundle" data-id="${level.id}" data-name="${escapeAttr(level.name)}" title="${t('admin:campaign.levels.bundleTitle')}">${t('admin:campaign.levels.bundleBtn')}</button>
+            <button class="btn-sm btn-secondary camp-export-level" data-id="${level.id}" data-name="${escapeAttr(level.name)}" title="${escapeAttr(t('admin:campaign.levels.exportTitle'))}">${t('admin:campaign.levels.exportBtn')}</button>
+            <button class="btn-sm btn-secondary camp-export-bundle" data-id="${level.id}" data-name="${escapeAttr(level.name)}" title="${escapeAttr(t('admin:campaign.levels.bundleTitle'))}">${t('admin:campaign.levels.bundleBtn')}</button>
             <button class="btn-sm btn-secondary camp-toggle-pub-level" data-id="${level.id}" data-pub="${level.isPublished}">${level.isPublished ? t('admin:campaign.levels.unpublish') : t('admin:campaign.levels.publish')}</button>
             <button class="btn-sm btn-danger camp-delete-level" data-id="${level.id}" data-name="${escapeAttr(level.name)}">${t('admin:campaign.levels.deleteBtn')}</button>
           </div>
@@ -647,11 +680,11 @@ export class CampaignTab {
       <div class="camp-modal-form">
         <div class="form-group">
           <label class="camp-form-label" for="world-name">${t('admin:campaign.worldModal.nameLabel')}</label>
-          <input type="text" id="world-name" class="admin-input w-full" value="${escapeAttr(existing?.name || '')}" placeholder="${t('admin:campaign.worldModal.namePlaceholder')}" maxlength="100">
+          <input type="text" id="world-name" class="admin-input w-full" value="${escapeAttr(existing?.name || '')}" placeholder="${escapeAttr(t('admin:campaign.worldModal.namePlaceholder'))}" maxlength="100">
         </div>
         <div class="form-group">
           <label class="camp-form-label" for="world-desc">${t('admin:campaign.worldModal.descriptionLabel')}</label>
-          <textarea id="world-desc" class="admin-textarea" placeholder="${t('admin:campaign.worldModal.descriptionPlaceholder')}" maxlength="500" rows="2">${escapeHtml(existing?.description || '')}</textarea>
+          <textarea id="world-desc" class="admin-textarea" placeholder="${escapeAttr(t('admin:campaign.worldModal.descriptionPlaceholder'))}" maxlength="500" rows="2">${escapeHtml(existing?.description || '')}</textarea>
         </div>
         <div class="form-group">
           <label class="camp-form-label" for="world-theme">${t('admin:campaign.worldModal.themeLabel')}</label>
@@ -797,7 +830,7 @@ export class CampaignTab {
         <td>
           <div class="camp-btn-group">
             <button class="btn-sm btn-secondary camp-edit-enemy" data-id="${et.id}">${t('admin:campaign.enemies.editBtn')}</button>
-            <button class="btn-sm btn-secondary camp-export-enemy" data-id="${et.id}" data-name="${escapeAttr(et.name)}" title="${t('admin:campaign.enemies.exportTitle')}">${t('admin:campaign.enemies.exportBtn')}</button>
+            <button class="btn-sm btn-secondary camp-export-enemy" data-id="${et.id}" data-name="${escapeAttr(et.name)}" title="${escapeAttr(t('admin:campaign.enemies.exportTitle'))}">${t('admin:campaign.enemies.exportBtn')}</button>
             <button class="btn-sm btn-danger camp-delete-enemy" data-id="${et.id}" data-name="${escapeAttr(et.name)}">${t('admin:campaign.enemies.deleteBtn')}</button>
           </div>
         </td>
@@ -870,25 +903,25 @@ export class CampaignTab {
         <div class="camp-enemy-left">
           <div class="form-group">
             <label class="camp-form-label" for="enemy-name">${t('admin:campaign.enemyModal.nameLabel')}</label>
-            <input type="text" id="enemy-name" class="admin-input w-full" value="${escapeAttr(existing?.name || '')}" placeholder="${t('admin:campaign.enemyModal.namePlaceholder')}" maxlength="100">
+            <input type="text" id="enemy-name" class="admin-input w-full" value="${escapeAttr(existing?.name || '')}" placeholder="${escapeAttr(t('admin:campaign.enemyModal.namePlaceholder'))}" maxlength="100">
           </div>
           <div class="form-group">
             <label class="camp-form-label" for="enemy-desc">${t('admin:campaign.enemyModal.descriptionLabel')}</label>
-            <input type="text" id="enemy-desc" class="admin-input w-full" value="${escapeAttr(existing?.description || '')}" placeholder="${t('admin:campaign.enemyModal.descriptionPlaceholder')}" maxlength="200">
+            <input type="text" id="enemy-desc" class="admin-input w-full" value="${escapeAttr(existing?.description || '')}" placeholder="${escapeAttr(t('admin:campaign.enemyModal.descriptionPlaceholder'))}" maxlength="200">
           </div>
 
           <div class="camp-form-row">
             <div class="camp-form-col">
               <label class="camp-form-label" for="enemy-hp">${t('admin:campaign.enemyModal.hpLabel')}</label>
-              <input type="number" id="enemy-hp" class="admin-input w-full" value="${config.hp}" min="1" max="100">
+              <input type="number" id="enemy-hp" class="admin-input w-full" value="${numAttr(config.hp, 1)}" min="1" max="100">
             </div>
             <div class="camp-form-col">
               <label class="camp-form-label" for="enemy-speed">${t('admin:campaign.enemyModal.speedLabel')}</label>
-              <input type="number" id="enemy-speed" class="admin-input w-full" value="${config.speed}" min="0.1" max="5" step="0.1">
+              <input type="number" id="enemy-speed" class="admin-input w-full" value="${numAttr(config.speed, 1)}" min="0.1" max="5" step="0.1">
             </div>
             <div class="camp-form-col">
               <label class="camp-form-label" for="enemy-size">${t('admin:campaign.enemyModal.sizeLabel')}</label>
-              <input type="number" id="enemy-size" class="admin-input w-full" value="${config.sizeMultiplier}" min="1" max="3" step="0.1">
+              <input type="number" id="enemy-size" class="admin-input w-full" value="${numAttr(config.sizeMultiplier, 1)}" min="1" max="3" step="0.1">
             </div>
           </div>
 
@@ -935,7 +968,7 @@ export class CampaignTab {
           <div class="camp-form-row">
             <div class="camp-form-col">
               <label class="camp-form-label" for="enemy-drop-chance">${t('admin:campaign.enemyModal.dropChanceLabel')}</label>
-              <input type="number" id="enemy-drop-chance" class="admin-input w-full" value="${config.dropChance}" min="0" max="1" step="0.05">
+              <input type="number" id="enemy-drop-chance" class="admin-input w-full" value="${numAttr(config.dropChance, 0)}" min="0" max="1" step="0.05">
             </div>
           </div>
         </div>
@@ -961,11 +994,11 @@ export class CampaignTab {
           <div class="camp-color-row">
             <div class="camp-form-col">
               <label class="camp-form-label sm" for="enemy-primary-color">${t('admin:campaign.enemyModal.primaryColorLabel')}</label>
-              <input type="color" id="enemy-primary-color" value="${sprite.primaryColor}" class="camp-color-input">
+              <input type="color" id="enemy-primary-color" value="${colorAttr(sprite.primaryColor, '#cc3333')}" class="camp-color-input">
             </div>
             <div class="camp-form-col">
               <label class="camp-form-label sm" for="enemy-secondary-color">${t('admin:campaign.enemyModal.secondaryColorLabel')}</label>
-              <input type="color" id="enemy-secondary-color" value="${sprite.secondaryColor}" class="camp-color-input">
+              <input type="color" id="enemy-secondary-color" value="${colorAttr(sprite.secondaryColor, '#ff6666')}" class="camp-color-input">
             </div>
           </div>
           <div class="camp-checkbox-row">
@@ -1105,6 +1138,8 @@ export class CampaignTab {
         return;
       }
 
+      const isBoss = (overlay.querySelector('#enemy-boss') as HTMLInputElement).checked;
+      const canBomb = (overlay.querySelector('#enemy-can-bomb') as HTMLInputElement).checked;
       const newConfig: EnemyTypeConfig = {
         hp: Number((overlay.querySelector('#enemy-hp') as HTMLInputElement).value) || 1,
         speed: Number((overlay.querySelector('#enemy-speed') as HTMLInputElement).value) || 1,
@@ -1112,16 +1147,20 @@ export class CampaignTab {
           Number((overlay.querySelector('#enemy-size') as HTMLInputElement).value) || 1,
         movementPattern: (overlay.querySelector('#enemy-movement') as HTMLSelectElement)
           .value as EnemyMovementPattern,
-        isBoss: (overlay.querySelector('#enemy-boss') as HTMLInputElement).checked,
+        isBoss,
         contactDamage: (overlay.querySelector('#enemy-contact-dmg') as HTMLInputElement).checked,
-        canBomb: (overlay.querySelector('#enemy-can-bomb') as HTMLInputElement).checked,
+        canBomb,
         canPassWalls: (overlay.querySelector('#enemy-pass-walls') as HTMLInputElement).checked,
         canPassBombs: (overlay.querySelector('#enemy-pass-bombs') as HTMLInputElement).checked,
         dropChance:
           Number((overlay.querySelector('#enemy-drop-chance') as HTMLInputElement).value) || 0,
         dropTable: config.dropTable,
-        bombConfig: config.canBomb ? config.bombConfig : undefined,
-        bossPhases: config.isBoss ? config.bossPhases : undefined,
+        // Keyed off the ticked boxes, not the stored flags: ticking "Can bomb" on an enemy that
+        // never bombed sent no bombConfig, and the backend never let it bomb. Stored settings are
+        // kept either way (inert while the box is off), so unticking and ticking loses nothing.
+        bombConfig: config.bombConfig ?? (canBomb ? { ...DEFAULT_ENEMY_BOMB_CONFIG } : undefined),
+        // A boss needs no phases (it just has none to switch to); existing ones are kept.
+        bossPhases: config.bossPhases,
         enemyAiId: aiSelect.value || undefined,
         difficulty: aiSelect.value ? (diffSelect.value as 'easy' | 'normal' | 'hard') : undefined,
         sprite: {
@@ -1223,7 +1262,15 @@ export class CampaignTab {
         const data = JSON.parse(text);
         // Strip format metadata if present
         const { _format, _version, ...rest } = data;
-        await ApiClient.post('/admin/campaign/enemy-types/import', rest);
+        const res = await ApiClient.post<EnemyImportResponse>(
+          '/admin/campaign/enemy-types/import',
+          rest,
+        );
+        // A bundled AI makes the server stop before creating anything and ask what to do with it.
+        if (res.needsResolution) {
+          this.showEnemyAiConflictModal(rest, res.conflict);
+          return;
+        }
         this.notifications.success(t('admin:campaign.enemies.enemyImported'));
         await this.loadEnemyTypes();
       } catch (err: unknown) {
@@ -1231,6 +1278,82 @@ export class CampaignTab {
       }
     });
     input.click();
+  }
+
+  /** Phase 2 of an enemy-type import with a bundled AI: create it, reuse one, or drop the AI. */
+  private showEnemyAiConflictModal(
+    payload: Record<string, unknown>,
+    conflict: EnemyAiImportConflict,
+  ): void {
+    const option = (value: string, label: string, checked = false) =>
+      `<label class="camp-conflict-option">
+         <input type="radio" name="enemy-ai-action" value="${escapeAttr(value)}" ${checked ? 'checked' : ''}>
+         ${label}
+       </label>`;
+    const title = t('admin:campaign.enemyAiConflict.title');
+    const { overlay, content, close } = createModal({
+      ariaLabel: title,
+      className: 'camp-modal-body conflict',
+    });
+
+    setHtml(
+      content,
+      `
+      <h3 class="camp-modal-title warning">${escapeHtml(title)}</h3>
+      <p class="camp-import-hint mb-md">
+        ${t('admin:campaign.enemyAiConflict.hint', { name: escapeHtml(conflict.aiName) })}
+      </p>
+      <div class="camp-conflict-card">
+        <div class="camp-conflict-options">
+          ${option('create', t('admin:campaign.enemyAiConflict.createNew', { name: escapeHtml(conflict.aiName) }), true)}
+          ${
+            conflict.existingId
+              ? option(
+                  `use-existing:${conflict.existingId}`,
+                  t('admin:campaign.enemyAiConflict.useExisting', {
+                    name: escapeHtml(conflict.existingName ?? ''),
+                    id: escapeHtml(conflict.existingId),
+                  }),
+                )
+              : ''
+          }
+          ${option('skip', t('admin:campaign.enemyAiConflict.skip'))}
+        </div>
+      </div>
+      <div class="camp-modal-actions mt-sm">
+        <button class="btn btn-secondary" id="enemy-ai-conflict-cancel">${t('admin:campaign.conflictModal.cancel')}</button>
+        <button class="btn btn-primary" id="enemy-ai-conflict-submit">${t('admin:campaign.conflictModal.import')}</button>
+      </div>
+    `,
+    );
+
+    overlay.querySelector('#enemy-ai-conflict-cancel')!.addEventListener('click', close);
+    const submitBtn = overlay.querySelector('#enemy-ai-conflict-submit') as HTMLButtonElement;
+    submitBtn.addEventListener('click', async () => {
+      const selected = overlay.querySelector<HTMLInputElement>(
+        'input[name="enemy-ai-action"]:checked',
+      );
+      if (!selected) return;
+      submitBtn.disabled = true;
+      try {
+        const res = await ApiClient.post<EnemyImportResponse>(
+          '/admin/campaign/enemy-types/import',
+          { ...payload, enemyAiAction: selected.value },
+        );
+        // Only an id means the enemy type exists now.
+        if (res.needsResolution) {
+          this.notifications.error(t('admin:campaign.enemyAiConflict.unresolved'));
+          submitBtn.disabled = false;
+          return;
+        }
+        close();
+        this.notifications.success(t('admin:campaign.enemies.enemyImported'));
+        await this.loadEnemyTypes();
+      } catch (err: unknown) {
+        this.notifications.error(getErrorMessage(err));
+        submitBtn.disabled = false;
+      }
+    });
   }
 
   private showImportLevelModal(worldId: number): void {
@@ -1461,7 +1584,7 @@ export class CampaignTab {
       <h3 class="camp-modal-title danger">${t('admin:campaign.deleteModal.title', { entity: entityLabel })}</h3>
       <p class="camp-delete-confirm-text">${warningText} <strong>${escapeHtml(name)}</strong></p>
       <p class="camp-delete-confirm-hint">${t('admin:campaign.deleteModal.confirmHint')}</p>
-      <input type="text" id="camp-delete-confirm" class="admin-input w-full mb-md" placeholder="${escapeAttr(name)}" aria-label="${t('admin:campaign.deleteModal.confirmAriaLabel')}">
+      <input type="text" id="camp-delete-confirm" class="admin-input w-full mb-md" placeholder="${escapeAttr(name)}" aria-label="${escapeAttr(t('admin:campaign.deleteModal.confirmAriaLabel'))}">
       <div class="camp-modal-actions">
         <button class="btn btn-secondary" id="camp-delete-cancel">${t('admin:campaign.deleteModal.cancel')}</button>
         <button class="btn btn-danger" id="camp-delete-submit" disabled>${t('admin:campaign.deleteModal.deleteBtn')}</button>
@@ -1573,7 +1696,7 @@ export class CampaignTab {
     } catch (err: unknown) {
       setHtml(
         content,
-        `<div class="text-danger">${t('admin:campaign.replays.loadReplaysError', { error: getErrorMessage(err) })}</div>`,
+        `<div class="text-danger">${t('admin:campaign.replays.loadReplaysError', { error: escapeHtml(getErrorMessage(err)) })}</div>`,
       );
     }
   }

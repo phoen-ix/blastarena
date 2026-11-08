@@ -12,6 +12,7 @@ import * as friendsService from '../services/friends';
 import * as settingsService from '../services/settings';
 import { createSocketRateLimiter } from '../utils/socketRateLimit';
 import {
+  ackOf,
   validateSocket,
   userIdSchema,
   inviteIdSchema,
@@ -64,6 +65,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
   // Current membership, for a party UI that was just built (every lobby rebuild made a new one
   // that started empty until the next party event).
   socket.on('party:sync', async (callback) => {
+    callback = ackOf(callback);
     if (!partyActionLimiter.isAllowed(socket.id))
       return callback({ success: false, error: 'Rate limited' });
     try {
@@ -78,6 +80,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Create party
   socket.on('party:create', async (callback) => {
+    callback = ackOf(callback);
     if (!partyActionLimiter.isAllowed(socket.id))
       return callback({ success: false, error: 'Rate limited' }); // audit B16
     try {
@@ -92,6 +95,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Invite to party
   socket.on('party:invite', async (data, callback) => {
+    callback = ackOf(callback);
     // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
     // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
     if (!inviteLimiter.isAllowed(socket.id))
@@ -140,6 +144,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Accept party invite
   socket.on('party:acceptInvite', async (data, callback) => {
+    callback = ackOf(callback);
     if (!partyActionLimiter.isAllowed(socket.id))
       return callback({ success: false, error: 'Rate limited' }); // audit B16
     try {
@@ -181,6 +186,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Leave party
   socket.on('party:leave', async (callback) => {
+    callback = ackOf(callback);
     if (!partyActionLimiter.isAllowed(socket.id))
       return callback({ success: false, error: 'Rate limited' }); // audit B16
     try {
@@ -216,6 +222,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Kick from party
   socket.on('party:kick', async (data, callback) => {
+    callback = ackOf(callback);
     if (!partyActionLimiter.isAllowed(socket.id))
       return callback({ success: false, error: 'Rate limited' }); // audit B16
     try {
@@ -284,6 +291,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Room invite (invite friend to current room)
   socket.on('invite:room', async (data, callback) => {
+    callback = ackOf(callback);
     // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
     // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
     if (!inviteLimiter.isAllowed(socket.id))
@@ -323,6 +331,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Accept room invite
   socket.on('invite:acceptRoom', async (data, callback) => {
+    callback = ackOf(callback);
     if (!partyActionLimiter.isAllowed(socket.id))
       return callback({ success: false, error: 'Rate limited' }); // audit B16
     try {

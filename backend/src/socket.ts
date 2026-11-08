@@ -37,8 +37,8 @@ import * as presenceService from './services/presence';
 import * as partyService from './services/party';
 import * as replayService from './services/replay';
 import * as customMapsService from './services/custom-maps';
-import { z } from 'zod';
 import {
+  ackOf,
   validateSocket,
   isValidPlayerInput,
   clientError,
@@ -49,6 +49,7 @@ import {
   adminKickSchema,
   adminCloseRoomSchema,
   adminSpectateSchema,
+  createRoomRequestSchema,
   allowGuestPacket,
   guestPacketLabel,
   sanitizeGuestUsername,
@@ -106,69 +107,6 @@ function requireRoom(
   }
   return roomCode;
 }
-
-// MatchConfig validation for room:create socket events
-const VALID_GAME_MODES = [
-  'ffa',
-  'teams',
-  'battle_royale',
-  'sudden_death',
-  'deathmatch',
-  'king_of_the_hill',
-] as const;
-const VALID_POWERUP_TYPES = [
-  'bomb_up',
-  'fire_up',
-  'speed_up',
-  'shield',
-  'kick',
-  'pierce_bomb',
-  'remote_bomb',
-  'line_bomb',
-  'bomb_throw',
-] as const;
-
-const matchConfigSchema = z.object({
-  gameMode: z.enum(VALID_GAME_MODES),
-  maxPlayers: z.number().int().min(2).max(8),
-  mapWidth: z.number().int().min(9).max(51),
-  mapHeight: z.number().int().min(9).max(51),
-  mapSeed: z.number().int().optional(),
-  roundTime: z.number().int().min(30).max(600),
-  teams: z.number().int().min(2).max(2).optional(),
-  wallDensity: z.number().min(0).max(1).optional(),
-  enabledPowerUps: z.array(z.enum(VALID_POWERUP_TYPES)).optional(),
-  powerUpDropRate: z.number().min(0).max(1).optional(),
-  botCount: z.number().int().min(0).max(7).optional(),
-  botDifficulty: z.enum(['easy', 'normal', 'hard']).optional(),
-  botTeams: z.array(z.union([z.number().int().min(0).max(1), z.null()])).optional(),
-  friendlyFire: z.boolean().optional(),
-  hazardTiles: z.boolean().optional(),
-  selectedHazardTiles: z.array(z.string()).optional(),
-  enableMapEvents: z.boolean().optional(),
-  selectedMapEvents: z.array(z.string()).optional(),
-  reinforcedWalls: z.boolean().optional(),
-  puzzleTiles: z.boolean().optional(),
-  selectedPuzzleTiles: z.array(z.string()).optional(),
-  enableSpectatorActions: z.boolean().optional(),
-  recordGame: z.boolean().optional(),
-  botAiId: z.string().optional(),
-  customMapId: z.number().int().positive().optional(),
-});
-
-const createRoomRequestSchema = z.object({
-  // Trimmed, inner whitespace collapsed, control and format (e.g. bidi) characters removed.
-  name: z
-    .string()
-    .transform((n) =>
-      n
-        .replace(/[\p{Cc}\p{Cf}]/gu, '')
-        .replace(/\s+/g, ' ')
-        .trim(),
-    )
-    .pipe(z.string().min(1).max(50)),
-  config: matchConfigSchema,
-});
 
 // Rematch vote tracking per room
 const rematchVotes = new Map<
@@ -503,6 +441,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Room creation
     socket.on('room:create', async (data, callback) => {
+      callback = ackOf(callback);
       // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
       // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
       if (!createLimiter(socket.id) || !ipCreateLimiter(clientIp))
@@ -557,6 +496,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Join room
     socket.on('room:join', async (data, callback) => {
+      callback = ackOf(callback);
       // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
       // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
       if (!joinLimiter(socket.id) || !ipJoinLimiter(clientIp))
@@ -775,6 +715,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Restart room (play again)
     socket.on('room:restart', async (callback) => {
+      callback = ackOf(callback);
       if (!lobbyActionLimiter(socket.id))
         return callback({ success: false, error: 'Rate limited' });
       try {
@@ -835,6 +776,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Rematch voting
     socket.on('rematch:vote', async (data, callback) => {
+      callback = ackOf(callback);
       try {
         const parsed = validateSocket(rematchVoteSchema, data, callback);
         if (!parsed) return;
@@ -1051,6 +993,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Spectator Game Master action
     socket.on('spectator:action', async (data, callback) => {
+      callback = ackOf(callback);
       try {
         const roomCode = requireRoom(socket, callback);
         if (!roomCode) return;
@@ -1113,6 +1056,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Admin: kick player from room
     socket.on('admin:kick', async (data, callback) => {
+      callback = ackOf(callback);
       try {
         if (!adminActionLimiter(socket.id))
           return callback({ success: false, error: 'Rate limited' });
@@ -1168,6 +1112,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Admin: force close room
     socket.on('admin:closeRoom', async (data, callback) => {
+      callback = ackOf(callback);
       try {
         if (!adminActionLimiter(socket.id))
           return callback({ success: false, error: 'Rate limited' });
@@ -1223,6 +1168,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Admin: spectate room
     socket.on('admin:spectate', async (data, callback) => {
+      callback = ackOf(callback);
       if (!adminRoomLimiter.isAllowed(socket.id))
         return callback({ success: false, error: 'Rate limited' }); // audit B16
       if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') {
@@ -1262,7 +1208,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     // admin's socket to be in the room, which only Spectate (running games only) achieved, and it
     // gave no answer, so the admin UI reported success either way.
     socket.on('admin:roomMessage', async (data, callback) => {
-      const ack = typeof callback === 'function' ? callback : () => {};
+      const ack = ackOf(callback);
       if (!adminRoomLimiter.isAllowed(socket.id))
         return ack({ success: false, error: 'Rate limited' }); // audit B16
       if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') {
@@ -1303,6 +1249,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Simulation: start batch
     socket.on('sim:start', async (config, callback) => {
+      callback = ackOf(callback);
       if (socket.data.role !== 'admin') {
         return callback({ success: false, error: 'Admin access required' });
       }
@@ -1367,6 +1314,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Simulation: cancel batch
     socket.on('sim:cancel', async (data, callback) => {
+      callback = ackOf(callback);
       if (socket.data.role !== 'admin') {
         return callback({ success: false, error: 'Admin access required' });
       }
@@ -1390,6 +1338,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Simulation: spectate
     socket.on('sim:spectate', (data, callback) => {
+      callback = ackOf(callback);
       if (socket.data.role !== 'admin') {
         return callback({ success: false, error: 'Admin access required' });
       }
@@ -1421,6 +1370,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Campaign: start level (solo, online co-op, or local co-op)
     socket.on('campaign:start', async (data, callback) => {
+      callback = ackOf(callback);
       if (!campaignStartLimiter.isAllowed(socket.id)) {
         return callback({ success: false, error: 'Too many requests, please wait' });
       }
@@ -1458,6 +1408,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         const level = await campaignService.getLevel(data.levelId);
         if (!level || !level.isPublished) {
           return callback({ success: false, error: 'Level not found' });
+        }
+        // The campaign view locks levels, but only client-side. The starting user's progress
+        // decides, in co-op too. (audit V11)
+        if (!(await progressService.isLevelUnlocked(socket.data.userId, level.id))) {
+          return callback({ success: false, error: 'Level is locked' });
         }
 
         // Gather enemy type configs
@@ -1908,6 +1863,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     // Campaign: pause (either player can pause for both). Both players are told, so a co-op
     // partner gets the pause menu instead of a silently frozen level.
     socket.on('campaign:pause', (callback) => {
+      callback = ackOf(callback);
       if (!campaignPauseLimiter.isAllowed(socket.id)) return callback({ success: false });
       const sessionId = socket.data.activeCampaignSession;
       if (!sessionId) return callback({ success: false });
@@ -1921,6 +1877,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // Campaign: resume (either player can resume)
     socket.on('campaign:resume', (callback) => {
+      callback = ackOf(callback);
       if (!campaignPauseLimiter.isAllowed(socket.id)) return callback({ success: false });
       const sessionId = socket.data.activeCampaignSession;
       if (!sessionId) return callback({ success: false });
@@ -1959,6 +1916,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     // ---- Open World events ----
     socket.on('openworld:join', (_data, callback) => {
+      callback = ackOf(callback);
       if (
         !openWorldJoinLimiter.isAllowed(socket.id) ||
         !openWorldJoinIpLimiter.isAllowed(clientIp)

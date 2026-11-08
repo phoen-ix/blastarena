@@ -10,7 +10,7 @@ import {
 import * as settingsService from '../services/settings';
 import * as messageService from '../services/messages';
 import { createSocketRateLimiter } from '../utils/socketRateLimit';
-import { validateSocket, dmReadSchema, clientError } from '../utils/socketValidation';
+import { ackOf, validateSocket, dmReadSchema, clientError } from '../utils/socketValidation';
 import { logger } from '../utils/logger';
 
 type TypedServer = Server<
@@ -32,6 +32,7 @@ export function setupDMHandlers(socket: TypedSocket, io: TypedServer): void {
   const userId = socket.data.userId;
 
   socket.on('dm:send', async (data, callback) => {
+    callback = ackOf(callback);
     // Every path below answers the ack. There is no ack timeout anywhere in the frontend, and
     // MessagesView clears the composer synchronously on send — so a handler that returns without
     // calling back loses the message silently, with the connection still showing as healthy.

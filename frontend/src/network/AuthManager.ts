@@ -82,6 +82,9 @@ export class AuthManager {
   }
 
   private setAuth(response: AuthResponse): void {
+    // A guest who signs in (the open-world HUD's login bar) is no longer a guest: left set, the
+    // lobby kept guest-only navigation and its logout skipped the server, so the session survived.
+    this._isGuest = false;
     this.accessToken = response.accessToken;
     this.currentUser = response.user;
     // Sync i18n language with user's stored preference
@@ -182,6 +185,8 @@ export class AuthManager {
     }
     this.accessToken = null;
     this.currentUser = null;
+    this._isGuest = false;
+    this.pendingTotpToken = null;
     this._loggingOut = false;
     this.notify();
   }

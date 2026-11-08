@@ -7,7 +7,8 @@ import { ADMIN_AUDIT_ACTIONS } from '@blast-arena/shared';
 interface AdminActionEntry {
   id: number;
   admin_id: number;
-  admin_username: string;
+  /** Null once the admin's account was deleted. */
+  admin_username: string | null;
   action: string;
   target_type: string;
   target_id: number;
@@ -101,7 +102,7 @@ export class LogsTab {
                 (a: AdminActionEntry, i: number) => `
               <tr class="log-row" data-log-index="${i}" style="cursor:pointer;">
                 <td>${new Date(a.created_at).toLocaleString()}</td>
-                <td>${escapeHtml(a.admin_username)}</td>
+                <td>${escapeHtml(a.admin_username ?? t('admin:logs.deletedAdmin'))}</td>
                 <td><span class="badge badge-${this.actionBadgeClass(a.action)}">${escapeHtml(a.action)}</span></td>
                 <td>${escapeHtml(a.target_type)}</td>
                 <td>${a.target_id}</td>

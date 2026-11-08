@@ -62,12 +62,12 @@
       "emailLabel": "Email *",
       "emailPlaceholder": "utente@esempio.com",
       "passwordLabel": "Password *",
-      "passwordPlaceholder": "Minimo 6 caratteri",
+      "passwordPlaceholder": "Minimo {{min}} caratteri",
       "roleLabel": "Ruolo",
       "cancel": "Annulla",
       "submit": "Crea",
       "errorRequired": "Nome utente, email e password sono obbligatori",
-      "errorPasswordLength": "La password deve avere almeno 6 caratteri",
+      "errorPasswordLength": "La password deve avere almeno {{min}} caratteri",
       "successMessage": "Utente \"{{username}}\" creato"
     },
     "resetPasswordModal": {
@@ -75,13 +75,13 @@
       "title": "Reimposta password",
       "description": "Imposta una nuova password per <strong style=\"color:var(--text);\">{{username}}</strong>. Verrà disconnesso e dovrà accedere con la nuova password.",
       "newPasswordLabel": "Nuova password",
-      "newPasswordPlaceholder": "Minimo 6 caratteri",
+      "newPasswordPlaceholder": "Minimo {{min}} caratteri",
       "confirmPasswordLabel": "Conferma password",
       "confirmPasswordPlaceholder": "Reinserisci la password",
       "cancel": "Annulla",
       "submit": "Reimposta password",
       "errorRequired": "La password è obbligatoria",
-      "errorPasswordLength": "La password deve avere almeno 6 caratteri",
+      "errorPasswordLength": "La password deve avere almeno {{min}} caratteri",
       "errorPasswordMismatch": "Le password non corrispondono",
       "successMessage": "Password reimpostata per \"{{username}}\""
     },
@@ -269,7 +269,8 @@
     "prevPage": "Prec",
     "nextPage": "Succ",
     "pageInfo": "Pagina {{page}} di {{totalPages}} ({{total}} azioni)",
-    "failedToLoad": "Impossibile caricare le azioni admin"
+    "failedToLoad": "Impossibile caricare le azioni admin",
+    "deletedAdmin": "(account eliminato)"
   },
   "ai": {
     "botManagement": "Gestione IA Bot",
@@ -699,7 +700,9 @@
       "save": "Salva impostazioni mondo aperto",
       "saved": "Impostazioni mondo aperto salvate",
       "saveFailed": "Impossibile salvare le impostazioni del mondo aperto"
-    }
+    },
+    "settingsLoadFailed": "Queste impostazioni non sono state caricate e sono bloccate perché un salvataggio non le sovrascriva: {{settings}}. Ricarica la scheda per riprovare.",
+    "settingLoadFailedHint": "Impossibile caricare. Ricarica la scheda per modificare questa impostazione."
   },
   "seasons": {
     "sectionTitle": "Gestione stagioni",
@@ -941,6 +944,14 @@
       "cancel": "Annulla",
       "import": "Importa",
       "importSuccess": "Livello importato con successo"
+    },
+    "enemyAiConflict": {
+      "title": "IA nemico inclusa",
+      "hint": "Questo tipo di nemico include una propria IA \"{{name}}\". Scegli come importarla.",
+      "createNew": "Crea una nuova IA nemico \"{{name}}\" dal codice incluso",
+      "useExisting": "Usa l'IA esistente \"{{name}}\" (ID {{id}})",
+      "skip": "Importa senza IA (usa il suo schema di movimento)",
+      "unresolved": "Il server richiede ancora una decisione sull'IA inclusa. Non è stato importato nulla."
     },
     "deleteModal": {
       "entityLabels": {

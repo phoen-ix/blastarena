@@ -307,6 +307,13 @@ describe('Achievements Service', () => {
         [7],
       );
     });
+
+    it('reports whether a row was deleted (false for an unknown id)', async () => {
+      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
+      await expect(deleteAchievement(7)).resolves.toBe(true);
+      mockExecute.mockResolvedValueOnce({ affectedRows: 0 });
+      await expect(deleteAchievement(999)).resolves.toBe(false);
+    });
   });
 
   // ==================== getUserAchievements ====================

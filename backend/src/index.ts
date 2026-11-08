@@ -19,11 +19,7 @@ async function main(): Promise<void> {
   // 3. Connect to Redis
   await createRedisClient();
 
-  // 4. Backfill email hashes (must run before migration 030 can finalize)
-  const { backfillEmailHashes } = await import('./db/backfill-emails');
-  await backfillEmailHashes();
-
-  // 4.1. Run migrations
+  // 4. Run migrations
   await runMigrations();
 
   // 4.5. Initialize i18n
@@ -74,7 +70,7 @@ async function main(): Promise<void> {
   const { getPool } = await import('./db/connection');
   const { getRedis } = await import('./db/redis');
   let shuttingDown = false;
-  const shutdown = async () => {
+  const shutdown = async (exitCode = 0) => {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info('Shutting down...');
@@ -89,7 +85,13 @@ async function main(): Promise<void> {
     } catch (err) {
       logger.error({ err }, 'Open world shutdown failed');
     }
-    void io.close();
+    // io.close() disconnects every socket and closes the attached HTTP server; awaited, so every
+    // socket is disconnected (its disconnect handlers called) before the pool below is ended.
+    try {
+      await io.close();
+    } catch (err) {
+      logger.error({ err }, 'Socket.io close failed');
+    }
     httpServer.close();
     try {
       await getPool().end();
@@ -101,19 +103,22 @@ async function main(): Promise<void> {
     } catch (err) {
       logger.error({ err }, 'Redis close failed');
     }
-    process.exit(0);
+    process.exit(exitCode);
   };
 
   process.on('SIGTERM', () => void shutdown());
   process.on('SIGINT', () => void shutdown());
 
-  // Last-resort safety nets: log unhandled async failures instead of letting them crash the
-  // process (or be silently swallowed). Individual handlers still do their own error handling. (audit ERR-004)
+  // Last-resort safety nets. An unhandled rejection is logged, not fatal: individual handlers do
+  // their own error handling. (audit ERR-004) An uncaught exception leaves the process in an
+  // unknown state, so it is logged and the server shuts down gracefully with exit code 1 (the
+  // container restarts it) instead of running on.
   process.on('unhandledRejection', (reason) => {
     logger.error({ err: reason }, 'Unhandled promise rejection');
   });
   process.on('uncaughtException', (err) => {
-    logger.fatal({ err }, 'Uncaught exception');
+    logger.fatal({ err }, 'Uncaught exception, shutting down');
+    void shutdown(1);
   });
 }
 

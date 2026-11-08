@@ -869,7 +869,10 @@ describe('PUT /admin/settings/email_settings', () => {
   });
 
   it('preserves existing password when masked value is sent', async () => {
-    mockGetEmailSettings.mockResolvedValue({ smtpPassword: 'existing-secret' });
+    mockGetEmailSettings.mockResolvedValue({
+      smtpHost: 'smtp.test.com',
+      smtpPassword: 'existing-secret',
+    });
     mockSetEmailSettings.mockResolvedValue(undefined);
     const req = mockReq({
       body: { smtpPassword: '••••••••', smtpHost: 'smtp.test.com' },
@@ -881,7 +884,7 @@ describe('PUT /admin/settings/email_settings', () => {
   });
 
   it('preserves existing password when smtpPassword is undefined', async () => {
-    mockGetEmailSettings.mockResolvedValue({ smtpPassword: 'old-pw' });
+    mockGetEmailSettings.mockResolvedValue({ smtpHost: 'smtp.test.com', smtpPassword: 'old-pw' });
     mockSetEmailSettings.mockResolvedValue(undefined);
     const req = mockReq({
       body: { smtpHost: 'smtp.test.com' },
@@ -892,7 +895,8 @@ describe('PUT /admin/settings/email_settings', () => {
     expect(savedSettings.smtpPassword).toBe('old-pw');
   });
 
-  it('clears password when empty string is sent', async () => {
+  it('clears password when empty string is sent: stored as "", so SMTP_PASSWORD is not used', async () => {
+    // Leaving the key out fell back to the .env password, so "clear" brought it straight back
     mockGetEmailSettings.mockResolvedValue({ smtpPassword: 'existing' });
     mockSetEmailSettings.mockResolvedValue(undefined);
     const req = mockReq({
@@ -901,7 +905,60 @@ describe('PUT /admin/settings/email_settings', () => {
     const res = mockRes();
     await handler(req, res, vi.fn());
     const savedSettings = mockSetEmailSettings.mock.calls[0][0];
-    expect(savedSettings.smtpPassword).toBeUndefined();
+    expect(savedSettings.smtpPassword).toBe('');
+  });
+
+  it('an empty body resets every stored value, the password included', async () => {
+    mockGetEmailSettings.mockResolvedValue({ smtpHost: 'mail.test', smtpPassword: 'stored' });
+    mockSetEmailSettings.mockResolvedValue(undefined);
+    const res = mockRes();
+    await handler(mockReq({ body: {} }), res, vi.fn());
+    expect(mockSetEmailSettings).toHaveBeenCalledWith({});
+    expect(mockInvalidateTransporter).toHaveBeenCalled();
+    expect(res._json).toEqual({ message: 'Email settings updated' });
+  });
+
+  it.each([
+    ['host', { smtpHost: 'attacker.example', smtpPassword: '••••••••' }],
+    ['user', { smtpUser: 'someone-else', smtpPassword: '••••••••' }],
+    ['host (password left out)', { smtpHost: 'attacker.example' }],
+  ])(
+    'a changed %s without a new password drops the stored one instead of sending it there',
+    async (_what, body) => {
+      mockGetEmailSettings.mockResolvedValue({ smtpPassword: 'stored-secret' });
+      mockSetEmailSettings.mockResolvedValue(undefined);
+      await handler(mockReq({ body }), mockRes(), vi.fn());
+      // '' rather than absent: absent would fall back to SMTP_PASSWORD, for the new server too
+      expect(mockSetEmailSettings.mock.calls[0][0].smtpPassword).toBe('');
+    },
+  );
+
+  it('keeps the password when host and user are those it was entered for (here from .env)', async () => {
+    mockGetEmailSettings.mockResolvedValue({ smtpPassword: 'stored-secret' });
+    mockSetEmailSettings.mockResolvedValue(undefined);
+    await handler(
+      mockReq({
+        body: {
+          smtpHost: 'smtp.example.com',
+          smtpUser: 'user@example.com',
+          smtpPassword: '••••••••',
+        },
+      }),
+      mockRes(),
+      vi.fn(),
+    );
+    expect(mockSetEmailSettings.mock.calls[0][0].smtpPassword).toBe('stored-secret');
+  });
+
+  it('a changed host with a new password stores the new password', async () => {
+    mockGetEmailSettings.mockResolvedValue({ smtpPassword: 'stored-secret' });
+    mockSetEmailSettings.mockResolvedValue(undefined);
+    await handler(
+      mockReq({ body: { smtpHost: 'new.example', smtpPassword: 'new-secret' } }),
+      mockRes(),
+      vi.fn(),
+    );
+    expect(mockSetEmailSettings.mock.calls[0][0].smtpPassword).toBe('new-secret');
   });
 
   it('sets new password when a non-masked value is provided', async () => {
@@ -955,7 +1012,7 @@ describe('PUT /admin/settings/email_settings', () => {
   it('passes error to next() on failure', async () => {
     const err = new Error('DB error');
     mockGetEmailSettings.mockRejectedValue(err);
-    const req = mockReq({ body: {} });
+    const req = mockReq({ body: { smtpHost: 'new.host.com' } });
     const res = mockRes();
     const next = vi.fn();
     await handler(req, res, next);
@@ -1860,6 +1917,7 @@ describe('DELETE /admin/campaign-replays/:sessionId', () => {
   const handler = getHandler('delete', '/admin/campaign-replays/:sessionId');
 
   it('deletes the campaign replay and audit-logs the session id', async () => {
+    mockQuery.mockResolvedValueOnce([{ id: 3 }]);
     mockDeleteCampaignReplay.mockResolvedValue(true);
     const res = mockRes();
     await handler(mockReq({ params: { sessionId: 'abc-123' } }), res, vi.fn());
@@ -1872,6 +1930,28 @@ describe('DELETE /admin/campaign-replays/:sessionId', () => {
       0,
       JSON.stringify({ sessionId: 'abc-123' }),
     ]);
+  });
+
+  it('deletes a row whose file is already gone', async () => {
+    mockQuery.mockResolvedValueOnce([{ id: 3 }]);
+    mockDeleteCampaignReplay.mockResolvedValue(false);
+    const res = mockRes();
+    await handler(mockReq({ params: { sessionId: 'abc-123' } }), res, vi.fn());
+    expect(res._status).toBe(200);
+    expect(mockExecute).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO admin_actions'),
+      expect.anything(),
+    );
+  });
+
+  it('answers 404 for an unknown session and logs nothing', async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    mockDeleteCampaignReplay.mockResolvedValue(false);
+    const res = mockRes();
+    await handler(mockReq({ params: { sessionId: 'nope' } }), res, vi.fn());
+    expect(res._status).toBe(404);
+    expect(res._json).toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockExecute).not.toHaveBeenCalled();
   });
 });
 

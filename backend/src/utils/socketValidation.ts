@@ -79,6 +79,78 @@ export const adminCloseRoomSchema = z.object({
   roomCode: z.string().min(1).max(20),
 });
 
+// MatchConfig validation for room:create socket events
+const VALID_GAME_MODES = [
+  'ffa',
+  'teams',
+  'battle_royale',
+  'sudden_death',
+  'deathmatch',
+  'king_of_the_hill',
+] as const;
+const VALID_POWERUP_TYPES = [
+  'bomb_up',
+  'fire_up',
+  'speed_up',
+  'shield',
+  'kick',
+  'pierce_bomb',
+  'remote_bomb',
+  'line_bomb',
+  'bomb_throw',
+] as const;
+
+// Odd, as validateCustomMap() in shared mapValidation requires: the generator's pillar grid and
+// border walls assume an odd size. (audit K11)
+const mapDimensionSchema = z
+  .number()
+  .int()
+  .min(9)
+  .max(51)
+  .refine((n) => n % 2 === 1, 'Map dimensions must be odd');
+
+const matchConfigSchema = z.object({
+  gameMode: z.enum(VALID_GAME_MODES),
+  maxPlayers: z.number().int().min(2).max(8),
+  mapWidth: mapDimensionSchema,
+  mapHeight: mapDimensionSchema,
+  mapSeed: z.number().int().optional(),
+  roundTime: z.number().int().min(30).max(600),
+  teams: z.number().int().min(2).max(2).optional(),
+  wallDensity: z.number().min(0).max(1).optional(),
+  enabledPowerUps: z.array(z.enum(VALID_POWERUP_TYPES)).optional(),
+  powerUpDropRate: z.number().min(0).max(1).optional(),
+  botCount: z.number().int().min(0).max(7).optional(),
+  botDifficulty: z.enum(['easy', 'normal', 'hard']).optional(),
+  botTeams: z.array(z.union([z.number().int().min(0).max(1), z.null()])).optional(),
+  friendlyFire: z.boolean().optional(),
+  hazardTiles: z.boolean().optional(),
+  selectedHazardTiles: z.array(z.string()).optional(),
+  enableMapEvents: z.boolean().optional(),
+  selectedMapEvents: z.array(z.string()).optional(),
+  reinforcedWalls: z.boolean().optional(),
+  puzzleTiles: z.boolean().optional(),
+  selectedPuzzleTiles: z.array(z.string()).optional(),
+  enableSpectatorActions: z.boolean().optional(),
+  recordGame: z.boolean().optional(),
+  botAiId: z.string().optional(),
+  customMapId: z.number().int().positive().optional(),
+});
+
+export const createRoomRequestSchema = z.object({
+  // Trimmed, inner whitespace collapsed, control and format (e.g. bidi) characters removed.
+  name: z
+    .string()
+    .transform((n) =>
+      n
+        .replace(/[\p{Cc}\p{Cf}]/gu, '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
+    .pipe(z.string().min(1).max(50)),
+  config: matchConfigSchema,
+});
+
 /**
  * Shape of a lobby room code: `generateRoomCode()` in services/lobby.ts takes the first six hex
  * characters of a UUID and upper-cases them. `admin:spectate` used to `socket.join()` whatever it
@@ -89,6 +161,16 @@ export const ROOM_CODE_REGEX = /^[A-Z0-9]{6}$/;
 export const adminSpectateSchema = z.object({
   roomCode: z.string().regex(ROOM_CODE_REGEX),
 });
+
+/**
+ * An ack a handler can always call. Socket.io hands a handler an ack only when the client asked
+ * for one; otherwise the parameter is undefined (or, with fewer args than declared, whatever value
+ * the client sent there), and calling it threw an uncaught TypeError — before the rate limiter
+ * ran. Every handler that takes a callback reassigns it through this first. (audit K1)
+ */
+export function ackOf<T>(cb: ((res: T) => void) | undefined): (res: T) => void {
+  return typeof cb === 'function' ? cb : () => {};
+}
 
 /**
  * Validate socket event data against a Zod schema.
@@ -102,9 +184,7 @@ export function validateSocket<T>(
 ): T | null {
   const result = schema.safeParse(data);
   if (!result.success) {
-    if (callback) {
-      callback({ success: false, error: 'Invalid input' });
-    }
+    ackOf(callback)({ success: false, error: 'Invalid input' });
     return null;
   }
   return result.data;

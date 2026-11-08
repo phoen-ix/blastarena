@@ -18,6 +18,8 @@ const mockVerifyCredentials = vi.hoisted(() => vi.fn<AnyFn>());
 const mockGenerateLocalCoopToken = vi.hoisted(() => vi.fn<AnyFn>());
 const mockGenerateLocalCoopTotpToken = vi.hoisted(() => vi.fn<AnyFn>());
 const mockVerifyLocalCoopTotpToken = vi.hoisted(() => vi.fn<AnyFn>());
+const mockCompleteTotpLogin = vi.hoisted(() => vi.fn<AnyFn>());
+const mockRefreshTokenLifetimeMs = vi.hoisted(() => vi.fn<AnyFn>());
 
 vi.mock('../../../backend/src/services/auth', () => ({
   register: mockRegister,
@@ -31,6 +33,8 @@ vi.mock('../../../backend/src/services/auth', () => ({
   generateLocalCoopToken: mockGenerateLocalCoopToken,
   generateLocalCoopTotpToken: mockGenerateLocalCoopTotpToken,
   verifyLocalCoopTotpToken: mockVerifyLocalCoopTotpToken,
+  completeTotpLogin: mockCompleteTotpLogin,
+  refreshTokenLifetimeMs: mockRefreshTokenLifetimeMs,
 }));
 
 const mockVerifyCode = vi.hoisted(() => vi.fn<AnyFn>());
@@ -94,6 +98,8 @@ vi.mock('../../../backend/src/utils/logger', () => ({
 
 import authRouter from '../../../backend/src/routes/auth';
 import { verifyCsrfToken } from '../../../backend/src/middleware/csrf';
+import { AppError } from '../../../backend/src/middleware/errorHandler';
+import type { ZodType } from 'zod';
 import { Request, Response, NextFunction } from 'express';
 
 // ---------------------------------------------------------------------------
@@ -185,9 +191,19 @@ function mockReq(overrides: Record<string, unknown> = {}): any {
 // Tests
 // ---------------------------------------------------------------------------
 
+// validate() runs once per route at import; keep its schemas before clearAllMocks drops the calls.
+const validators = mockValidate.mock.calls.map((call, i) => ({
+  schema: call[0] as ZodType,
+  middleware: mockValidate.mock.results[i].value as unknown,
+}));
+
+/** A refresh lifetime other than the old hard-coded 7 days. */
+const REFRESH_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetConfig.mockReturnValue({ APP_URL: 'http://localhost:8080' });
+  mockRefreshTokenLifetimeMs.mockReturnValue(REFRESH_LIFETIME_MS);
 });
 
 // ============================== POST /auth/register ========================
@@ -337,8 +353,36 @@ describe('POST /auth/login', () => {
     expect(opts.httpOnly).toBe(true);
     expect(opts.sameSite).toBe('strict');
     expect(opts.path).toBe('/api/auth');
-    expect(opts.maxAge).toBe(7 * 24 * 60 * 60 * 1000);
   });
+
+  // The cookie used a hard-coded 7 days while the DB row followed JWT_REFRESH_EXPIRES_IN.
+  it.each([
+    ['post', '/auth/login', () => mockLogin.mockResolvedValue({ auth: {}, refreshToken: 'rt' })],
+    [
+      'post',
+      '/auth/verify-totp',
+      () => mockCompleteTotpLogin.mockResolvedValue({ auth: {}, refreshToken: 'rt' }),
+    ],
+    [
+      'post',
+      '/auth/refresh',
+      () => mockRefreshAccessToken.mockResolvedValue({ auth: {}, refreshToken: 'rt' }),
+    ],
+  ] as const)(
+    '%s %s: the cookie lives as long as the refresh token',
+    async (method, path, arrange) => {
+      arrange();
+      const req = mockReq({
+        body: { username: 'u', password: 'p', totpToken: 't', code: '123456' },
+        cookies: { refreshToken: 'old' },
+      });
+      const res = mockRes();
+      await getHandler(method, path)(req, res, vi.fn());
+
+      expect(res._cookie).toMatchObject({ name: 'refreshToken', value: 'rt' });
+      expect(res._cookie.opts.maxAge).toBe(REFRESH_LIFETIME_MS);
+    },
+  );
 
   it('sets secure flag based on APP_URL (http = false, https = true)', async () => {
     // HTTP
@@ -474,7 +518,24 @@ describe('GET /auth/verify-email/:token', () => {
     expect(mockVerifyEmail).toHaveBeenCalledWith('valid_token');
   });
 
-  it('passes error to next() on failure', async () => {
+  it('redirects with emailVerified=false when the token is expired or used', async () => {
+    mockVerifyEmail.mockRejectedValue(
+      new AppError('Invalid or expired verification token', 400, 'INVALID_TOKEN'),
+    );
+
+    const req = mockReq({ params: { token: 'used' } });
+    const res = mockRes();
+    const next = vi.fn();
+    await handler(req, res, next);
+
+    expect(res._redirect).toEqual({
+      status: 302,
+      url: 'http://localhost:8080?emailVerified=false',
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('passes an unexpected error to next()', async () => {
     const err = new Error('invalid token');
     mockVerifyEmail.mockRejectedValue(err);
 
@@ -484,6 +545,22 @@ describe('GET /auth/verify-email/:token', () => {
     await handler(req, res, next);
 
     expect(next).toHaveBeenCalledWith(err);
+  });
+});
+
+// ============================== POST /auth/resend-verification =============
+
+describe('POST /auth/resend-verification', () => {
+  // `const { email } = req.body` threw a TypeError on a body-less POST under Express 5.
+  it('validates the body with a schema before the handler', () => {
+    const stack = getRouteStack('post', '/auth/resend-verification');
+    expect(stack.length).toBe(4); // rateLimiter, authMiddleware, validate, handler
+    const schema = validators.find((v) => v.middleware === stack[2].handle)?.schema;
+    expect(schema).toBeDefined();
+    expect(schema!.safeParse({ email: 'player@example.org' }).success).toBe(true);
+    expect(schema!.safeParse(undefined).success).toBe(false);
+    expect(schema!.safeParse({}).success).toBe(false);
+    expect(schema!.safeParse({ email: 42 }).success).toBe(false);
   });
 });
 

@@ -122,17 +122,18 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // Check for ?emailVerified=true from verification redirect
+    // The verification and email-change links redirect here with ?emailVerified= / ?emailChanged=
+    // (true on success, false for an invalid, expired or already-used link).
     const params = new URLSearchParams(window.location.search);
-    if (params.get('emailVerified') === 'true') {
+    const verified = params.get('emailVerified');
+    const changed = params.get('emailChanged');
+    if (verified !== null || changed !== null) {
       window.history.replaceState({}, '', window.location.pathname);
-      this.notifications.success(t('auth:verification.verified'));
     }
-    // Same for the email-change confirmation link, which now redirects here too (audit B15)
-    if (params.get('emailChanged') === 'true') {
-      window.history.replaceState({}, '', window.location.pathname);
-      this.notifications.success(t('auth:verification.emailChanged'));
-    }
+    if (verified === 'true') this.notifications.success(t('auth:verification.verified'));
+    if (verified === 'false') this.notifications.error(t('auth:verification.verifyFailed'));
+    if (changed === 'true') this.notifications.success(t('auth:verification.emailChanged'));
+    if (changed === 'false') this.notifications.error(t('auth:verification.emailChangeFailed'));
 
     // Stale-flag hygiene: the in-game auth overlay flag must not survive into a fresh menu
     // (e.g. if the guest was AFK-kicked with the form open and we land back here).

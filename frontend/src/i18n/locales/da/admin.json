@@ -62,12 +62,12 @@
       "emailLabel": "Email *",
       "emailPlaceholder": "bruger@eksempel.dk",
       "passwordLabel": "Adgangskode *",
-      "passwordPlaceholder": "Min. 6 tegn",
+      "passwordPlaceholder": "Min. {{min}} tegn",
       "roleLabel": "Rolle",
       "cancel": "Annuller",
       "submit": "Opret",
       "errorRequired": "Brugernavn, email og adgangskode er påkrævet",
-      "errorPasswordLength": "Adgangskode skal være mindst 6 tegn",
+      "errorPasswordLength": "Adgangskode skal være mindst {{min}} tegn",
       "successMessage": "Bruger \"{{username}}\" oprettet"
     },
     "resetPasswordModal": {
@@ -75,13 +75,13 @@
       "title": "Nulstil adgangskode",
       "description": "Indstil en ny adgangskode for <strong style=\"color:var(--text);\">{{username}}</strong>. De vil blive logget ud og skal logge ind med den nye adgangskode.",
       "newPasswordLabel": "Ny adgangskode",
-      "newPasswordPlaceholder": "Min. 6 tegn",
+      "newPasswordPlaceholder": "Min. {{min}} tegn",
       "confirmPasswordLabel": "Bekræft adgangskode",
       "confirmPasswordPlaceholder": "Gentag adgangskode",
       "cancel": "Annuller",
       "submit": "Nulstil adgangskode",
       "errorRequired": "Adgangskode er påkrævet",
-      "errorPasswordLength": "Adgangskode skal være mindst 6 tegn",
+      "errorPasswordLength": "Adgangskode skal være mindst {{min}} tegn",
       "errorPasswordMismatch": "Adgangskoderne matcher ikke",
       "successMessage": "Adgangskode nulstillet for \"{{username}}\""
     },
@@ -269,7 +269,8 @@
     "prevPage": "Forrige",
     "nextPage": "Næste",
     "pageInfo": "Side {{page}} af {{totalPages}} ({{total}} handlinger)",
-    "failedToLoad": "Kunne ikke indlæse admin-handlinger"
+    "failedToLoad": "Kunne ikke indlæse admin-handlinger",
+    "deletedAdmin": "(slettet konto)"
   },
   "ai": {
     "botManagement": "Bot AI-administration",
@@ -699,7 +700,9 @@
       "save": "Gem indstillinger for åben verden",
       "saved": "Indstillinger for åben verden gemt",
       "saveFailed": "Kunne ikke gemme indstillinger for åben verden"
-    }
+    },
+    "settingsLoadFailed": "Disse indstillinger kunne ikke indlæses og er låst, så en gemning ikke overskriver dem: {{settings}}. Genindlæs fanen for at prøve igen.",
+    "settingLoadFailedHint": "Kunne ikke indlæses. Genindlæs fanen for at redigere denne indstilling."
   },
   "seasons": {
     "sectionTitle": "Sæsonadministration",
@@ -941,6 +944,14 @@
       "cancel": "Annuller",
       "import": "Importér",
       "importSuccess": "Bane importeret succesfuldt"
+    },
+    "enemyAiConflict": {
+      "title": "Medfølgende fjende-AI",
+      "hint": "Denne fjendetype har sin egen AI \"{{name}}\" med. Vælg, hvordan den skal importeres.",
+      "createNew": "Opret en ny fjende-AI \"{{name}}\" fra den medfølgende kode",
+      "useExisting": "Brug den eksisterende AI \"{{name}}\" (ID {{id}})",
+      "skip": "Importér uden AI (bruger sit bevægelsesmønster)",
+      "unresolved": "Serveren mangler stadig en beslutning om den medfølgende AI. Intet blev importeret."
     },
     "deleteModal": {
       "entityLabels": {

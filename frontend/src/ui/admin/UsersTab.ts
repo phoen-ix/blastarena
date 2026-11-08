@@ -1,6 +1,6 @@
 import { ApiClient } from '../../network/ApiClient';
 import { NotificationUI } from '../NotificationUI';
-import { UserRole, getErrorMessage } from '@blast-arena/shared';
+import { UserRole, getErrorMessage, PASSWORD_MIN_LENGTH } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { createModal, confirmModal } from '../../utils/modal';
 import { t } from '../../i18n';
@@ -307,7 +307,7 @@ export class UsersTab {
         </div>
         <div>
           <label for="cu-password" style="color:var(--text-dim);font-size:13px;">${t('admin:users.createModal.passwordLabel')}</label>
-          <input type="password" class="admin-input" id="cu-password" placeholder="${escapeAttr(t('admin:users.createModal.passwordPlaceholder'))}" style="margin-top:4px;">
+          <input type="password" class="admin-input" id="cu-password" placeholder="${escapeAttr(t('admin:users.createModal.passwordPlaceholder', { min: PASSWORD_MIN_LENGTH }))}" style="margin-top:4px;">
         </div>
         <div>
           <label for="cu-role" style="color:var(--text-dim);font-size:13px;">${t('admin:users.createModal.roleLabel')}</label>
@@ -339,8 +339,10 @@ export class UsersTab {
         errorEl.style.display = 'block';
         return;
       }
-      if (password.length < 6) {
-        errorEl.textContent = t('admin:users.createModal.errorPasswordLength');
+      if (password.length < PASSWORD_MIN_LENGTH) {
+        errorEl.textContent = t('admin:users.createModal.errorPasswordLength', {
+          min: PASSWORD_MIN_LENGTH,
+        });
         errorEl.style.display = 'block';
         return;
       }
@@ -375,7 +377,7 @@ export class UsersTab {
       <p style="color:var(--text-dim);font-size:14px;">${t('admin:users.resetPasswordModal.description', { username: escapeHtml(username) })}</p>
       <div style="margin-top:12px;">
         <label for="rp-password" style="color:var(--text-dim);font-size:13px;">${t('admin:users.resetPasswordModal.newPasswordLabel')}</label>
-        <input type="password" class="admin-input" id="rp-password" placeholder="${escapeAttr(t('admin:users.resetPasswordModal.newPasswordPlaceholder'))}" style="margin-top:4px;">
+        <input type="password" class="admin-input" id="rp-password" placeholder="${escapeAttr(t('admin:users.resetPasswordModal.newPasswordPlaceholder', { min: PASSWORD_MIN_LENGTH }))}" style="margin-top:4px;">
       </div>
       <div style="margin-top:8px;">
         <label for="rp-confirm" style="color:var(--text-dim);font-size:13px;">${t('admin:users.resetPasswordModal.confirmPasswordLabel')}</label>
@@ -400,8 +402,10 @@ export class UsersTab {
         errorEl.style.display = 'block';
         return;
       }
-      if (password.length < 6) {
-        errorEl.textContent = t('admin:users.resetPasswordModal.errorPasswordLength');
+      if (password.length < PASSWORD_MIN_LENGTH) {
+        errorEl.textContent = t('admin:users.resetPasswordModal.errorPasswordLength', {
+          min: PASSWORD_MIN_LENGTH,
+        });
         errorEl.style.display = 'block';
         return;
       }
@@ -433,6 +437,16 @@ export class UsersTab {
 
     let selectedType: 'unverified' | 'inactive' | 'deactivated' = 'unverified';
     let previewCount: number | null = null;
+    // The days value the shown preview was computed for: execute sends exactly this one, and any
+    // edit of the days input drops the preview (it re-read the input at execute time, so a
+    // changed value could delete far more accounts than the preview had counted).
+    let previewedDays: number | undefined;
+    let daysValue = '';
+
+    const resetPreview = () => {
+      previewCount = null;
+      previewedDays = undefined;
+    };
 
     const renderModal = () => {
       const needsDays = selectedType !== 'deactivated';
@@ -451,7 +465,7 @@ export class UsersTab {
         </div>
         <div style="margin-bottom:12px;${needsDays ? '' : 'display:none;'}">
           <label for="cleanup-days" style="color:var(--text-dim);font-size:13px;">${t('admin:users.cleanup.daysLabel')}</label>
-          <input type="number" class="admin-input" id="cleanup-days" min="1" placeholder="${escapeAttr(t('admin:users.cleanup.daysPlaceholder'))}" style="margin-top:4px;width:120px;">
+          <input type="number" class="admin-input" id="cleanup-days" min="1" value="${escapeAttr(daysValue)}" placeholder="${escapeAttr(t('admin:users.cleanup.daysPlaceholder'))}" style="margin-top:4px;width:120px;">
         </div>
         <div style="margin-bottom:12px;">
           <button class="btn btn-secondary btn-sm" id="cleanup-preview">${t('admin:users.cleanup.previewButton')}</button>
@@ -489,9 +503,19 @@ export class UsersTab {
       overlay.querySelectorAll('[data-cleanup-type]').forEach((chip) => {
         chip.addEventListener('click', () => {
           selectedType = (chip as HTMLElement).dataset.cleanupType as typeof selectedType;
-          previewCount = null;
+          resetPreview();
           renderModal();
         });
+      });
+
+      // A new days value invalidates the preview: hide the confirm step until it is re-run.
+      const daysField = overlay.querySelector('#cleanup-days') as HTMLInputElement | null;
+      daysField?.addEventListener('input', () => {
+        daysValue = daysField.value;
+        if (previewCount === null) return;
+        resetPreview();
+        renderModal();
+        overlay.querySelector<HTMLInputElement>('#cleanup-days')?.focus();
       });
 
       // Preview
@@ -508,6 +532,9 @@ export class UsersTab {
         }
         errorEl.style.display = 'none';
 
+        if (daysInput) daysValue = daysInput.value;
+        const requestedType = selectedType;
+        const requestedDays = daysValue;
         try {
           const body: { type: typeof selectedType; days?: number } = { type: selectedType };
           if (needsDaysNow) body.days = days;
@@ -515,11 +542,11 @@ export class UsersTab {
             '/admin/users/cleanup/preview',
             body,
           );
+          // The form changed while the preview was loading: that count is for other inputs.
+          if (selectedType !== requestedType || daysValue !== requestedDays) return;
           previewCount = result.count;
+          previewedDays = body.days;
           renderModal();
-          // Restore days value after re-render
-          const newDaysInput = overlay.querySelector('#cleanup-days') as HTMLInputElement | null;
-          if (newDaysInput && days) newDaysInput.value = String(days);
         } catch (err: unknown) {
           errorEl.textContent = getErrorMessage(err);
           errorEl.style.display = 'block';
@@ -540,12 +567,11 @@ export class UsersTab {
 
         executeBtn.addEventListener('click', async () => {
           const errorEl = overlay.querySelector('#cleanup-error') as HTMLElement;
-          const daysInput = overlay.querySelector('#cleanup-days') as HTMLInputElement | null;
-          const days = daysInput ? parseInt(daysInput.value) : undefined;
+          if (selectedType !== 'deactivated' && previewedDays === undefined) return;
 
           try {
             const body: { type: typeof selectedType; days?: number } = { type: selectedType };
-            if (selectedType !== 'deactivated') body.days = days;
+            if (selectedType !== 'deactivated') body.days = previewedDays;
             const result = await ApiClient.post<{ deleted: number }>(
               '/admin/users/cleanup/execute',
               body,

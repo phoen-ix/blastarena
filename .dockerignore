@@ -1,5 +1,13 @@
-node_modules
-dist
+# `**/`: a bare `node_modules` or `dist` only matches at the context root, so the workspaces'
+# host node_modules and build output were sent as context, and the Dockerfiles' `COPY shared/`,
+# `backend/`, `frontend/` (after `npm ci`, before the build) laid them over the image's install.
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+# Generated from the locale sources by copy-locales.cjs, which `npm run build` runs as prebuild
+# inside the images.
+frontend/public/locales
+backend/locales
 data
 # The dev stack's data dir, the counterpart to `data/` above. Without this the whole dev MariaDB
 # and Redis state is sent as build context, and once the dev stack has run the build fails
@@ -10,7 +18,7 @@ data-dev
 .env
 *.md
 tests
-coverage
+**/coverage
 .nyc_output
 # The docs tour and its screenshots are not part of any image (docs/*.md are, for the in-game Help).
 e2e

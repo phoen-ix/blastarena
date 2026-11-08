@@ -62,12 +62,12 @@
       "emailLabel": "Email *",
       "emailPlaceholder": "usuario@exemplo.com",
       "passwordLabel": "Senha *",
-      "passwordPlaceholder": "Mínimo 6 caracteres",
+      "passwordPlaceholder": "Mínimo {{min}} caracteres",
       "roleLabel": "Função",
       "cancel": "Cancelar",
       "submit": "Criar",
       "errorRequired": "Nome de usuário, email e senha são obrigatórios",
-      "errorPasswordLength": "A senha deve ter pelo menos 6 caracteres",
+      "errorPasswordLength": "A senha deve ter pelo menos {{min}} caracteres",
       "successMessage": "Usuário \"{{username}}\" criado"
     },
     "resetPasswordModal": {
@@ -75,13 +75,13 @@
       "title": "Redefinir Senha",
       "description": "Definir nova senha para <strong style=\"color:var(--text);\">{{username}}</strong>. O usuário será desconectado e precisará entrar com a nova senha.",
       "newPasswordLabel": "Nova Senha",
-      "newPasswordPlaceholder": "Mínimo 6 caracteres",
+      "newPasswordPlaceholder": "Mínimo {{min}} caracteres",
       "confirmPasswordLabel": "Confirmar Senha",
       "confirmPasswordPlaceholder": "Digite a senha novamente",
       "cancel": "Cancelar",
       "submit": "Redefinir Senha",
       "errorRequired": "A senha é obrigatória",
-      "errorPasswordLength": "A senha deve ter pelo menos 6 caracteres",
+      "errorPasswordLength": "A senha deve ter pelo menos {{min}} caracteres",
       "errorPasswordMismatch": "As senhas não coincidem",
       "successMessage": "Senha redefinida para \"{{username}}\""
     },
@@ -269,7 +269,8 @@
     "prevPage": "Anterior",
     "nextPage": "Próximo",
     "pageInfo": "Página {{page}} de {{totalPages}} ({{total}} ações)",
-    "failedToLoad": "Falha ao carregar ações de admin"
+    "failedToLoad": "Falha ao carregar ações de admin",
+    "deletedAdmin": "(conta eliminada)"
   },
   "ai": {
     "botManagement": "Gerenciamento de IA de Bots",
@@ -699,7 +700,9 @@
       "save": "Salvar configurações do mundo aberto",
       "saved": "Configurações do mundo aberto salvas",
       "saveFailed": "Falha ao salvar as configurações do mundo aberto"
-    }
+    },
+    "settingsLoadFailed": "Não foi possível carregar estas definições, que ficam bloqueadas para que guardar não as substitua: {{settings}}. Recarrega o separador para tentar de novo.",
+    "settingLoadFailedHint": "Não foi possível carregar. Recarrega o separador para editar esta definição."
   },
   "seasons": {
     "sectionTitle": "Gerenciamento de Temporadas",
@@ -941,6 +944,14 @@
       "cancel": "Cancelar",
       "import": "Importar",
       "importSuccess": "Fase importada com sucesso"
+    },
+    "enemyAiConflict": {
+      "title": "IA de inimigo incluída",
+      "hint": "Este tipo de inimigo traz a sua própria IA \"{{name}}\". Escolhe como a importar.",
+      "createNew": "Criar uma nova IA de inimigo \"{{name}}\" a partir do código incluído",
+      "useExisting": "Usar a IA existente \"{{name}}\" (ID {{id}})",
+      "skip": "Importar sem IA (usa o seu padrão de movimento)",
+      "unresolved": "O servidor ainda precisa de uma decisão sobre a IA incluída. Nada foi importado."
     },
     "deleteModal": {
       "entityLabels": {

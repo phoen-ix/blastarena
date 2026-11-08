@@ -5142,6 +5142,7 @@ paths:
     get:
       tags: [Settings]
       summary: Get imprint settings
+      description: Public. `text` is empty while the imprint is disabled.
       security: []
       operationId: getImprint
       responses:
@@ -5173,6 +5174,7 @@ paths:
                 text:
                   type: string
                   maxLength: 10000
+                  description: Omit to keep the stored text (the enable toggle sends only `enabled`).
       responses:
         '200':
           description: Imprint settings updated
@@ -5182,6 +5184,28 @@ paths:
                 $ref: '#/components/schemas/Message'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/settings/imprint/raw:
+    get:
+      tags: [Settings]
+      summary: Get the stored imprint text, also while disabled (admin only)
+      operationId: getImprintRaw
+      responses:
+        '200':
+          description: Imprint settings with the stored text
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  text:
+                    type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

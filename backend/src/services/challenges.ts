@@ -18,7 +18,8 @@ interface ChallengeRow extends RowDataPacket {
   start_date: Date;
   end_date: Date;
   is_active: boolean;
-  created_by: number;
+  /** Null once the creator's account was deleted (migration 047). */
+  created_by: number | null;
   created_at: Date;
 }
 

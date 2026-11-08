@@ -17,6 +17,15 @@ import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { createModal } from '../../utils/modal';
 import { t } from '../../i18n';
 
+/**
+ * A stored config value (typed unknown: it is JSON from the DB or an import) as an escaped
+ * attribute value; anything but a string or a finite number falls back.
+ */
+function cfgAttr(value: unknown, fallback: string | number): string {
+  const ok = typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value));
+  return escapeAttr(String(ok ? value : fallback));
+}
+
 const CONDITION_TYPES: AchievementConditionType[] = [
   'cumulative',
   'per_game',
@@ -294,20 +303,20 @@ export class AchievementsTab {
         <div class="form-stack">
           <div>
             <label class="field-label" for="am-name">${t('admin:achievements.nameLabel')}</label>
-            <input type="text" class="admin-input mt-label" id="am-name" value="${escapeAttr(existing?.name || '')}" placeholder="${t('admin:achievements.namePlaceholder')}">
+            <input type="text" class="admin-input mt-label" id="am-name" value="${escapeAttr(existing?.name || '')}" placeholder="${escapeAttr(t('admin:achievements.namePlaceholder'))}">
           </div>
           <div>
             <label class="field-label" for="am-desc">${t('admin:achievements.descriptionLabel')}</label>
-            <input type="text" class="admin-input mt-label" id="am-desc" value="${escapeAttr(existing?.description || '')}" placeholder="${t('admin:achievements.descriptionPlaceholder')}">
+            <input type="text" class="admin-input mt-label" id="am-desc" value="${escapeAttr(existing?.description || '')}" placeholder="${escapeAttr(t('admin:achievements.descriptionPlaceholder'))}">
           </div>
           <div class="form-row">
             <div>
               <label class="field-label" for="am-icon">${t('admin:achievements.iconLabel')}</label>
-              <input type="text" class="admin-input mt-label" id="am-icon" value="${escapeAttr(existing?.icon || '')}" placeholder="${t('admin:achievements.iconPlaceholder')}">
+              <input type="text" class="admin-input mt-label" id="am-icon" value="${escapeAttr(existing?.icon || '')}" placeholder="${escapeAttr(t('admin:achievements.iconPlaceholder'))}">
             </div>
             <div>
               <label class="field-label" for="am-category">${t('admin:achievements.categoryLabel')}</label>
-              <input type="text" class="admin-input mt-label" id="am-category" value="${escapeAttr(existing?.category || '')}" placeholder="${t('admin:achievements.categoryPlaceholder')}">
+              <input type="text" class="admin-input mt-label" id="am-category" value="${escapeAttr(existing?.category || '')}" placeholder="${escapeAttr(t('admin:achievements.categoryPlaceholder'))}">
             </div>
           </div>
           <div>
@@ -328,12 +337,12 @@ export class AchievementsTab {
             </div>
             <div id="am-reward-id-wrap">
               <label class="field-label" for="am-rewardId">${t('admin:achievements.rewardCosmeticIdLabel')}</label>
-              <input type="number" class="admin-input mt-label" id="am-rewardId" value="${existing?.rewardId ?? ''}" placeholder="${t('admin:achievements.rewardCosmeticIdPlaceholder')}" min="0">
+              <input type="number" class="admin-input mt-label" id="am-rewardId" value="${cfgAttr(existing?.rewardId, '')}" placeholder="${escapeAttr(t('admin:achievements.rewardCosmeticIdPlaceholder'))}" min="0">
             </div>
           </div>
           <div>
             <label class="field-label" for="am-sortOrder">${t('admin:achievements.sortOrderLabel')}</label>
-            <input type="number" class="admin-input mt-label" id="am-sortOrder" value="${existing?.sortOrder ?? 0}" min="0">
+            <input type="number" class="admin-input mt-label" id="am-sortOrder" value="${cfgAttr(existing?.sortOrder, 0)}" min="0">
           </div>
         </div>
         <div id="am-error" class="modal-error"></div>
@@ -437,7 +446,7 @@ export class AchievementsTab {
           </div>
           <div>
             <label class="field-label" for="am-cond-threshold">${t('admin:achievements.conditionFields.threshold')}</label>
-            <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfg.threshold ?? 1}" min="1">
+            <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfgAttr(cfg.threshold, 1)}" min="1">
           </div>
         </div>
       `,
@@ -461,7 +470,7 @@ export class AchievementsTab {
           </div>
           <div class="form-row-half">
             <label class="field-label" for="am-cond-threshold">${t('admin:achievements.conditionFields.threshold')}</label>
-            <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfg.threshold ?? 1}" min="0">
+            <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfgAttr(cfg.threshold, 1)}" min="0">
           </div>
         </div>
       `,
@@ -485,7 +494,7 @@ export class AchievementsTab {
           </div>
           <div class="form-row-half">
             <label class="field-label" for="am-cond-threshold">${t('admin:achievements.conditionFields.threshold')}</label>
-            <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfg.threshold ?? 1}" min="1">
+            <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfgAttr(cfg.threshold, 1)}" min="1">
           </div>
         </div>
       `,
@@ -503,7 +512,7 @@ export class AchievementsTab {
           </div>
           <div>
             <label class="field-label" for="am-cond-threshold">${t('admin:achievements.conditionFields.threshold')}</label>
-            <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfg.threshold ?? 1}" min="1">
+            <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfgAttr(cfg.threshold, 1)}" min="1">
           </div>
         </div>
       `,
@@ -677,7 +686,7 @@ export class AchievementsTab {
         <div class="form-stack">
           <div>
             <label class="field-label" for="cm-name">${t('admin:achievements.cosmeticNameLabel')}</label>
-            <input type="text" class="admin-input mt-label" id="cm-name" value="${escapeAttr(existing?.name || '')}" placeholder="${t('admin:achievements.cosmeticNamePlaceholder')}">
+            <input type="text" class="admin-input mt-label" id="cm-name" value="${escapeAttr(existing?.name || '')}" placeholder="${escapeAttr(t('admin:achievements.cosmeticNamePlaceholder'))}">
           </div>
           <div class="form-row">
             <div>
@@ -703,12 +712,12 @@ export class AchievementsTab {
             </div>
             <div id="cm-unlock-req-wrap">
               <label class="field-label" for="cm-unlockReq">${t('admin:achievements.unlockRequirementLabel')}</label>
-              <textarea class="admin-input admin-textarea-mono" id="cm-unlockReq" rows="2" placeholder='{"threshold": 50}'>${existing?.unlockRequirement ? JSON.stringify(existing.unlockRequirement, null, 2) : ''}</textarea>
+              <textarea class="admin-input admin-textarea-mono" id="cm-unlockReq" rows="2" placeholder='{"threshold": 50}'>${existing?.unlockRequirement ? escapeHtml(JSON.stringify(existing.unlockRequirement, null, 2)) : ''}</textarea>
             </div>
           </div>
           <div>
             <label class="field-label" for="cm-sortOrder">${t('admin:achievements.sortOrderLabel')}</label>
-            <input type="number" class="admin-input mt-label" id="cm-sortOrder" value="${existing?.sortOrder ?? 0}" min="0">
+            <input type="number" class="admin-input mt-label" id="cm-sortOrder" value="${cfgAttr(existing?.sortOrder, 0)}" min="0">
           </div>
         </div>
         <div id="cm-error" class="modal-error"></div>
@@ -840,7 +849,7 @@ export class AchievementsTab {
         `
         <div>
           <label class="field-label" for="cm-cfg-style">${t('admin:achievements.configFields.eyeStyle')}</label>
-          <input type="text" class="admin-input mt-label" id="cm-cfg-style" value="${escapeAttr(style)}" placeholder="${t('admin:achievements.configFields.eyeStylePlaceholder')}">
+          <input type="text" class="admin-input mt-label" id="cm-cfg-style" value="${escapeAttr(style)}" placeholder="${escapeAttr(t('admin:achievements.configFields.eyeStylePlaceholder'))}">
         </div>
       `,
       );
@@ -860,7 +869,7 @@ export class AchievementsTab {
         </div>
         <div>
           <label class="field-label" for="cm-cfg-frequency">${t('admin:achievements.configFields.frequency')}</label>
-          <input type="number" class="admin-input mt-label" id="cm-cfg-frequency" value="${cfg.frequency ?? 100}" min="1" max="1000">
+          <input type="number" class="admin-input mt-label" id="cm-cfg-frequency" value="${cfgAttr(cfg.frequency, 100)}" min="1" max="1000">
         </div>
       `,
       );
@@ -880,7 +889,7 @@ export class AchievementsTab {
         </div>
         <div>
           <label class="field-label" for="cm-cfg-label">${t('admin:achievements.configFields.label')}</label>
-          <input type="text" class="admin-input mt-label" id="cm-cfg-label" value="${escapeAttr(String(cfg.label || ''))}" placeholder="${t('admin:achievements.configFields.labelPlaceholder')}">
+          <input type="text" class="admin-input mt-label" id="cm-cfg-label" value="${escapeAttr(String(cfg.label || ''))}" placeholder="${escapeAttr(t('admin:achievements.configFields.labelPlaceholder'))}">
         </div>
       `,
       );
@@ -1212,7 +1221,7 @@ export class AchievementsTab {
         <h2 class="text-danger">${t('admin:achievements.deleteEntity', { entity: escapeHtml(entity) })}</h2>
         <p class="modal-desc" style="font-size:14px;">${t('admin:achievements.deleteConfirmMessage', { name: escapeHtml(name) })}</p>
         <p class="modal-hint">${t('admin:achievements.deleteTypePrompt')}</p>
-        <input type="text" class="admin-input mt-label" id="del-confirm-input" placeholder="${escapeAttr(name)}" aria-label="${t('admin:achievements.deleteConfirmAriaLabel')}">
+        <input type="text" class="admin-input mt-label" id="del-confirm-input" placeholder="${escapeAttr(name)}" aria-label="${escapeAttr(t('admin:achievements.deleteConfirmAriaLabel'))}">
         <div class="modal-actions">
           <button class="btn btn-secondary" id="del-cancel">${t('admin:achievements.cancel')}</button>
           <button class="btn-danger btn-confirm" id="del-confirm" style="opacity:0.5;" disabled>${t('admin:achievements.deleteBtn')}</button>

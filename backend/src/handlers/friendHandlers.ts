@@ -9,7 +9,7 @@ import {
 import * as friendsService from '../services/friends';
 import * as presenceService from '../services/presence';
 import { createSocketRateLimiter } from '../utils/socketRateLimit';
-import { clientError } from '../utils/socketValidation';
+import { ackOf, clientError } from '../utils/socketValidation';
 import { logger } from '../utils/logger';
 
 type TypedServer = Server<
@@ -34,6 +34,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
 
   // List friends + pending
   socket.on('friend:list', async (callback) => {
+    callback = ackOf(callback);
     // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
     // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
     if (!friendActionLimiter.isAllowed(socket.id))
@@ -56,6 +57,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
 
   // Send friend request
   socket.on('friend:request', async (data, callback) => {
+    callback = ackOf(callback);
     // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
     // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
     if (!friendRequestLimiter.isAllowed(socket.id))
@@ -82,6 +84,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
 
   // Accept friend request
   socket.on('friend:accept', async (data, callback) => {
+    callback = ackOf(callback);
     // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
     // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
     if (!friendActionLimiter.isAllowed(socket.id))
@@ -110,6 +113,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
 
   // Decline friend request
   socket.on('friend:decline', async (data, callback) => {
+    callback = ackOf(callback);
     // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
     // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
     if (!friendActionLimiter.isAllowed(socket.id))
@@ -124,6 +128,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
 
   // Cancel outgoing friend request
   socket.on('friend:cancel', async (data, callback) => {
+    callback = ackOf(callback);
     // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
     // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
     if (!friendActionLimiter.isAllowed(socket.id))
@@ -138,6 +143,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
 
   // Remove friend
   socket.on('friend:remove', async (data, callback) => {
+    callback = ackOf(callback);
     // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
     // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
     if (!friendActionLimiter.isAllowed(socket.id))
@@ -156,6 +162,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
 
   // Block user
   socket.on('friend:block', async (data, callback) => {
+    callback = ackOf(callback);
     // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
     // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
     if (!friendActionLimiter.isAllowed(socket.id))
@@ -174,6 +181,7 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
 
   // Unblock user
   socket.on('friend:unblock', async (data, callback) => {
+    callback = ackOf(callback);
     // Ack even when rate limited — the frontend has no ack timeout, so a bare return leaves
     // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
     if (!friendActionLimiter.isAllowed(socket.id))

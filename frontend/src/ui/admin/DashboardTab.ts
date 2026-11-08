@@ -24,6 +24,42 @@ import { availableStyles } from '../../art/registry';
 
 const ALL_POWER_UPS = Object.values(POWERUP_DEFINITIONS);
 
+/** The settings the dashboard loads, each with its label key and the controls that write it. */
+const SETTINGS = {
+  recordings: { label: 'admin:dashboard.matchRecordings', controls: ['#toggle-recordings'] },
+  registration: { label: 'admin:dashboard.userRegistration', controls: ['#toggle-registration'] },
+  partyChat: { label: 'admin:dashboard.partyChat', controls: ['#select-chat-mode'] },
+  lobbyChat: { label: 'admin:dashboard.lobbyChat', controls: ['#select-lobby-chat-mode'] },
+  dm: { label: 'admin:dashboard.directMessages', controls: ['#select-dm-mode'] },
+  emote: { label: 'admin:dashboard.inGameEmotes', controls: ['#select-emote-mode'] },
+  spectatorChat: {
+    label: 'admin:dashboard.spectatorChat',
+    controls: ['#select-spectator-chat-mode'],
+  },
+  xp: {
+    label: 'admin:dashboard.xpMultiplier',
+    controls: ['#input-xp-multiplier', '#btn-save-xp-multiplier'],
+  },
+  theme: { label: 'admin:dashboard.defaultTheme', controls: ['#select-default-theme'] },
+  artStyle: { label: 'admin:dashboard.defaultArtStyle', controls: ['#select-default-art-style'] },
+  gameDefaults: { label: 'admin:dashboard.gameCreationDefaults', controls: ['#gd-save'] },
+  simulationDefaults: { label: 'admin:dashboard.simulationDefaults', controls: ['#sd-save'] },
+  // Without the AI list the bot-AI select is missing, and a defaults save would drop botAiId.
+  activeAIs: { label: 'admin:dashboard.botAi', controls: ['#gd-save', '#sd-save'] },
+  imprint: {
+    label: 'admin:dashboard.displayImprint',
+    controls: ['#toggle-display-imprint', '#btn-save-imprint'],
+  },
+  github: { label: 'admin:dashboard.displayGithubLink', controls: ['#toggle-display-github'] },
+  spectatorActions: {
+    label: 'admin:dashboard.spectatorActionsGlobal',
+    controls: ['#toggle-spectator-actions'],
+  },
+  email: { label: 'admin:dashboard.emailSmtpSettings', controls: ['#email-save'] },
+  openWorld: { label: 'admin:dashboard.openWorld.title', controls: ['#ow-save-btn'] },
+} as const satisfies Record<string, { label: string; controls: readonly string[] }>;
+type SettingKey = keyof typeof SETTINGS;
+
 export class DashboardTab {
   private container: HTMLElement | null = null;
   private notifications: NotificationUI;
@@ -46,6 +82,8 @@ export class DashboardTab {
   private displayImprint: boolean = false;
   private imprintText: string = '';
   private displayGithub: boolean = false;
+  /** Settings whose GET failed on the last load: their controls render disabled. */
+  private failedSettings = new Set<SettingKey>();
   private owSettings: {
     enabled: boolean;
     guestAccess: boolean;
@@ -94,82 +132,108 @@ export class DashboardTab {
   }
 
   private async loadSettings(): Promise<void> {
-    try {
-      const [
-        recResp,
-        regResp,
-        chatResp,
-        lobbyResp,
-        dmResp,
-        emoteResp,
-        specChatResp,
-        xpResp,
-        themeResp,
-        gameResp,
-        simResp,
-        aiResp,
-        imprintResp,
-        githubResp,
-        spectatorResp,
-      ] = await Promise.all([
-        ApiClient.get<{ enabled: boolean }>('/admin/settings/recordings_enabled'),
-        ApiClient.get<{ enabled: boolean }>('/admin/settings/registration_enabled'),
-        ApiClient.get<{ mode: ChatMode }>('/admin/settings/party_chat_mode'),
-        ApiClient.get<{ mode: ChatMode }>('/admin/settings/lobby_chat_mode'),
-        ApiClient.get<{ mode: ChatMode }>('/admin/settings/dm_mode'),
-        ApiClient.get<{ mode: ChatMode }>('/admin/settings/emote_mode'),
-        ApiClient.get<{ mode: ChatMode }>('/admin/settings/spectator_chat_mode'),
-        ApiClient.get<{ multiplier: number }>('/admin/settings/xp_multiplier'),
-        ApiClient.get<{ theme: string }>('/admin/settings/default_theme'),
-        ApiClient.get<{ defaults: GameDefaults }>('/admin/settings/game_defaults'),
-        ApiClient.get<{ defaults: SimulationDefaults }>('/admin/settings/simulation_defaults'),
-        ApiClient.get<{ ais: BotAIEntry[] }>('/admin/ai/active'),
-        ApiClient.get<{ enabled: boolean; text: string }>('/admin/settings/imprint'),
-        ApiClient.get<{ enabled: boolean }>('/admin/settings/display_github'),
-        ApiClient.get<{ enabled: boolean }>('/admin/settings/spectator_actions_enabled'),
-      ]);
-      this.recordingsEnabled = recResp.enabled;
-      this.registrationEnabled = regResp.enabled;
-      this.spectatorActionsEnabled = spectatorResp.enabled;
-      this.chatMode = chatResp.mode ?? 'everyone';
-      this.lobbyChatMode = lobbyResp.mode ?? 'everyone';
-      this.dmMode = dmResp.mode ?? 'everyone';
-      this.emoteMode = emoteResp.mode ?? 'everyone';
-      this.spectatorChatMode = specChatResp.mode ?? 'everyone';
-      this.xpMultiplier = xpResp.multiplier ?? 1;
-      this.defaultTheme = (themeResp.theme as ThemeId) || 'inferno';
-      this.gameDefaults = gameResp.defaults ?? {};
-      this.simulationDefaults = simResp.defaults ?? {};
-      this.activeAIs = aiResp.ais ?? [];
-      this.displayImprint = imprintResp.enabled;
-      this.imprintText = imprintResp.text ?? '';
-      this.displayGithub = githubResp.enabled;
-    } catch {
-      // Use defaults on failure
-    }
-    try {
-      const artResp = await ApiClient.get<{ style?: unknown }>('/admin/settings/default_art_style');
-      if (isArtStyleId(artResp.style)) this.defaultArtStyle = artResp.style;
-    } catch {
-      // Older server: keep the built-in default
-    }
-    // Email settings are admin-only; fetch separately to handle non-admin gracefully
-    try {
-      const emailResp = await ApiClient.get<{ settings: EmailSettings }>(
-        '/admin/settings/email_settings',
-      );
-      this.emailSettings = emailResp.settings ?? {};
-    } catch {
-      // Non-admin or fetch failure — leave as empty
-    }
-    // Open world settings
-    try {
-      const owResp = await ApiClient.get<typeof this.owSettings>('/admin/settings/open_world');
-      this.owSettings = owResp;
-    } catch {
-      // Leave defaults
+    // Each setting loads on its own: one failing request used to drop every value back to its
+    // default silently, and the next save then overwrote the real settings with those defaults.
+    // A failed setting keeps its default, and lockFailedSettings() disables its controls.
+    this.failedSettings.clear();
+    const load = async <T>(key: SettingKey, path: string, apply: (resp: T) => void) => {
+      try {
+        apply(await ApiClient.get<T>(path));
+      } catch {
+        this.failedSettings.add(key);
+      }
+    };
+    await Promise.all([
+      load<{ enabled: boolean }>('recordings', '/admin/settings/recordings_enabled', (r) => {
+        this.recordingsEnabled = r.enabled;
+      }),
+      load<{ enabled: boolean }>('registration', '/admin/settings/registration_enabled', (r) => {
+        this.registrationEnabled = r.enabled;
+      }),
+      load<{ mode: ChatMode }>('partyChat', '/admin/settings/party_chat_mode', (r) => {
+        this.chatMode = r.mode ?? 'everyone';
+      }),
+      load<{ mode: ChatMode }>('lobbyChat', '/admin/settings/lobby_chat_mode', (r) => {
+        this.lobbyChatMode = r.mode ?? 'everyone';
+      }),
+      load<{ mode: ChatMode }>('dm', '/admin/settings/dm_mode', (r) => {
+        this.dmMode = r.mode ?? 'everyone';
+      }),
+      load<{ mode: ChatMode }>('emote', '/admin/settings/emote_mode', (r) => {
+        this.emoteMode = r.mode ?? 'everyone';
+      }),
+      load<{ mode: ChatMode }>('spectatorChat', '/admin/settings/spectator_chat_mode', (r) => {
+        this.spectatorChatMode = r.mode ?? 'everyone';
+      }),
+      load<{ multiplier: number }>('xp', '/admin/settings/xp_multiplier', (r) => {
+        this.xpMultiplier = r.multiplier ?? 1;
+      }),
+      load<{ theme: string }>('theme', '/admin/settings/default_theme', (r) => {
+        this.defaultTheme = (r.theme as ThemeId) || 'inferno';
+      }),
+      load<{ style?: unknown }>('artStyle', '/admin/settings/default_art_style', (r) => {
+        if (isArtStyleId(r.style)) this.defaultArtStyle = r.style;
+      }),
+      load<{ defaults: GameDefaults }>('gameDefaults', '/admin/settings/game_defaults', (r) => {
+        this.gameDefaults = r.defaults ?? {};
+      }),
+      load<{ defaults: SimulationDefaults }>(
+        'simulationDefaults',
+        '/admin/settings/simulation_defaults',
+        (r) => {
+          this.simulationDefaults = r.defaults ?? {};
+        },
+      ),
+      load<{ ais: BotAIEntry[] }>('activeAIs', '/admin/ai/active', (r) => {
+        this.activeAIs = r.ais ?? [];
+      }),
+      // The admin-only raw endpoint: the public one answers an empty text while the imprint is off.
+      load<{ enabled: boolean; text: string }>('imprint', '/admin/settings/imprint/raw', (r) => {
+        this.displayImprint = r.enabled;
+        this.imprintText = r.text ?? '';
+      }),
+      load<{ enabled: boolean }>('github', '/admin/settings/display_github', (r) => {
+        this.displayGithub = r.enabled;
+      }),
+      load<{ enabled: boolean }>(
+        'spectatorActions',
+        '/admin/settings/spectator_actions_enabled',
+        (r) => {
+          this.spectatorActionsEnabled = r.enabled;
+        },
+      ),
+      load<{ settings: EmailSettings }>('email', '/admin/settings/email_settings', (r) => {
+        this.emailSettings = r.settings ?? {};
+      }),
+      load<typeof this.owSettings>('openWorld', '/admin/settings/open_world', (r) => {
+        this.owSettings = r;
+      }),
+    ]);
+    // destroy() ran during the loads: no card to render, no toast for a tab that is gone.
+    if (!this.container) return;
+    if (this.failedSettings.size > 0) {
+      const names = [...this.failedSettings].map((key) => t(SETTINGS[key].label)).join(', ');
+      this.notifications.error(t('admin:dashboard.settingsLoadFailed', { settings: names }));
     }
     this.renderSettingsCard();
+  }
+
+  /**
+   * Disables every control that would write a setting whose current value failed to load, so a
+   * save cannot replace the stored value with the placeholder default the form shows.
+   */
+  private lockFailedSettings(card: HTMLElement): void {
+    const hint = t('admin:dashboard.settingLoadFailedHint');
+    for (const key of this.failedSettings) {
+      for (const selector of SETTINGS[key].controls) {
+        const el = card.querySelector<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>(
+          selector,
+        );
+        if (!el) continue;
+        el.disabled = true;
+        el.title = hint;
+      }
+    }
   }
 
   private renderSettingsCard(): void {
@@ -372,6 +436,7 @@ export class DashboardTab {
     `,
     );
     this.container.appendChild(card);
+    this.lockFailedSettings(card);
 
     card.querySelector('#toggle-recordings')!.addEventListener('change', async (e) => {
       const enabled = (e.target as HTMLInputElement).checked;
@@ -579,11 +644,11 @@ export class DashboardTab {
     const imprintTextGroup = card.querySelector('#imprint-text-group') as HTMLElement;
     imprintToggle.addEventListener('change', async () => {
       const enabled = imprintToggle.checked;
-      const text = (card.querySelector('#input-imprint-text') as HTMLTextAreaElement).value;
       try {
-        await ApiClient.put('/admin/settings/imprint', { enabled, text });
+        // Only the flag: sending the textarea here used to wipe the stored text on a
+        // disable/enable cycle. The text is written only by "Save imprint" below.
+        await ApiClient.put('/admin/settings/imprint', { enabled });
         this.displayImprint = enabled;
-        this.imprintText = text;
         imprintTextGroup.style.display = enabled ? '' : 'none';
         this.notifications.success(
           t('admin:dashboard.imprintToggled', {
@@ -804,6 +869,7 @@ export class DashboardTab {
           '/admin/settings/email_settings',
         );
         this.emailSettings = resp.settings ?? {};
+        this.failedSettings.delete('email');
         this.renderSettingsCard();
       } catch {
         this.notifications.error(t('admin:dashboard.failedSaveEmailSettings'));
@@ -811,18 +877,32 @@ export class DashboardTab {
     });
 
     // Reset
+    // An empty body is a full reset on the server (the stored password included).
     card.querySelector('#email-reset')!.addEventListener('click', async () => {
       try {
         await ApiClient.put('/admin/settings/email_settings', {});
-        this.notifications.success(t('admin:dashboard.emailSettingsReset'));
+      } catch {
+        this.notifications.error(t('admin:dashboard.failedResetEmailSettings'));
+        return;
+      }
+      this.notifications.success(t('admin:dashboard.emailSettingsReset'));
+      // Show what the server holds now, never the pre-reset form.
+      try {
         const resp = await ApiClient.get<{ settings: EmailSettings }>(
           '/admin/settings/email_settings',
         );
         this.emailSettings = resp.settings ?? {};
-        this.renderSettingsCard();
+        this.failedSettings.delete('email');
       } catch {
-        this.notifications.error(t('admin:dashboard.failedResetEmailSettings'));
+        this.emailSettings = {};
+        this.failedSettings.add('email');
+        this.notifications.error(
+          t('admin:dashboard.settingsLoadFailed', {
+            settings: t(SETTINGS.email.label),
+          }),
+        );
       }
+      this.renderSettingsCard();
     });
 
     // Test email

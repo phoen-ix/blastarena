@@ -62,12 +62,12 @@
       "emailLabel": "Email *",
       "emailPlaceholder": "user@example.com",
       "passwordLabel": "Password *",
-      "passwordPlaceholder": "Min 6 characters",
+      "passwordPlaceholder": "Min {{min}} characters",
       "roleLabel": "Role",
       "cancel": "Cancel",
       "submit": "Create",
       "errorRequired": "Username, email, and password are required",
-      "errorPasswordLength": "Password must be at least 6 characters",
+      "errorPasswordLength": "Password must be at least {{min}} characters",
       "successMessage": "User \"{{username}}\" created"
     },
     "resetPasswordModal": {
@@ -75,13 +75,13 @@
       "title": "Reset Password",
       "description": "Set a new password for <strong style=\"color:var(--text);\">{{username}}</strong>. They will be logged out and must sign in with the new password.",
       "newPasswordLabel": "New Password",
-      "newPasswordPlaceholder": "Min 6 characters",
+      "newPasswordPlaceholder": "Min {{min}} characters",
       "confirmPasswordLabel": "Confirm Password",
       "confirmPasswordPlaceholder": "Re-enter password",
       "cancel": "Cancel",
       "submit": "Reset Password",
       "errorRequired": "Password is required",
-      "errorPasswordLength": "Password must be at least 6 characters",
+      "errorPasswordLength": "Password must be at least {{min}} characters",
       "errorPasswordMismatch": "Passwords do not match",
       "successMessage": "Password reset for \"{{username}}\""
     },
@@ -269,7 +269,8 @@
     "prevPage": "Prev",
     "nextPage": "Next",
     "pageInfo": "Page {{page}} of {{totalPages}} ({{total}} actions)",
-    "failedToLoad": "Failed to load admin actions"
+    "failedToLoad": "Failed to load admin actions",
+    "deletedAdmin": "(deleted account)"
   },
   "ai": {
     "botManagement": "Bot AI Management",
@@ -699,7 +700,9 @@
       "save": "Save Open World Settings",
       "saved": "Open World settings saved",
       "saveFailed": "Failed to save Open World settings"
-    }
+    },
+    "settingsLoadFailed": "These settings could not be loaded and are locked so a save cannot overwrite them: {{settings}}. Reload the tab to try again.",
+    "settingLoadFailedHint": "Could not be loaded. Reload the tab to edit this setting."
   },
   "seasons": {
     "sectionTitle": "Season Management",
@@ -941,6 +944,14 @@
       "cancel": "Cancel",
       "import": "Import",
       "importSuccess": "Level imported successfully"
+    },
+    "enemyAiConflict": {
+      "title": "Bundled enemy AI",
+      "hint": "This enemy type comes with its own AI \"{{name}}\". Choose how to import it.",
+      "createNew": "Create a new enemy AI \"{{name}}\" from the bundled code",
+      "useExisting": "Use the existing AI \"{{name}}\" (ID {{id}})",
+      "skip": "Import without an AI (uses its movement pattern)",
+      "unresolved": "The server still needs a decision about the bundled AI. Nothing was imported."
     },
     "deleteModal": {
       "entityLabels": {

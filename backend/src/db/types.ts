@@ -124,8 +124,9 @@ export interface MatchPlayerRow extends RowDataPacket {
 /** Admin action row */
 export interface AdminActionRow extends RowDataPacket {
   id: number;
-  admin_id: number;
-  admin_username: string;
+  /** Null once the admin's account was deleted (migration 047: ON DELETE SET NULL). */
+  admin_id: number | null;
+  admin_username: string | null;
   action: string;
   target_type: string;
   target_id: number;

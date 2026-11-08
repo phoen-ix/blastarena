@@ -130,6 +130,14 @@ export function verifyLocalCoopSocketToken(
   }
 }
 
+/** bcrypt hash (cost 12, as hashPassword) of a random string nobody knows. */
+const DUMMY_PASSWORD_HASH = '$2b$12$YxNacjI3hGHrJoeUC1f24.EDOKZq6UdOnQ7SVT7Yv1H2jvPzh3p2G';
+
+/** Lifetime of a refresh token (DB `expires_at` and the refresh cookie), in ms. */
+export function refreshTokenLifetimeMs(): number {
+  return parseExpiresIn(getConfig().JWT_REFRESH_EXPIRES_IN);
+}
+
 function parseExpiresIn(expiresIn: string): number {
   const match = expiresIn.match(/^(\d+)(s|m|h|d)$/);
   if (!match) return 7 * 24 * 60 * 60 * 1000; // default 7 days
@@ -239,19 +247,17 @@ export async function verifyCredentials(username: string, password: string): Pro
     [username],
   );
 
-  if (rows.length === 0) {
+  // The password is checked first, and for an unknown name against a dummy hash of the same cost,
+  // so neither the answer nor its timing tells an unauthenticated caller whether a username
+  // exists or is deactivated. Deactivation is revealed only to someone who knows the password.
+  const user = rows[0];
+  const valid = await comparePassword(password, user?.password_hash ?? DUMMY_PASSWORD_HASH);
+  if (!user || !valid) {
     throw new AppError('Invalid username or password', 401, 'INVALID_CREDENTIALS');
   }
-
-  const user = rows[0];
 
   if (user.is_deactivated) {
     throw new AppError('Account has been deactivated', 403, 'DEACTIVATED');
-  }
-
-  const valid = await comparePassword(password, user.password_hash);
-  if (!valid) {
-    throw new AppError('Invalid username or password', 401, 'INVALID_CREDENTIALS');
   }
 
   return toPublicUser(user);
@@ -298,8 +304,7 @@ async function completeLogin(
   // Create refresh token
   const refreshToken = generateToken();
   const refreshHash = hashToken(refreshToken);
-  const config = getConfig();
-  const expiresMs = parseExpiresIn(config.JWT_REFRESH_EXPIRES_IN);
+  const expiresMs = refreshTokenLifetimeMs();
   const expiresAt = new Date(Date.now() + expiresMs);
 
   await execute('INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)', [
@@ -383,8 +388,7 @@ export async function refreshAccessToken(
   // Issue new refresh token (rotation)
   const newRefreshToken = generateToken();
   const newHash = hashToken(newRefreshToken);
-  const config = getConfig();
-  const expiresMs = parseExpiresIn(config.JWT_REFRESH_EXPIRES_IN);
+  const expiresMs = refreshTokenLifetimeMs();
   const expiresAt = new Date(Date.now() + expiresMs);
 
   // Revoke-old and insert-new in one transaction. As two statements, an INSERT failure after a

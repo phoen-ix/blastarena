@@ -62,12 +62,12 @@
       "emailLabel": "E-mail *",
       "emailPlaceholder": "uzytkownik@przyklad.pl",
       "passwordLabel": "Hasło *",
-      "passwordPlaceholder": "Min. 6 znaków",
+      "passwordPlaceholder": "Min. {{min}} znaków",
       "roleLabel": "Rola",
       "cancel": "Anuluj",
       "submit": "Utwórz",
       "errorRequired": "Nazwa użytkownika, e-mail i hasło są wymagane",
-      "errorPasswordLength": "Hasło musi mieć co najmniej 6 znaków",
+      "errorPasswordLength": "Hasło musi mieć co najmniej {{min}} znaków",
       "successMessage": "Użytkownik \"{{username}}\" utworzony"
     },
     "resetPasswordModal": {
@@ -75,13 +75,13 @@
       "title": "Reset hasła",
       "description": "Ustaw nowe hasło dla <strong style=\"color:var(--text);\">{{username}}</strong>. Zostanie wylogowany i będzie musiał zalogować się nowym hasłem.",
       "newPasswordLabel": "Nowe hasło",
-      "newPasswordPlaceholder": "Min. 6 znaków",
+      "newPasswordPlaceholder": "Min. {{min}} znaków",
       "confirmPasswordLabel": "Potwierdź hasło",
       "confirmPasswordPlaceholder": "Wprowadź hasło ponownie",
       "cancel": "Anuluj",
       "submit": "Resetuj hasło",
       "errorRequired": "Hasło jest wymagane",
-      "errorPasswordLength": "Hasło musi mieć co najmniej 6 znaków",
+      "errorPasswordLength": "Hasło musi mieć co najmniej {{min}} znaków",
       "errorPasswordMismatch": "Hasła nie są zgodne",
       "successMessage": "Hasło zresetowane dla \"{{username}}\""
     },
@@ -269,7 +269,8 @@
     "prevPage": "Poprz.",
     "nextPage": "Nast.",
     "pageInfo": "Strona {{page}} z {{totalPages}} ({{total}} akcji)",
-    "failedToLoad": "Nie udało się załadować akcji administratora"
+    "failedToLoad": "Nie udało się załadować akcji administratora",
+    "deletedAdmin": "(usunięte konto)"
   },
   "ai": {
     "botManagement": "Zarządzanie AI botów",
@@ -703,7 +704,9 @@
       "save": "Zapisz ustawienia otwartego świata",
       "saved": "Zapisano ustawienia otwartego świata",
       "saveFailed": "Nie udało się zapisać ustawień otwartego świata"
-    }
+    },
+    "settingsLoadFailed": "Nie udało się wczytać tych ustawień, więc są zablokowane, aby zapis ich nie nadpisał: {{settings}}. Odśwież kartę, aby spróbować ponownie.",
+    "settingLoadFailedHint": "Nie udało się wczytać. Odśwież kartę, aby edytować to ustawienie."
   },
   "seasons": {
     "sectionTitle": "Zarządzanie sezonami",
@@ -945,6 +948,14 @@
       "cancel": "Anuluj",
       "import": "Importuj",
       "importSuccess": "Poziom zaimportowany pomyślnie"
+    },
+    "enemyAiConflict": {
+      "title": "Dołączona SI przeciwnika",
+      "hint": "Ten typ przeciwnika ma własną SI „{{name}}”. Wybierz, jak ją zaimportować.",
+      "createNew": "Utwórz nową SI przeciwnika „{{name}}” z dołączonego kodu",
+      "useExisting": "Użyj istniejącej SI „{{name}}” (ID {{id}})",
+      "skip": "Importuj bez SI (używa swojego wzorca ruchu)",
+      "unresolved": "Serwer nadal potrzebuje decyzji w sprawie dołączonej SI. Nic nie zostało zaimportowane."
     },
     "deleteModal": {
       "entityLabels": {

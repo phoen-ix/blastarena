@@ -1,4 +1,5 @@
 import { CampaignWorld, CampaignLevel, CampaignLevelSummary } from '@blast-arena/shared';
+import type { PoolConnection, ResultSetHeader } from 'mysql2/promise';
 import { query, execute } from '../db/connection';
 import { CampaignWorldRow, CampaignLevelRow, CampaignProgressRow, CountRow } from '../db/types';
 import { AppError } from '../middleware/errorHandler';
@@ -275,10 +276,12 @@ export async function getLevel(id: number): Promise<CampaignLevel | null> {
   return rows.length > 0 ? levelRowToEntry(rows[0]) : null;
 }
 
+/** `conn`: insert inside that transaction (an import creating its enemy types as well). */
 export async function createLevel(
   worldId: number,
   data: Partial<CampaignLevel>,
   createdBy: number,
+  conn?: PoolConnection,
 ): Promise<number> {
   // Level create and import both land here; an unknown world failed the foreign key as a 500
   if (!(await getWorld(worldId))) {
@@ -293,44 +296,45 @@ export async function createLevel(
   // covered_tiles is written here as well as in updateLevel. The INSERT used to omit it, so
   // covered tiles were silently dropped on level create and on import — both of which come
   // through this function. (audit B3)
-  const result = await execute(
-    `INSERT INTO campaign_levels
+  const sql = `INSERT INTO campaign_levels
      (world_id, name, description, sort_order, map_width, map_height, tiles, fill_mode, wall_density,
       player_spawns, enemy_placements, powerup_placements, win_condition, win_condition_config,
       lives, time_limit, par_time, carry_over_powerups, starting_powerups, available_powerup_types,
       powerup_drop_rate, reinforced_walls, hazard_tiles, covered_tiles, puzzle_config, is_published,
       created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      worldId,
-      data.name ?? 'Untitled Level',
-      data.description ?? '',
-      sortOrder,
-      data.mapWidth ?? 15,
-      data.mapHeight ?? 13,
-      JSON.stringify(data.tiles ?? []),
-      data.fillMode ?? 'handcrafted',
-      data.wallDensity ?? 0.65,
-      JSON.stringify(data.playerSpawns ?? []),
-      JSON.stringify(data.enemyPlacements ?? []),
-      JSON.stringify(data.powerupPlacements ?? []),
-      data.winCondition ?? 'kill_all',
-      data.winConditionConfig ? JSON.stringify(data.winConditionConfig) : null,
-      data.lives ?? 3,
-      data.timeLimit ?? 0,
-      data.parTime ?? 0,
-      data.carryOverPowerups ?? false,
-      data.startingPowerups ? JSON.stringify(data.startingPowerups) : null,
-      data.availablePowerupTypes ? JSON.stringify(data.availablePowerupTypes) : null,
-      data.powerupDropRate ?? 0.3,
-      data.reinforcedWalls ?? false,
-      data.hazardTiles ?? false,
-      JSON.stringify(data.coveredTiles ?? []),
-      data.puzzleConfig ? JSON.stringify(data.puzzleConfig) : null,
-      data.isPublished ?? false,
-      createdBy,
-    ],
-  );
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const params = [
+    worldId,
+    data.name ?? 'Untitled Level',
+    data.description ?? '',
+    sortOrder,
+    data.mapWidth ?? 15,
+    data.mapHeight ?? 13,
+    JSON.stringify(data.tiles ?? []),
+    data.fillMode ?? 'handcrafted',
+    data.wallDensity ?? 0.65,
+    JSON.stringify(data.playerSpawns ?? []),
+    JSON.stringify(data.enemyPlacements ?? []),
+    JSON.stringify(data.powerupPlacements ?? []),
+    data.winCondition ?? 'kill_all',
+    data.winConditionConfig ? JSON.stringify(data.winConditionConfig) : null,
+    data.lives ?? 3,
+    data.timeLimit ?? 0,
+    data.parTime ?? 0,
+    data.carryOverPowerups ?? false,
+    data.startingPowerups ? JSON.stringify(data.startingPowerups) : null,
+    data.availablePowerupTypes ? JSON.stringify(data.availablePowerupTypes) : null,
+    data.powerupDropRate ?? 0.3,
+    data.reinforcedWalls ?? false,
+    data.hazardTiles ?? false,
+    JSON.stringify(data.coveredTiles ?? []),
+    data.puzzleConfig ? JSON.stringify(data.puzzleConfig) : null,
+    data.isPublished ?? false,
+    createdBy,
+  ];
+  const result = conn
+    ? (await conn.execute<ResultSetHeader>(sql, params))[0]
+    : await execute(sql, params);
   return result.insertId;
 }
 

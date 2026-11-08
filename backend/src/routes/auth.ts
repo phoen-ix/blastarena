@@ -22,6 +22,7 @@ import {
   PASSWORD_MAX_LENGTH,
 } from '@blast-arena/shared';
 import { param } from '../utils/params';
+import { AppError } from '../middleware/errorHandler';
 
 const router = Router();
 
@@ -45,10 +46,27 @@ const forgotPasswordSchema = z.object({
   email: z.email(),
 });
 
+// The route used to destructure `req.body` itself, which throws on a body-less POST under
+// Express 5 (req.body is undefined there).
+const resendVerificationSchema = z.object({
+  email: z.string().min(1).max(255),
+});
+
 const resetPasswordSchema = z.object({
   token: z.string(),
   password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
 });
+
+/** Set the refresh cookie; it lives exactly as long as the token's DB row (JWT_REFRESH_EXPIRES_IN). */
+function setRefreshCookie(res: Response, refreshToken: string): void {
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: getConfig().APP_URL.startsWith('https'),
+    sameSite: 'strict',
+    maxAge: authService.refreshTokenLifetimeMs(),
+    path: '/api/auth',
+  });
+}
 
 router.post(
   '/auth/register',
@@ -94,16 +112,7 @@ router.post(
         return res.json(result);
       }
 
-      // Set refresh token as httpOnly cookie
-      const config = getConfig();
-      res.cookie('refreshToken', result.refreshToken, {
-        httpOnly: true,
-        secure: config.APP_URL.startsWith('https'),
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        path: '/api/auth',
-      });
-
+      setRefreshCookie(res, result.refreshToken);
       res.json(result.auth);
     } catch (err) {
       next(err);
@@ -125,15 +134,7 @@ router.post(
       const { totpToken, code } = req.body;
       const { auth, refreshToken } = await authService.completeTotpLogin(totpToken, code);
 
-      const config = getConfig();
-      res.cookie('refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: config.APP_URL.startsWith('https'),
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        path: '/api/auth',
-      });
-
+      setRefreshCookie(res, refreshToken);
       res.json(auth);
     } catch (err) {
       next(err);
@@ -171,15 +172,7 @@ router.post('/auth/refresh', parseCookies, verifyCsrfToken, async (req, res, nex
     const { auth, refreshToken: newRefreshToken } =
       await authService.refreshAccessToken(refreshToken);
 
-    const config = getConfig();
-    res.cookie('refreshToken', newRefreshToken, {
-      httpOnly: true,
-      secure: config.APP_URL.startsWith('https'),
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/api/auth',
-    });
-
+    setRefreshCookie(res, newRefreshToken);
     res.json(auth);
   } catch (err) {
     next(err);
@@ -190,11 +183,15 @@ router.get(
   '/auth/verify-email/:token',
   rateLimiter({ windowMs: 15 * 60 * 1000, maxRequests: 10 }),
   async (req, res, next) => {
+    // The link is opened in a browser, so a failure redirects as success does; a JSON error
+    // page was a dead end for the user. Only the service's own refusal (an expired or already
+    // used token) is answered this way; anything else is still a 500. (audit H10)
+    const appUrl = getConfig().APP_URL;
     try {
       await authService.verifyEmail(param(req.params.token));
-      const config = getConfig();
-      res.redirect(`${config.APP_URL}?emailVerified=true`);
+      res.redirect(`${appUrl}?emailVerified=true`);
     } catch (err) {
+      if (err instanceof AppError) return res.redirect(`${appUrl}?emailVerified=false`);
       next(err);
     }
   },
@@ -204,12 +201,10 @@ router.post(
   '/auth/resend-verification',
   rateLimiter({ windowMs: 120_000, maxRequests: 1 }),
   authMiddleware,
+  validate(resendVerificationSchema),
   async (req, res, next) => {
     try {
       const { email } = req.body;
-      if (!email || typeof email !== 'string') {
-        return res.status(400).json({ error: 'Email is required' });
-      }
       const { remainingResends } = await authService.resendVerificationEmail(
         req.user!.userId,
         email,

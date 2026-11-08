@@ -62,12 +62,12 @@
       "emailLabel": "E-posta *",
       "emailPlaceholder": "kullanici@ornek.com",
       "passwordLabel": "Şifre *",
-      "passwordPlaceholder": "En az 6 karakter",
+      "passwordPlaceholder": "En az {{min}} karakter",
       "roleLabel": "Rol",
       "cancel": "İptal",
       "submit": "Oluştur",
       "errorRequired": "Kullanıcı adı, e-posta ve şifre gereklidir",
-      "errorPasswordLength": "Şifre en az 6 karakter olmalıdır",
+      "errorPasswordLength": "Şifre en az {{min}} karakter olmalıdır",
       "successMessage": "\"{{username}}\" kullanıcısı oluşturuldu"
     },
     "resetPasswordModal": {
@@ -75,13 +75,13 @@
       "title": "Şifre Sıfırla",
       "description": "<strong style=\"color:var(--text);\">{{username}}</strong> için yeni bir şifre belirleyin. Oturumu kapatılacak ve yeni şifre ile giriş yapması gerekecektir.",
       "newPasswordLabel": "Yeni Şifre",
-      "newPasswordPlaceholder": "En az 6 karakter",
+      "newPasswordPlaceholder": "En az {{min}} karakter",
       "confirmPasswordLabel": "Şifreyi Onayla",
       "confirmPasswordPlaceholder": "Şifreyi tekrar girin",
       "cancel": "İptal",
       "submit": "Şifre Sıfırla",
       "errorRequired": "Şifre gereklidir",
-      "errorPasswordLength": "Şifre en az 6 karakter olmalıdır",
+      "errorPasswordLength": "Şifre en az {{min}} karakter olmalıdır",
       "errorPasswordMismatch": "Şifreler uyuşmuyor",
       "successMessage": "\"{{username}}\" için şifre sıfırlandı"
     },
@@ -269,7 +269,8 @@
     "prevPage": "Önceki",
     "nextPage": "Sonraki",
     "pageInfo": "Sayfa {{page}} / {{totalPages}} ({{total}} işlem)",
-    "failedToLoad": "Yönetici işlemleri yüklenemedi"
+    "failedToLoad": "Yönetici işlemleri yüklenemedi",
+    "deletedAdmin": "(silinmiş hesap)"
   },
   "ai": {
     "botManagement": "Bot Yapay Zeka Yönetimi",
@@ -699,7 +700,9 @@
       "save": "Açık Dünya Ayarlarını Kaydet",
       "saved": "Açık Dünya ayarları kaydedildi",
       "saveFailed": "Açık Dünya ayarları kaydedilemedi"
-    }
+    },
+    "settingsLoadFailed": "Bu ayarlar yüklenemedi ve bir kaydetme işleminin üzerine yazmaması için kilitlendi: {{settings}}. Tekrar denemek için sekmeyi yeniden yükleyin.",
+    "settingLoadFailedHint": "Yüklenemedi. Bu ayarı düzenlemek için sekmeyi yeniden yükleyin."
   },
   "seasons": {
     "sectionTitle": "Sezon Yönetimi",
@@ -941,6 +944,14 @@
       "cancel": "İptal",
       "import": "İçe Aktar",
       "importSuccess": "Bölüm başarıyla içe aktarıldı"
+    },
+    "enemyAiConflict": {
+      "title": "Paketlenmiş düşman yapay zekâsı",
+      "hint": "Bu düşman türü kendi yapay zekâsıyla \"{{name}}\" geliyor. Nasıl içe aktarılacağını seçin.",
+      "createNew": "Paketlenmiş koddan yeni bir düşman yapay zekâsı \"{{name}}\" oluştur",
+      "useExisting": "Mevcut yapay zekâyı kullan: \"{{name}}\" (ID {{id}})",
+      "skip": "Yapay zekâ olmadan içe aktar (kendi hareket desenini kullanır)",
+      "unresolved": "Sunucu hâlâ paketlenmiş yapay zekâ hakkında bir karar bekliyor. Hiçbir şey içe aktarılmadı."
     },
     "deleteModal": {
       "entityLabels": {

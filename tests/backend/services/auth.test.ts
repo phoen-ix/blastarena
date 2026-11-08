@@ -222,6 +222,39 @@ describe('Auth Service', () => {
       }
     });
 
+    // The password used to be checked after deactivation, and not at all for an unknown name:
+    // both answers and their timing told a caller which usernames exist. (audit S5)
+    it('compares the password against a dummy bcrypt hash for an unknown username', async () => {
+      mockQuery.mockResolvedValue([]);
+
+      await expect(authService.login('nonexistent', 'pass')).rejects.toMatchObject({
+        statusCode: 401,
+        code: 'INVALID_CREDENTIALS',
+      });
+      expect(mockComparePassword).toHaveBeenCalledTimes(1);
+      expect(mockComparePassword.mock.calls[0][1]).toMatch(/^\$2[aby]\$12\$.{53}$/);
+    });
+
+    it('answers a deactivated account with a wrong password as invalid credentials', async () => {
+      mockQuery.mockResolvedValue([{ ...mockUserRow, is_deactivated: true }]);
+      mockComparePassword.mockResolvedValue(false);
+
+      await expect(authService.login('testuser', 'wrong')).rejects.toMatchObject({
+        statusCode: 401,
+        code: 'INVALID_CREDENTIALS',
+      });
+    });
+
+    it('reveals deactivation only after the password checked out', async () => {
+      mockQuery.mockResolvedValue([{ ...mockUserRow, is_deactivated: true }]);
+
+      await expect(authService.login('testuser', 'right')).rejects.toMatchObject({
+        statusCode: 403,
+        code: 'DEACTIVATED',
+      });
+      expect(mockComparePassword).toHaveBeenCalledWith('right', 'hashed');
+    });
+
     it('should store hashed refresh token in DB', async () => {
       mockQuery.mockResolvedValue([mockUserRow]);
       mockExecute.mockResolvedValue({ affectedRows: 1 });
@@ -235,6 +268,12 @@ describe('Auth Service', () => {
       );
       expect(insertCall).toBeDefined();
       expect(insertCall![1]).toEqual(expect.arrayContaining([10, 'hashed-token']));
+    });
+  });
+
+  describe('refreshTokenLifetimeMs', () => {
+    it('follows JWT_REFRESH_EXPIRES_IN (the route sets the cookie maxAge from it)', () => {
+      expect(authService.refreshTokenLifetimeMs()).toBe(7 * 24 * 60 * 60 * 1000);
     });
   });
 

@@ -1,5 +1,6 @@
 import { CampaignUserState, LevelProgress, StartingPowerUps } from '@blast-arena/shared';
 import { query, execute } from '../db/connection';
+import { RowDataPacket } from 'mysql2';
 import { CampaignProgressRow, CampaignUserStateRow } from '../db/types';
 
 export async function getUserState(userId: number): Promise<CampaignUserState> {
@@ -46,6 +47,41 @@ export async function getProgress(userId: number, levelId: number): Promise<Leve
     stars: row.stars,
     attempts: row.attempts,
   };
+}
+
+/**
+ * Whether `userId` may start `levelId`. Mirrors the campaign view's rule (CampaignUI
+ * loadCampaignData): the level and its world are published, and the level is the first published
+ * level of its world, or the user completed it, or the user completed the published level before
+ * it. `campaign:start` used to check only `level.isPublished`, so the lock was client-side only.
+ * (audit V11)
+ */
+export async function isLevelUnlocked(userId: number, levelId: number): Promise<boolean> {
+  const levels = await query<(RowDataPacket & { world_id: number; sort_order: number })[]>(
+    `SELECT l.world_id, l.sort_order
+     FROM campaign_levels l JOIN campaign_worlds w ON w.id = l.world_id
+     WHERE l.id = ? AND l.is_published = TRUE AND w.is_published = TRUE`,
+    [levelId],
+  );
+  if (levels.length === 0) return false;
+  const { world_id: worldId, sort_order: sortOrder } = levels[0];
+
+  // Same order as getNextLevel(): sort_order, then id.
+  const previous = await query<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM campaign_levels
+     WHERE world_id = ? AND is_published = TRUE
+       AND (sort_order < ? OR (sort_order = ? AND id < ?))
+     ORDER BY sort_order DESC, id DESC LIMIT 1`,
+    [worldId, sortOrder, sortOrder, levelId],
+  );
+  if (previous.length === 0) return true;
+
+  const completed = await query<(RowDataPacket & { level_id: number })[]>(
+    `SELECT level_id FROM campaign_progress
+     WHERE user_id = ? AND completed = TRUE AND level_id IN (?, ?)`,
+    [userId, levelId, previous[0].id],
+  );
+  return completed.length > 0;
 }
 
 export async function recordAttempt(userId: number, levelId: number): Promise<void> {

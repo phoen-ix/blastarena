@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { randomBytes, timingSafeEqual } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { getConfig } from '../config';
 
@@ -33,9 +33,17 @@ export function issueCsrfToken(req: Request, res: Response): void {
   res.json({ csrfToken });
 }
 
+/** Constant-time string comparison; the length check first, as timingSafeEqual requires. */
+function tokensMatch(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
+
 export function verifyCsrfToken(req: Request, res: Response, next: NextFunction): void {
   const csrfToken: unknown = req.cookies.csrfToken;
-  if (typeof csrfToken !== 'string' || csrfToken !== req.get('X-CSRF-Token')) {
+  const header = req.get('X-CSRF-Token');
+  if (typeof csrfToken !== 'string' || !header || !tokensMatch(csrfToken, header)) {
     res.status(403).json({ error: 'Invalid CSRF token', code: 'CSRF_INVALID' });
     return;
   }

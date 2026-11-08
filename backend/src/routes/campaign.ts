@@ -9,6 +9,7 @@ import * as enemyTypeService from '../services/enemy-type';
 import * as progressService from '../services/campaign-progress';
 import * as enemyaiService from '../services/enemyai';
 import { AppError } from '../middleware/errorHandler';
+import { withTransaction } from '../db/connection';
 import {
   CampaignLevel,
   EnemyPlacement,
@@ -20,22 +21,13 @@ import {
 import { param } from '../utils/params';
 import { logAdminAction } from '../services/admin-audit';
 
-interface BundledEnemyType {
-  originalId: number;
-  name: string;
-  description: string;
-  config: EnemyTypeConfig;
-  enemyAiSource?: string;
-  enemyAiName?: string;
-}
-
 interface LevelImportData extends Record<string, unknown> {
   _format?: string;
   _version?: number;
   name?: string;
   tiles?: TileType[][];
   level?: LevelImportData;
-  enemyTypes?: BundledEnemyType[];
+  enemyTypes?: unknown;
   enemyPlacements?: EnemyPlacement[];
 }
 
@@ -66,6 +58,8 @@ const orderSchema = z.object({
   sortOrder: z.number().int().min(0),
 });
 
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
 const enemyTypeSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(2000).optional().default(''),
@@ -93,8 +87,9 @@ const enemyTypeSchema = z.object({
     contactDamage: z.boolean(),
     sprite: z.object({
       bodyShape: z.enum(['blob', 'spiky', 'ghost', 'robot', 'bug', 'skull']),
-      primaryColor: z.string(),
-      secondaryColor: z.string(),
+      // Drawn as canvas fill styles and shown in the admin UI: a colour, nothing else
+      primaryColor: z.string().regex(HEX_COLOR),
+      secondaryColor: z.string().regex(HEX_COLOR),
       eyeStyle: z.enum(['round', 'angry', 'sleepy', 'crazy']),
       hasTeeth: z.boolean(),
       hasHorns: z.boolean(),
@@ -145,7 +140,17 @@ const levelSchema = z.object({
   fillMode: z.enum(['handcrafted', 'hybrid']).optional(),
   wallDensity: z.number().min(0.1).max(0.9).optional(),
   playerSpawns: z.array(z.object({ x: z.number().int(), y: z.number().int() })).optional(),
-  enemyPlacements: z.array(z.any()).optional(),
+  // Typed: an import's ids are remapped by number, and a string id slipped past the remap
+  enemyPlacements: z
+    .array(
+      z.object({
+        enemyTypeId: z.number().int(),
+        x: z.number().int(),
+        y: z.number().int(),
+        patrolPath: z.array(z.object({ x: z.number().int(), y: z.number().int() })).optional(),
+      }),
+    )
+    .optional(),
   powerupPlacements: z.array(z.any()).optional(),
   winCondition: z.enum(['kill_all', 'find_exit', 'reach_goal', 'survive_time']).optional(),
   winConditionConfig: z.any().optional(),
@@ -710,6 +715,18 @@ router.get(
   },
 );
 
+// An enemy type bundled with a level export: the create schema plus the id it had at the source.
+// Bundles used to be trusted as is and stored straight into campaign_enemy_types.
+const bundledEnemyTypeSchema = z.object({
+  originalId: z.number().int(),
+  name: enemyTypeSchema.shape.name,
+  description: enemyTypeSchema.shape.description,
+  config: enemyTypeSchema.shape.config,
+  enemyAiSource: z.string().optional(),
+  enemyAiName: z.string().optional(),
+});
+type BundledEnemyType = z.infer<typeof bundledEnemyTypeSchema>;
+
 // Import level (with optional bundled enemy types)
 const importLevelSchema = z.object({
   level: z.any(),
@@ -732,14 +749,14 @@ router.post(
 
       // Accept both plain level and bundle format
       let levelData: LevelImportData;
-      let bundledEnemyTypes: BundledEnemyType[] | undefined;
+      let rawEnemyTypes: unknown;
 
       if (req.body.level?._format === 'blast-arena-level-bundle') {
         // Bundle wrapped in `level`. A bundle posted at the top level loses its `_format` to
         // validation and is handled by the last branch, which reads the same two fields.
         const bundle = req.body.level;
         levelData = bundle.level;
-        bundledEnemyTypes = bundle.enemyTypes;
+        rawEnemyTypes = bundle.enemyTypes;
       } else if (req.body.level?._format === 'blast-arena-level') {
         // Plain level export
         const { _format, _version, ...rest } = req.body.level;
@@ -747,7 +764,7 @@ router.post(
       } else {
         // Raw level data or stripped bundle
         levelData = req.body.level;
-        bundledEnemyTypes = req.body.enemyTypes;
+        rawEnemyTypes = req.body.enemyTypes;
       }
 
       if (!levelData || !levelData.name || !levelData.tiles) {
@@ -770,6 +787,21 @@ router.post(
       // created the enemy types mapped to `create`, which an unknown world then left behind.
       if (!(await campaignService.getWorld(worldId))) {
         return res.status(400).json({ error: 'World not found', code: 'WORLD_NOT_FOUND' });
+      }
+
+      let bundledEnemyTypes: BundledEnemyType[] | undefined;
+      if (rawEnemyTypes !== undefined) {
+        const bundled = z.array(bundledEnemyTypeSchema).safeParse(rawEnemyTypes);
+        if (!bundled.success) {
+          return res.status(400).json({
+            error: 'Invalid enemy type data',
+            details: bundled.error.issues.map((e) => ({
+              field: e.path.join('.'),
+              message: e.message,
+            })),
+          });
+        }
+        bundledEnemyTypes = bundled.data;
       }
 
       // Collect enemy type IDs referenced in placements
@@ -817,61 +849,98 @@ router.post(
       }
 
       // Phase 2: Remap enemy IDs
-      const idMap = new Map<number, number>();
-      const createdEnemyTypes: number[] = [];
-
-      if (enemyIdMap) {
-        for (const [origIdStr, action] of Object.entries(enemyIdMap)) {
-          const origId = Number(origIdStr);
-          if (action === 'skip') {
-            // Will filter out these placements
-            continue;
-          } else if (action === 'create') {
-            const bundled = bundledEnemyTypes?.find((et) => et.originalId === origId);
-            if (bundled) {
-              const newId = await enemyTypeService.createEnemyType(
-                bundled.name,
-                bundled.description || '',
-                bundled.config,
-                userId,
-              );
-              idMap.set(origId, newId);
-              createdEnemyTypes.push(newId);
-            }
-          } else if (typeof action === 'number') {
-            idMap.set(origId, action);
-          }
-        }
-      }
-
-      // Remap enemy placements
       const skippedIds = new Set<number>();
-      if (enemyIdMap) {
-        for (const [origIdStr, action] of Object.entries(enemyIdMap)) {
-          if (action === 'skip') skippedIds.add(Number(origIdStr));
-        }
+      const createIds = new Set<number>();
+      const idMap = new Map<number, number>();
+      for (const [origIdStr, action] of Object.entries(enemyIdMap ?? {})) {
+        const origId = Number(origIdStr);
+        if (action === 'skip') skippedIds.add(origId);
+        else if (action === 'create') {
+          if (bundledEnemyTypes?.some((et) => et.originalId === origId)) createIds.add(origId);
+        } else if (typeof action === 'number') idMap.set(origId, action);
       }
 
-      const remappedPlacements = (levelData.enemyPlacements || [])
-        .filter((ep: EnemyPlacement) => !skippedIds.has(ep.enemyTypeId))
-        .map((ep: EnemyPlacement) => ({
-          ...ep,
-          enemyTypeId: idMap.get(ep.enemyTypeId) ?? ep.enemyTypeId,
-        }));
+      // Every placement must end up on an enemy type that exists here, or on one this import
+      // creates. A numeric mapping to an unknown id, or an unmapped id the database does not
+      // have, used to be stored as a placement of nothing.
+      const missing: number[] = [];
+      for (const origId of enemyIdMap ? referencedIds : []) {
+        if (skippedIds.has(origId) || createIds.has(origId)) continue;
+        const targetId = idMap.get(origId) ?? origId;
+        if (!(await enemyTypeService.getEnemyType(targetId))) missing.push(targetId);
+      }
+      if (missing.length > 0) {
+        return res.status(400).json({
+          error: `Enemy type not found: ${missing.join(', ')}`,
+          code: 'ENEMY_TYPE_NOT_FOUND',
+        });
+      }
 
-      // Create the level
-      const newLevelData = {
-        ...levelData,
-        enemyPlacements: remappedPlacements,
-      };
+      // An enemy AI is referenced by its id on the exporting server. Kept only when that id exists
+      // here (an export re-imported on the same server), otherwise dropped with its difficulty:
+      // the type falls back to its movement pattern instead of pointing at nothing.
+      const toCreate: BundledEnemyType[] = [];
+      for (const et of bundledEnemyTypes ?? []) {
+        if (!createIds.has(et.originalId)) continue;
+        const config = { ...et.config };
+        if (config.enemyAiId && !(await enemyaiService.getEnemyAI(config.enemyAiId))) {
+          delete config.enemyAiId;
+          delete config.difficulty;
+        }
+        toCreate.push({ ...et, config });
+      }
 
-      const levelId = await campaignService.createLevel(worldId, newLevelData, userId);
+      // All or nothing: a failing level insert used to leave the enemy types created for it.
+      const { levelId, createdEnemyTypes } = await withTransaction(async (conn) => {
+        const created: { id: number; name: string; enemyAiId: string | null }[] = [];
+        for (const et of toCreate) {
+          const newId = await enemyTypeService.createEnemyType(
+            et.name,
+            et.description || '',
+            et.config as EnemyTypeConfig,
+            userId,
+            conn,
+          );
+          idMap.set(et.originalId, newId);
+          created.push({ id: newId, name: et.name, enemyAiId: et.config.enemyAiId ?? null });
+        }
+
+        const remappedPlacements = (levelData.enemyPlacements || [])
+          .filter((ep: EnemyPlacement) => !skippedIds.has(ep.enemyTypeId))
+          .map((ep: EnemyPlacement) => ({
+            ...ep,
+            enemyTypeId: idMap.get(ep.enemyTypeId) ?? ep.enemyTypeId,
+          }));
+
+        const id = await campaignService.createLevel(
+          worldId,
+          { ...levelData, enemyPlacements: remappedPlacements },
+          userId,
+          conn,
+        );
+        return { levelId: id, createdEnemyTypes: created };
+      });
+
+      // Logged once committed, like a single enemy type import
+      for (const et of createdEnemyTypes) {
+        await logAdminAction(
+          userId,
+          'enemy_type_import',
+          'enemy_type',
+          et.id,
+          JSON.stringify({ name: et.name, enemyAiId: et.enemyAiId }),
+        );
+      }
       await logAdminAction(
         userId,
         'campaign_level_import',
         'campaign_level',
         levelId,
-        JSON.stringify({ worldId, name: levelData.name, createdEnemyTypes }),
+        JSON.stringify({
+          worldId,
+          name: levelData.name,
+          createdEnemyTypes: createdEnemyTypes.map((et) => et.id),
+        }),
       );
       res.status(201).json({ id: levelId });
     } catch (err) {

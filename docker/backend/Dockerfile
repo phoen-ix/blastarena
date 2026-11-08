@@ -62,8 +62,11 @@ RUN chmod +x /entrypoint.sh
 # isolates) and writes to five bind-mounted host directories; running it as uid 0 removed the
 # second layer of defence behind the isolate boundary and left root-owned files on the host.
 # The node:26.13.0-alpine3.24 image already provides the `node` user (uid 1000). (audit CONTAINER-ROOT-1)
+# Only those five directories belong to `node`; the code, node_modules, locales and docs stay
+# root-owned and read-only to the process. (In the stack the bind mounts replace these dirs, so
+# their host side must be uid 1000 too: see README.)
 RUN mkdir -p /app/gamelogs /app/simulations /app/replays /app/ai /app/enemy-ai \
-    && chown -R node:node /app
+    && chown node:node /app/gamelogs /app/simulations /app/replays /app/ai /app/enemy-ai
 USER node
 
 EXPOSE 3000

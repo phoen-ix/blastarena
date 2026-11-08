@@ -62,12 +62,12 @@
       "emailLabel": "Correo *",
       "emailPlaceholder": "usuario@ejemplo.com",
       "passwordLabel": "Contraseña *",
-      "passwordPlaceholder": "Mínimo 6 caracteres",
+      "passwordPlaceholder": "Mínimo {{min}} caracteres",
       "roleLabel": "Rol",
       "cancel": "Cancelar",
       "submit": "Crear",
       "errorRequired": "Usuario, correo y contraseña son obligatorios",
-      "errorPasswordLength": "La contraseña debe tener al menos 6 caracteres",
+      "errorPasswordLength": "La contraseña debe tener al menos {{min}} caracteres",
       "successMessage": "Usuario \"{{username}}\" creado"
     },
     "resetPasswordModal": {
@@ -75,13 +75,13 @@
       "title": "Restablecer Contraseña",
       "description": "Establecer una nueva contraseña para <strong style=\"color:var(--text);\">{{username}}</strong>. Se cerrará su sesión y deberá iniciar sesión con la nueva contraseña.",
       "newPasswordLabel": "Nueva Contraseña",
-      "newPasswordPlaceholder": "Mínimo 6 caracteres",
+      "newPasswordPlaceholder": "Mínimo {{min}} caracteres",
       "confirmPasswordLabel": "Confirmar Contraseña",
       "confirmPasswordPlaceholder": "Repetir contraseña",
       "cancel": "Cancelar",
       "submit": "Restablecer Contraseña",
       "errorRequired": "La contraseña es obligatoria",
-      "errorPasswordLength": "La contraseña debe tener al menos 6 caracteres",
+      "errorPasswordLength": "La contraseña debe tener al menos {{min}} caracteres",
       "errorPasswordMismatch": "Las contraseñas no coinciden",
       "successMessage": "Contraseña restablecida para \"{{username}}\""
     },
@@ -269,7 +269,8 @@
     "prevPage": "Anterior",
     "nextPage": "Siguiente",
     "pageInfo": "Página {{page}} de {{totalPages}} ({{total}} acciones)",
-    "failedToLoad": "Error al cargar acciones de administración"
+    "failedToLoad": "Error al cargar acciones de administración",
+    "deletedAdmin": "(cuenta eliminada)"
   },
   "ai": {
     "botManagement": "Gestión de IA de Bots",
@@ -699,7 +700,9 @@
       "save": "Guardar ajustes del mundo abierto",
       "saved": "Ajustes del mundo abierto guardados",
       "saveFailed": "No se pudieron guardar los ajustes del mundo abierto"
-    }
+    },
+    "settingsLoadFailed": "No se pudieron cargar estos ajustes y están bloqueados para que guardar no los sobrescriba: {{settings}}. Recarga la pestaña para intentarlo de nuevo.",
+    "settingLoadFailedHint": "No se pudo cargar. Recarga la pestaña para editar este ajuste."
   },
   "seasons": {
     "sectionTitle": "Gestión de Temporadas",
@@ -941,6 +944,14 @@
       "cancel": "Cancelar",
       "import": "Importar",
       "importSuccess": "Nivel importado exitosamente"
+    },
+    "enemyAiConflict": {
+      "title": "IA de enemigo incluida",
+      "hint": "Este tipo de enemigo trae su propia IA «{{name}}». Elige cómo importarla.",
+      "createNew": "Crear una nueva IA de enemigo «{{name}}» a partir del código incluido",
+      "useExisting": "Usar la IA existente «{{name}}» (ID {{id}})",
+      "skip": "Importar sin IA (usa su patrón de movimiento)",
+      "unresolved": "El servidor aún necesita una decisión sobre la IA incluida. No se importó nada."
     },
     "deleteModal": {
       "entityLabels": {

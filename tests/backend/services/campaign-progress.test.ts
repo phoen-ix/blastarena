@@ -13,6 +13,7 @@ vi.mock('../../../backend/src/db/connection', () => ({
 import {
   getUserState,
   getProgress,
+  isLevelUnlocked,
   recordAttempt,
   recordCompletion,
   updateCarriedPowerups,
@@ -443,6 +444,47 @@ describe('Campaign Progress Service', () => {
 
       const [, params] = mockExecute.mock.calls[0];
       expect(params[0]).toBe(99);
+    });
+  });
+
+  // campaign:start checked only level.isPublished; the lock lived in the client. (audit V11)
+  describe('isLevelUnlocked', () => {
+    it('refuses a level that is unpublished or in an unpublished world', async () => {
+      mockQuery.mockResolvedValueOnce([]);
+
+      expect(await isLevelUnlocked(1, 5)).toBe(false);
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+      const sql = mockQuery.mock.calls[0][0] as string;
+      expect(sql).toContain('l.is_published = TRUE');
+      expect(sql).toContain('w.is_published = TRUE');
+      expect(mockQuery.mock.calls[0][1]).toEqual([5]);
+    });
+
+    it('unlocks the first published level of a world', async () => {
+      mockQuery.mockResolvedValueOnce([{ world_id: 2, sort_order: 0 }]).mockResolvedValueOnce([]);
+
+      expect(await isLevelUnlocked(1, 5)).toBe(true);
+      expect(mockQuery.mock.calls[1][1]).toEqual([2, 0, 0, 5]);
+    });
+
+    it('unlocks a level once the previous one (or the level itself) is completed', async () => {
+      mockQuery
+        .mockResolvedValueOnce([{ world_id: 2, sort_order: 3 }])
+        .mockResolvedValueOnce([{ id: 4 }])
+        .mockResolvedValueOnce([{ level_id: 4 }]);
+
+      expect(await isLevelUnlocked(1, 5)).toBe(true);
+      expect(mockQuery.mock.calls[2][0]).toContain('completed = TRUE');
+      expect(mockQuery.mock.calls[2][1]).toEqual([1, 5, 4]);
+    });
+
+    it('keeps a level locked while the previous one is not completed', async () => {
+      mockQuery
+        .mockResolvedValueOnce([{ world_id: 2, sort_order: 3 }])
+        .mockResolvedValueOnce([{ id: 4 }])
+        .mockResolvedValueOnce([]);
+
+      expect(await isLevelUnlocked(1, 5)).toBe(false);
     });
   });
 });

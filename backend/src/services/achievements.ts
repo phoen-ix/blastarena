@@ -12,6 +12,7 @@ import {
 } from '@blast-arena/shared';
 import { AchievementRow, UserAchievementRow, CountRow } from '../db/types';
 import { RowDataPacket } from 'mysql2';
+import type { PoolConnection, ResultSetHeader } from 'mysql2/promise';
 import * as cosmeticsService from './cosmetics';
 
 function toAchievement(row: AchievementRow): Achievement {
@@ -46,33 +47,43 @@ export async function getAchievementById(id: number): Promise<Achievement | null
   return rows.length > 0 ? toAchievement(rows[0]) : null;
 }
 
-export async function createAchievement(data: {
-  name: string;
-  description: string;
-  icon?: string;
-  category?: string;
-  conditionType: AchievementConditionType;
-  conditionConfig: Record<string, unknown>;
-  rewardType?: AchievementRewardType;
-  rewardId?: number | null;
-  sortOrder?: number;
-}): Promise<Achievement> {
-  const result = await execute(
-    `INSERT INTO achievements (name, description, icon, category, condition_type, condition_config, reward_type, reward_id, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      data.name,
-      data.description,
-      data.icon ?? '🏆',
-      data.category ?? 'general',
-      data.conditionType,
-      JSON.stringify(data.conditionConfig),
-      data.rewardType ?? 'none',
-      data.rewardId ?? null,
-      data.sortOrder ?? 0,
-    ],
-  );
-
+/** `conn`: run inside that transaction (an import creating several rows at once). */
+export async function createAchievement(
+  data: {
+    name: string;
+    description: string;
+    icon?: string;
+    category?: string;
+    conditionType: AchievementConditionType;
+    conditionConfig: Record<string, unknown>;
+    rewardType?: AchievementRewardType;
+    rewardId?: number | null;
+    sortOrder?: number;
+  },
+  conn?: PoolConnection,
+): Promise<Achievement> {
+  const sql = `INSERT INTO achievements (name, description, icon, category, condition_type, condition_config, reward_type, reward_id, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const params = [
+    data.name,
+    data.description,
+    data.icon ?? '🏆',
+    data.category ?? 'general',
+    data.conditionType,
+    JSON.stringify(data.conditionConfig),
+    data.rewardType ?? 'none',
+    data.rewardId ?? null,
+    data.sortOrder ?? 0,
+  ];
+  if (conn) {
+    // Read back on the same connection: the row is not visible to the pool until commit
+    const [result] = await conn.execute<ResultSetHeader>(sql, params);
+    const [rows] = await conn.execute<AchievementRow[]>('SELECT * FROM achievements WHERE id = ?', [
+      result.insertId,
+    ]);
+    return toAchievement(rows[0]);
+  }
+  const result = await execute(sql, params);
   return (await getAchievementById(result.insertId))!;
 }
 
@@ -140,8 +151,10 @@ export async function updateAchievement(
   await execute(`UPDATE achievements SET ${sets.join(', ')} WHERE id = ?`, params);
 }
 
-export async function deleteAchievement(id: number): Promise<void> {
-  await execute('DELETE FROM achievements WHERE id = ?', [id]);
+/** False when no row has this id. */
+export async function deleteAchievement(id: number): Promise<boolean> {
+  const result = await execute('DELETE FROM achievements WHERE id = ?', [id]);
+  return result.affectedRows > 0;
 }
 
 export async function getUserAchievements(userId: number): Promise<UserAchievement[]> {

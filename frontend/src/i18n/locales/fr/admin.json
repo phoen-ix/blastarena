@@ -62,12 +62,12 @@
       "emailLabel": "E-mail *",
       "emailPlaceholder": "utilisateur@exemple.com",
       "passwordLabel": "Mot de passe *",
-      "passwordPlaceholder": "Min. 6 caractères",
+      "passwordPlaceholder": "Min. {{min}} caractères",
       "roleLabel": "Rôle",
       "cancel": "Annuler",
       "submit": "Créer",
       "errorRequired": "Le nom d'utilisateur, l'e-mail et le mot de passe sont requis",
-      "errorPasswordLength": "Le mot de passe doit contenir au moins 6 caractères",
+      "errorPasswordLength": "Le mot de passe doit contenir au moins {{min}} caractères",
       "successMessage": "Utilisateur \"{{username}}\" créé"
     },
     "resetPasswordModal": {
@@ -75,13 +75,13 @@
       "title": "Réinitialiser le mot de passe",
       "description": "Définir un nouveau mot de passe pour <strong style=\"color:var(--text);\">{{username}}</strong>. L'utilisateur sera déconnecté et devra se reconnecter avec le nouveau mot de passe.",
       "newPasswordLabel": "Nouveau mot de passe",
-      "newPasswordPlaceholder": "Min. 6 caractères",
+      "newPasswordPlaceholder": "Min. {{min}} caractères",
       "confirmPasswordLabel": "Confirmer le mot de passe",
       "confirmPasswordPlaceholder": "Ressaisir le mot de passe",
       "cancel": "Annuler",
       "submit": "Réinitialiser le mot de passe",
       "errorRequired": "Le mot de passe est requis",
-      "errorPasswordLength": "Le mot de passe doit contenir au moins 6 caractères",
+      "errorPasswordLength": "Le mot de passe doit contenir au moins {{min}} caractères",
       "errorPasswordMismatch": "Les mots de passe ne correspondent pas",
       "successMessage": "Mot de passe réinitialisé pour \"{{username}}\""
     },
@@ -269,7 +269,8 @@
     "prevPage": "Préc.",
     "nextPage": "Suiv.",
     "pageInfo": "Page {{page}} sur {{totalPages}} ({{total}} actions)",
-    "failedToLoad": "Échec du chargement des actions admin"
+    "failedToLoad": "Échec du chargement des actions admin",
+    "deletedAdmin": "(compte supprimé)"
   },
   "ai": {
     "botManagement": "Gestion de l'IA des bots",
@@ -699,7 +700,9 @@
       "save": "Enregistrer les paramètres du monde ouvert",
       "saved": "Paramètres du monde ouvert enregistrés",
       "saveFailed": "Échec de l'enregistrement des paramètres du monde ouvert"
-    }
+    },
+    "settingsLoadFailed": "Ces paramètres n'ont pas pu être chargés et sont verrouillés pour qu'un enregistrement ne les écrase pas : {{settings}}. Rechargez l'onglet pour réessayer.",
+    "settingLoadFailedHint": "Chargement impossible. Rechargez l'onglet pour modifier ce paramètre."
   },
   "seasons": {
     "sectionTitle": "Gestion des saisons",
@@ -941,6 +944,14 @@
       "cancel": "Annuler",
       "import": "Importer",
       "importSuccess": "Niveau importé avec succès"
+    },
+    "enemyAiConflict": {
+      "title": "IA d'ennemi fournie",
+      "hint": "Ce type d'ennemi est livré avec sa propre IA « {{name}} ». Choisissez comment l'importer.",
+      "createNew": "Créer une nouvelle IA d'ennemi « {{name}} » à partir du code fourni",
+      "useExisting": "Utiliser l'IA existante « {{name}} » (ID {{id}})",
+      "skip": "Importer sans IA (utilise son schéma de déplacement)",
+      "unresolved": "Le serveur attend encore une décision concernant l'IA fournie. Rien n'a été importé."
     },
     "deleteModal": {
       "entityLabels": {

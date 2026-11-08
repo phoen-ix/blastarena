@@ -7,7 +7,8 @@ export interface MapChallenge {
   startDate: string;
   endDate: string;
   isActive: boolean;
-  createdBy: number;
+  /** Null once the creator's account was deleted. */
+  createdBy: number | null;
   createdAt: string;
 }
 

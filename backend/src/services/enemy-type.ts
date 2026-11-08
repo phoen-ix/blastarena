@@ -1,4 +1,5 @@
 import { EnemyTypeEntry, EnemyTypeConfig } from '@blast-arena/shared';
+import type { PoolConnection, ResultSetHeader } from 'mysql2/promise';
 import { query, execute } from '../db/connection';
 import { CampaignEnemyTypeRow } from '../db/types';
 
@@ -43,16 +44,19 @@ export async function getEnemyTypeConfigs(ids: number[]): Promise<Map<number, En
   return map;
 }
 
+/** `conn`: run inside that transaction (a level import creating its enemy types). */
 export async function createEnemyType(
   name: string,
   description: string,
   config: EnemyTypeConfig,
   createdBy: number,
+  conn?: PoolConnection,
 ): Promise<number> {
-  const result = await execute(
-    `INSERT INTO campaign_enemy_types (name, description, config, is_boss, created_by) VALUES (?, ?, ?, ?, ?)`,
-    [name, description, JSON.stringify(config), config.isBoss, createdBy],
-  );
+  const sql = `INSERT INTO campaign_enemy_types (name, description, config, is_boss, created_by) VALUES (?, ?, ?, ?, ?)`;
+  const params = [name, description, JSON.stringify(config), config.isBoss, createdBy];
+  const result = conn
+    ? (await conn.execute<ResultSetHeader>(sql, params))[0]
+    : await execute(sql, params);
   return result.insertId;
 }
 

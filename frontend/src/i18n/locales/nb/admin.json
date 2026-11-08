@@ -62,12 +62,12 @@
       "emailLabel": "E-post *",
       "emailPlaceholder": "bruker@eksempel.no",
       "passwordLabel": "Passord *",
-      "passwordPlaceholder": "Minst 6 tegn",
+      "passwordPlaceholder": "Minst {{min}} tegn",
       "roleLabel": "Rolle",
       "cancel": "Avbryt",
       "submit": "Opprett",
       "errorRequired": "Brukernavn, e-post og passord er påkrevd",
-      "errorPasswordLength": "Passord må være minst 6 tegn",
+      "errorPasswordLength": "Passord må være minst {{min}} tegn",
       "successMessage": "Bruker \"{{username}}\" opprettet"
     },
     "resetPasswordModal": {
@@ -75,13 +75,13 @@
       "title": "Tilbakestill passord",
       "description": "Sett et nytt passord for <strong style=\"color:var(--text);\">{{username}}</strong>. De vil bli logget ut og må logge inn med det nye passordet.",
       "newPasswordLabel": "Nytt passord",
-      "newPasswordPlaceholder": "Minst 6 tegn",
+      "newPasswordPlaceholder": "Minst {{min}} tegn",
       "confirmPasswordLabel": "Bekreft passord",
       "confirmPasswordPlaceholder": "Gjenta passord",
       "cancel": "Avbryt",
       "submit": "Tilbakestill passord",
       "errorRequired": "Passord er påkrevd",
-      "errorPasswordLength": "Passord må være minst 6 tegn",
+      "errorPasswordLength": "Passord må være minst {{min}} tegn",
       "errorPasswordMismatch": "Passordene stemmer ikke overens",
       "successMessage": "Passord tilbakestilt for \"{{username}}\""
     },
@@ -269,7 +269,8 @@
     "prevPage": "Forrige",
     "nextPage": "Neste",
     "pageInfo": "Side {{page}} av {{totalPages}} ({{total}} handlinger)",
-    "failedToLoad": "Kunne ikke laste adminhandlinger"
+    "failedToLoad": "Kunne ikke laste adminhandlinger",
+    "deletedAdmin": "(slettet konto)"
   },
   "ai": {
     "botManagement": "Robot-KI-administrasjon",
@@ -699,7 +700,9 @@
       "save": "Lagre innstillinger for åpen verden",
       "saved": "Innstillinger for åpen verden lagret",
       "saveFailed": "Kunne ikke lagre innstillinger for åpen verden"
-    }
+    },
+    "settingsLoadFailed": "Disse innstillingene kunne ikke lastes og er låst slik at lagring ikke overskriver dem: {{settings}}. Last inn fanen på nytt for å prøve igjen.",
+    "settingLoadFailedHint": "Kunne ikke lastes. Last inn fanen på nytt for å redigere denne innstillingen."
   },
   "seasons": {
     "sectionTitle": "Sesongadministrasjon",
@@ -941,6 +944,14 @@
       "cancel": "Avbryt",
       "import": "Importer",
       "importSuccess": "Nivå importert"
+    },
+    "enemyAiConflict": {
+      "title": "Medfølgende fiende-AI",
+      "hint": "Denne fiendetypen har med seg sin egen AI «{{name}}». Velg hvordan den skal importeres.",
+      "createNew": "Opprett en ny fiende-AI «{{name}}» fra den medfølgende koden",
+      "useExisting": "Bruk den eksisterende AI-en «{{name}}» (ID {{id}})",
+      "skip": "Importer uten AI (bruker bevegelsesmønsteret sitt)",
+      "unresolved": "Serveren trenger fortsatt en avgjørelse om den medfølgende AI-en. Ingenting ble importert."
     },
     "deleteModal": {
       "entityLabels": {

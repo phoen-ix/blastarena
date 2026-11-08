@@ -12,6 +12,8 @@ import {
 import { getConfig } from '../config';
 import { sendEmailChangeEmail, sendEmailTakenChangeWarning } from './email';
 import { logger } from '../utils/logger';
+import { getIO } from '../game/registry';
+import { getErrorMessage } from '@blast-arena/shared';
 import {
   UserRow,
   UserProfileRow,
@@ -139,9 +141,10 @@ export async function requestEmailChange(
     return; // Silently succeed — don't update pending fields, don't reveal conflict
   }
 
-  // Also check if another user has this as a pending email
+  // Also check if another user has this as a pending email. Only an unexpired claim counts: an
+  // abandoned (or deliberately squatted) change used to block the address for everyone, forever.
   const pendingExisting = await query<IdWithLanguageRow[]>(
-    'SELECT id, language FROM users WHERE pending_email_hash = ? AND id != ?',
+    'SELECT id, language FROM users WHERE pending_email_hash = ? AND id != ? AND email_change_expires > NOW()',
     [emailHash, userId],
   );
   if (pendingExisting.length > 0) {
@@ -285,6 +288,14 @@ export async function deleteAccount(userId: number, password: string): Promise<v
   const valid = await comparePassword(password, rows[0].password_hash);
   if (!valid) {
     throw new AppError('Password is incorrect', 401, 'INVALID_PASSWORD');
+  }
+
+  // Live sockets outlived the account: an open game or lobby went on acting for a user id that no
+  // longer exists. Without the socket server (tests, a CLI context) the delete goes ahead.
+  try {
+    getIO().in(`user:${userId}`).disconnectSockets(true);
+  } catch (err) {
+    logger.warn({ err: getErrorMessage(err), userId }, 'Could not disconnect deleted user');
   }
 
   // Hard delete — FK cascades handle all related data

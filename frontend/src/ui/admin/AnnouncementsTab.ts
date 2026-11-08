@@ -8,7 +8,7 @@ import { t } from '../../i18n';
 interface ActiveBanner {
   id: number;
   message: string;
-  admin_username: string;
+  admin_username: string | null;
   created_at: string;
 }
 

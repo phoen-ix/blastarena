@@ -123,6 +123,18 @@ export async function listUsers(page: number = 1, limit: number = 20, search?: s
   return { users: rows, total, page, limit };
 }
 
+/**
+ * Drop every live socket of the user (each one joins `user:{userId}`). Without the socket server
+ * (tests, or a CLI context) the DB change stands and the sockets lapse on their own. (audit B17)
+ */
+function disconnectUserSockets(userId: number, why: string): void {
+  try {
+    getIO().in(`user:${userId}`).disconnectSockets(true);
+  } catch (err) {
+    logger.warn({ err: getErrorMessage(err), userId }, `Could not disconnect ${why} user`);
+  }
+}
+
 /** Role changes and (de)activation used to accept an unknown id: 200, and an audit entry. */
 async function assertUserExists(userId: number): Promise<void> {
   const rows = await query<IdRow[]>('SELECT id FROM users WHERE id = ?', [userId]);
@@ -142,6 +154,10 @@ export async function changeUserRole(
   await execute('UPDATE users SET role = ? WHERE id = ?', [role, userId]);
 
   await logAdminAction(adminId, 'role_change', 'user', userId, role);
+
+  // Sockets carry the role they authenticated with (staff rooms, admin events): a demoted user
+  // kept receiving staff broadcasts until they reconnected. Reconnecting reads the new role.
+  disconnectUserSockets(userId, 'role-changed');
 }
 
 export async function deactivateUser(
@@ -164,14 +180,7 @@ export async function deactivateUser(
 
   if (deactivated) {
     await execute('UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = ?', [userId]);
-    // Force-disconnect active sockets immediately
-    try {
-      getIO().in(`user:${userId}`).disconnectSockets(true);
-    } catch (err) {
-      // Socket server may not be available (tests, or a CLI context) — the DB change stands and
-      // the sessions lapse with their tokens. (audit B17)
-      logger.warn({ err: getErrorMessage(err), userId }, 'Could not disconnect deactivated user');
-    }
+    disconnectUserSockets(userId, 'deactivated');
   }
 }
 
@@ -179,6 +188,8 @@ export async function revokeUserSessions(adminId: number, userId: number): Promi
   if (adminId === userId) {
     throw new AppError('Cannot revoke your own sessions', 400, 'SELF_ACTION');
   }
+  // An unknown id answered 200 and wrote an audit entry
+  await assertUserExists(userId);
 
   await execute('UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = ?', [userId]);
 
@@ -237,8 +248,11 @@ export async function deleteUser(adminId: number, userId: number): Promise<void>
 
   const username = rows[0].username;
 
-  // Log action before deletion (FK cascade would remove the log if admin is the target)
   await logAdminAction(adminId, 'delete', 'user', userId, username);
+
+  // Live sockets outlived the account: an open game or lobby went on acting for a user id that no
+  // longer exists, and writes keyed on it failed the foreign keys.
+  disconnectUserSockets(userId, 'deleted');
 
   // Hard delete — FK cascades handle refresh_tokens, user_stats, match_players
   await execute('DELETE FROM users WHERE id = ?', [userId]);
@@ -407,7 +421,7 @@ export async function getAdminActions(page: number = 1, limit: number = 20, acti
     SELECT a.id, a.admin_id, u.username as admin_username, a.action,
            a.target_type, a.target_id, a.details, a.created_at
     FROM admin_actions a
-    JOIN users u ON u.id = a.admin_id
+    LEFT JOIN users u ON u.id = a.admin_id
   `;
   const params: (string | number)[] = [];
 
@@ -416,6 +430,9 @@ export async function getAdminActions(page: number = 1, limit: number = 20, acti
     params.push(action);
   }
 
+  // LEFT JOIN: a deleted admin's entries stay in the log (migration 047) with admin_id and
+  // admin_username NULL. An inner join hid them from the page while the COUNT below still
+  // counted them, so the pager promised rows it never showed.
   // Tiebreak on the primary key: ORDER BY on a non-unique column is not a total order, so
   // tied rows may resequence per LIMIT/OFFSET window and pages then overlap and gap.
   // (audit PAGINATION-TOTAL-ORDER-1)
@@ -511,7 +528,7 @@ export async function getActiveBanner() {
   const rows = await query(
     `SELECT a.id, a.message, u.username as admin_username, a.created_at
      FROM announcements a
-     JOIN users u ON u.id = a.admin_id
+     LEFT JOIN users u ON u.id = a.admin_id
      WHERE a.is_active = TRUE AND a.type = 'banner'
      ORDER BY a.created_at DESC, a.id DESC LIMIT 1`,
   );
@@ -579,7 +596,7 @@ export async function executeCleanup(
 
   const userIds = rows.map((r) => r.id);
 
-  // Audit log before deletion (FK cascade would remove if admin is in the set)
+  // Audit log before deletion, so a failed delete still leaves the attempt on record
   const details = JSON.stringify({ type, days: days ?? null, count: userIds.length });
   await logAdminAction(adminId, 'bulk_delete', 'user', 0, details);
 

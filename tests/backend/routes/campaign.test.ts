@@ -72,6 +72,15 @@ vi.mock('../../../backend/src/services/campaign-progress', () => ({
   getUserState: mockGetUserState,
 }));
 
+// The level import's write phase runs in a transaction; the fake connection is passed through
+const fakeConn = vi.hoisted(() => ({ fakeConnection: true }));
+const mockWithTransaction = vi.hoisted(() =>
+  vi.fn<AnyFn>(async (fn: (conn: unknown) => unknown) => fn(fakeConn)),
+);
+vi.mock('../../../backend/src/db/connection', () => ({
+  withTransaction: mockWithTransaction,
+}));
+
 const mockLogAdminAction = vi.hoisted(() => vi.fn<AnyFn>());
 vi.mock('../../../backend/src/services/admin-audit', () => ({
   logAdminAction: mockLogAdminAction,
@@ -227,6 +236,11 @@ function sampleLevel(overrides: Record<string, any> = {}) {
     isPublished: true,
     ...overrides,
   };
+}
+
+/** A config the enemy type schema accepts (what an export bundles). */
+function enemyConfig(overrides: Record<string, any> = {}) {
+  return { ...sampleEnemyType().config, ...overrides };
 }
 
 function sampleEnemyType(overrides: Record<string, any> = {}) {
@@ -1435,6 +1449,13 @@ describe('GET /admin/campaign/enemy-types/:id/export', () => {
 describe('POST /admin/campaign/levels/import', () => {
   const handler = getHandler('post', '/admin/campaign/levels/import');
 
+  beforeEach(() => {
+    // Mapped and unmapped ids exist unless a test says otherwise
+    mockGetEnemyType.mockImplementation(async (id: number) => sampleEnemyType({ id }));
+    mockGetEnemyAI.mockResolvedValue(null);
+    mockGetWorld.mockResolvedValue({ id: 1 });
+  });
+
   it('refuses an unknown world before creating any enemy type', async () => {
     // createLevel checks it too, but only after phase 2 had created the enemy types
     mockGetWorld.mockResolvedValueOnce(null);
@@ -1443,7 +1464,7 @@ describe('POST /admin/campaign/levels/import', () => {
       body: {
         worldId: 404,
         level: { name: 'L', tiles: [['empty']], enemyPlacements: [{ enemyTypeId: 7, x: 1, y: 1 }] },
-        enemyTypes: [{ id: 7, name: 'E', config: {} }],
+        enemyTypes: [{ id: 7, name: 'E', config: enemyConfig() }],
         enemyIdMap: { '7': 'create' },
       },
     });
@@ -1481,6 +1502,7 @@ describe('POST /admin/campaign/levels/import', () => {
       3,
       expect.objectContaining({ name: 'Imported Level', tiles: [['empty']] }),
       1,
+      fakeConn,
     );
   });
 
@@ -1604,7 +1626,9 @@ describe('POST /admin/campaign/levels/import', () => {
           tiles: [['empty']],
           enemyPlacements: [{ enemyTypeId: 5, x: 1, y: 1 }],
         },
-        enemyTypes: [{ originalId: 5, name: 'Bundle Blob', description: '', config: {} }],
+        enemyTypes: [
+          { originalId: 5, name: 'Bundle Blob', description: '', config: enemyConfig() },
+        ],
       },
     });
     const res = mockRes();
@@ -1634,7 +1658,9 @@ describe('POST /admin/campaign/levels/import', () => {
           tiles: [['empty']],
           enemyPlacements: [{ enemyTypeId: 99, x: 1, y: 1 }],
         },
-        enemyTypes: [{ originalId: 99, name: 'New Monster', description: '', config: {} }],
+        enemyTypes: [
+          { originalId: 99, name: 'New Monster', description: '', config: enemyConfig() },
+        ],
       },
     });
     const res = mockRes();
@@ -1713,7 +1739,7 @@ describe('POST /admin/campaign/levels/import', () => {
           enemyPlacements: [{ enemyTypeId: 50, x: 1, y: 1 }],
         },
         enemyTypes: [
-          { originalId: 50, name: 'Created Monster', description: 'desc', config: { speed: 1 } },
+          { originalId: 50, name: 'Created Monster', description: 'desc', config: enemyConfig() },
         ],
         enemyIdMap: { '50': 'create' },
       },
@@ -1721,13 +1747,20 @@ describe('POST /admin/campaign/levels/import', () => {
     const res = mockRes();
     await handler(req, res, vi.fn());
 
-    expect(mockCreateEnemyType).toHaveBeenCalledWith('Created Monster', 'desc', { speed: 1 }, 1);
+    expect(mockCreateEnemyType).toHaveBeenCalledWith(
+      'Created Monster',
+      'desc',
+      expect.objectContaining({ speed: 1 }),
+      1,
+      fakeConn,
+    );
     expect(mockCreateLevel).toHaveBeenCalledWith(
       1,
       expect.objectContaining({
         enemyPlacements: [{ enemyTypeId: 100, x: 1, y: 1 }],
       }),
       1,
+      fakeConn,
     );
     expect(res._status).toBe(201);
   });
@@ -1762,6 +1795,7 @@ describe('POST /admin/campaign/levels/import', () => {
         ],
       }),
       1,
+      fakeConn,
     );
     expect(res._status).toBe(201);
   });
@@ -1793,6 +1827,7 @@ describe('POST /admin/campaign/levels/import', () => {
         enemyPlacements: [{ enemyTypeId: 10, x: 2, y: 2 }],
       }),
       1,
+      fakeConn,
     );
   });
 
@@ -1826,6 +1861,7 @@ describe('POST /admin/campaign/levels/import', () => {
         ],
       }),
       1,
+      fakeConn,
     );
   });
 
@@ -1853,6 +1889,7 @@ describe('POST /admin/campaign/levels/import', () => {
         enemyPlacements: [],
       }),
       1,
+      fakeConn,
     );
   });
 
@@ -1886,6 +1923,7 @@ describe('POST /admin/campaign/levels/import', () => {
       1,
       expect.objectContaining({ name: 'Nested Bundle Level' }),
       1,
+      fakeConn,
     );
   });
 
@@ -1917,6 +1955,7 @@ describe('POST /admin/campaign/levels/import', () => {
       1,
       expect.objectContaining({ name: 'Top Bundle Level' }),
       1,
+      fakeConn,
     );
   });
 
@@ -1933,14 +1972,20 @@ describe('POST /admin/campaign/levels/import', () => {
           tiles: [['empty']],
           enemyPlacements: [{ enemyTypeId: 50, x: 1, y: 1 }],
         },
-        enemyTypes: [{ originalId: 50, name: 'Monster', config: { speed: 1 } }],
+        enemyTypes: [{ originalId: 50, name: 'Monster', config: enemyConfig() }],
         enemyIdMap: { '50': 'create' },
       },
     });
     const res = mockRes();
     await handler(req, res, vi.fn());
 
-    expect(mockCreateEnemyType).toHaveBeenCalledWith('Monster', '', { speed: 1 }, 1);
+    expect(mockCreateEnemyType).toHaveBeenCalledWith(
+      'Monster',
+      '',
+      expect.objectContaining({ speed: 1 }),
+      1,
+      fakeConn,
+    );
   });
 
   it('handles create action when no bundled enemy type matches originalId', async () => {
@@ -1955,7 +2000,7 @@ describe('POST /admin/campaign/levels/import', () => {
           tiles: [['empty']],
           enemyPlacements: [{ enemyTypeId: 50, x: 1, y: 1 }],
         },
-        enemyTypes: [{ originalId: 999, name: 'Wrong', config: {} }],
+        enemyTypes: [{ originalId: 999, name: 'Wrong', config: enemyConfig() }],
         enemyIdMap: { '50': 'create' },
       },
     });
@@ -1971,6 +2016,7 @@ describe('POST /admin/campaign/levels/import', () => {
         enemyPlacements: [{ enemyTypeId: 50, x: 1, y: 1 }],
       }),
       1,
+      fakeConn,
     );
   });
 
@@ -2018,8 +2064,8 @@ describe('POST /admin/campaign/levels/import', () => {
           ],
         },
         enemyTypes: [
-          { originalId: 5, name: 'Bundle Blob', description: '', config: {} },
-          { originalId: 99, name: 'New Ghost', description: '', config: {} },
+          { originalId: 5, name: 'Bundle Blob', description: '', config: enemyConfig() },
+          { originalId: 99, name: 'New Ghost', description: '', config: enemyConfig() },
         ],
       },
     });
@@ -2052,7 +2098,7 @@ describe('POST /admin/campaign/levels/import', () => {
           ],
         },
         enemyTypes: [
-          { originalId: 10, name: 'Create Me', description: 'new', config: { speed: 1 } },
+          { originalId: 10, name: 'Create Me', description: 'new', config: enemyConfig() },
         ],
         enemyIdMap: {
           '10': 'create',
@@ -2065,7 +2111,13 @@ describe('POST /admin/campaign/levels/import', () => {
     await handler(req, res, vi.fn());
 
     // 10 -> create -> 300, 20 -> skip (removed), 30 -> remap to 55
-    expect(mockCreateEnemyType).toHaveBeenCalledWith('Create Me', 'new', { speed: 1 }, 1);
+    expect(mockCreateEnemyType).toHaveBeenCalledWith(
+      'Create Me',
+      'new',
+      expect.objectContaining({ speed: 1 }),
+      1,
+      fakeConn,
+    );
     expect(mockCreateLevel).toHaveBeenCalledWith(
       1,
       expect.objectContaining({
@@ -2075,8 +2127,201 @@ describe('POST /admin/campaign/levels/import', () => {
         ],
       }),
       1,
+      fakeConn,
     );
     expect(res._status).toBe(201);
+  });
+
+  // ---- Validation and atomicity ----
+
+  function bundleImport(overrides: Record<string, any> = {}) {
+    return mockReq({
+      user: { userId: 1 },
+      body: {
+        worldId: 1,
+        level: {
+          name: 'Bundle',
+          tiles: [['empty']],
+          enemyPlacements: [{ enemyTypeId: 50, x: 1, y: 1 }],
+        },
+        enemyTypes: [{ originalId: 50, name: 'Monster', description: '', config: enemyConfig() }],
+        enemyIdMap: { '50': 'create' },
+        ...overrides,
+      },
+    });
+  }
+
+  it('rejects a bundled enemy type the create schema would reject, creating nothing', async () => {
+    const res = mockRes();
+    await handler(
+      bundleImport({
+        enemyTypes: [
+          {
+            originalId: 50,
+            name: 'Monster',
+            config: enemyConfig({
+              sprite: { ...enemyConfig().sprite, primaryColor: '<img src=x onerror=alert(1)>' },
+            }),
+          },
+        ],
+      }),
+      res,
+      vi.fn(),
+    );
+
+    expect(res._status).toBe(400);
+    expect(res._json).toMatchObject({ error: 'Invalid enemy type data' });
+    expect(mockWithTransaction).not.toHaveBeenCalled();
+    expect(mockCreateEnemyType).not.toHaveBeenCalled();
+    expect(mockCreateLevel).not.toHaveBeenCalled();
+  });
+
+  it('rejects a bundled enemy type without a numeric originalId or with a bad config', async () => {
+    for (const enemyTypes of [
+      [{ originalId: '50', name: 'Monster', config: enemyConfig() }],
+      [{ originalId: 50, name: 'Monster', config: { speed: 1 } }],
+      [{ originalId: 50, name: 42, config: enemyConfig() }],
+    ]) {
+      const res = mockRes();
+      await handler(bundleImport({ enemyTypes }), res, vi.fn());
+      expect(res._status).toBe(400);
+    }
+    expect(mockCreateEnemyType).not.toHaveBeenCalled();
+  });
+
+  it('rejects a placement whose enemyTypeId is not a number', async () => {
+    const res = mockRes();
+    await handler(
+      bundleImport({
+        level: {
+          name: 'L',
+          tiles: [['empty']],
+          enemyPlacements: [{ enemyTypeId: '5', x: 1, y: 1 }],
+        },
+        enemyTypes: undefined,
+        enemyIdMap: undefined,
+      }),
+      res,
+      vi.fn(),
+    );
+    expect(res._status).toBe(400);
+    expect(mockCreateLevel).not.toHaveBeenCalled();
+  });
+
+  it('answers 400 when a numeric mapping names an unknown enemy type, creating nothing', async () => {
+    mockGetEnemyType.mockImplementation(async (id: number) =>
+      id === 404 ? null : sampleEnemyType({ id }),
+    );
+    const res = mockRes();
+    await handler(
+      bundleImport({
+        level: {
+          name: 'L',
+          tiles: [['empty']],
+          enemyPlacements: [
+            { enemyTypeId: 50, x: 1, y: 1 },
+            { enemyTypeId: 60, x: 2, y: 2 },
+          ],
+        },
+        enemyIdMap: { '50': 'create', '60': 404 },
+      }),
+      res,
+      vi.fn(),
+    );
+
+    expect(res._status).toBe(400);
+    expect(res._json).toMatchObject({ code: 'ENEMY_TYPE_NOT_FOUND' });
+    expect(mockCreateEnemyType).not.toHaveBeenCalled();
+    expect(mockCreateLevel).not.toHaveBeenCalled();
+    expect(mockLogAdminAction).not.toHaveBeenCalled();
+  });
+
+  it('answers 400 for a "create" without bundled data when the id does not exist here', async () => {
+    mockGetEnemyType.mockResolvedValue(null);
+    const res = mockRes();
+    await handler(bundleImport({ enemyTypes: [] }), res, vi.fn());
+    expect(res._status).toBe(400);
+    expect(res._json).toMatchObject({ code: 'ENEMY_TYPE_NOT_FOUND' });
+    expect(mockCreateLevel).not.toHaveBeenCalled();
+  });
+
+  it('drops an enemy AI id this server does not have, keeps one it has', async () => {
+    mockCreateEnemyType.mockResolvedValue(100);
+    mockCreateLevel.mockResolvedValue(25);
+    const foreign = '11111111-1111-4111-8111-111111111111';
+    const local = '22222222-2222-4222-8222-222222222222';
+    mockGetEnemyAI.mockImplementation(async (id: string) => (id === local ? { id } : null));
+
+    await handler(
+      bundleImport({
+        level: {
+          name: 'L',
+          tiles: [['empty']],
+          enemyPlacements: [
+            { enemyTypeId: 50, x: 1, y: 1 },
+            { enemyTypeId: 60, x: 2, y: 2 },
+          ],
+        },
+        enemyTypes: [
+          {
+            originalId: 50,
+            name: 'Foreign',
+            config: enemyConfig({ enemyAiId: foreign, difficulty: 'hard' }),
+          },
+          {
+            originalId: 60,
+            name: 'Local',
+            config: enemyConfig({ enemyAiId: local, difficulty: 'easy' }),
+          },
+        ],
+        enemyIdMap: { '50': 'create', '60': 'create' },
+      }),
+      mockRes(),
+      vi.fn(),
+    );
+
+    const foreignConfig = mockCreateEnemyType.mock.calls[0][2];
+    expect(foreignConfig.enemyAiId).toBeUndefined();
+    expect(foreignConfig.difficulty).toBeUndefined();
+    const localConfig = mockCreateEnemyType.mock.calls[1][2];
+    expect(localConfig).toMatchObject({ enemyAiId: local, difficulty: 'easy' });
+  });
+
+  it('creates the enemy types and the level in one transaction', async () => {
+    mockCreateEnemyType.mockResolvedValue(100);
+    mockCreateLevel.mockResolvedValue(25);
+    const res = mockRes();
+    await handler(bundleImport(), res, vi.fn());
+
+    expect(res._status).toBe(201);
+    expect(mockWithTransaction).toHaveBeenCalledTimes(1);
+    expect(mockCreateEnemyType.mock.calls[0][4]).toBe(fakeConn);
+    expect(mockCreateLevel.mock.calls[0][3]).toBe(fakeConn);
+  });
+
+  it('logs nothing when the level insert fails (the transaction rolls the enemy types back)', async () => {
+    mockCreateEnemyType.mockResolvedValue(100);
+    const err = new Error('insert failed');
+    mockCreateLevel.mockRejectedValueOnce(err);
+    const next = vi.fn();
+    await handler(bundleImport(), mockRes(), next);
+
+    expect(next).toHaveBeenCalledWith(err);
+    expect(mockLogAdminAction).not.toHaveBeenCalled();
+  });
+
+  it('audit-logs every enemy type the import created', async () => {
+    mockCreateEnemyType.mockResolvedValue(100);
+    mockCreateLevel.mockResolvedValue(25);
+    await handler(bundleImport(), mockRes(), vi.fn());
+
+    expect(mockLogAdminAction).toHaveBeenCalledWith(
+      1,
+      'enemy_type_import',
+      'enemy_type',
+      100,
+      JSON.stringify({ name: 'Monster', enemyAiId: null }),
+    );
   });
 });
 
@@ -2568,7 +2813,7 @@ describe('campaign admin routes write the audit log', () => {
             tiles: [['empty']],
             enemyPlacements: [{ enemyTypeId: 7, x: 1, y: 1 }],
           },
-          enemyTypes: [{ originalId: 7, name: 'E', config: {} }],
+          enemyTypes: [{ originalId: 7, name: 'E', config: enemyConfig() }],
           enemyIdMap: { '7': 'create' },
         },
       }),

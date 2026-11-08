@@ -74,6 +74,7 @@ import {
   changeUserRole,
   deactivateUser,
   deleteUser,
+  revokeUserSessions,
   resetUserPassword,
   getServerStats,
   getMatchHistory,
@@ -1063,6 +1064,85 @@ describe('admin service', () => {
 
       const details = JSON.parse(mockExecute.mock.calls[0][1][4]);
       expect(details.days).toBeNull();
+    });
+  });
+
+  // ── live sockets follow account changes ─────────────────────────────
+
+  describe('socket disconnects and missing users', () => {
+    function ioSpy() {
+      const disconnectSockets = vi.fn();
+      const fetchSockets = vi.fn().mockResolvedValue([]);
+      const inRoom = vi.fn().mockReturnValue({ disconnectSockets, fetchSockets });
+      mockGetIO.mockImplementation(() => ({ in: inRoom }));
+      return { inRoom, disconnectSockets };
+    }
+
+    it('a role change disconnects the user so the sockets reconnect with the new role', async () => {
+      const { inRoom, disconnectSockets } = ioSpy();
+      mockQuery.mockResolvedValueOnce([{ id: 5 }]);
+      mockExecute.mockResolvedValue({});
+
+      await changeUserRole(1, 5, 'user');
+
+      expect(inRoom).toHaveBeenCalledWith('user:5');
+      expect(disconnectSockets).toHaveBeenCalledWith(true);
+      // After the UPDATE: a reconnect before it would read the old role
+      expect(disconnectSockets.mock.invocationCallOrder[0]).toBeGreaterThan(
+        mockExecute.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('deleting a user disconnects their sockets before the row goes', async () => {
+      const { inRoom, disconnectSockets } = ioSpy();
+      mockQuery.mockResolvedValueOnce([{ id: 5, username: 'victim' }]);
+      mockExecute.mockResolvedValue({});
+
+      await deleteUser(1, 5);
+
+      expect(inRoom).toHaveBeenCalledWith('user:5');
+      const deleteCall = mockExecute.mock.calls.findIndex((c) =>
+        String(c[0]).startsWith('DELETE FROM users'),
+      );
+      expect(disconnectSockets.mock.invocationCallOrder[0]).toBeLessThan(
+        mockExecute.mock.invocationCallOrder[deleteCall],
+      );
+    });
+
+    it('deletes the user even without a socket server', async () => {
+      mockGetIO.mockImplementation(() => {
+        throw new Error('Socket.io server not initialized');
+      });
+      mockQuery.mockResolvedValueOnce([{ id: 5, username: 'victim' }]);
+      mockExecute.mockResolvedValue({});
+
+      await deleteUser(1, 5);
+
+      expect(mockExecute).toHaveBeenCalledWith('DELETE FROM users WHERE id = ?', [5]);
+    });
+
+    it('revoking the sessions of an unknown user answers 404 and logs nothing', async () => {
+      ioSpy();
+      mockQuery.mockResolvedValueOnce([]);
+
+      await expect(revokeUserSessions(1, 99)).rejects.toMatchObject({ statusCode: 404 });
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it("keeps a deleted admin's entries in the log list (LEFT JOIN, like the count)", async () => {
+      mockQuery.mockResolvedValueOnce([]);
+      mockQuery.mockResolvedValueOnce([{ total: 0 }]);
+
+      await getAdminActions(1, 20);
+
+      expect(mockQuery.mock.calls[0][0]).toMatch(/LEFT JOIN users u ON u\.id = a\.admin_id/);
+      expect(mockQuery.mock.calls[1][0]).not.toMatch(/JOIN/);
+    });
+
+    it('still shows a banner whose author was deleted', async () => {
+      mockQuery.mockResolvedValueOnce([]);
+      await getActiveBanner();
+      expect(mockQuery.mock.calls[0][0]).toMatch(/LEFT JOIN users u ON u\.id = a\.admin_id/);
     });
   });
 });

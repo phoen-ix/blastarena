@@ -62,12 +62,12 @@
       "emailLabel": "E-mail *",
       "emailPlaceholder": "gebruiker@voorbeeld.nl",
       "passwordLabel": "Wachtwoord *",
-      "passwordPlaceholder": "Minimaal 6 tekens",
+      "passwordPlaceholder": "Minimaal {{min}} tekens",
       "roleLabel": "Rol",
       "cancel": "Annuleren",
       "submit": "Aanmaken",
       "errorRequired": "Gebruikersnaam, e-mail en wachtwoord zijn verplicht",
-      "errorPasswordLength": "Wachtwoord moet minimaal 6 tekens bevatten",
+      "errorPasswordLength": "Wachtwoord moet minimaal {{min}} tekens bevatten",
       "successMessage": "Gebruiker \"{{username}}\" aangemaakt"
     },
     "resetPasswordModal": {
@@ -75,13 +75,13 @@
       "title": "Wachtwoord resetten",
       "description": "Stel een nieuw wachtwoord in voor <strong style=\"color:var(--text);\">{{username}}</strong>. Ze worden uitgelogd en moeten inloggen met het nieuwe wachtwoord.",
       "newPasswordLabel": "Nieuw wachtwoord",
-      "newPasswordPlaceholder": "Minimaal 6 tekens",
+      "newPasswordPlaceholder": "Minimaal {{min}} tekens",
       "confirmPasswordLabel": "Bevestig wachtwoord",
       "confirmPasswordPlaceholder": "Wachtwoord nogmaals invoeren",
       "cancel": "Annuleren",
       "submit": "Wachtwoord resetten",
       "errorRequired": "Wachtwoord is verplicht",
-      "errorPasswordLength": "Wachtwoord moet minimaal 6 tekens bevatten",
+      "errorPasswordLength": "Wachtwoord moet minimaal {{min}} tekens bevatten",
       "errorPasswordMismatch": "Wachtwoorden komen niet overeen",
       "successMessage": "Wachtwoord gereset voor \"{{username}}\""
     },
@@ -269,7 +269,8 @@
     "prevPage": "Vorige",
     "nextPage": "Volgende",
     "pageInfo": "Pagina {{page}} van {{totalPages}} ({{total}} acties)",
-    "failedToLoad": "Beheerdersacties laden mislukt"
+    "failedToLoad": "Beheerdersacties laden mislukt",
+    "deletedAdmin": "(verwijderd account)"
   },
   "ai": {
     "botManagement": "Bot-AI-beheer",
@@ -699,7 +700,9 @@
       "save": "Instellingen open wereld opslaan",
       "saved": "Instellingen open wereld opgeslagen",
       "saveFailed": "Instellingen open wereld opslaan mislukt"
-    }
+    },
+    "settingsLoadFailed": "Deze instellingen konden niet worden geladen en zijn vergrendeld zodat opslaan ze niet overschrijft: {{settings}}. Laad het tabblad opnieuw om het nog eens te proberen.",
+    "settingLoadFailedHint": "Kon niet worden geladen. Laad het tabblad opnieuw om deze instelling te bewerken."
   },
   "seasons": {
     "sectionTitle": "Seizoensbeheer",
@@ -941,6 +944,14 @@
       "cancel": "Annuleren",
       "import": "Importeren",
       "importSuccess": "Level succesvol geïmporteerd"
+    },
+    "enemyAiConflict": {
+      "title": "Meegeleverde vijand-AI",
+      "hint": "Dit vijandtype heeft een eigen AI \"{{name}}\". Kies hoe die geïmporteerd wordt.",
+      "createNew": "Een nieuwe vijand-AI \"{{name}}\" maken van de meegeleverde code",
+      "useExisting": "De bestaande AI \"{{name}}\" gebruiken (ID {{id}})",
+      "skip": "Importeren zonder AI (gebruikt zijn bewegingspatroon)",
+      "unresolved": "De server heeft nog een beslissing nodig over de meegeleverde AI. Er is niets geïmporteerd."
     },
     "deleteModal": {
       "entityLabels": {

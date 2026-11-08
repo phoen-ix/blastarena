@@ -352,10 +352,11 @@ describe('Cosmetics Service', () => {
       );
     });
 
-    it('should not throw when deleting non-existent id', async () => {
-      mockExecute.mockResolvedValue({ affectedRows: 0 });
-
-      await expect(deleteCosmetic(999)).resolves.toBeUndefined();
+    it('reports whether a row was deleted (false for an unknown id)', async () => {
+      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
+      await expect(deleteCosmetic(12)).resolves.toBe(true);
+      mockExecute.mockResolvedValueOnce({ affectedRows: 0 });
+      await expect(deleteCosmetic(999)).resolves.toBe(false);
     });
   });
 

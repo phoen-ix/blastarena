@@ -117,6 +117,8 @@ describe('migration files', () => {
       /\bCREATE (?:UNIQUE )?INDEX (?!IF NOT EXISTS)/i,
       /\bCREATE TABLE (?!IF NOT EXISTS)/i,
       /\bDROP (?:COLUMN|INDEX|KEY|TABLE) (?!IF EXISTS)/i,
+      /\bDROP FOREIGN KEY (?!IF EXISTS)/i,
+      /\bADD (?:CONSTRAINT \w+ )?FOREIGN KEY (?!IF NOT EXISTS)/i,
     ];
     const files = [
       ...ups.filter((f) => parseInt(f, 10) >= 42).map((f) => path.join(MIGRATIONS_DIR, f)),
@@ -134,6 +136,47 @@ describe('migration files', () => {
       }
     }
     expect(unguarded).toEqual([]);
+  });
+
+  it('047 keeps the audit trail: the author columns become nullable, ON DELETE SET NULL', () => {
+    const up = fs.readFileSync(
+      path.join(MIGRATIONS_DIR, '047_keep_audit_trail_on_user_delete.sql'),
+      'utf-8',
+    );
+    const down = fs.readFileSync(
+      path.join(DOWN_DIR, '047_keep_audit_trail_on_user_delete.down.sql'),
+      'utf-8',
+    );
+    const targets = [
+      // table, column, position of its foreign key in the CREATE TABLE (001/002/032)
+      ['admin_actions', 'admin_id', 1],
+      ['announcements', 'admin_id', 1],
+      ['map_challenges', 'created_by', 2],
+    ] as const;
+    for (const [table, column, n] of targets) {
+      // The unnamed foreign key under both of MariaDB's naming schemes (before/after 12.1)
+      expect(up).toContain(`ALTER TABLE ${table} DROP FOREIGN KEY IF EXISTS ${table}_ibfk_${n};`);
+      expect(up).toContain(`ALTER TABLE ${table} DROP FOREIGN KEY IF EXISTS \`${n}\`;`);
+      expect(up).toContain(`ALTER TABLE ${table} MODIFY COLUMN ${column} INT NULL;`);
+      expect(up).toMatch(
+        new RegExp(
+          `ALTER TABLE ${table} ADD CONSTRAINT \\w+ FOREIGN KEY IF NOT EXISTS \\(${column}\\) ` +
+            'REFERENCES users\\(id\\) ON DELETE SET NULL;',
+        ),
+      );
+      expect(down).toContain(`ALTER TABLE ${table} MODIFY COLUMN ${column} INT NOT NULL;`);
+      expect(down).toContain(
+        `ALTER TABLE ${table} ADD CONSTRAINT ${table}_ibfk_${n} FOREIGN KEY IF NOT EXISTS ` +
+          `(${column}) REFERENCES users(id) ON DELETE CASCADE;`,
+      );
+    }
+    // The positions above are the declaration order in the original CREATE TABLEs
+    const challenges = fs.readFileSync(
+      path.join(MIGRATIONS_DIR, '032_map_challenges.sql'),
+      'utf-8',
+    );
+    const fks = [...challenges.matchAll(/FOREIGN KEY \((\w+)\)/g)].map((m) => m[1]);
+    expect(fks.slice(0, 2)).toEqual(['custom_map_id', 'created_by']);
   });
 
   it('041 drops login_attempts and its down recreates the 001 definition verbatim', () => {

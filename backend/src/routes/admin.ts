@@ -17,7 +17,7 @@ import * as cosmeticsService from '../services/cosmetics';
 import { invalidateTransporter, sendTestEmail } from '../services/email';
 import { getSimulationManager, getIO } from '../game/registry';
 import { openWorldManager } from '../game/OpenWorldManager';
-import { execute, query } from '../db/connection';
+import { execute, query, withTransaction } from '../db/connection';
 import { logAdminAction } from '../services/admin-audit';
 import { IdRow } from '../db/types';
 import { logger } from '../utils/logger';
@@ -39,6 +39,11 @@ import {
   OPENWORLD_MAX_AFK_TIMEOUT,
   SMTP_SECURITY_MODES,
   defaultSmtpSecurity,
+  USERNAME_MIN_LENGTH,
+  USERNAME_MAX_LENGTH,
+  USERNAME_REGEX,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_MAX_LENGTH,
 } from '@blast-arena/shared';
 import multer from 'multer';
 import { AppError } from '../middleware/errorHandler';
@@ -63,18 +68,15 @@ const bannerSchema = z.object({
   message: z.string().min(1).max(1000),
 });
 
+// The rules registration and the password change apply: an admin-set password could be 6 long.
 const resetPasswordSchema = z.object({
-  password: z.string().min(6).max(128),
+  password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
 });
 
 const createUserSchema = z.object({
-  username: z
-    .string()
-    .min(3)
-    .max(20)
-    .regex(/^[a-zA-Z0-9_-]+$/),
+  username: z.string().min(USERNAME_MIN_LENGTH).max(USERNAME_MAX_LENGTH).regex(USERNAME_REGEX),
   email: z.email().max(255),
-  password: z.string().min(6).max(128),
+  password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
   role: z.enum(['user', 'moderator', 'admin']).optional(),
 });
 
@@ -589,27 +591,38 @@ router.put(
   },
 );
 
-router.put('/admin/settings/xp_multiplier', adminOnlyMiddleware, async (req, res, next) => {
-  try {
-    const multiplier = parseFloat(req.body.multiplier);
-    if (isNaN(multiplier) || multiplier < 0 || multiplier > 10) {
-      return res.status(400).json({ error: 'Multiplier must be between 0 and 10' });
-    }
-    await settingsService.setSetting('xp_multiplier', String(multiplier));
-    await logAdminAction(
-      req.user!.userId,
-      'update_setting',
-      'setting',
-      0,
-      JSON.stringify({ key: 'xp_multiplier', value: multiplier }),
-    );
-    const io = getIO();
-    io.to('role:staff').emit('admin:settingsChanged', { key: 'xp_multiplier', value: multiplier });
-    res.json({ message: 'XP multiplier updated' });
-  } catch (err) {
-    next(err);
-  }
+// A number, not parseFloat() of anything: "2abc" was stored as 2, and a missing body crashed into
+// a 500.
+const xpMultiplierSchema = z.object({
+  multiplier: z.number().min(0).max(10),
 });
+
+router.put(
+  '/admin/settings/xp_multiplier',
+  adminOnlyMiddleware,
+  validate(xpMultiplierSchema),
+  async (req, res, next) => {
+    try {
+      const multiplier: number = req.body.multiplier;
+      await settingsService.setSetting('xp_multiplier', String(multiplier));
+      await logAdminAction(
+        req.user!.userId,
+        'update_setting',
+        'setting',
+        0,
+        JSON.stringify({ key: 'xp_multiplier', value: multiplier }),
+      );
+      const io = getIO();
+      io.to('role:staff').emit('admin:settingsChanged', {
+        key: 'xp_multiplier',
+        value: multiplier,
+      });
+      res.json({ message: 'XP multiplier updated' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 const themeSchema = z.object({
   theme: z.enum(THEME_IDS as unknown as [string, ...string[]]),
@@ -673,9 +686,24 @@ router.put(
 
 // --- Imprint & GitHub Display ---
 
+// `text` is optional: a PUT without it (the dashboard's on/off toggle) keeps the stored text.
 const imprintSchema = z.object({
   enabled: z.boolean(),
   text: z.string().max(10000).optional(),
+});
+
+// The stored text whether or not the imprint is shown. The public GET answers '' while it is
+// off, so a dashboard that loaded from there and saved on toggle wiped the text.
+router.get('/admin/settings/imprint/raw', adminOnlyMiddleware, async (_req, res, next) => {
+  try {
+    const [enabled, text] = await Promise.all([
+      settingsService.getSetting('display_imprint'),
+      settingsService.getSetting('imprint_text'),
+    ]);
+    res.json({ enabled: enabled === 'true', text: text ?? '' });
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.put(
@@ -740,6 +768,9 @@ const gameDefaultsSchema = z.object({
     reinforcedWalls: z.boolean().optional(),
     enableMapEvents: z.boolean().optional(),
     hazardTiles: z.boolean().optional(),
+    // GameDefaults has both, but the schema stripped them: saving these defaults did nothing
+    puzzleTiles: z.boolean().optional(),
+    enableSpectatorActions: z.boolean().optional(),
     friendlyFire: z.boolean().optional(),
     enabledPowerUps: z
       .array(
@@ -775,6 +806,8 @@ const simulationDefaultsSchema = z.object({
     reinforcedWalls: z.boolean().optional(),
     enableMapEvents: z.boolean().optional(),
     hazardTiles: z.boolean().optional(),
+    puzzleTiles: z.boolean().optional(),
+    enableSpectatorActions: z.boolean().optional(),
     friendlyFire: z.boolean().optional(),
     enabledPowerUps: z
       .array(
@@ -908,16 +941,27 @@ router.put(
   async (req, res, next) => {
     try {
       const incoming = req.body as EmailSettings;
-      const existing = await settingsService.getEmailSettings();
+      // An empty body is the dashboard's Reset: every stored value goes, the password included,
+      // and .env applies again. It used to keep the stored password.
+      const reset = Object.keys(incoming).length === 0;
 
-      // Password handling: preserve existing if masked/undefined, clear if empty string
-      if (incoming.smtpPassword === PASSWORD_MASK || incoming.smtpPassword === undefined) {
-        incoming.smtpPassword = existing.smtpPassword;
-      } else if (incoming.smtpPassword === '') {
-        delete incoming.smtpPassword;
+      if (!reset) {
+        const existing = await settingsService.getEmailSettings();
+        const config = getConfig();
+        // Masked or absent: keep the password, but only for the server and account it was entered
+        // for. Pointing host or user elsewhere without re-entering it handed the stored (or .env)
+        // password to that server on the next send.
+        if (incoming.smtpPassword === PASSWORD_MASK || incoming.smtpPassword === undefined) {
+          const sameAccount =
+            (incoming.smtpHost ?? config.SMTP_HOST) === (existing.smtpHost ?? config.SMTP_HOST) &&
+            (incoming.smtpUser ?? config.SMTP_USER) === (existing.smtpUser ?? config.SMTP_USER);
+          incoming.smtpPassword = sameAccount ? existing.smtpPassword : '';
+        }
+        // '' is stored as is: no password. Leaving the key out fell back to SMTP_PASSWORD, so
+        // "clear" brought the .env password straight back.
       }
 
-      await settingsService.setEmailSettings(incoming);
+      await settingsService.setEmailSettings(reset ? {} : incoming);
       invalidateTransporter();
 
       await logAdminAction(
@@ -925,7 +969,7 @@ router.put(
         'update_setting',
         'setting',
         0,
-        JSON.stringify({ key: 'email_settings' }),
+        JSON.stringify(reset ? { key: 'email_settings', reset: true } : { key: 'email_settings' }),
       );
 
       const io = getIO();
@@ -1388,7 +1432,16 @@ router.get('/admin/campaign-replays/:sessionId', fsReadLimiter, async (req, res,
 router.delete('/admin/campaign-replays/:sessionId', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const sessionId = param(req.params.sessionId);
-    await replayService.deleteCampaignReplay(sessionId);
+    // An unknown session used to answer 200 and write an audit entry. The service deletes the row
+    // and reports only whether a file went, so the row is looked up first.
+    const rows = await query<IdRow[]>('SELECT id FROM campaign_replays WHERE session_id = ?', [
+      sessionId,
+    ]);
+    const fileDeleted = await replayService.deleteCampaignReplay(sessionId);
+    if (rows.length === 0 && !fileDeleted) {
+      res.status(404).json({ error: 'Campaign replay not found', code: 'NOT_FOUND' });
+      return;
+    }
     await logAdminAction(
       req.user!.userId,
       'delete_campaign_replay',
@@ -2071,7 +2124,10 @@ router.delete('/admin/achievements/:id', adminOnlyMiddleware, async (req, res, n
   try {
     const id = parseInt(param(req.params.id));
     if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
-    await achievementsService.deleteAchievement(id);
+    // An unknown id used to answer 200 and write an audit entry
+    if (!(await achievementsService.deleteAchievement(id))) {
+      return res.status(404).json({ error: 'Achievement not found', code: 'NOT_FOUND' });
+    }
     await logAdminAction(
       req.user!.userId,
       'achievement_delete',
@@ -2159,7 +2215,10 @@ router.delete('/admin/cosmetics/:id', adminOnlyMiddleware, async (req, res, next
   try {
     const id = parseInt(param(req.params.id));
     if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
-    await cosmeticsService.deleteCosmetic(id);
+    // An unknown id used to answer 200 and write an audit entry
+    if (!(await cosmeticsService.deleteCosmetic(id))) {
+      return res.status(404).json({ error: 'Cosmetic not found', code: 'NOT_FOUND' });
+    }
     await logAdminAction(req.user!.userId, 'cosmetic_delete', 'cosmetic', id, 'Deleted cosmetic');
     res.json({ message: 'Cosmetic deleted' });
   } catch (err) {
@@ -2172,6 +2231,8 @@ router.delete('/admin/cosmetics/:id', adminOnlyMiddleware, async (req, res, next
 router.get('/admin/achievements/:id/export', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const id = parseInt(param(req.params.id));
+    // NaN went to the driver as a parameter
+    if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     const achievement = await achievementsService.getAchievementById(id);
     if (!achievement) {
       res.status(404).json({ error: 'Achievement not found' });
@@ -2293,146 +2354,171 @@ router.get('/admin/achievements/export-all', adminOnlyMiddleware, async (_req, r
   }
 });
 
-router.post('/admin/achievements/import', adminOnlyMiddleware, async (req, res, next) => {
-  try {
-    // Express 5 leaves req.body undefined when nothing was parsed (Express 4 gave {}).
-    const {
-      achievements: achData,
-      cosmetics: cosData,
-      cosmeticIdMap,
-    } = (req.body ?? {}) as {
-      achievements: AchievementBundleExportData['achievements'];
-      cosmetics?: AchievementBundleExportData['cosmetics'];
-      cosmeticIdMap?: Record<string, 'create' | 'skip' | number>;
-    };
-
-    if (!achData || !Array.isArray(achData)) {
-      res.status(400).json({ error: 'Invalid import data: achievements array required' });
-      return;
-    }
-
-    // Phase 1: detect conflicts if no cosmeticIdMap provided
-    if (!cosmeticIdMap) {
-      const referencedCosmetics = cosData || [];
-      const allExisting = await cosmeticsService.getAllCosmetics();
-      const existingByName = new Map(allExisting.map((c) => [c.name.toLowerCase(), c]));
-
-      const conflicts: AchievementImportConflict[] = [];
-      for (const entry of referencedCosmetics) {
-        const existing = existingByName.get(entry.data.name.toLowerCase());
-        conflicts.push({
-          originalCosmeticId: entry.originalId,
-          cosmeticName: entry.data.name,
-          existingId: existing?.id,
-          existingName: existing?.name,
-        });
-      }
-
-      if (conflicts.length > 0) {
-        res.json({ conflicts });
-        return;
-      }
-    }
-
-    // Phase 2: import with resolved cosmetic mapping
-    const idMap = new Map<number, number | null>(); // originalId -> new/existing ID or null (skip)
-
-    if (cosmeticIdMap && cosData) {
-      for (const entry of cosData) {
-        const key = String(entry.originalId);
-        const action = cosmeticIdMap[key];
-
-        if (action === 'create') {
-          const created = await cosmeticsService.createCosmetic({
-            name: entry.data.name,
-            type: entry.data.type,
-            config: entry.data.config,
-            rarity: entry.data.rarity,
-            unlockType: entry.data.unlockType,
-            unlockRequirement: entry.data.unlockRequirement,
-            sortOrder: entry.data.sortOrder,
-          });
-          idMap.set(entry.originalId, created.id);
-          await logAdminAction(
-            req.user!.userId,
-            'cosmetic_import',
-            'cosmetic',
-            created.id,
-            `Imported cosmetic: ${created.name}`,
-          );
-        } else if (action === 'skip') {
-          idMap.set(entry.originalId, null);
-        } else if (typeof action === 'number') {
-          idMap.set(entry.originalId, action);
-        }
-      }
-    }
-
-    let created = 0;
-    // Fetched at most once for the whole import, lazily — it used to be re-fetched inside the
-    // loop for every achievement whose reward cosmetic was not in the bundle. (audit E10)
-    let existingCosmetics: Awaited<ReturnType<typeof cosmeticsService.getAllCosmetics>> | null =
-      null;
-    for (const achEntry of achData) {
-      let rewardType = achEntry.rewardType;
-      let rewardId: number | null = null;
-
-      if (rewardType === 'cosmetic' && achEntry.reward) {
-        // Try to find by name match in the idMap via cosmetics data
-        const matchedCos = cosData?.find((c) => c.data.name === achEntry.reward?.name);
-        if (matchedCos) {
-          const mappedId = idMap.get(matchedCos.originalId);
-          if (mappedId === null || mappedId === undefined) {
-            rewardType = 'none';
-          } else {
-            rewardId = mappedId;
-          }
-        } else {
-          // No cosmetic in bundle — try name match in DB
-          existingCosmetics ??= await cosmeticsService.getAllCosmetics();
-          const match = existingCosmetics.find(
-            (c) => c.name.toLowerCase() === achEntry.reward!.name.toLowerCase(),
-          );
-          if (match) {
-            rewardId = match.id;
-          } else {
-            rewardType = 'none';
-          }
-        }
-      }
-
-      const achievement = await achievementsService.createAchievement({
-        name: achEntry.name,
-        description: achEntry.description,
-        icon: achEntry.icon,
-        category: achEntry.category,
-        conditionType: achEntry.conditionType,
-        conditionConfig: achEntry.conditionConfig,
-        rewardType,
-        rewardId,
-        sortOrder: achEntry.sortOrder,
-      });
-      await logAdminAction(
-        req.user!.userId,
-        'achievement_import',
-        'achievement',
-        achievement.id,
-        `Imported achievement: ${achievement.name}`,
-      );
-      created++;
-    }
-
-    res.json({ message: `Imported ${created} achievement(s)`, created });
-  } catch (err) {
-    next(err);
-  }
+// Import bodies get the create schemas: they used to be trusted as is, so a bundle could store
+// any type in any column (a number as a name, an object as an icon, an unknown enum value).
+const achievementImportSchema = z.object({
+  achievements: z.array(
+    achievementSchema
+      .omit({ rewardId: true })
+      .extend({ reward: cosmeticSchema.nullable().optional() }),
+  ),
+  cosmetics: z.array(z.object({ originalId: z.number().int(), data: cosmeticSchema })).optional(),
+  cosmeticIdMap: z
+    .record(z.string(), z.union([z.literal('create'), z.literal('skip'), z.number().int()]))
+    .optional(),
 });
+
+router.post(
+  '/admin/achievements/import',
+  adminOnlyMiddleware,
+  validate(achievementImportSchema),
+  async (req, res, next) => {
+    try {
+      const {
+        achievements: achData,
+        cosmetics: cosData,
+        cosmeticIdMap,
+      } = req.body as z.infer<typeof achievementImportSchema>;
+
+      // Phase 1: detect conflicts if no cosmeticIdMap provided
+      if (!cosmeticIdMap) {
+        const referencedCosmetics = cosData || [];
+        const allExisting = await cosmeticsService.getAllCosmetics();
+        const existingByName = new Map(allExisting.map((c) => [c.name.toLowerCase(), c]));
+
+        const conflicts: AchievementImportConflict[] = [];
+        for (const entry of referencedCosmetics) {
+          const existing = existingByName.get(entry.data.name.toLowerCase());
+          conflicts.push({
+            originalCosmeticId: entry.originalId,
+            cosmeticName: entry.data.name,
+            existingId: existing?.id,
+            existingName: existing?.name,
+          });
+        }
+
+        if (conflicts.length > 0) {
+          res.json({ conflicts });
+          return;
+        }
+      }
+
+      // A numeric mapping names an existing cosmetic. Unchecked, an unknown id was stored as the
+      // reward of every achievement mapped to it.
+      for (const target of Object.values(cosmeticIdMap ?? {})) {
+        if (typeof target === 'number' && !(await cosmeticsService.getCosmeticById(target))) {
+          res.status(400).json({
+            error: `Cosmetic ${target} not found`,
+            code: 'COSMETIC_NOT_FOUND',
+          });
+          return;
+        }
+      }
+      // Fetched at most once for the whole import, before the transaction — it used to be
+      // re-fetched inside the loop for every achievement whose reward cosmetic was not in the
+      // bundle. (audit E10)
+      const needsDbLookup = achData.some(
+        (a) =>
+          a.rewardType === 'cosmetic' &&
+          a.reward &&
+          !cosData?.some((c) => c.data.name === a.reward?.name),
+      );
+      const existingCosmetics = needsDbLookup ? await cosmeticsService.getAllCosmetics() : [];
+
+      // Phase 2: import with resolved cosmetic mapping. All or nothing: a row failing halfway
+      // used to leave the cosmetics and achievements before it in place.
+      const { createdCosmetics, createdAchievements } = await withTransaction(async (conn) => {
+        const idMap = new Map<number, number | null>(); // originalId -> new/existing ID or null (skip)
+        const createdCosmetics: { id: number; name: string }[] = [];
+        const createdAchievements: { id: number; name: string }[] = [];
+
+        if (cosmeticIdMap && cosData) {
+          for (const entry of cosData) {
+            const action = cosmeticIdMap[String(entry.originalId)];
+            if (action === 'create') {
+              const created = await cosmeticsService.createCosmetic(entry.data, conn);
+              idMap.set(entry.originalId, created.id);
+              createdCosmetics.push({ id: created.id, name: created.name });
+            } else if (action === 'skip') {
+              idMap.set(entry.originalId, null);
+            } else if (typeof action === 'number') {
+              idMap.set(entry.originalId, action);
+            }
+          }
+        }
+
+        for (const achEntry of achData) {
+          let rewardType = achEntry.rewardType;
+          let rewardId: number | null = null;
+
+          if (rewardType === 'cosmetic' && achEntry.reward) {
+            // Try to find by name match in the idMap via cosmetics data
+            const matchedCos = cosData?.find((c) => c.data.name === achEntry.reward?.name);
+            if (matchedCos) {
+              const mappedId = idMap.get(matchedCos.originalId);
+              if (mappedId === null || mappedId === undefined) {
+                rewardType = 'none';
+              } else {
+                rewardId = mappedId;
+              }
+            } else {
+              // No cosmetic in bundle — try name match in DB
+              const match = existingCosmetics.find(
+                (c) => c.name.toLowerCase() === achEntry.reward!.name.toLowerCase(),
+              );
+              if (match) {
+                rewardId = match.id;
+              } else {
+                rewardType = 'none';
+              }
+            }
+          }
+
+          const { reward: _reward, ...fields } = achEntry;
+          const achievement = await achievementsService.createAchievement(
+            { ...fields, rewardType, rewardId },
+            conn,
+          );
+          createdAchievements.push({ id: achievement.id, name: achievement.name });
+        }
+        return { createdCosmetics, createdAchievements };
+      });
+
+      // Logged once the rows are committed: a rolled-back import created nothing to record
+      for (const c of createdCosmetics) {
+        await logAdminAction(
+          req.user!.userId,
+          'cosmetic_import',
+          'cosmetic',
+          c.id,
+          `Imported cosmetic: ${c.name}`,
+        );
+      }
+      for (const a of createdAchievements) {
+        await logAdminAction(
+          req.user!.userId,
+          'achievement_import',
+          'achievement',
+          a.id,
+          `Imported achievement: ${a.name}`,
+        );
+      }
+
+      const created = createdAchievements.length;
+      res.json({ message: `Imported ${created} achievement(s)`, created });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // ===== Cosmetic Export/Import =====
 
 router.get('/admin/cosmetics/:id/export', adminOnlyMiddleware, async (req, res, next) => {
   try {
     const id = parseInt(param(req.params.id));
+    // NaN went to the driver as a parameter
+    if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID', code: 'INVALID_ID' });
     const cosmetic = await cosmeticsService.getCosmeticById(id);
     if (!cosmetic) {
       res.status(404).json({ error: 'Cosmetic not found' });
@@ -2459,38 +2545,39 @@ router.get('/admin/cosmetics/:id/export', adminOnlyMiddleware, async (req, res, 
   }
 });
 
-router.post('/admin/cosmetics/import', adminOnlyMiddleware, async (req, res, next) => {
-  try {
-    // Express 5 leaves req.body undefined when nothing was parsed (Express 4 gave {}).
-    const data = (req.body ?? {}) as CosmeticExportData;
-    if (!data.name || !data.type || !data.config) {
-      res.status(400).json({ error: 'Invalid cosmetic import data' });
-      return;
+// The create schema (the export's _format/_version are stripped): the body used to be trusted
+// once name, type and config were truthy.
+router.post(
+  '/admin/cosmetics/import',
+  adminOnlyMiddleware,
+  validate(cosmeticSchema),
+  async (req, res, next) => {
+    try {
+      const data = req.body as z.infer<typeof cosmeticSchema>;
+      const cosmetic = await cosmeticsService.createCosmetic({
+        name: data.name,
+        type: data.type,
+        config: data.config,
+        rarity: data.rarity || 'common',
+        unlockType: data.unlockType || 'default',
+        unlockRequirement: data.unlockRequirement || null,
+        sortOrder: data.sortOrder || 0,
+      });
+
+      await logAdminAction(
+        req.user!.userId,
+        'cosmetic_import',
+        'cosmetic',
+        cosmetic.id,
+        `Imported cosmetic: ${cosmetic.name}`,
+      );
+
+      res.json(cosmetic);
+    } catch (err) {
+      next(err);
     }
-
-    const cosmetic = await cosmeticsService.createCosmetic({
-      name: data.name,
-      type: data.type,
-      config: data.config,
-      rarity: data.rarity || 'common',
-      unlockType: data.unlockType || 'default',
-      unlockRequirement: data.unlockRequirement || null,
-      sortOrder: data.sortOrder || 0,
-    });
-
-    await logAdminAction(
-      req.user!.userId,
-      'cosmetic_import',
-      'cosmetic',
-      cosmetic.id,
-      `Imported cosmetic: ${cosmetic.name}`,
-    );
-
-    res.json(cosmetic);
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
 // ===== Map Challenges =====
 

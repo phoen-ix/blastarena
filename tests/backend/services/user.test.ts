@@ -51,6 +51,11 @@ vi.mock('../../../backend/src/services/email', () => ({
   sendEmailTakenChangeWarning: mockSendEmailTakenChangeWarning,
 }));
 
+const mockGetIO = vi.hoisted(() => vi.fn<AnyFn>());
+vi.mock('../../../backend/src/game/registry', () => ({
+  getIO: mockGetIO,
+}));
+
 vi.mock('../../../backend/src/utils/logger', () => ({
   logger: {
     error: vi.fn(),
@@ -67,6 +72,7 @@ import {
   confirmEmailChange,
   changePassword,
   cancelEmailChange,
+  deleteAccount,
 } from '../../../backend/src/services/user';
 
 import { AppError } from '../../../backend/src/middleware/errorHandler';
@@ -330,6 +336,18 @@ describe('user service', () => {
       expect(mockSendEmailTakenChangeWarning).toHaveBeenCalledWith('pending@example.com', 'es');
       expect(mockExecute).not.toHaveBeenCalled();
     });
+
+    it('ignores an expired pending claim on the address', async () => {
+      mockQuery.mockResolvedValueOnce([]); // email column clear
+      mockQuery.mockResolvedValueOnce([]); // no unexpired pending claim
+      mockExecute.mockResolvedValueOnce({});
+      mockSendEmailChangeEmail.mockResolvedValueOnce(undefined);
+
+      await requestEmailChange(1, 'pending@example.com');
+
+      expect(mockQuery.mock.calls[1][0]).toContain('email_change_expires > NOW()');
+      expect(mockExecute).toHaveBeenCalled();
+    });
   });
 
   // ── confirmEmailChange ─────────────────────────────────────────────
@@ -509,6 +527,50 @@ describe('user service', () => {
         'UPDATE users SET pending_email_hash = NULL, pending_email_hint = NULL, email_change_token = NULL, email_change_expires = NULL WHERE id = ?',
         [1],
       );
+    });
+  });
+
+  describe('deleteAccount', () => {
+    it('disconnects the live sockets before deleting the account', async () => {
+      const disconnectSockets = vi.fn();
+      const inRoom = vi.fn().mockReturnValue({ disconnectSockets });
+      mockGetIO.mockImplementation(() => ({ in: inRoom }));
+      mockQuery.mockResolvedValueOnce([{ password_hash: 'h', role: 'user' }]);
+      mockComparePassword.mockResolvedValueOnce(true);
+      mockExecute.mockResolvedValueOnce({});
+
+      await deleteAccount(7, 'pw');
+
+      expect(inRoom).toHaveBeenCalledWith('user:7');
+      expect(disconnectSockets).toHaveBeenCalledWith(true);
+      expect(mockExecute).toHaveBeenCalledWith('DELETE FROM users WHERE id = ?', [7]);
+      expect(disconnectSockets.mock.invocationCallOrder[0]).toBeLessThan(
+        mockExecute.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('deletes the account even without a socket server', async () => {
+      mockGetIO.mockImplementation(() => {
+        throw new Error('Socket.io server not initialized');
+      });
+      mockQuery.mockResolvedValueOnce([{ password_hash: 'h', role: 'user' }]);
+      mockComparePassword.mockResolvedValueOnce(true);
+      mockExecute.mockResolvedValueOnce({});
+
+      await deleteAccount(7, 'pw');
+
+      expect(mockExecute).toHaveBeenCalledWith('DELETE FROM users WHERE id = ?', [7]);
+    });
+
+    it('keeps the sockets when the password is wrong', async () => {
+      const inRoom = vi.fn();
+      mockGetIO.mockImplementation(() => ({ in: inRoom }));
+      mockQuery.mockResolvedValueOnce([{ password_hash: 'h', role: 'user' }]);
+      mockComparePassword.mockResolvedValueOnce(false);
+
+      await expect(deleteAccount(7, 'bad')).rejects.toMatchObject({ statusCode: 401 });
+      expect(inRoom).not.toHaveBeenCalled();
+      expect(mockExecute).not.toHaveBeenCalled();
     });
   });
 });

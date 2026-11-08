@@ -62,12 +62,12 @@
       "emailLabel": "E-Mail *",
       "emailPlaceholder": "benutzer@beispiel.de",
       "passwordLabel": "Passwort *",
-      "passwordPlaceholder": "Min. 6 Zeichen",
+      "passwordPlaceholder": "Min. {{min}} Zeichen",
       "roleLabel": "Rolle",
       "cancel": "Abbrechen",
       "submit": "Erstellen",
       "errorRequired": "Benutzername, E-Mail und Passwort sind erforderlich",
-      "errorPasswordLength": "Passwort muss mindestens 6 Zeichen lang sein",
+      "errorPasswordLength": "Passwort muss mindestens {{min}} Zeichen lang sein",
       "successMessage": "Benutzer \"{{username}}\" erstellt"
     },
     "resetPasswordModal": {
@@ -75,13 +75,13 @@
       "title": "Passwort zurücksetzen",
       "description": "Setze ein neues Passwort für <strong style=\"color:var(--text);\">{{username}}</strong>. Der Benutzer wird abgemeldet und muss sich mit dem neuen Passwort anmelden.",
       "newPasswordLabel": "Neues Passwort",
-      "newPasswordPlaceholder": "Min. 6 Zeichen",
+      "newPasswordPlaceholder": "Min. {{min}} Zeichen",
       "confirmPasswordLabel": "Passwort bestätigen",
       "confirmPasswordPlaceholder": "Passwort erneut eingeben",
       "cancel": "Abbrechen",
       "submit": "Passwort zurücksetzen",
       "errorRequired": "Passwort ist erforderlich",
-      "errorPasswordLength": "Passwort muss mindestens 6 Zeichen lang sein",
+      "errorPasswordLength": "Passwort muss mindestens {{min}} Zeichen lang sein",
       "errorPasswordMismatch": "Passwörter stimmen nicht überein",
       "successMessage": "Passwort für \"{{username}}\" zurückgesetzt"
     },
@@ -269,7 +269,8 @@
     "prevPage": "Zurück",
     "nextPage": "Weiter",
     "pageInfo": "Seite {{page}} von {{totalPages}} ({{total}} Aktionen)",
-    "failedToLoad": "Admin-Aktionen konnten nicht geladen werden"
+    "failedToLoad": "Admin-Aktionen konnten nicht geladen werden",
+    "deletedAdmin": "(gelöschtes Konto)"
   },
   "ai": {
     "botManagement": "Bot-AI-Verwaltung",
@@ -699,7 +700,9 @@
       "save": "Offene-Welt-Einstellungen speichern",
       "saved": "Offene-Welt-Einstellungen gespeichert",
       "saveFailed": "Offene-Welt-Einstellungen konnten nicht gespeichert werden"
-    }
+    },
+    "settingsLoadFailed": "Diese Einstellungen konnten nicht geladen werden und sind gesperrt, damit Speichern sie nicht überschreibt: {{settings}}. Lade den Tab neu, um es erneut zu versuchen.",
+    "settingLoadFailedHint": "Konnte nicht geladen werden. Lade den Tab neu, um diese Einstellung zu bearbeiten."
   },
   "seasons": {
     "sectionTitle": "Season-Verwaltung",
@@ -941,6 +944,14 @@
       "cancel": "Abbrechen",
       "import": "Importieren",
       "importSuccess": "Level erfolgreich importiert"
+    },
+    "enemyAiConflict": {
+      "title": "Mitgelieferte Gegner-KI",
+      "hint": "Dieser Gegnertyp bringt eine eigene KI „{{name}}“ mit. Wähle, wie sie importiert werden soll.",
+      "createNew": "Neue Gegner-KI „{{name}}“ aus dem mitgelieferten Code erstellen",
+      "useExisting": "Vorhandene KI „{{name}}“ verwenden (ID {{id}})",
+      "skip": "Ohne KI importieren (nutzt sein Bewegungsmuster)",
+      "unresolved": "Der Server braucht noch eine Entscheidung zur mitgelieferten KI. Es wurde nichts importiert."
     },
     "deleteModal": {
       "entityLabels": {

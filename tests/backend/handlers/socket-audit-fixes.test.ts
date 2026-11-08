@@ -17,6 +17,7 @@ import path from 'path';
  *  - E10  campaignStartLimiter is module-scoped and removed on disconnect; no dynamic import()
  *         inside handlers; no redundant checkCampaignStarUnlocks call
  *  - G7   no spectator:actionApplied broadcast
+ *  - V11  campaign:start checks the server-side level unlock
  */
 
 const SOCKET_TS = path.join(__dirname, '../../../backend/src/socket.ts');
@@ -161,6 +162,16 @@ describe('socket.ts audit fixes', () => {
     const start = handlerSource('campaign:start');
     expect(start).not.toContain('checkCampaignStarUnlocks(');
     expect(start).toMatch(/evaluateAfterCampaign\(\s*uid,\s*totalStars,?\s*\)/);
+  });
+
+  it('V11: campaign:start refuses a level the starting user has not unlocked', () => {
+    const start = handlerSource('campaign:start');
+    expect(start).toContain('progressService.isLevelUnlocked(socket.data.userId, level.id)');
+    // Checked before any attempt is recorded or a session is created.
+    expect(start.indexOf('isLevelUnlocked(')).toBeLessThan(start.indexOf('recordAttempt('));
+    expect(start.indexOf('isLevelUnlocked(')).toBeLessThan(
+      start.indexOf('campaignManager.startLevel('),
+    );
   });
 
   it('G7: no spectator:actionApplied broadcast', () => {
