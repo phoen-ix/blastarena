@@ -15,7 +15,6 @@ vi.mock('../../src/i18n', () => ({
 /** A PlayerState with only the fields the list reads; the rest never leave the server. */
 function player(over: Partial<PlayerState> & { id: number }): PlayerState {
   return {
-    id: over.id,
     username: `P${over.id}`,
     alive: true,
     team: null,

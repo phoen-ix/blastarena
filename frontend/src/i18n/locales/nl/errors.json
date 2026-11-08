@@ -18,5 +18,9 @@
   "TOTP_RATE_LIMITED": "Te veel onjuiste codes. Wacht even voordat je het opnieuw probeert.",
   "CSRF_INVALID": "Je sessie kon niet worden gecontroleerd. Laad de pagina opnieuw.",
   "NO_REFRESH_TOKEN": "Je sessie is beëindigd. Log opnieuw in.",
-  "PAYLOAD_TOO_LARGE": "Het verzoek is te groot."
+  "PAYLOAD_TOO_LARGE": "Het verzoek is te groot.",
+  "INVALID_PASSWORD": "Het wachtwoord voldoet niet aan de eisen.",
+  "USER_NOT_FOUND": "Gebruiker niet gevonden",
+  "UNAUTHORIZED": "Log in om verder te gaan.",
+  "SERVICE_UNAVAILABLE": "De dienst is tijdelijk niet beschikbaar. Probeer het zo opnieuw."
 }

@@ -12,6 +12,7 @@ import {
   Direction,
   CampaignReplayMeta,
   GameState as GameStateType,
+  getErrorMessage,
 } from '@blast-arena/shared';
 import {
   TICK_RATE,
@@ -64,7 +65,7 @@ export interface CampaignSessionCallbacks {
     deaths: number,
     /** P1's power-ups at completion, for levels with carryOverPowerups. */
     carried: StartingPowerUps,
-  ) => void;
+  ) => void | Promise<void>;
   onGameOver: (reason: string) => void;
 }
 
@@ -1235,7 +1236,15 @@ export class CampaignGame {
     const elapsedTicks = this.gameState.tick - this.startTick;
     const timeSeconds = Math.round(elapsedTicks / TICK_RATE);
 
-    this.callbacks.onLevelComplete(timeSeconds, this.playerDeaths, this.collectedPowerUps());
+    // The socket layer's handler is async (progress, achievements): never an unhandled rejection.
+    Promise.resolve(
+      this.callbacks.onLevelComplete(timeSeconds, this.playerDeaths, this.collectedPowerUps()),
+    ).catch((err: unknown) => {
+      logger.error(
+        { err: getErrorMessage(err), levelId: this.level.id },
+        'Level completion failed',
+      );
+    });
   }
 
   /**

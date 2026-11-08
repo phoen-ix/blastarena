@@ -18,5 +18,9 @@
   "TOTP_RATE_LIMITED": "Too many incorrect codes. Please wait before trying again.",
   "CSRF_INVALID": "Your session could not be verified. Please reload the page.",
   "NO_REFRESH_TOKEN": "Your session has ended. Please log in again.",
-  "PAYLOAD_TOO_LARGE": "The request is too large."
+  "PAYLOAD_TOO_LARGE": "The request is too large.",
+  "INVALID_PASSWORD": "The password does not meet the requirements.",
+  "USER_NOT_FOUND": "User not found",
+  "UNAUTHORIZED": "Please log in to continue.",
+  "SERVICE_UNAVAILABLE": "The service is temporarily unavailable. Please try again shortly."
 }

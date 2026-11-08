@@ -39,7 +39,7 @@ function makeSocket(): FakeSocket {
 
 const io = vi.fn(() => makeSocket());
 
-vi.mock('socket.io-client', () => ({ io: (...args: unknown[]) => io(...args) }));
+vi.mock('socket.io-client', () => ({ io: (...args: unknown[]) => io(...(args as [])) }));
 vi.mock('../../src/i18n', () => ({ i18n: { language: 'en' }, t: (key: string) => key }));
 
 const authManager = { getAccessToken: () => 'token' } as unknown as AuthManager;

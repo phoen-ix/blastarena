@@ -49,7 +49,6 @@
 - Emails never stored in plaintext — HMAC-SHA256 with `EMAIL_PEPPER` env var (min 32 chars)
 - DB stores `email_hash` (for lookups) + `email_hint` (masked display like `j***@g***.com`)
 - Same pattern for `pending_email_hash`/`pending_email_hint` during email change
-- `backfill-emails.ts` runs on startup to migrate any legacy plaintext rows
 - Admin email search: exact match only (hashed) when query contains `@`
 
 ### Email Verification Enforcement
@@ -185,3 +184,10 @@ Migrations in `backend/src/db/migrations/` run automatically on server start:
 39. `039_leaderboard_elo_index.sql` — elo_rating and finished_at indexes for the leaderboard queries
 40. `040_audit_indexes.sql` — indexes for admin_actions(action), friendships(friend_id, status), cosmetics(unlock_type, is_active), achievements(is_active), campaign_replays(created_at), custom_maps(updated_at), refresh_tokens(revoked, created_at); drops the redundant idx_progress_user_level
 41. `041_drop_login_attempts.sql` — Drop the never-used login_attempts table (login limiting is Redis-based)
+42. `042_fix_best_win_streak.sql` — repairs best_win_streak values written one too high
+43. `043_koth_achievement_mode.sql` — the seeded "Hill Holder" achievement matches mode `king_of_the_hill` (it named `koth` and could never be earned)
+44. `044_totp_last_step.sql` — totp_last_step on users (a TOTP code is accepted once)
+45. `045_enemy_ai_builtin_key.sql` — builtin_key on enemy_ais (stable identity of the built-in enemy AIs)
+46. `046_drop_redundant_levels_world_index.sql` — drops a campaign_levels index covered by another
+47. `047_keep_audit_trail_on_user_delete.sql` — admin_actions.admin_id, announcements.admin_id and map_challenges.created_by become nullable `ON DELETE SET NULL`: deleting an admin keeps their audit trail, the live banner and their challenges
+48. `048_match_winner_and_win_only_achievements.sql` — match_players.is_winner (backfilled), used for mode "wins" achievements; Pacifist Win and Speed Demon get `requireWin`

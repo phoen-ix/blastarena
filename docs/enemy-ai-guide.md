@@ -24,7 +24,7 @@ Your class must:
 
 ## Context
 
-The `decide()` method receives an `EnemyAIContext` object each tick:
+The `decide()` method receives an `EnemyAIContext` object each time the enemy can act (whenever its move cooldown has run out, so a slow enemy is asked less often):
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -33,7 +33,7 @@ The `decide()` method receives an `EnemyAIContext` object each tick:
 | `self.direction` | Direction | Current facing direction |
 | `self.typeConfig` | object | Enemy abilities (same as constructor) |
 | `self.patrolPath` | Position[] | Waypoints for patrol movement |
-| `self.patrolIndex` | number | Current patrol waypoint index |
+| `self.patrolIndex` | number | Waypoint index of the built-in patrol pattern. It does not advance while your AI drives the enemy: keep your own index (the built-in Patrol Guard does) |
 | `players` | array | Alive players: `{ position, alive }` |
 | `tiles` | TileType[][] | Full map tile grid |
 | `mapWidth` / `mapHeight` | number | Map dimensions |

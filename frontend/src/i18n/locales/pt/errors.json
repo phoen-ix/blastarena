@@ -18,5 +18,9 @@
   "TOTP_RATE_LIMITED": "Demasiados códigos incorretos. Aguarda antes de tentar novamente.",
   "CSRF_INVALID": "Não foi possível verificar a tua sessão. Recarrega a página.",
   "NO_REFRESH_TOKEN": "A tua sessão terminou. Inicia sessão novamente.",
-  "PAYLOAD_TOO_LARGE": "O pedido é demasiado grande."
+  "PAYLOAD_TOO_LARGE": "O pedido é demasiado grande.",
+  "INVALID_PASSWORD": "A palavra-passe não cumpre os requisitos.",
+  "USER_NOT_FOUND": "Utilizador não encontrado",
+  "UNAUTHORIZED": "Inicia sessão para continuar.",
+  "SERVICE_UNAVAILABLE": "O serviço está temporariamente indisponível. Tenta novamente daqui a pouco."
 }

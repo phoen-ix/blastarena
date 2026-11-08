@@ -2136,7 +2136,9 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
   const shutdown = () => {
     clearInterval(cleanupInterval);
     clearInterval(presenceInterval);
-    void openWorldManager.shutdown();
+    openWorldManager.shutdown().catch((err: unknown) => {
+      logger.error({ err: getErrorMessage(err) }, 'Open world shutdown failed');
+    });
   };
   process.once('SIGTERM', shutdown);
   process.once('SIGINT', shutdown);

@@ -772,8 +772,8 @@ describe('BotAI', () => {
         }
         clearCooldown(p1);
       }
-      // Bot may still bomb walls, but should not bomb offensively against ally
-      // Note: wall bombing is fine, the test checks that pure offensive bombing doesn't trigger
+      // wallDensity 0: there are no walls to bomb either, so any bomb here would be offensive.
+      expect(bombedNearAlly).toBe(false);
     });
 
     it('should not detonate remote bombs when only teammate is in blast zone', () => {

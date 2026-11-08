@@ -157,9 +157,11 @@ describe('campaign run helpers', () => {
         'campaignCoopMode',
         'localCoopMode',
         'localCoopConfig',
+        'localCoopP2Identity',
         'buddyMode',
         'buddyConfig',
         'campaignTheme',
+        'campaignEnemyTypes',
         'unrelated',
       ].map((k) => [k, true]),
     );

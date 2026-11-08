@@ -18,5 +18,9 @@
   "TOTP_RATE_LIMITED": "Çok fazla hatalı kod. Tekrar denemeden önce lütfen bekle.",
   "CSRF_INVALID": "Oturumun doğrulanamadı. Lütfen sayfayı yenile.",
   "NO_REFRESH_TOKEN": "Oturumun sona erdi. Lütfen tekrar giriş yap.",
-  "PAYLOAD_TOO_LARGE": "İstek çok büyük."
+  "PAYLOAD_TOO_LARGE": "İstek çok büyük.",
+  "INVALID_PASSWORD": "Parola gereksinimleri karşılamıyor.",
+  "USER_NOT_FOUND": "Kullanıcı bulunamadı",
+  "UNAUTHORIZED": "Devam etmek için giriş yap.",
+  "SERVICE_UNAVAILABLE": "Hizmet geçici olarak kullanılamıyor. Lütfen birazdan tekrar dene."
 }

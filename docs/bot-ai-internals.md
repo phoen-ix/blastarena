@@ -2,6 +2,8 @@
 
 Detailed technical reference for the built-in BotAI decision engine in `backend/src/game/BotAI.ts`. For the external developer guide on writing custom AIs, see [bot-ai-guide.md](bot-ai-guide.md).
 
+**Units:** BotAI's own counters (cooldowns, hold and stuck thresholds, "ticks" below) count *decisions*, and a bot decides every other game tick (see Performance). One such tick is therefore 0.1 s: a 40-tick hold lasts 4 s, not 2 s. Values read from the game state (`bomb.ticksRemaining`, invulnerability) are real 20 Hz ticks.
+
 ## Difficulty Tiers
 
 Three difficulty presets defined in `DIFFICULTY_PRESETS`:
@@ -14,7 +16,7 @@ Three difficulty presets defined in `DIFFICULTY_PRESETS`:
 ### Normal
 - `huntChance=0.90`, `bombCooldown=15-25`, `escapeSearchDepth=8`, `dangerTimerThreshold=40`
 - `roamAfterIdleTicks=60`, `huntStuckThreshold=3`, `huntStuckMaxTicks=60`
-- `stalemateThresholdTicks=100`, `remoteHoldThreshold=40`, `optimalMoveChance=0.8`
+- `stalemateThresholdTicks=100`, `remoteHoldThreshold=40`
 - `enableReachabilityFilter=true`, `huntSearchDepth=25`, `duelStalemateThresholdTicks=200`
 
 ### Hard
@@ -94,7 +96,7 @@ Three phases:
 - **Detonation triggers**: Enemy in blast zone, near a bomb (manhattan <=2), movement blocked by own remote bomb blast, or after hold threshold at max bombs (priority 2.5)
 - **Shield-aware sacrifice**: Detonates even when `selfInBlast` if bot has shield and enemy doesn't; self-damage check skipped if bot has shield; invulnerable enemies (post-shield-break) are ignored
 - **Self-unblock detonation**: Computes `ownRemoteBlastCells` from own remote bombs (pierce-aware), checks if any walkable direction leads into both blast set and BFS danger set — detonates (with `!selfInBlast` guard)
-- **Delayed self-unblock**: `remoteBlockedTicks` counter requires 10 ticks (0.5s) blocked OR enemy within manhattan 5 before detonating — gives bots time to find alternative paths
+- **Delayed self-unblock**: `remoteBlockedTicks` counter requires 10 decision ticks (1 s) blocked OR enemy within manhattan 5 before detonating — gives bots time to find alternative paths
 - **Pre-placement guard**: `wouldRemoteBombSelfBlock()` checks if placing a remote bomb would block ALL walkable neighbor directions with its blast zone; skips placement when no enemy is in blast range
 
 ## Stalemate Breakers
@@ -111,7 +113,7 @@ Three phases:
 
 ## Power-Up Awareness
 
-- **Pierce-aware danger zones**: `getDangerCells()`, `canEscapeAfterBomb()`, `isEnemyInBlastRange()`, and remote bomb detonation check all respect `bomb.isPierce`/`player.hasPierceBomb` — pierce bombs blast through destructible walls, matching `calculateExplosionCells()` in shared/
+- **Pierce-aware danger zones**: `getDangerCells()`, `canEscapeAfterBomb()`, `isEnemyInBlastRange()`, and remote bomb detonation check all respect `bomb.isPierce`/`player.hasPierceBomb` — pierce bombs blast through destructible walls, matching `getExplosionCells()` in shared/
 - **Line bomb escape**: `canEscapeAfterBomb()` simulates full line of bombs in facing direction (using available bomb capacity) — danger zones computed for ALL future bomb positions
 - **Shield aggression**: Hard bots skip escape validation when shielded (bomb freely with shield active)
 

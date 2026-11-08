@@ -10,7 +10,7 @@
     "prebuild": "npm run copy-locales",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tests/tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {

@@ -18,5 +18,9 @@
   "TOTP_RATE_LIMITED": "Zbyt wiele błędnych kodów. Odczekaj przed kolejną próbą.",
   "CSRF_INVALID": "Nie udało się zweryfikować sesji. Odśwież stronę.",
   "NO_REFRESH_TOKEN": "Sesja wygasła. Zaloguj się ponownie.",
-  "PAYLOAD_TOO_LARGE": "Żądanie jest zbyt duże."
+  "PAYLOAD_TOO_LARGE": "Żądanie jest zbyt duże.",
+  "INVALID_PASSWORD": "Hasło nie spełnia wymagań.",
+  "USER_NOT_FOUND": "Nie znaleziono użytkownika",
+  "UNAUTHORIZED": "Zaloguj się, aby kontynuować.",
+  "SERVICE_UNAVAILABLE": "Usługa jest chwilowo niedostępna. Spróbuj ponownie za chwilę."
 }

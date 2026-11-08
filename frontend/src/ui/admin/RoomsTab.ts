@@ -32,7 +32,7 @@ export class RoomsTab {
     this.container = container;
     parent.appendChild(container);
 
-    this.roomListHandler = () => this.loadRooms();
+    this.roomListHandler = () => void this.loadRooms();
     this.socketClient.on('room:list', this.roomListHandler);
     // Idempotent server-side join. The tab lives inside the lobby shell, which subscribed on
     // mount and unsubscribes on hide; `socket.leave` is not ref-counted, so this tab must NOT

@@ -18,5 +18,9 @@
   "TOTP_RATE_LIMITED": "For mange forkerte koder. Vent, før du prøver igen.",
   "CSRF_INVALID": "Din session kunne ikke bekræftes. Genindlæs siden.",
   "NO_REFRESH_TOKEN": "Din session er udløbet. Log ind igen.",
-  "PAYLOAD_TOO_LARGE": "Anmodningen er for stor."
+  "PAYLOAD_TOO_LARGE": "Anmodningen er for stor.",
+  "INVALID_PASSWORD": "Adgangskoden opfylder ikke kravene.",
+  "USER_NOT_FOUND": "Brugeren blev ikke fundet",
+  "UNAUTHORIZED": "Log ind for at fortsætte.",
+  "SERVICE_UNAVAILABLE": "Tjenesten er midlertidigt utilgængelig. Prøv igen om lidt."
 }

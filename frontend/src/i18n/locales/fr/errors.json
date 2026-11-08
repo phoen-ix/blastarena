@@ -18,5 +18,9 @@
   "TOTP_RATE_LIMITED": "Trop de codes incorrects. Patiente avant de réessayer.",
   "CSRF_INVALID": "Ta session n’a pas pu être vérifiée. Recharge la page.",
   "NO_REFRESH_TOKEN": "Ta session est terminée. Reconnecte-toi.",
-  "PAYLOAD_TOO_LARGE": "La requête est trop volumineuse."
+  "PAYLOAD_TOO_LARGE": "La requête est trop volumineuse.",
+  "INVALID_PASSWORD": "Le mot de passe ne respecte pas les exigences.",
+  "USER_NOT_FOUND": "Utilisateur introuvable",
+  "UNAUTHORIZED": "Connecte-toi pour continuer.",
+  "SERVICE_UNAVAILABLE": "Le service est temporairement indisponible. Réessaie dans un instant."
 }

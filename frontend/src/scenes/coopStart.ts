@@ -10,9 +10,13 @@ const CAMPAIGN_RUN_KEYS = [
   'campaignCoopMode',
   'localCoopMode',
   'localCoopConfig',
+  // A later local co-op run whose P2 plays as a guest would otherwise still send the previous
+  // run's logged-in P2 identity. (audit S4)
+  'localCoopP2Identity',
   'buddyMode',
   'buddyConfig',
   'campaignTheme',
+  'campaignEnemyTypes',
 ];
 
 /**

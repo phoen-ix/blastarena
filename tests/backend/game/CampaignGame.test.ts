@@ -516,7 +516,7 @@ describe('CampaignGame', () => {
       expect(game.isFinished()).toBe(false);
     });
 
-    it('should reset enemy ID counter between games', () => {
+    it('gives every game its own enemy ids (they are unique per process, never reused)', () => {
       const enemyConfig = createMinimalEnemyConfig();
       const enemyTypes = new Map<number, EnemyTypeConfig>();
       enemyTypes.set(1, enemyConfig);
@@ -525,12 +525,16 @@ describe('CampaignGame', () => {
         enemyPlacements: [{ enemyTypeId: 1, x: 3, y: 3 }],
       });
 
-      // Create first game
-      new CampaignGame([1], ['Player1'], level, enemyTypes, callbacks);
-      // Create second game — should reset IDs
-      new CampaignGame([2], ['Player2'], level, enemyTypes, callbacks);
+      // Ids are monotonic for the process (audit ENEMY-ID-1): two concurrent levels must never
+      // share one, or one game's enemy events would address the other's sprite.
+      const first = new CampaignGame([1], ['Player1'], level, enemyTypes, callbacks);
+      const second = new CampaignGame([2], ['Player2'], level, enemyTypes, callbacks);
 
-      // Should not throw due to ID conflicts
+      const firstIds = [...first.getEnemies().keys()];
+      const secondIds = [...second.getEnemies().keys()];
+      expect(firstIds).toHaveLength(1);
+      expect(secondIds).toHaveLength(1);
+      expect(secondIds[0]).not.toBe(firstIds[0]);
     });
 
     it('should deep copy enemy configs to avoid mutation', () => {

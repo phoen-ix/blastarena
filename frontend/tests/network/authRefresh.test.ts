@@ -84,7 +84,7 @@ describe('CSRF token on the cookie-authenticated routes', () => {
 
     const [url, init] = posts()[0];
     expect(url).toBe('/api/auth/refresh');
-    expect(init.headers).toEqual({ 'X-CSRF-Token': 'tok' });
+    expect(init?.headers).toEqual({ 'X-CSRF-Token': 'tok' });
   });
 
   it('logout echoes it too', async () => {
@@ -93,6 +93,6 @@ describe('CSRF token on the cookie-authenticated routes', () => {
 
     const [url, init] = posts()[0];
     expect(url).toBe('/api/auth/logout');
-    expect(init.headers).toEqual({ 'X-CSRF-Token': 'tok' });
+    expect(init?.headers).toEqual({ 'X-CSRF-Token': 'tok' });
   });
 });

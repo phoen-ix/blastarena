@@ -118,7 +118,7 @@ describe('StyledTileMap', () => {
   });
 
   it('plays the loop of an animated special tile and keeps it on the ground', () => {
-    scene.anims.exists = (key: string) => key === 'anim/lava';
+    (scene.anims as { exists: (key: string) => boolean }).exists = (key) => key === 'anim/lava';
     const { at } = build(['###', '#L#', '###']);
     const lava = at(1, 1, false)[0];
     expect(lava.playing).toBe('anim/lava');

@@ -52,9 +52,9 @@ player on disconnect).
 On disconnect, the server:
 
 1. Removes per-socket rate limiter entries
-2. Cleans up emote cooldowns and rematch votes
+2. Cleans up emote cooldowns and drops the user from the room's rematch vote (a vote whose remaining yes votes now reach the threshold starts the rematch)
 3. Removes presence and notifies friends offline
-4. Handles party disconnect (leave or disband)
+4. Party: unless another tab of the user is still in it, leaves the party after a 30-second grace period (`PARTY_DISCONNECT_GRACE_MS`). A reconnect within that time keeps the membership (`restoreSession` rejoins `party:{partyId}`); after it the user leaves, and a leaving leader disbands the party
 5. Handles campaign session cleanup (co-op: notify partner; solo: end session)
 6. If in a running game: starts 10-second disconnect grace period (200 ticks). If not in a game: leaves room normally and broadcasts updated state
 
@@ -88,7 +88,7 @@ On disconnect, the server:
 
 | Event | Payload | Description | Rate Limit |
 |-------|---------|-------------|------------|
-| `campaign:start` | `{ levelId: number, coopMode?: boolean, localCoopMode?: boolean, localP2?: LocalP2Data, buddyMode?: boolean }` + callback | Start a campaign level. Supports solo, online co-op (party-based), local co-op, and buddy mode. Ends any existing campaign session first | 1/s per socket |
+| `campaign:start` | `{ levelId: number, coopMode?: boolean, localCoopMode?: boolean, localP2?: LocalP2Data, buddyMode?: boolean }` + callback | Start a campaign level. Supports solo, online co-op (party-based), local co-op, and buddy mode. Ends any existing campaign session first. Refused (`Level is locked`) unless the level and its world are published and the level is unlocked for the starting user | 1/s per socket |
 | `campaign:input` | `PlayerInput & { playerId?: number }` | Send input during campaign. `playerId` used for local co-op/buddy mode (only the session owner may send for the second character); defaults to socket's userId for solo/online co-op. Validated against session player list | 50/s per socket (two local players at 20/s each) |
 | `campaign:pause` | callback | Pause the campaign game. Either co-op player can pause | -- |
 | `campaign:resume` | callback | Resume a paused campaign game. Either co-op player can resume | -- |
@@ -145,6 +145,7 @@ On disconnect, the server:
 | `party:leave` | callback | Leave the party. The leaver's own tabs get `party:disbanded`; if the leader leaves, the party is disbanded and every member gets it too | 5/s (partyAction) |
 | `party:kick` | `{ userId: number }` + callback | Kick a member from the party. Leader-only. Kicked user receives `party:disbanded`. Errors: `Only the party leader can kick members`, `Cannot kick yourself`, `User is not in the party` | 5/s (partyAction) |
 | `party:chat` | `{ message: string }` | Send a chat message to the party. Max 200 chars (`PARTY_CHAT_MAX_LENGTH`). Subject to admin chat mode | 5/s (partyChat) |
+| `party:sync` | callback `{ success, party?, error? }` | Ask for the current party (sets `activePartyId` from Redis). Used by the party bar when it is built, so it shows the party without waiting for the next event | 5/s (partyAction) |
 
 **Create/accept callback**: `{ success: boolean; party?: Party; error?: string }`
 
@@ -188,7 +189,7 @@ On disconnect, the server:
 | `room:playerJoined` | `RoomPlayer` (`{ user: PublicUser, ready: boolean, team: number \| null }`) | `room:{code}` | A new player joined the room |
 | `room:playerLeft` | `number` (userId) | `room:{code}` | A player left the room |
 | `room:playerReady` | `{ userId: number, ready: boolean }` | `room:{code}` | A player toggled their ready state |
-| `room:list` | `RoomListItem[]` | broadcast (all) | Updated room list. Broadcast on every room mutation (create, join, leave, start, delete) via coalesced `setImmediate` |
+| `room:list` | `RoomListItem[]` | `lobby` (sockets showing the lobby, see `lobby:subscribe`) | Updated room list. Broadcast on every room mutation (create, join, leave, start, delete) via coalesced `setImmediate` |
 
 ### Game Events
 
@@ -219,6 +220,7 @@ On disconnect, the server:
 | `campaign:levelComplete` | `{ levelId: number, timeSeconds: number, stars: number, nextLevelId: number \| null }` | `user:{userId}` per real player (falls back to `campaign:{userId}` with `stars: 0` when no real player is present) | Level completed with completion time, the recipient's own star rating, and next level ID |
 | `campaign:gameOver` | `{ levelId: number, reason: string }` | `campaign:{userId}` | Campaign game over (all lives lost or time expired) |
 | `campaign:partnerLeft` | `{ reason: string }` | `campaign:{userId}` | Co-op partner left (reason: `'quit'` or `'disconnected'`). Game continues solo |
+| `campaign:pauseState` | `{ paused: boolean }` | `campaign:{userId}` | The co-op level was paused or resumed (also sent as unpaused when the partner leaves) |
 
 ### Admin Events
 
@@ -234,12 +236,12 @@ On disconnect, the server:
 
 | Event | Payload | Scope | Description |
 |-------|---------|-------|-------------|
-| `sim:progress` | `SimulationBatchStatus` | requesting socket | Batch progress update (games completed, win rates, etc.) |
-| `sim:gameResult` | `{ batchId: string, result: SimulationGameResult }` | requesting socket | Individual game result within a batch |
+| `sim:progress` | `SimulationBatchStatus` | `sim:admin` (every admin socket) | Batch progress update (games completed, win rates, etc.) |
+| `sim:gameResult` | `{ batchId: string, result: SimulationGameResult }` | `sim:admin` | Individual game result within a batch |
 | `sim:state` | `{ batchId: string, state: GameState }` | `sim:{batchId}` | Live game state for spectating a simulation game |
 | `sim:gameTransition` | `{ batchId: string, gameIndex: number, totalGames: number, lastResult: SimulationGameResult \| null }` | `sim:{batchId}` | Transition between games in a batch (for spectator scene reset) |
-| `sim:completed` | `{ batchId: string, status: SimulationBatchStatus }` | requesting socket | Batch simulation completed with final status |
-| `sim:queueUpdate` | `{ queue: QueueEntry[] }` | broadcast (all admins) | Updated simulation queue status. `QueueEntry`: `{ batchId, queuePosition, config, queuedAt }` |
+| `sim:completed` | `{ batchId: string, status: SimulationBatchStatus }` | `sim:admin` | Batch simulation completed with final status |
+| `sim:queueUpdate` | `{ queue: QueueEntry[] }` | `sim:admin` | Updated simulation queue status. `QueueEntry`: `{ batchId, queuePosition, config, queuedAt }` |
 
 ### Friend Events
 
@@ -304,13 +306,13 @@ All open world events are scoped to the `openworld` room, which a socket enters 
 
 | Event | Payload | Scope | Description |
 |-------|---------|-------|-------------|
-| `error` | `{ message: string, code?: string }` | target socket | Generic error notification (validation failures, permission errors, game start issues) |
+| `error` | `{ message: string, code?: string }` | target socket | Failure of a lobby action that has no ack (room:start, room:ready, room:setTeam…). The lobby shows it as an error toast |
 
 ### Lobby Chat Events
 
 | Event | Payload | Scope | Description |
 |-------|---------|-------|-------------|
-| `lobby:chat` | `LobbyChatMessage` (`{ fromUserId, fromUsername, message, timestamp, role }`) | broadcast (all) | Global lobby chat message |
+| `lobby:chat` | `LobbyChatMessage` (`{ fromUserId, fromUsername, message, timestamp, role }`) | `lobby` | Global lobby chat message |
 
 ## Rate Limits
 

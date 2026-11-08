@@ -18,5 +18,9 @@
   "TOTP_RATE_LIMITED": "För många felaktiga koder. Vänta innan du försöker igen.",
   "CSRF_INVALID": "Din session kunde inte verifieras. Ladda om sidan.",
   "NO_REFRESH_TOKEN": "Din session har avslutats. Logga in igen.",
-  "PAYLOAD_TOO_LARGE": "Begäran är för stor."
+  "PAYLOAD_TOO_LARGE": "Begäran är för stor.",
+  "INVALID_PASSWORD": "Lösenordet uppfyller inte kraven.",
+  "USER_NOT_FOUND": "Användaren hittades inte",
+  "UNAUTHORIZED": "Logga in för att fortsätta.",
+  "SERVICE_UNAVAILABLE": "Tjänsten är tillfälligt otillgänglig. Försök igen om en stund."
 }

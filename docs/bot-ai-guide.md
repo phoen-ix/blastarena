@@ -30,7 +30,7 @@ This guide explains how to write, upload, and run custom bot AI implementations 
 
 ## Overview
 
-A custom bot AI is a TypeScript class that controls bot players during gameplay. The game engine calls your AI 20 times per second for each bot, passing the current game state. Your AI decides what each bot should do: move in a direction, place a bomb, detonate remote bombs, or do nothing.
+A custom bot AI is a TypeScript class that controls bot players during gameplay. The game engine calls your AI 10 times per second for each bot (every other tick of the 20-tick loop), passing the current game state. Your AI decides what each bot should do: move in a direction, place a bomb, detonate remote bombs, or do nothing.
 
 **How it works:**
 
@@ -44,7 +44,8 @@ The built-in AI (BotAI.ts) is always available as a reference implementation and
 
 **Sandboxing (security):** Uploaded AIs run inside an isolated V8 sandbox (`isolated-vm`) — a separate heap with no access to `require`, `process`, the filesystem, or the network. Each `generateInput()` call has a hard CPU timeout; if your AI throws or runs too long, the engine logs it and falls back to the built-in AI for that bot. Two consequences for your code:
 
-- `console` and the optional `logger` argument are **no-ops** inside the sandbox — they won't print or record anything. Use the returned `PlayerInput` to drive behavior; don't rely on logging side effects.
+- `console` and the optional `logger` argument are **no-ops** inside the sandbox — they won't print or record anything. Use the returned `PlayerInput` to drive behavior; don't rely on logging side effects. (The Logging section below applies to the built-in AI, which runs outside the sandbox.)
+- `Math.random()` is seeded per bot from the map seed, and `Date.now()` returns the game time of the current tick in milliseconds, so a bot match with your AI replays exactly. Don't use either for anything that must differ between runs.
 - The `player`/`state` objects (and the players/bombs/etc. they contain) are **rebuilt fresh each tick** from a snapshot, so object identity is **not stable across ticks**. Don't use them as `Map`/`WeakMap`/`Set` keys or compare with `===` across calls — key on the numeric ids (`player.id`, `bomb.id`) instead. All documented fields and methods work as before.
 
 ---
@@ -518,7 +519,7 @@ Your AI should adapt its strategy to the current game mode. You can detect the m
 
 ## Logging
 
-The optional `logger` parameter lets you log bot decisions for debugging. Logs appear in game log files and replay log panels.
+The optional `logger` parameter lets the **built-in** AI log its decisions; logs appear in game log files and replay log panels. Inside the sandbox an uploaded AI's `logger` (and `console`) does nothing, so the calls below are harmless but record nothing.
 
 ```typescript
 generateInput(player, state, logger) {
@@ -598,7 +599,7 @@ In practice, most AI logic is self-contained. Use the types from `@blast-arena/s
 
 ### Execution
 
-- `generateInput()` is called **once per tick** (20 times per second) for each bot using your AI
+- `generateInput()` is called **every other tick** (10 times per second) for each bot using your AI
 - Each bot gets its own class instance — state is not shared between bots
 - The function should return quickly. Long-running computations block the game tick for all players.
 
@@ -607,7 +608,7 @@ In practice, most AI logic is self-contained. Use the types from `@blast-arena/s
 If your `generateInput()` throws an exception:
 
 1. The error is logged to the game logger
-2. That specific bot is **immediately replaced** with the built-in AI (normal difficulty)
+2. That specific bot is **immediately replaced** with the built-in AI, at the room's bot difficulty
 3. The game continues without interruption
 4. The replacement is permanent for that game — your AI won't be retried
 
@@ -1056,7 +1057,7 @@ It's simpler than the built-in AI (which has 2000+ lines of logic), but demonstr
 ### Debugging
 
 - Download the built-in AI from the admin panel as reference — it covers every edge case.
-- Use `logger?.logBotDecision()` liberally during development. Set simulation log verbosity to "Full" to see all logs.
+- Uploaded AIs cannot log (see Sandboxing): to see why a bot acts, run simulations in real-time mode or encode a debug signal in the returned input while developing.
 - Run simulations in real-time mode to visually observe your bot's behavior.
 - If your AI crashes, check the game logs for the error message. The fallback to builtin means the game won't break, but you'll want to fix the bug.
 

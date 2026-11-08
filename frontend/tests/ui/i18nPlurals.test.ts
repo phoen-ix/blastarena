@@ -33,7 +33,8 @@ describe('plural keys resolve with the real i18next', () => {
         pl: { ui: load('pl', 'ui'), admin: load('pl', 'admin') },
       },
       interpolation: { escapeValue: false },
-      showSupportNotice: false,
+      // Not in i18next's InitOptions type, but read at runtime (silences the console notice).
+      ...({ showSupportNotice: false } as object),
     });
   });
 

@@ -18,5 +18,9 @@
   "TOTP_RATE_LIMITED": "For mange feil koder. Vent før du prøver igjen.",
   "CSRF_INVALID": "Økten din kunne ikke bekreftes. Last inn siden på nytt.",
   "NO_REFRESH_TOKEN": "Økten din er avsluttet. Logg inn på nytt.",
-  "PAYLOAD_TOO_LARGE": "Forespørselen er for stor."
+  "PAYLOAD_TOO_LARGE": "Forespørselen er for stor.",
+  "INVALID_PASSWORD": "Passordet oppfyller ikke kravene.",
+  "USER_NOT_FOUND": "Fant ikke brukeren",
+  "UNAUTHORIZED": "Logg inn for å fortsette.",
+  "SERVICE_UNAVAILABLE": "Tjenesten er midlertidig utilgjengelig. Prøv igjen om litt."
 }

@@ -3,7 +3,7 @@
 Part b of the split Wave 2 suite: admin tabs (all 12), the level editor, the 12 interface
 languages, the 11 themes and the account flows (register, verify, reset, 2FA, Settings > Account).
 Part a (player side: landing, lobby views, rooms, matches, open world, social, stats) is mapped in
-`COVERAGE.md`. Specs: `e2e/b/*.spec.ts`, run by `scripts/e2e.sh` (all of `e2e/`) or
+[COVERAGE.a.md](COVERAGE.a.md). Specs: `e2e/b/*.spec.ts`, run by `scripts/e2e.sh` (all of `e2e/`) or
 `bash scripts/e2e.sh b/` (this part only).
 
 - **Extraction:** `bash e2e/b/inventory.sh` (admin tab ids from `AdminUI.ts`; every `ApiClient` call

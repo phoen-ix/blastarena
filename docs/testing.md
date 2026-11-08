@@ -35,6 +35,7 @@ bash scripts/e2e.sh [playwright args]                         # E2E suite (Docke
 - Environment: `jsdom` (spec-compliant DOM; DOMPurify 3.4 mis-sanitises under happy-dom)
 - Test include: `tests/**/*.test.ts` (relative to `frontend/`, so `tests/helpers/*.ts` are not collected as tests)
 - Module aliases: `@shared` and `@blast-arena/shared` → `../shared/src`
+- Type-checked by `frontend/tests/tsconfig.json` (extends the app config, no emit) as part of the frontend `typecheck` script
 
 ## Test Organization
 
@@ -100,6 +101,8 @@ Core game mechanics — most of these drive the server-authoritative game state 
 | `game/CampaignRegressions.test.ts` | Timed kill-all fails at time-up, one hit per explosion per enemy, departed co-op partner not respawned/charged/awaited, idempotent pause |
 | `game/MapEventPrune.test.ts` | Map events expire with dynamic events on or off, in-window events kept, list stays bounded over long matches |
 | `game/ChainSnapshot.test.ts` | Chained detonations use the pre-detonation tile snapshot (a first blast cannot widen the second), incl. a 3-bomb line batch and with unexpired bombs left |
+| `game/GameRulesAudit.test.ts` | Deathmatch kill-target win ranks every player, departed players are not respawned (and return on reconnect), a between-tick death reaches the next tick's events, teammate kills earn nothing, XP never negative, campaign runs no second puzzle processor |
+| `game/enemyAiDefaults.test.ts` | Built-in enemy AIs: Patrol Guard walks its path past waypoint 0, paths cross switches and open gates, lethal hazards are avoided |
 
 ### Services
 
@@ -185,6 +188,7 @@ Socket.io event handler tests — handlers tested with mock socket/io objects an
 | `handlers/simStart.test.ts` | `sim:start` through the real `createSocketServer` (socket.io faked): the payload is checked with the REST route's `simulationConfigSchema`; invalid → `Invalid input` ack, no batch, nothing logged |
 | `handlers/lobbyHandlers.test.ts` | lobby:chat mode enforcement (disabled/admin_only/staff), message truncation, empty/non-string messages dropped |
 | `handlers/socket-await-guard.test.ts` | AST scan of `socket.ts` + `handlers/`: no `await` outside a `try` in any socket.on handler, connection listeners registered synchronously |
+| `handlers/socket-ack-guard.test.ts` | AST scan of `socket.ts` + `handlers/`: every handler with an ack starts with `ackOf()`, so a client that sends none cannot throw |
 
 ### Middleware
 
@@ -199,6 +203,7 @@ Socket.io event handler tests — handlers tested with mock socket/io objects an
 | `middleware/apiRateLimit.test.ts` | Real app over HTTP: the app-wide `/api` limiter answers 429 `RATE_LIMITED` past its per-IP budget on any route, RateLimit headers, default 1000/min |
 | `middleware/csrf.test.ts` | Real app over HTTP: `/auth/refresh` and `/auth/logout` refuse a missing or mismatched X-CSRF-Token (403 `CSRF_INVALID`), a matching one reaches the handler, `GET /auth/csrf` reuses its cookie |
 | `middleware/bodyParserErrors.test.ts` | Real Express stack: malformed JSON → 400 INVALID_JSON (body not reflected), corrupt gzip → 4xx, oversized → 413, unsupported charset → 415 |
+| `middleware/csrf-timing.test.ts` | The CSRF token is compared with `crypto.timingSafeEqual`: a match is accepted, a same-length mismatch refused |
 
 ### Database
 
@@ -228,6 +233,9 @@ Backend utilities, config guards (nginx, Compose, Node version) and the shared-p
 | `../shared/puzzle.test.ts` | All switch/gate helpers (4 colors): tile checks, active/open state, color extraction, tile construction; constants |
 | `utils/guestGate.test.ts` | Guest socket packet gate: openworld:* allowed, 17 other events blocked (ack still answered), malformed packets blocked, allowlist matches `socket.ts`; guestPacketLabel truncation |
 | `utils/nginxHeaders.test.ts` | Parses prod + dev nginx configs: every location includes the security headers, no duplicate Content-Type on `return`, error_page 502 paired with 429; prod enforces Trusted Types, dev has no CSP/HSTS |
+| `utils/cspScriptHash.test.ts` | The CSP whitelists the sha256 of the inline script in `frontend/index.html` (an edit to one without the other silently blocks the theme bootstrap) |
+| `utils/socketValidation.test.ts` | `ackOf()`; `validateSocket()` answers the ack on invalid input and does not throw without one; room create accepts only odd map sizes 9–51; mode and power-up schemas follow the shared tables (no open world for rooms) |
+| `../shared/authErrorKeys.test.ts` | Every error code the auth paths can send has an `errors:` translation key, or is listed as one no sign-in screen shows |
 | `shared/xp.test.ts` | XP calculation, level-from-XP math, level-for-XP inverse, placement bonuses, multiplier |
 | `../shared/mapValidation.test.ts` | Dimension limits, odd enforcement, tile validity, border walls, spawn counts, spawnPoints vs spawn tiles, teleporter pairing, switch/gate pairing |
 | `utils/gameLogger.test.ts` | Idle gating of empty-room tick logs, verbosity mapping, pruneOldLogs (age/size limits, logs with real players protected, throttled), peak-player filename on close |
@@ -254,6 +262,13 @@ All frontend tests run on Vitest + jsdom. Paths are relative to `frontend/`.
 | `tests/ui/hudPlayerList.test.ts` | HUD player list: keyed DOM reuse (no writes when unchanged), alive-first order, click-to-spectate only while dead, team headers, live KOTH reorder + crown icon, username escaping, bot/buddy tags, colour-blind shape markers, reset() |
 | `tests/utils/wrapGhosts.test.ts` | wrapGhostOffsets/wrapGhostPositions: ghost copies only near the seams (edges, corners, margin), at most 3 copies, degenerate and oversized worlds |
 | `tests/art/painters.test.ts` | Every drawn-style painter (Toy, Neon, Pixel) over every world, tile, character, bomb, flame, pickup and effect draws something without throwing, against a fake 2D context; deterministic output; sane frame counts and palettes |
+| `tests/network/authGuest.test.ts` | Signing in (login, TOTP, refresh) clears the guest flag; logout clears it and the pending TOTP challenge |
+| `tests/ui/adminTabFixes.test.ts` | Dashboard: imprint toggle sends only the flag, a partial load failure locks only the affected settings, email reset; account cleanup executes the previewed days; stored config values and import colours stay attribute values; enemy import resolves a bundled-AI conflict; "Can bomb" sends a bombConfig |
+| `tests/shared/wrapDistance.test.ts` | Shortest toroidal distance, never negative for a point beyond the world |
+| `tests/game/replayPlayerFrameZero.test.ts` | Frame 0's tile changes show on forward play as well as after a backward seek |
+| `tests/game/reducedMotion.test.ts` | Classic art and the Animations setting: power-ups float and bombs pulse when on, stay still when off |
+| `tests/scenes/guestPlayReveal.test.ts` | Play as Guest reveals the running background arena, and waits for a queued launch instead of joining twice |
+| `tests/utils/fontFaces.test.ts` | Every self-hosted `@font-face` has its file in `public/` |
 | `tests/shared/grid.test.ts` | manhattanDistance, getExplosionCells (range, walls, bounds, first destructible stops the blast, pierce, cracked walls) |
 | `tests/utils/tileTexture.test.ts` | themePrefix, getTileTexture (themed/unthemed keys, classic = no theme, floor variation, unknown-tile fallback), conveyor helpers |
 | `tests/game/gameClientFixes.test.ts` | PowerUpRenderer kills its float tween, LocalCoopInput releases keys on blur, GamepadManager.suppressHeldButtons, ReplayPlayer.seekToTick by game tick, campaign run helpers (P2 socket token, guest P2) |

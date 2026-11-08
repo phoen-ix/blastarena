@@ -150,14 +150,14 @@ describe('Settings', () => {
 
   describe('saveSettings', () => {
     it('stores to localStorage', () => {
-      const settings = { animations: false, screenShake: false, particles: true };
+      const settings = { ...getSettings(), animations: false, screenShake: false, particles: true };
       saveSettings(settings);
       const stored = JSON.parse(localStorage.getItem('blast-arena-settings')!);
       expect(stored).toEqual(settings);
     });
 
     it('updates cache (getSettings reflects change)', () => {
-      const settings = { animations: false, screenShake: true, particles: false };
+      const settings = { ...getSettings(), animations: false, screenShake: true, particles: false };
       saveSettings(settings);
       const result = getSettings();
       expect(result).toEqual(settings);

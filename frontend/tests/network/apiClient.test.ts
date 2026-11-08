@@ -15,6 +15,11 @@ vi.mock('../../src/i18n', () => ({ t: (key: string) => key, i18n: { language: 'e
 
 let ApiClient: typeof import('../../src/network/ApiClient').ApiClient;
 let ApiError: typeof import('../../src/network/ApiClient').ApiError;
+type ApiErr = InstanceType<typeof import('../../src/network/ApiClient').ApiError>;
+/** For requests that must fail: a success is a test failure, the rejection is the value. */
+const expectRejection = (): never => {
+  throw new Error('expected the request to fail');
+};
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -51,7 +56,10 @@ describe('ApiClient errors', () => {
       jsonResponse(400, { error: 'Invalid username or password', code: 'INVALID_CREDENTIALS' }),
     );
 
-    const err = await ApiClient.post('/auth/login', { username: 'a' }, true).catch((e) => e);
+    const err = await ApiClient.post('/auth/login', { username: 'a' }, true).then(
+      expectRejection,
+      (e: ApiErr) => e,
+    );
     expect(err).toBeInstanceOf(ApiError);
     expect(err.code).toBe('INVALID_CREDENTIALS');
     expect(err.status).toBe(400);
@@ -67,7 +75,7 @@ describe('ApiClient errors', () => {
         details: [{ field: 'name', message: 'Required' }],
       }),
     );
-    const err = await ApiClient.get('/x').catch((e) => e);
+    const err = await ApiClient.get('/x').then(expectRejection, (e: ApiErr) => e);
     expect(err.message).toBe('Validation failed (name: Required)');
     expect(err.code).toBe('VALIDATION_FAILED');
   });
@@ -81,7 +89,7 @@ describe('ApiClient 401 handling', () => {
       jsonResponse(401, { error: 'Authentication required', code: 'UNAUTHORIZED' }),
     );
 
-    const err = await ApiClient.get('/user/rank').catch((e) => e);
+    const err = await ApiClient.get('/user/rank').then(expectRejection, (e: ApiErr) => e);
     expect(auth.refresh).toHaveBeenCalledTimes(1);
     expect(auth.logout).not.toHaveBeenCalled();
     expect(err).toBeInstanceOf(ApiError);
@@ -99,7 +107,7 @@ describe('ApiClient 401 handling', () => {
       jsonResponse(401, { error: 'Invalid or expired token', code: 'INVALID_TOKEN' }),
     );
 
-    const err = await ApiClient.get('/user/profile').catch((e) => e);
+    const err = await ApiClient.get('/user/profile').then(expectRejection, (e: ApiErr) => e);
     expect(auth.logout).toHaveBeenCalledTimes(1);
     expect(err).toBeInstanceOf(ApiError);
     expect(err.code).toBe('TOKEN_EXPIRED');
@@ -138,8 +146,9 @@ describe('ApiClient non-token 401', () => {
       jsonResponse(401, { error: 'Password is incorrect', code: 'INVALID_PASSWORD' }),
     );
 
-    const err = await ApiClient.post('/user/totp/disable', { password: 'x', code: '1' }).catch(
-      (e) => e,
+    const err = await ApiClient.post('/user/totp/disable', { password: 'x', code: '1' }).then(
+      expectRejection,
+      (e: ApiErr) => e,
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(auth.refresh).not.toHaveBeenCalled();
@@ -170,7 +179,10 @@ describe('ApiClient.download', () => {
   it('throws an ApiError for a failed download', async () => {
     ApiClient.setAuthManager(fakeAuth('tok') as unknown as AuthManager);
     fetchMock.mockResolvedValueOnce(jsonResponse(404, { error: 'Not found', code: 'NOT_FOUND' }));
-    const err = await ApiClient.download('/admin/ai/x/download').catch((e) => e);
+    const err = await ApiClient.download('/admin/ai/x/download').then(
+      expectRejection,
+      (e: ApiErr) => e,
+    );
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(404);
   });

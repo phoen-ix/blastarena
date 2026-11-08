@@ -36,14 +36,25 @@ export default tseslint.config(
     },
   },
 
-  // Type-aware rules (each workspace's tsconfig.json covers its src/)
+  // Promises must be awaited, returned, caught or explicitly `void`ed: a dropped rejection only
+  // reached the process-level "Unhandled promise rejection" log with no context (the audit found
+  // 118). Type-aware, so it runs on the source only, with each workspace's tsconfig.
+  // checksVoidReturn is relaxed for callback arguments and JSX-like attributes: async event
+  // handlers are the norm in the DOM UI and handle their own errors.
   {
-    files: ['{shared,backend,frontend}/src/**/*.ts'],
+    files: ['shared/src/**/*.ts', 'backend/src/**/*.ts', 'frontend/src/**/*.ts'],
     languageOptions: {
-      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
     rules: {
       '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksVoidReturn: { arguments: false, attributes: false } },
+      ],
     },
   },
 
