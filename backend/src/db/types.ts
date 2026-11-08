@@ -119,6 +119,8 @@ export interface MatchPlayerRow extends RowDataPacket {
   bombs_placed: number;
   powerups_collected: number;
   survived_seconds: number;
+  /** Migration 048; 0/1 from the driver. Only where a query selects it. */
+  is_winner?: number | boolean;
 }
 
 /** Admin action row */

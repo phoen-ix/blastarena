@@ -6,7 +6,7 @@ import { IEnemyAI, EnemyAIContext } from '../game/EnemyAI';
 import { query } from '../db/connection';
 import { EnemyAIRow } from '../db/types';
 import { loadBotAIInSandbox } from './botai-compiler';
-import { IsolatedEnemyAI } from './IsolatedAIRunner';
+import { IsolatedEnemyAI, IsolatedAIOptions } from './IsolatedAIRunner';
 
 type EnemyAIConstructor = new (
   difficulty: 'easy' | 'normal' | 'hard',
@@ -73,6 +73,8 @@ export class EnemyAIRegistry {
     aiId: string,
     difficulty: 'easy' | 'normal' | 'hard',
     typeConfig: EnemyAIContext['self']['typeConfig'],
+    /** Isolate options; pass AI_IN_TICK_BOOTSTRAP_TIMEOUT_MS when creating inside a game tick. */
+    options?: IsolatedAIOptions,
   ): IEnemyAI | null {
     const entry = this.loaded.get(aiId);
     if (!entry) {
@@ -85,7 +87,7 @@ export class EnemyAIRegistry {
     // Untrusted upload — run in an isolate. On build/instantiation failure, return null so the
     // caller falls back to the built-in patterns.
     try {
-      return new IsolatedEnemyAI(entry.code, difficulty, typeConfig);
+      return new IsolatedEnemyAI(entry.code, difficulty, typeConfig, options);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.warn({ aiId, error: msg }, 'Failed to create isolated enemy AI, falling back');

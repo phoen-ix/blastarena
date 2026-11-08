@@ -3,7 +3,19 @@ import {
   EnemyEyeStyle,
   EnemyAccessory,
   EnemyMovementPattern,
+  EnemyBombConfig,
 } from '../types/campaign';
+
+/**
+ * Bomb settings for an enemy (or boss phase) that may bomb but has none of its own: the seeded
+ * Bombotron's values (migration 009). Without a bombConfig, canPlaceBomb() never fires.
+ */
+export const DEFAULT_ENEMY_BOMB_CONFIG: Readonly<EnemyBombConfig> = {
+  fireRange: 2,
+  cooldownTicks: 60,
+  trigger: 'proximity',
+  proximityRange: 4,
+};
 
 export const CAMPAIGN_RESPAWN_TICKS = 40; // 2 seconds
 export const CAMPAIGN_RESPAWN_INVULNERABILITY = 40; // 2 seconds after respawn

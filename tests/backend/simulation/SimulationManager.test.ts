@@ -124,6 +124,8 @@ vi.mock('../../../backend/src/simulation/SimulationRunner', () => ({
       run: mockRunnerRun,
       cancel: mockRunnerCancel,
       isActive: mockRunnerIsActive,
+      getLogDir: () => `/sims/ffa/batch_dir`,
+      once: (_event: string, cb: () => void) => cb(),
       getStatus: mockRunnerGetStatus,
       getResults: mockRunnerGetResults,
       on: mockRunnerOn,
@@ -1086,6 +1088,24 @@ describe('SimulationManager', () => {
       expect(mockRmSync).not.toHaveBeenCalled();
     });
 
+    it('cancels a running batch and deletes its own directory (it used to be orphaned)', async () => {
+      mockRunnerIsActive.mockReturnValue(false);
+      const started = manager.startBatch(createSimConfig(), 1) as { batchId: string };
+      mockRunnerIsActive.mockReturnValue(true);
+      mockRunnerCancel.mockClear();
+      mockRm.mockClear();
+
+      const deleted = await manager.deleteBatch(started.batchId);
+
+      expect(deleted).toBe(true);
+      expect(mockRunnerCancel).toHaveBeenCalled();
+      expect(mockRm).toHaveBeenCalledWith(
+        '/sims/ffa/batch_dir',
+        expect.objectContaining({ recursive: true, force: true }),
+      );
+      expect(manager.getBatch(started.batchId)).toBeUndefined();
+    });
+
     it('drops a deleted batch from the cached index without rescanning', async () => {
       mockDisk({
         ffa: {
@@ -1126,12 +1146,10 @@ describe('SimulationManager', () => {
     });
 
     it('should handle disk errors gracefully', async () => {
-      mockRunnerIsActive.mockReturnValue(false);
-      const started = manager.startBatch(createSimConfig(), 1) as { batchId: string };
-
+      // A batch known only from disk (not in memory): it is looked up through the disk index.
       mockReaddir.mockRejectedValue(new Error('Disk read error'));
 
-      const deleted = await manager.deleteBatch(started.batchId);
+      const deleted = await manager.deleteBatch('disk_only_batch');
       // Returns false because disk lookup failed
       expect(deleted).toBe(false);
     });
@@ -1150,12 +1168,9 @@ describe('SimulationManager', () => {
     });
 
     it('should skip malformed configs on disk during delete', async () => {
-      mockRunnerIsActive.mockReturnValue(false);
-      const started = manager.startBatch(createSimConfig(), 1) as { batchId: string };
-
       mockDisk({ ffa: { batch_bad: { 'batch_config.json': 'not json' } } });
 
-      const deleted = await manager.deleteBatch(started.batchId);
+      const deleted = await manager.deleteBatch('disk_only_batch');
       // Malformed config means no match found
       expect(deleted).toBe(false);
     });

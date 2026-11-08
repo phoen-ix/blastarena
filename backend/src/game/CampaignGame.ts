@@ -32,7 +32,11 @@ import { Player } from './Player';
 import { Bomb } from './Bomb';
 import { processEnemyAI, IEnemyAI, EnemyAIContext, EnemyAIResult } from './EnemyAI';
 import { getEnemyAIRegistry } from './registry';
-import { disposeAI, toEnemyAIResult } from '../services/IsolatedAIRunner';
+import {
+  disposeAI,
+  toEnemyAIResult,
+  AI_IN_TICK_BOOTSTRAP_TIMEOUT_MS,
+} from '../services/IsolatedAIRunner';
 import { PuzzleTileProcessor } from './PuzzleTileProcessor';
 import { ReplayRecorder } from '../utils/replayRecorder';
 import { GameLogger } from '../utils/gameLogger';
@@ -643,6 +647,13 @@ export class CampaignGame {
         if (player) {
           const spawnPos = this.respawnPositions.get(playerId) ?? { x: 1, y: 1 };
           player.respawn(spawnPos);
+          // respawn() zeroes bombCount, but bombs from the last life may still be live (the fuse
+          // outlasts the respawn delay; remote bombs never expire), so recount them, as GameState
+          // does for deathmatch. Otherwise the player could hold maxBombs + 1. (audit G6)
+          player.bombCount = 0;
+          for (const bomb of this.gameState.bombs.values()) {
+            if (bomb.ownerId === playerId) player.bombCount++;
+          }
           player.invulnerableTicks = CAMPAIGN_RESPAWN_INVULNERABILITY;
 
           // Re-apply starting powerups on respawn
@@ -860,7 +871,8 @@ export class CampaignGame {
             const minion = new Enemy(spawn.enemyTypeId, { ...enemy.position }, configCopy);
             this.enemies.set(minion.id, minion);
             // Init custom AI for spawned minion if applicable
-            this.initEnemyAIForEnemy(minion);
+            // Inside the tick: a slow upload must not stall the game for the 5 s bootstrap limit.
+            this.initEnemyAIForEnemy(minion, getEnemyAIRegistry(), true);
           }
         }
       }
@@ -888,6 +900,16 @@ export class CampaignGame {
 
     // 11. Update enemy positions for next tick's bomb slide collision checks
     this.updateEnemyPositions();
+
+    // 12. Forget hits of explosions that are gone (the sets grew for the whole level).
+    for (const [enemyId, hits] of this.enemyExplosionHits) {
+      for (const explosionId of hits) {
+        if (!this.gameState.explosions.has(explosionId)) hits.delete(explosionId);
+      }
+      if (hits.size === 0 || !this.enemies.get(enemyId)?.alive) {
+        this.enemyExplosionHits.delete(enemyId);
+      }
+    }
   }
 
   /**
@@ -939,19 +961,24 @@ export class CampaignGame {
     }
   }
 
-  private initEnemyAIForEnemy(enemy: Enemy, registry = getEnemyAIRegistry()): void {
+  private initEnemyAIForEnemy(enemy: Enemy, registry = getEnemyAIRegistry(), inTick = false): void {
     const config = enemy.typeConfig;
     if (!config.enemyAiId || !registry.isLoaded(config.enemyAiId)) return;
     try {
-      const ai = registry.createInstance(config.enemyAiId, config.difficulty || 'normal', {
-        speed: config.speed,
-        canPassWalls: config.canPassWalls,
-        canPassBombs: config.canPassBombs,
-        canBomb: config.canBomb,
-        contactDamage: config.contactDamage,
-        isBoss: config.isBoss,
-        sizeMultiplier: config.sizeMultiplier,
-      });
+      const ai = registry.createInstance(
+        config.enemyAiId,
+        config.difficulty || 'normal',
+        {
+          speed: config.speed,
+          canPassWalls: config.canPassWalls,
+          canPassBombs: config.canPassBombs,
+          canBomb: config.canBomb,
+          contactDamage: config.contactDamage,
+          isBoss: config.isBoss,
+          sizeMultiplier: config.sizeMultiplier,
+        },
+        inTick ? { bootstrapTimeoutMs: AI_IN_TICK_BOOTSTRAP_TIMEOUT_MS } : undefined,
+      );
       if (ai) this.enemyAIs.set(enemy.id, ai);
     } catch (err: unknown) {
       logger.warn(
@@ -1049,6 +1076,13 @@ export class CampaignGame {
   }
 
   private onEnemyDied(enemy: Enemy): void {
+    // A dead enemy never decides again: free its isolate now rather than at the end of the level.
+    const ai = this.enemyAIs.get(enemy.id);
+    if (ai) {
+      disposeAI(ai);
+      this.enemyAIs.delete(enemy.id);
+    }
+
     // Drop power-up
     if (this.rng.next() < enemy.typeConfig.dropChance && enemy.typeConfig.dropTable.length > 0) {
       const dropType =
@@ -1063,6 +1097,9 @@ export class CampaignGame {
     const player = this.gameState.players.get(playerId);
     if (!player) return;
     if (player.isBuddy) return; // Buddy cannot die
+    // The level is won and in its grace period: a lingering blast must not turn the win into
+    // "No lives remaining!". (audit G7)
+    if (this.completionTick !== null) return;
 
     // Player might already be handled (pending respawn)
     if (!player.alive && this.respawnTicks.has(playerId)) return;

@@ -52,6 +52,8 @@ COPY --from=builder /app/shared/dist ./shared/dist
 COPY shared/package.json ./shared/
 COPY --from=builder /app/backend/dist ./backend/dist
 COPY backend/src/db/migrations ./backend/src/db/migrations
+# The built-in bot AI's source, served by the admin "Download" button (services/botai.ts).
+COPY backend/src/game/BotAI.ts ./backend/src/game/BotAI.ts
 COPY --from=builder /app/backend/locales ./backend/locales
 COPY docs/ ./docs/
 

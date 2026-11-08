@@ -250,6 +250,9 @@ function checkPerGame(gameData: GameAchievementData, config: Record<string, unkn
   const operator = (config.operator as string) ?? '>=';
   const threshold = config.threshold as number;
   if (!stat || threshold === undefined) return false;
+  // "Pacifist Win" (self_kills == 0) and "Speed Demon" (survived_seconds <= 60) tested the stat
+  // alone, so a lost game unlocked them.
+  if (config.requireWin && !gameData.isWinner) return false;
 
   const dataMap: Record<string, number | boolean> = {
     kills: gameData.kills,
@@ -312,31 +315,34 @@ async function checkModeSpecific(
     total: number;
   }
 
+  // Only finished matches count: an aborted one (everyone walked out) or one still being played
+  // has match_players rows too. A win is `is_winner`, not placement 1: teams mode ranks the whole
+  // winning team, and a draw can leave several players on placement 1 with nobody winning.
   let total: number | null = null;
   if (stat === 'wins') {
     const [row] = await query<CountRow[]>(
       `SELECT COUNT(*) as total FROM matches m
        JOIN match_players mp ON mp.match_id = m.id
-       WHERE mp.user_id = ? AND m.game_mode = ? AND mp.placement = 1`,
+       WHERE mp.user_id = ? AND m.game_mode = ? AND m.status = 'finished' AND mp.is_winner = TRUE`,
       [userId, mode],
     );
-    total = row.total;
+    total = Number(row.total);
   } else if (stat === 'matches') {
     const [row] = await query<CountRow[]>(
       `SELECT COUNT(*) as total FROM matches m
        JOIN match_players mp ON mp.match_id = m.id
-       WHERE mp.user_id = ? AND m.game_mode = ?`,
+       WHERE mp.user_id = ? AND m.game_mode = ? AND m.status = 'finished'`,
       [userId, mode],
     );
-    total = row.total;
+    total = Number(row.total);
   } else if (stat === 'kills') {
     const [row] = await query<SumRow[]>(
       `SELECT COALESCE(SUM(mp.kills), 0) as total FROM matches m
        JOIN match_players mp ON mp.match_id = m.id
-       WHERE mp.user_id = ? AND m.game_mode = ?`,
+       WHERE mp.user_id = ? AND m.game_mode = ? AND m.status = 'finished'`,
       [userId, mode],
     );
-    total = row.total;
+    total = Number(row.total);
   }
 
   if (total === null) return false;
@@ -529,23 +535,55 @@ export async function getAchievementProgress(userId: number): Promise<Achievemen
   // Numeric stat lookup by column name (achievement configs reference numeric columns only)
   const stats: Record<string, number | undefined> = statsRows[0] || {};
 
-  // Batch fetch per_game bests
+  // Batch fetch per_game bests, split by won/lost so a `requireWin` condition reads its best from
+  // won games only (its best over every game read as complete while it was still locked).
+  type BestColumn =
+    | 'best_kills'
+    | 'best_deaths'
+    | 'best_bombs_placed'
+    | 'best_powerups_collected'
+    | 'best_survived_seconds'
+    | 'best_placement';
   interface BestRow extends RowDataPacket {
-    best_kills: number;
-    best_deaths: number;
-    best_bombs_placed: number;
-    best_powerups_collected: number;
-    best_survived_seconds: number;
-    best_placement: number;
+    is_winner: number | boolean | null;
+    best_kills: number | null;
+    best_deaths: number | null;
+    best_bombs_placed: number | null;
+    best_powerups_collected: number | null;
+    best_survived_seconds: number | null;
+    best_placement: number | null;
   }
   const bestRows = await query<BestRow[]>(
-    `SELECT MAX(kills) as best_kills, MAX(deaths) as best_deaths,
+    `SELECT is_winner, MAX(kills) as best_kills, MAX(deaths) as best_deaths,
      MAX(bombs_placed) as best_bombs_placed, MAX(powerups_collected) as best_powerups_collected,
      MAX(survived_seconds) as best_survived_seconds, MIN(placement) as best_placement
-     FROM match_players WHERE user_id = ?`,
+     FROM match_players WHERE user_id = ? GROUP BY is_winner`,
     [userId],
   );
-  const bests: Partial<BestRow> = bestRows[0] || {};
+  const mergeBests = (rows: BestRow[]): Partial<Record<BestColumn, number>> => {
+    const out: Partial<Record<BestColumn, number>> = {};
+    for (const r of rows) {
+      for (const col of [
+        'best_kills',
+        'best_deaths',
+        'best_bombs_placed',
+        'best_powerups_collected',
+        'best_survived_seconds',
+        'best_placement',
+      ] as const) {
+        const v = r[col];
+        if (v === null || v === undefined) continue;
+        const prev = out[col];
+        const better = col === 'best_placement' ? Math.min : Math.max;
+        out[col] = prev === undefined ? v : better(prev, v);
+      }
+    }
+    return out;
+  };
+  const wonRows = bestRows.filter((r) => !!r.is_winner);
+  const bests = mergeBests(bestRows);
+  const wonBests = mergeBests(wonRows);
+  const hasWon = wonRows.length > 0;
 
   // Per-mode and campaign totals are aggregated ONCE each, lazily, and the loop below reads them
   // from memory. There used to be a query inside the loop for every locked mode_specific or
@@ -564,11 +602,11 @@ export async function getAchievementProgress(userId: number): Promise<Achievemen
     const rows = await query<ModeTotalsRow[]>(
       `SELECT m.game_mode,
               COUNT(*) as matches,
-              SUM(CASE WHEN mp.placement = 1 THEN 1 ELSE 0 END) as wins,
+              SUM(CASE WHEN mp.is_winner = TRUE THEN 1 ELSE 0 END) as wins,
               COALESCE(SUM(mp.kills), 0) as kills
        FROM match_players mp
        JOIN matches m ON m.id = mp.match_id
-       WHERE mp.user_id = ?
+       WHERE mp.user_id = ? AND m.status = 'finished'
        GROUP BY m.game_mode`,
       [userId],
     );
@@ -626,13 +664,6 @@ export async function getAchievementProgress(userId: number): Promise<Achievemen
           // read as complete while still locked. Unknown operators evaluate as ">=".
           const operator = (config.operator as string) ?? '>=';
           if (operator === '<=' || operator === '==' || operator === '<') break;
-          type BestColumn =
-            | 'best_kills'
-            | 'best_deaths'
-            | 'best_bombs_placed'
-            | 'best_powerups_collected'
-            | 'best_survived_seconds'
-            | 'best_placement';
           const colMap: Record<string, BestColumn> = {
             kills: 'best_kills',
             deaths: 'best_deaths',
@@ -641,16 +672,13 @@ export async function getAchievementProgress(userId: number): Promise<Achievemen
             survived_seconds: 'best_survived_seconds',
             placement: 'best_placement',
             self_kills: 'best_kills', // approximate
-            is_winner: 'best_placement', // placement 1 = winner
             player_count: 'best_kills', // not meaningful for progress
           };
-          const col = colMap[stat];
-          if (col) {
-            current = bests[col] ?? 0;
-          }
-          // For is_winner, convert placement to boolean-like
           if (stat === 'is_winner') {
-            current = current === 1 ? 1 : 0;
+            current = hasWon ? 1 : 0;
+          } else {
+            const col = colMap[stat];
+            if (col) current = (config.requireWin ? wonBests : bests)[col] ?? 0;
           }
           // A best equal to the threshold has not met "> threshold" yet.
           if (operator === '>') current = Math.min(current, threshold - 1);

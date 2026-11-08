@@ -7,6 +7,7 @@ import {
   OPENWORLD_DEFAULT_ROUND_TIME,
   OPENWORLD_DEFAULT_MAX_PLAYERS,
   OPENWORLD_GUEST_ID_START,
+  OPENWORLD_GUEST_ID_COUNT,
   OPENWORLD_ROUND_FREEZE_TICKS,
   OPENWORLD_JOIN_INVULNERABILITY_TICKS,
   OPENWORLD_STATS_FLUSH_TICKS,
@@ -30,7 +31,6 @@ import {
 } from '../services/settings';
 import { logger } from '../utils/logger';
 import { GameLogger } from '../utils/gameLogger';
-import type { ReplayRecorder } from '../utils/replayRecorder';
 import type { RowDataPacket } from 'mysql2';
 import { withTransaction } from '../db/connection';
 import { checkLevelMilestoneUnlocks } from '../services/cosmetics';
@@ -120,9 +120,6 @@ class OpenWorldManager {
   private lastStatsFlushTick: number = 0;
 
   // Replay recording (only active ticks)
-  private replayRecorder: ReplayRecorder | null = null;
-  private lastActivityTick: number = 0;
-  private static readonly ACTIVITY_RECORD_WINDOW = 60; // Record 3s after last activity
 
   async init(io: TypedServer): Promise<void> {
     this.io = io;
@@ -195,19 +192,15 @@ class OpenWorldManager {
 
     this.freezeTick = null;
     this.lastStatsFlushTick = 0;
-    this.lastActivityTick = 0;
 
     // No round replays: they were saved as `campaign_openworld_…` files with no DB row, so nothing
     // listed them and the retention pruning skipped them — disk use grew without bound.
-    this.replayRecorder = null;
 
     const gameLogger = new GameLogger(
       `openworld_r${this.roundNumber}`,
       'open_world',
       this.players.size,
-      // Open world runs continuously, so 'full' (every tick) is far too much. Movement, powerup
-      // and explosion detail still reach replayRecorder unconditionally, so replays keep full
-      // fidelity regardless of this setting.
+      // Open world runs continuously, so 'full' (every tick) is far too much.
       { verbosity: 'normal' },
     );
     this.gameState.gameLogger = gameLogger;
@@ -215,7 +208,9 @@ class OpenWorldManager {
     this.gameLoop = new GameLoop(
       this.gameState,
       (serialize) => this.onTick(serialize),
-      () => {}, // Open world never calls onGameOver
+      // The world has no game over; this only fires when the loop's circuit breaker trips after
+      // repeated tick errors. It used to be a no-op, which left the world dead until a restart.
+      () => this.recoverFromLoopFailure(),
       TICK_RATE,
       true, // skip countdown
     );
@@ -272,28 +267,6 @@ class OpenWorldManager {
       }
     }
 
-    // Record replay frame when there's activity (inputs update lastActivityTick in handleInput)
-    if (this.replayRecorder) {
-      // Events (explosions, deaths) also extend the recording window
-      const hasEvents =
-        this.gameState.tickEvents.explosions.length > 0 ||
-        this.gameState.tickEvents.playerDied.length > 0 ||
-        this.gameState.tickEvents.powerupCollected.length > 0 ||
-        this.gameState.tickEvents.bombThrown.length > 0;
-
-      if (hasEvents) {
-        this.lastActivityTick = tick;
-      }
-
-      // Record during activity and for a short window after
-      if (tick - this.lastActivityTick <= OpenWorldManager.ACTIVITY_RECORD_WINDOW) {
-        this.replayRecorder.recordTick(
-          { ...state, map: { ...state.map, tiles: this.gameState.map.tiles } },
-          this.gameState.tickEvents,
-        );
-      }
-    }
-
     // Flush stats periodically (fire-and-forget from the tick, but never an unhandled rejection)
     if (tick - this.lastStatsFlushTick >= OPENWORLD_STATS_FLUSH_TICKS) {
       void this.flushStats().catch((err) => logger.error({ err }, 'Open world stats flush failed'));
@@ -308,6 +281,9 @@ class OpenWorldManager {
     // Check round timer
     const timeElapsed = tick / TICK_RATE;
     if (this.freezeTick === null && this.settings && timeElapsed >= this.settings.roundTime) {
+      // This tick's state was already serialized (pending tile changes cleared, explosions marked
+      // sent), so it must go out: returning without it left the freeze showing stale tiles.
+      this.io.to('openworld').emit('openworld:state', state);
       this.startRoundTransition();
       return;
     }
@@ -359,8 +335,7 @@ class OpenWorldManager {
     // flushStats, so the new round's kills cannot bleed into it. (audit OPENWORLD-FLUSH-1)
     void this.flushStats().catch((err) => logger.error({ err }, 'Open world stats flush failed'));
 
-    // Save replay for this round (if any frames were recorded)
-    this.finalizeReplay();
+    this.closeRoundLog();
 
     // Stop old game loop
     this.gameLoop?.stop();
@@ -416,7 +391,11 @@ class OpenWorldManager {
 
     // Generate guest identity if needed
     if (isGuest) {
-      userId = OPENWORLD_GUEST_ID_START - this.guestCounter++;
+      // Stay inside the documented guest range (-3000..-9999), skipping ids still in use; the
+      // counter used to grow without bound.
+      do {
+        userId = OPENWORLD_GUEST_ID_START - (this.guestCounter++ % OPENWORLD_GUEST_ID_COUNT);
+      } while (this.players.has(userId));
       if (!username) {
         const pick = (n: number) => this.guestNameRng?.nextInt(n) ?? randomInt(n);
         username = `Guest_${ADJECTIVES[pick(ADJECTIVES.length)]}${pick(100)}`;
@@ -492,12 +471,11 @@ class OpenWorldManager {
 
     this.gameState.inputBuffer.addInput(userId, input);
 
-    // Track player activity for AFK detection and replay recording
+    // Track player activity for AFK detection
     const playerData = this.players.get(userId);
     if (playerData) {
       playerData.lastInputTick = this.gameState.tick;
     }
-    this.lastActivityTick = this.gameState.tick;
   }
 
   async handleSettingsChange(): Promise<void> {
@@ -627,7 +605,7 @@ class OpenWorldManager {
     } catch (err) {
       logger.error({ err }, 'Open world stats flush failed during shutdown');
     }
-    this.finalizeReplay();
+    this.closeRoundLog();
     this.gameLoop = null;
     this.gameState = null;
     this.players.clear();
@@ -636,28 +614,23 @@ class OpenWorldManager {
     this.enabled = false;
   }
 
-  private finalizeReplay(): void {
-    if (!this.replayRecorder) return;
+  /**
+   * Ends the round's game log. This used to sit behind a `replayRecorder` check that was always
+   * false once round replays were dropped, so every round (and shutdown) left its log stream open.
+   */
+  private closeRoundLog(): void {
+    this.gameState?.gameLogger?.logGameOver(null, []); // writes the last line and closes
+  }
 
-    const leaderboard = this.getLeaderboard();
-    const winner = leaderboard.length > 0 ? leaderboard[0] : null;
-
-    this.replayRecorder.finalize({
-      winnerId: winner?.playerId ?? null,
-      winnerTeam: null,
-      reason: `Round ${this.roundNumber} ended`,
-      placements: leaderboard.map((e, i) => ({
-        playerId: e.playerId,
-        username: e.username,
-        placement: i + 1,
-        kills: e.kills,
-        deaths: e.deaths,
-      })),
-    });
-
-    this.replayRecorder = null;
-    // Close the game logger stream
-    this.gameState?.gameLogger?.logGameOver(null, []);
+  /** The loop's circuit breaker tripped: log it and start a fresh round instead of staying dead. */
+  private recoverFromLoopFailure(): void {
+    if (!this.enabled || this.shutdownPromise) return;
+    logger.error({ roundNumber: this.roundNumber }, 'Open world loop failed; starting a new round');
+    try {
+      this.completeRoundTransition();
+    } catch (err) {
+      logger.error({ err }, 'Open world recovery failed');
+    }
   }
 
   /**

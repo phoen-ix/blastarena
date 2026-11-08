@@ -14,6 +14,7 @@ import {
 import {
   GAME_MODES,
   MAX_SPEED,
+  TICK_RATE,
   calculateXpGained,
   getLevelForXp,
   getXpForLevel,
@@ -293,7 +294,11 @@ export class GameRoom {
 
   handlePlayerDisconnect(playerId: number): void {
     const player = this.gameState.players.get(playerId);
-    if (!player?.alive) return;
+    if (!player) return;
+    // A dead player in a respawn mode is only waiting to come back, so their disconnect needs the
+    // same grace period: it used to be ignored, leaving them respawning as an idle body, never
+    // counted as gone for isAbandoned()/the bot-only speed-up, and unable to resume. (audit G3)
+    if (!player.alive && !this.hasRespawn()) return;
 
     // Start grace period instead of instant death
     this.disconnectedPlayers.set(playerId, this.gameState.tick);
@@ -319,15 +324,19 @@ export class GameRoom {
       );
     }
     if (player && !player.isBot) this.departedHumans.add(playerId);
+    // Never respawn a player who left. (audit G3)
+    this.gameState.markDeparted(playerId);
 
     this.checkBotOnlySpeedup();
   }
 
   handlePlayerReconnect(playerId: number): boolean {
     this.departedHumans.delete(playerId);
+    this.gameState.markReturned(playerId);
     if (!this.disconnectedPlayers.has(playerId)) return false;
     const player = this.gameState.players.get(playerId);
-    if (!player?.alive) return false;
+    // In a respawn mode a dead player resumes too: they respawn as usual. (audit G3)
+    if (!player || (!player.alive && !this.hasRespawn())) return false;
 
     this.disconnectedPlayers.delete(playerId);
     logger.info(
@@ -344,13 +353,16 @@ export class GameRoom {
     for (const [playerId, disconnectTick] of this.disconnectedPlayers) {
       if (currentTick - disconnectTick >= DISCONNECT_GRACE_TICKS) {
         const player = this.gameState.players.get(playerId);
-        this.gameState.gameLogger?.logPlayerDisconnectKill(playerId, player?.username ?? '?');
-        this.gameState.killPlayer(playerId, null);
-        logger.info(
-          { code: this.code, playerId },
-          'Player killed after disconnect grace period expired',
-        );
+        if (player?.alive) {
+          this.gameState.gameLogger?.logPlayerDisconnectKill(playerId, player.username);
+          this.gameState.killPlayer(playerId, null);
+          logger.info(
+            { code: this.code, playerId },
+            'Player killed after disconnect grace period expired',
+          );
+        }
         if (player && !player.isBot) this.departedHumans.add(playerId);
+        this.gameState.markDeparted(playerId);
         this.disconnectedPlayers.delete(playerId);
         killedByGrace = true;
       }
@@ -361,12 +373,16 @@ export class GameRoom {
     }
   }
 
+  private hasRespawn(): boolean {
+    return GAME_MODES[this.room.config.gameMode]?.hasRespawn ?? false;
+  }
+
   /** Speed up simulation when only bots remain alive and hide room from lobby */
   private checkBotOnlySpeedup(): void {
     if (!this.gameLoop.isRunning()) return;
     // In respawn modes a dead human is only waiting to come back: counting them as gone sped the
     // match up 5x and deleted the lobby room while they were still playing.
-    const respawns = GAME_MODES[this.room.config.gameMode]?.hasRespawn ?? false;
+    const respawns = this.hasRespawn();
     const hasActiveHuman = Array.from(this.gameState.players.values()).some(
       (p) => !p.isBot && !this.departedHumans.has(p.id) && (p.alive || respawns),
     );
@@ -530,6 +546,13 @@ export class GameRoom {
     // match. One predicate, used by all of them. (audit TEAMS-WIN-1)
     const isWinningPlayer = (p: { id: number; team: number | null }): boolean =>
       p.id === state.winnerId || (state.winnerTeam !== null && p.team === state.winnerTeam);
+    // One fallback for a missing placement, used by XP, Elo and achievements alike (XP used
+    // `|| 0`, the others `?? 999`). 999 earns no placement bonus anywhere.
+    const placementOf = (p: { placement: number | null }): number => p.placement ?? 999;
+    // Time actually spent alive, per player: every row used to get the match length, so a player
+    // who died in the first seconds of a long match earned survival achievements. (audit V6)
+    const survivedSeconds = (p: { aliveTicks: number }): number =>
+      Math.floor(p.aliveTicks / TICK_RATE);
 
     // 1. Match record + per-player match rows, atomically. The per-player rows go out as one
     // multi-row upsert instead of N sequential UPDATEs. (audit GAME-END-BATCH-1)
@@ -541,12 +564,12 @@ export class GameRoom {
       if (humans.length > 0) {
         await conn.execute(
           `INSERT INTO match_players
-             (match_id, user_id, team, placement, kills, deaths, bombs_placed, powerups_collected, survived_seconds)
-           VALUES ${humans.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}
+             (match_id, user_id, team, placement, kills, deaths, bombs_placed, powerups_collected, survived_seconds, is_winner)
+           VALUES ${humans.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}
            ON DUPLICATE KEY UPDATE
              placement = VALUES(placement), kills = VALUES(kills), deaths = VALUES(deaths),
              bombs_placed = VALUES(bombs_placed), powerups_collected = VALUES(powerups_collected),
-             survived_seconds = VALUES(survived_seconds)`,
+             survived_seconds = VALUES(survived_seconds), is_winner = VALUES(is_winner)`,
           humans.flatMap((p) => [
             this.matchId,
             p.id,
@@ -556,7 +579,9 @@ export class GameRoom {
             p.deaths,
             p.bombsPlaced,
             p.powerupsCollected,
-            duration,
+            survivedSeconds(p),
+            // Mode "wins" are counted from this (migration 048), not from placement 1.
+            isWinningPlayer(p),
           ]),
         );
       }
@@ -573,7 +598,7 @@ export class GameRoom {
         this.room.config.gameMode,
         humans.map((p) => ({
           userId: p.id,
-          placement: p.placement ?? 999,
+          placement: placementOf(p),
           team: p.team,
           isWinner: isWinningPlayer(p),
         })),
@@ -609,13 +634,14 @@ export class GameRoom {
               kills: player.kills,
               bombsPlaced: player.bombsPlaced,
               powerupsCollected: player.powerupsCollected,
-              placement: player.placement || 0,
+              placement: placementOf(player),
               isWinner,
             },
             xpMultiplier,
           );
           const newTotalXp = currentXp + xpGained;
-          const newLevel = getLevelForXp(newTotalXp);
+          // A level is never lost (the open world already guarantees this). (audit G8)
+          const newLevel = Math.max(oldLevel, getLevelForXp(newTotalXp));
           if (newLevel > oldLevel) levelUps.push({ userId: player.id, newLevel });
           xpResults.push({
             userId: player.id,
@@ -680,8 +706,8 @@ export class GameRoom {
             selfKills: player.selfKills,
             bombsPlaced: player.bombsPlaced,
             powerupsCollected: player.powerupsCollected,
-            survivedSeconds: duration,
-            placement: player.placement ?? 999,
+            survivedSeconds: survivedSeconds(player),
+            placement: placementOf(player),
             playerCount: this.gameState.players.size,
           });
           if (unlocked.achievements.length > 0) {
@@ -717,7 +743,10 @@ export class GameRoom {
               isWinningPlayer(player),
               player.kills,
               player.deaths,
-              player.placement || 0,
+              player.placement,
+              // The service checks mode, dates and challenges_enabled, and ignores a missing
+              // placement (`|| 0` made 0 everyone's best). (audit V9, V10)
+              { gameMode: this.room.config.gameMode },
             );
           }
         }

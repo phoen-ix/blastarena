@@ -64,7 +64,7 @@ export async function getUserProfile(userId: number) {
       totalPlaytime: row.total_playtime || 0,
       winStreak: row.win_streak || 0,
       bestWinStreak: row.best_win_streak || 0,
-      eloRating: row.elo_rating || 1000,
+      eloRating: row.elo_rating ?? 1000,
       peakElo: row.peak_elo || 1000,
       totalXp: row.total_xp || 0,
       level: row.level || 1,

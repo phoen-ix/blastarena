@@ -593,5 +593,54 @@ describe('Elo Service', () => {
       // DB query should only contain human IDs
       expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('user_id IN'), [1, 2]);
     });
+
+    it('moves season Elo by the match delta instead of copying the global rating', async () => {
+      // season_elo.elo_rating used to be set to the new GLOBAL rating, so season Elo mirrored it
+      const connExecute = vi.fn<AnyFn>().mockResolvedValue([{ affectedRows: 1 }]);
+      mockWithTransaction.mockImplementation(async (fn: AnyFn) => fn({ execute: connExecute }));
+      mockQuery
+        .mockResolvedValueOnce([
+          { user_id: 1, elo_rating: 1400, matches_played: 50 },
+          { user_id: 2, elo_rating: 1000, matches_played: 50 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 9,
+            name: 'S',
+            start_date: new Date('2026-11-01'),
+            end_date: new Date('2026-12-01'),
+            is_active: 1,
+          },
+        ]);
+
+      const results = await processMatchElo(
+        'ffa',
+        [
+          { userId: 1, placement: 1, team: null, isWinner: true },
+          { userId: 2, placement: 2, team: null, isWinner: false },
+        ],
+        100,
+      );
+
+      const seasonCalls = connExecute.mock.calls.filter(([sql]) =>
+        (sql as string).includes('INSERT INTO season_elo'),
+      );
+      expect(seasonCalls).toHaveLength(2);
+      for (const [sql, params] of seasonCalls) {
+        const r = results.find((x) => x.userId === params[0])!;
+        expect(sql).toContain('elo_rating = GREATEST(0, elo_rating + ?)');
+        expect(sql).not.toMatch(/elo_rating = \?/);
+        // [user, season, new-row rating, new-row peak, delta, delta]
+        expect(params).toEqual([
+          r.userId,
+          9,
+          r.newElo,
+          Math.max(r.oldElo, r.newElo),
+          r.delta,
+          r.delta,
+        ]);
+      }
+      expect(results.find((x) => x.userId === 1)!.delta).toBeGreaterThan(0);
+    });
   });
 });

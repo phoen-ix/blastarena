@@ -4,6 +4,8 @@ import {
   MAX_SPEED,
   SimulationConfig,
   SimulationGameResult,
+  MAP_EVENT_TYPES,
+  HAZARD_TILE_TYPES,
 } from '@blast-arena/shared';
 import { GameStateManager } from '../game/GameState';
 import { GameLogger } from '../utils/gameLogger';
@@ -65,6 +67,10 @@ export class SimulationGame {
       botDifficulty: config.botDifficulty,
       reinforcedWalls: config.reinforcedWalls,
       enableMapEvents: config.enableMapEvents,
+      // The same mapping as GameRoom. hazardTiles was never passed, so the simulation's "Hazard
+      // tiles" option did nothing. (audit AI4)
+      enabledMapEvents: config.enableMapEvents ? [...MAP_EVENT_TYPES] : [],
+      hazardTiles: config.hazardTiles ? [...HAZARD_TILE_TYPES] : [],
       botAiId: config.botAiId,
     });
 
@@ -242,6 +248,9 @@ export class SimulationGame {
   /** Release any isolated custom bot-AI isolates. Call after the game completes (audit C1). */
   dispose(): void {
     this.gameState.disposeAIs();
+    // finalize() closes the log through logGameOver; a game that threw never got there and kept
+    // its file descriptor open. close() is idempotent. (audit R6)
+    void this.gameLogger.close();
   }
 
   private finalize(): SimulationGameResult {

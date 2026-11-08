@@ -100,41 +100,15 @@ export async function getLeaderboard(opts: {
   const offset = (page - 1) * limit;
   const rankConfig = await getRankConfig();
 
-  let season: Season | null = null;
-  let rows: LeaderboardRow[];
-  let total: number;
+  // An explicit season, else the active one; the global ranking from user_stats only when
+  // neither exists. (The explicit and active branches used to carry the same SQL twice.)
+  const season: Season | null = opts.seasonId
+    ? await seasonService.getSeasonById(opts.seasonId)
+    : await seasonService.getActiveSeason();
+  const seasonId = opts.seasonId ?? season?.id;
 
-  if (opts.seasonId) {
-    season = await seasonService.getSeasonById(opts.seasonId);
-    const [dataRows, countRows] = await Promise.all([
-      query<LeaderboardRow[]>(
-        `SELECT se.user_id, u.username, se.elo_rating, se.peak_elo, se.matches_played,
-                COALESCE(us.total_wins, 0) as total_wins, COALESCE(us.total_kills, 0) as total_kills,
-                COALESCE(us.total_xp, 0) as total_xp, COALESCE(us.level, 1) as level
-         FROM season_elo se
-         JOIN users u ON u.id = se.user_id
-         LEFT JOIN user_stats us ON us.user_id = se.user_id
-         WHERE se.season_id = ? AND u.is_deactivated = 0 AND u.is_profile_public = 1
-         ORDER BY se.elo_rating DESC, se.id ASC
-         LIMIT ? OFFSET ?`,
-        [opts.seasonId, limit, offset],
-      ),
-      query<CountRow[]>(
-        `SELECT COUNT(*) as total FROM season_elo se
-         JOIN users u ON u.id = se.user_id
-         WHERE se.season_id = ? AND u.is_deactivated = 0 AND u.is_profile_public = 1`,
-        [opts.seasonId],
-      ),
-    ]);
-    rows = dataRows;
-    total = countRows[0].total;
-  } else {
-    // Current/global leaderboard from user_stats
-    const activeSeason = await seasonService.getActiveSeason();
-    season = activeSeason;
-
-    if (activeSeason) {
-      const [dataRows, countRows] = await Promise.all([
+  const [rows, countRows] = seasonId
+    ? await Promise.all([
         query<LeaderboardRow[]>(
           `SELECT se.user_id, u.username, se.elo_rating, se.peak_elo, se.matches_played,
                   COALESCE(us.total_wins, 0) as total_wins, COALESCE(us.total_kills, 0) as total_kills,
@@ -145,19 +119,16 @@ export async function getLeaderboard(opts: {
            WHERE se.season_id = ? AND u.is_deactivated = 0 AND u.is_profile_public = 1
            ORDER BY se.elo_rating DESC, se.id ASC
            LIMIT ? OFFSET ?`,
-          [activeSeason.id, limit, offset],
+          [seasonId, limit, offset],
         ),
         query<CountRow[]>(
           `SELECT COUNT(*) as total FROM season_elo se
            JOIN users u ON u.id = se.user_id
            WHERE se.season_id = ? AND u.is_deactivated = 0 AND u.is_profile_public = 1`,
-          [activeSeason.id],
+          [seasonId],
         ),
-      ]);
-      rows = dataRows;
-      total = countRows[0].total;
-    } else {
-      const [dataRows, countRows] = await Promise.all([
+      ])
+    : await Promise.all([
         query<LeaderboardRow[]>(
           `SELECT us.user_id, u.username, us.elo_rating, us.peak_elo,
                   us.total_matches as matches_played,
@@ -176,10 +147,7 @@ export async function getLeaderboard(opts: {
            WHERE u.is_deactivated = 0 AND u.is_profile_public = 1`,
         ),
       ]);
-      rows = dataRows;
-      total = countRows[0].total;
-    }
-  }
+  const total = countRows[0].total;
 
   const entries: LeaderboardEntry[] = rows.map((row, i) => {
     const rank = getRankForElo(row.elo_rating, rankConfig);

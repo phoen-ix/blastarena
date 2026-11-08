@@ -1,3 +1,5 @@
+import { WALKABLE_FN_SOURCE } from './walkable';
+
 export const AMBUSHER_SOURCE = `
 var DIRS = ['up', 'down', 'left', 'right'];
 var DD = { up: {dx:0,dy:-1}, down: {dx:0,dy:1}, left: {dx:-1,dy:0}, right: {dx:1,dy:0} };
@@ -6,13 +8,7 @@ function manhattan(a, b) {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
-function walkable(tile, ghost) {
-  if (!tile) return false;
-  if (tile === 'wall') return false;
-  if (ghost) return true;
-  return tile === 'empty' || tile === 'spawn' || tile === 'exit' || tile === 'goal'
-    || tile.indexOf('teleporter') === 0 || tile.indexOf('conveyor') === 0;
-}
+${WALKABLE_FN_SOURCE}
 
 function getWalkable(pos, ctx) {
   var dirs = [];

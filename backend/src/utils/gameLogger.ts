@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
-import { LogVerbosity, Position } from '@blast-arena/shared';
+import { LogVerbosity, Position, getErrorMessage } from '@blast-arena/shared';
 import { logger } from './logger';
 import { resolveInside } from './safePath';
 import type { ReplayRecorder } from './replayRecorder';
@@ -65,6 +65,11 @@ export class GameLogger {
     }
 
     this.stream = fs.createWriteStream(resolveInside(logDir, this.filename), { flags: 'a' });
+    // Without a listener a stream error (EACCES/ENOENT on open, a full disk) is an uncaught
+    // exception, logged as fatal; a lost game log is not worth that. (audit R4)
+    this.stream.on('error', (err) => {
+      logger.warn({ err: getErrorMessage(err), file: this.filename }, 'Game log write failed');
+    });
 
     this.log('game_init', { roomCode, gameMode, playerCount, verbosity: this.verbosity });
 
@@ -155,9 +160,16 @@ export class GameLogger {
     return tick % 5 === 0;
   }
 
+  /** Every write goes through here: after close() a late event (e.g. a leave after game over)
+   * used to write after end, which the stream reports as an error. (audit R4) */
+  private writeLine(line: string): void {
+    if (this.closed) return;
+    this.stream.write(line);
+  }
+
   log(event: string, data: Record<string, unknown>): void {
     const entry = { t: Date.now(), event, ...data };
-    this.stream.write(JSON.stringify(entry) + '\n');
+    this.writeLine(JSON.stringify(entry) + '\n');
   }
 
   logTick(tick: number, players: Player[], bombs: Bomb[], explosions: Explosion[]): void {
@@ -207,7 +219,7 @@ export class GameLogger {
         cells: this.verbosity === 'full' ? e.cells : e.cells.length,
       })),
     };
-    this.stream.write(JSON.stringify(tickData) + '\n');
+    this.writeLine(JSON.stringify(tickData) + '\n');
   }
 
   logBotDecision(
@@ -216,7 +228,7 @@ export class GameLogger {
     decision: string,
     details?: Record<string, unknown>,
   ): void {
-    this.stream.write(
+    this.writeLine(
       JSON.stringify({
         t: Date.now(),
         event: 'bot_decision',
@@ -241,7 +253,7 @@ export class GameLogger {
     victimName: string,
     selfKill: boolean,
   ): void {
-    this.stream.write(
+    this.writeLine(
       JSON.stringify({
         t: Date.now(),
         event: 'kill',
@@ -268,7 +280,7 @@ export class GameLogger {
     pos: Position,
     fireRange?: number,
   ): void {
-    this.stream.write(
+    this.writeLine(
       JSON.stringify({
         t: Date.now(),
         event: `bomb_${event}`,
@@ -302,7 +314,7 @@ export class GameLogger {
       direction,
     });
     if (this.verbosity === 'normal') return;
-    this.stream.write(
+    this.writeLine(
       JSON.stringify({
         t: Date.now(),
         event: 'movement',
@@ -328,7 +340,7 @@ export class GameLogger {
       position,
     });
     if (this.verbosity === 'normal') return;
-    this.stream.write(
+    this.writeLine(
       JSON.stringify({
         t: Date.now(),
         event: 'powerup_pickup',
@@ -357,7 +369,7 @@ export class GameLogger {
       chainedBombs,
     });
     if (this.verbosity !== 'full') return;
-    this.stream.write(
+    this.writeLine(
       JSON.stringify({
         t: Date.now(),
         event: 'explosion_detail',
@@ -379,7 +391,7 @@ export class GameLogger {
     target: { x: number; y: number } | null,
   ): void {
     if (this.verbosity !== 'full') return;
-    this.stream.write(
+    this.writeLine(
       JSON.stringify({
         t: Date.now(),
         event: 'bot_pathfinding',

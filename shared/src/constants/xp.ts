@@ -47,7 +47,8 @@ export function getLevelForXp(totalXp: number): number {
 /** Calculate XP gained from a single match */
 export function calculateXpGained(data: XpCalculationData, multiplier: number = 1): number {
   let xp = 0;
-  xp += data.kills * XP_PER_KILL;
+  // Kills go negative with self-kills (each one subtracts a kill); a match never costs XP.
+  xp += Math.max(0, data.kills) * XP_PER_KILL;
   xp += data.bombsPlaced * XP_PER_BOMB;
   xp += data.powerupsCollected * XP_PER_POWERUP;
   xp += XP_MATCH_COMPLETION;
@@ -55,5 +56,5 @@ export function calculateXpGained(data: XpCalculationData, multiplier: number = 
   if (data.placement >= 1 && data.placement <= 3) {
     xp += XP_PLACEMENT_BONUS[data.placement - 1];
   }
-  return Math.round(xp * multiplier);
+  return Math.max(0, Math.round(xp * multiplier));
 }

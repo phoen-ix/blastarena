@@ -1,10 +1,12 @@
 import ivm from 'isolated-vm';
+import { TICK_RATE } from '@blast-arena/shared';
 import type { PlayerInput, TileDiff } from '@blast-arena/shared';
 import type { EnemyAIContext, EnemyAIResult, IEnemyAI } from '../game/EnemyAI';
 import type { Player } from '../game/Player';
 import type { GameStateManager } from '../game/GameState';
 import type { IBotAI } from '../game/BotAI';
 import type { GameLogger } from '../utils/gameLogger';
+import { logger } from '../utils/logger';
 
 /**
  * Runs UNTRUSTED (admin-uploaded) bot/enemy AI code inside an `isolated-vm` V8 isolate.
@@ -28,6 +30,58 @@ export const AI_INVOKE_TIMEOUT_MS = 20;
 export const ISOLATE_MEMORY_LIMIT_MB = 16;
 /** Timeout for the one-time bootstrap/instantiation when the runner is created. */
 export const AI_COMPILE_TIMEOUT_MS = 5000;
+/**
+ * Bootstrap timeout for an instance created INSIDE a game tick (a bot joining the open world, a
+ * boss's minions). The bootstrap is synchronous, so the 5 s default would stall every room on the
+ * thread; a module that cannot start in this long falls back to the built-in AI instead.
+ */
+export const AI_IN_TICK_BOOTSTRAP_TIMEOUT_MS = 100;
+/**
+ * Total wall time all isolated AI calls of ONE game may use in one tick. The per-call timeout
+ * bounds a single AI, but seven bots (or a room of campaign enemies) at 20 ms each would still eat
+ * several ticks. Once a game's AIs have used this much in a tick, the remaining isolated AIs skip
+ * that tick (no input / no move). Wall-clock based, so it only ever kicks in under overload.
+ */
+export const AI_TICK_BUDGET_MS = 30;
+
+export interface IsolatedAIOptions {
+  /** Bootstrap (compile + instantiate) timeout; defaults to AI_COMPILE_TIMEOUT_MS. */
+  bootstrapTimeoutMs?: number;
+}
+
+interface TickBudget {
+  tick: number;
+  usedMs: number;
+  warned: boolean;
+}
+
+/** Keyed by an object that identifies one game (its GameStateManager / its tile grid). */
+const tickBudgets = new WeakMap<object, TickBudget>();
+
+function budgetFor(game: object, tick: number): TickBudget {
+  let budget = tickBudgets.get(game);
+  if (!budget) {
+    budget = { tick, usedMs: 0, warned: false };
+    tickBudgets.set(game, budget);
+  } else if (budget.tick !== tick) {
+    budget.tick = tick;
+    budget.usedMs = 0;
+  }
+  return budget;
+}
+
+/** True (and logs once per game) when this game's isolated AIs have used up this tick's budget. */
+function overBudget(budget: TickBudget, kind: 'bot' | 'enemy'): boolean {
+  if (budget.usedMs < AI_TICK_BUDGET_MS) return false;
+  if (!budget.warned) {
+    budget.warned = true;
+    logger.warn(
+      { kind, tick: budget.tick, usedMs: Math.round(budget.usedMs), budgetMs: AI_TICK_BUDGET_MS },
+      'Isolated AI tick budget exceeded; skipping the remaining custom AI calls this tick',
+    );
+  }
+  return true;
+}
 
 // ── Guest runtime ────────────────────────────────────────────────────────────
 // Ported, read-only port of CollisionSystem + facade builders, defined INSIDE the isolate. Source
@@ -84,7 +138,7 @@ var __ai = (function () {
       hasShield: p.hasShield, hasKick: p.hasKick, hasPierceBomb: p.hasPierceBomb,
       hasRemoteBomb: p.hasRemoteBomb, hasLineBomb: p.hasLineBomb, hasBombThrow: p.hasBombThrow,
       team: p.team, invulnerableTicks: p.invulnerableTicks, moveCooldown: p.moveCooldown,
-      kills: p.kills, deaths: p.deaths, selfKills: p.selfKills,
+      kills: p.kills, deaths: p.deaths, selfKills: p.selfKills, isBot: p.isBot,
       canMove: function () { return p.alive && p.moveCooldown <= 0; },
       canPlaceBomb: function () { return p.alive && p.bombCount < p.maxBombs; },
     };
@@ -98,7 +152,31 @@ var __ai = (function () {
     };
   }
   function buildExplosion(e) {
-    return { id: e.id, cells: e.cells, ownerId: e.ownerId, ticksRemaining: e.ticksRemaining };
+    var cellSet = null;
+    return {
+      id: e.id, cells: e.cells, ownerId: e.ownerId, ticksRemaining: e.ticksRemaining,
+      containsCell: function (x, y) {
+        if (!cellSet) {
+          cellSet = new Set();
+          for (var i = 0; i < e.cells.length; i++) cellSet.add(e.cells[i].x + ',' + e.cells[i].y);
+        }
+        return cellSet.has(x + ',' + y);
+      },
+    };
+  }
+  // Mirrors BattleRoyaleZone (isInsideZone/toState) over its toState() snapshot.
+  function buildZone(z) {
+    if (!z) return null;
+    return {
+      currentRadius: z.currentRadius, targetRadius: z.targetRadius,
+      centerX: z.centerX, centerY: z.centerY, shrinkRate: z.shrinkRate,
+      nextShrinkTick: z.nextShrinkTick,
+      isInsideZone: function (x, y) {
+        var dx = x - z.centerX, dy = y - z.centerY;
+        return Math.sqrt(dx * dx + dy * dy) <= z.currentRadius;
+      },
+      toState: function () { return z; },
+    };
   }
   function buildPowerUp(pu) { return { id: pu.id, position: pu.position, type: pu.type }; }
 
@@ -109,8 +187,12 @@ var __ai = (function () {
   }
   function buildState(snap) {
     var st = {
-      tick: snap.tick, roundTime: snap.roundTime, status: 'playing',
+      tick: snap.tick, roundTime: snap.roundTime, status: snap.status,
       hillZone: snap.hillZone, map: snap.map,
+      zone: buildZone(snap.zone),
+      kothScores: new Map(snap.kothScores),
+      winnerId: snap.winnerId, winnerTeam: snap.winnerTeam,
+      enableMapEvents: snap.enableMapEvents,
       reinforcedWalls: snap.map.reinforcedWalls,
       collisionSystem: new GuestCollision(snap.map),
       players: toMap(snap.players, buildPlayer),
@@ -150,9 +232,28 @@ const CLASS_DISCOVERY = (method: string) => `
 // CommonJS module shim created INSIDE the isolate; the user's esbuild-CJS output assigns to it.
 const CJS_SHIM = `var module = { exports: {} }; var exports = module.exports;`;
 
-function buildBotBootstrap(compiledCode: string, argsLiteral: string): string {
+/**
+ * Determinism for uploaded bots: the built-in BotAI draws from SeededRandom(map seed + bot id), so a
+ * bot match replays identically. Inside the isolate Math.random is the same LCG on the same seed,
+ * and Date.now() is the game time of the current tick (ms since the match started), not the wall
+ * clock — otherwise an upload that uses either would make the match unreproducible.
+ */
+function botDeterminismPrelude(seed: number): string {
+  return `
+  var __rngState = ${Math.trunc(seed) | 0};
+  Math.random = function () {
+    __rngState = (__rngState * 1664525 + 1013904223) & 0xffffffff;
+    return (__rngState >>> 0) / 0x100000000;
+  };
+  var __gameTimeMs = 0;
+  Date.now = function () { return __gameTimeMs; };
+`;
+}
+
+function buildBotBootstrap(compiledCode: string, argsLiteral: string, seed: number): string {
   return (
     BOT_GUEST_RUNTIME +
+    botDeterminismPrelude(seed) +
     '\n' +
     CJS_SHIM +
     '\n' +
@@ -164,11 +265,16 @@ function buildBotBootstrap(compiledCode: string, argsLiteral: string): string {
   // The tile grid lives in the isolate: it arrives once (snap.map.tiles) and is patched from
   // snap.map.tileDiffs afterwards, instead of being re-serialised and re-parsed on every decision.
   // Rows are frozen so a guest that scribbles on state.map.tiles cannot corrupt later decisions.
+  // spawnPoints and seed never change during a match, so they travel with the full grid only.
   var __tiles = null;
+  var __spawnPoints = [];
+  var __seed = 0;
   function __syncTiles(map) {
     if (map.tiles) {
       __tiles = map.tiles;
       for (var r = 0; r < __tiles.length; r++) Object.freeze(__tiles[r]);
+      __spawnPoints = Object.freeze(map.spawnPoints || []);
+      __seed = map.seed;
     } else {
       var diffs = map.tileDiffs || [];
       for (var i = 0; i < diffs.length; i++) {
@@ -179,9 +285,12 @@ function buildBotBootstrap(compiledCode: string, argsLiteral: string): string {
       }
     }
     map.tiles = __tiles;
+    map.spawnPoints = __spawnPoints;
+    map.seed = __seed;
   }
   globalThis.__invoke = function (snapshotJson) {
     var snap = JSON.parse(snapshotJson);
+    __gameTimeMs = snap.tick * ${1000 / TICK_RATE};
     __syncTiles(snap.map);
     var self = __ai.buildPlayer(snap.self);
     var state = __ai.buildState(snap);
@@ -291,27 +400,37 @@ export class IsolatedAIRunner {
     compiledCode: string,
     ctorArgs: unknown[],
     rng?: () => number,
+    options: IsolatedAIOptions & { seed?: number } = {},
   ) {
     this.isolate = new ivm.Isolate({ memoryLimit: ISOLATE_MEMORY_LIMIT_MB });
-    this.context = this.isolate.createContextSync();
+    // Isolates are not reclaimed by GC: a bootstrap that throws (syntax error, constructor throw,
+    // timeout) must dispose the one it just created, or every failed instantiation leaks one.
+    try {
+      this.context = this.isolate.createContextSync();
 
-    if (rng) {
-      this.rngRef = new ivm.Reference(rng);
-      // Expose the host seeded RNG to the guest as globalThis.__hostRng() returning a number.
-      this.context.evalClosureSync(
-        'globalThis.__hostRng = function () { return $0.applySync(undefined, [], { result: { copy: true } }); };',
-        [this.rngRef],
-      );
+      if (rng) {
+        this.rngRef = new ivm.Reference(rng);
+        // Expose the host seeded RNG to the guest as globalThis.__hostRng() returning a number.
+        this.context.evalClosureSync(
+          'globalThis.__hostRng = function () { return $0.applySync(undefined, [], { result: { copy: true } }); };',
+          [this.rngRef],
+        );
+      }
+
+      const argsLiteral = argsToLiteral(ctorArgs);
+      const bootstrap =
+        kind === 'bot'
+          ? buildBotBootstrap(compiledCode, argsLiteral, options.seed ?? 1)
+          : buildEnemyBootstrap(compiledCode, argsLiteral);
+
+      this.context.evalSync(bootstrap, {
+        timeout: options.bootstrapTimeoutMs ?? AI_COMPILE_TIMEOUT_MS,
+      });
+      this.invokeRef = this.context.global.getSync('__invoke', { reference: true });
+    } catch (err) {
+      this.dispose();
+      throw err;
     }
-
-    const argsLiteral = argsToLiteral(ctorArgs);
-    const bootstrap =
-      kind === 'bot'
-        ? buildBotBootstrap(compiledCode, argsLiteral)
-        : buildEnemyBootstrap(compiledCode, argsLiteral);
-
-    this.context.evalSync(bootstrap, { timeout: AI_COMPILE_TIMEOUT_MS });
-    this.invokeRef = this.context.global.getSync('__invoke', { reference: true });
   }
 
   /** Invoke the AI with a JSON argument; returns the guest's JSON result string or null. Throws on timeout/error (and disposes). */
@@ -383,6 +502,7 @@ function playerSnap(p: Player) {
     kills: p.kills,
     deaths: p.deaths,
     selfKills: p.selfKills,
+    isBot: p.isBot,
   };
 }
 
@@ -399,6 +519,7 @@ export function buildBotSnapshotJson(
   state: GameStateManager,
   tileSync: TileSync = { tiles: state.map.tiles },
 ): string {
+  // Optional chaining throughout: tests hand in partial state doubles.
   const players = [];
   for (const p of state.players.values()) players.push(playerSnap(p));
   const bombs = [];
@@ -426,15 +547,29 @@ export function buildBotSnapshotJson(
   for (const pu of state.powerUps.values()) {
     powerUps.push({ id: pu.id, position: { x: pu.position.x, y: pu.position.y }, type: pu.type });
   }
-  const map = state.map as { width: number; height: number; wrapping?: boolean };
+  const map = state.map as {
+    width: number;
+    height: number;
+    wrapping?: boolean;
+    spawnPoints?: { x: number; y: number }[];
+    seed?: number;
+  };
   return JSON.stringify({
     tick: state.tick,
     roundTime: state.roundTime,
+    status: state.status ?? 'playing',
     hillZone: state.hillZone,
+    zone: state.zone?.toState() ?? null,
+    kothScores: state.kothScores ? [...state.kothScores] : [],
+    winnerId: state.winnerId ?? null,
+    winnerTeam: state.winnerTeam ?? null,
+    enableMapEvents: !!state.enableMapEvents,
     map: {
       width: map.width,
       height: map.height,
       ...tileSync,
+      // Static for the match: only shipped with the full grid (the isolate caches them).
+      ...('tiles' in tileSync ? { spawnPoints: map.spawnPoints ?? [], seed: map.seed ?? 0 } : {}),
       wrapping: !!map.wrapping,
       reinforcedWalls: state.reinforcedWalls,
     },
@@ -484,8 +619,21 @@ export class IsolatedBotAI implements IBotAI {
     compiledCode: string,
     difficulty: 'easy' | 'normal' | 'hard',
     mapSize?: { width: number; height: number },
+    /** Per-bot seed (map seed + bot id): seeds the isolate's Math.random. */
+    seed?: number,
+    options?: IsolatedAIOptions,
   ) {
-    this.runner = new IsolatedAIRunner('bot', compiledCode, [difficulty, mapSize]);
+    // The seed is also the constructor's third argument, matching the built-in BotAI's signature.
+    this.runner = new IsolatedAIRunner(
+      'bot',
+      compiledCode,
+      [difficulty, mapSize, seed],
+      undefined,
+      {
+        ...options,
+        seed,
+      },
+    );
   }
 
   generateInput(
@@ -493,15 +641,22 @@ export class IsolatedBotAI implements IBotAI {
     state: GameStateManager,
     _logger?: GameLogger | null,
   ): PlayerInput | null {
-    // A state without a change log (hand-built test doubles) always gets the full grid.
-    const log = state.tileChangeLog as TileDiff[] | undefined;
-    const tileSync: TileSync =
-      this.tileLogIndex < 0 || !log
-        ? { tiles: state.map.tiles }
-        : { tileDiffs: this.tileLogIndex < log.length ? log.slice(this.tileLogIndex) : [] };
-    const out = this.runner.invoke(buildBotSnapshotJson(self, state, tileSync)); // throws on timeout/error → caller fallback
-    if (log) this.tileLogIndex = log.length;
-    return out ? toPlayerInput(JSON.parse(out), state.tick) : null;
+    const budget = budgetFor(state, state.tick);
+    if (overBudget(budget, 'bot')) return null;
+    const started = performance.now();
+    try {
+      // A state without a change log (hand-built test doubles) always gets the full grid.
+      const log = state.tileChangeLog as TileDiff[] | undefined;
+      const tileSync: TileSync =
+        this.tileLogIndex < 0 || !log
+          ? { tiles: state.map.tiles }
+          : { tileDiffs: this.tileLogIndex < log.length ? log.slice(this.tileLogIndex) : [] };
+      const out = this.runner.invoke(buildBotSnapshotJson(self, state, tileSync)); // throws on timeout/error → caller fallback
+      if (log) this.tileLogIndex = log.length;
+      return out ? toPlayerInput(JSON.parse(out), state.tick) : null;
+    } finally {
+      budget.usedMs += performance.now() - started;
+    }
   }
 
   dispose(): void {
@@ -519,18 +674,31 @@ export class IsolatedEnemyAI implements IEnemyAI {
     compiledCode: string,
     difficulty: 'easy' | 'normal' | 'hard',
     typeConfig: EnemyAIContext['self']['typeConfig'],
+    options?: IsolatedAIOptions,
   ) {
-    this.runner = new IsolatedAIRunner('enemy', compiledCode, [difficulty, typeConfig], () =>
-      this.currentRng(),
+    this.runner = new IsolatedAIRunner(
+      'enemy',
+      compiledCode,
+      [difficulty, typeConfig],
+      () => this.currentRng(),
+      options,
     );
   }
 
   decide(context: EnemyAIContext): EnemyAIResult {
-    this.currentRng = context.rng;
-    // Strip the rng function (not serializable); the isolate re-attaches it via the host Reference.
-    const { rng: _rng, ...plain } = context;
-    const out = this.runner.invoke(JSON.stringify(plain)); // throws on timeout/error → caller fallback
-    return toEnemyAIResult(out == null ? null : JSON.parse(out));
+    // The tile grid is one array per game, so it identifies the game for the tick budget.
+    const budget = budgetFor(context.tiles ?? this, context.tick);
+    if (overBudget(budget, 'enemy')) return { direction: null, placeBomb: false };
+    const started = performance.now();
+    try {
+      this.currentRng = context.rng;
+      // Strip the rng function (not serializable); the isolate re-attaches it via the host Reference.
+      const { rng: _rng, ...plain } = context;
+      const out = this.runner.invoke(JSON.stringify(plain)); // throws on timeout/error → caller fallback
+      return toEnemyAIResult(out == null ? null : JSON.parse(out));
+    } finally {
+      budget.usedMs += performance.now() - started;
+    }
   }
 
   dispose(): void {

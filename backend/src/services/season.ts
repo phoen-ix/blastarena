@@ -98,23 +98,47 @@ export async function updateSeason(
 }
 
 export async function deleteSeason(id: number): Promise<void> {
-  const result = await execute('DELETE FROM seasons WHERE id = ?', [id]);
+  const rows = await query<SeasonRow[]>('SELECT is_active FROM seasons WHERE id = ?', [id]);
+  if (rows.length === 0) throw notFound();
+  // Deleting the running season dropped its ratings mid-season and left no season active.
+  if (rows[0].is_active) {
+    throw new AppError('End the active season before deleting it', 409, 'SEASON_ACTIVE');
+  }
+  const result = await execute('DELETE FROM seasons WHERE id = ? AND is_active = FALSE', [id]);
   if (result.affectedRows === 0) throw notFound();
 }
 
+/**
+ * Starts a season. Refused while another season is active (409: end it first, which applies the
+ * hard/soft reset — switching straight over used to skip the reset) and for a season whose end
+ * date has passed (400: re-activating an ended season resumed it on its stale season_elo rows).
+ * Activating the season that is already active changes nothing.
+ */
 export async function activateSeason(id: number): Promise<void> {
+  const todayUtc = new Date().toISOString().slice(0, 10);
   await withTransaction(async (conn) => {
     // Checked before anything changes: an unknown id switched every season off and none on.
     const [found] = await conn.execute<RowDataPacket[]>(
-      'SELECT id FROM seasons WHERE id = ? FOR UPDATE',
-      [id],
+      'SELECT id, is_active, end_date < ? AS has_ended FROM seasons WHERE id = ? FOR UPDATE',
+      [todayUtc, id],
     );
     if (found.length === 0) throw notFound();
-    // Deactivate all seasons
-    await conn.execute('UPDATE seasons SET is_active = FALSE');
-    // Activate target
+    if (found[0].is_active) return;
+    if (found[0].has_ended) {
+      throw new AppError('This season has already ended', 400, 'SEASON_ENDED');
+    }
+    const [active] = await conn.execute<RowDataPacket[]>(
+      'SELECT id FROM seasons WHERE is_active = TRUE FOR UPDATE',
+    );
+    if (active.length > 0) {
+      throw new AppError(
+        'Another season is active; end it before activating this one',
+        409,
+        'SEASON_ALREADY_ACTIVE',
+      );
+    }
     await conn.execute('UPDATE seasons SET is_active = TRUE WHERE id = ?', [id]);
-    // Create season_elo rows for all existing users
+    // Every player starts the season on their current (already reset) global rating
     await conn.execute(
       `INSERT IGNORE INTO season_elo (user_id, season_id, elo_rating, peak_elo)
        SELECT us.user_id, ?, us.elo_rating, us.elo_rating FROM user_stats us`,
@@ -145,9 +169,8 @@ export async function endSeason(id: number, resetMode: 'hard' | 'soft'): Promise
         'UPDATE user_stats SET elo_rating = ROUND(1000 + (elo_rating - 1000) * 0.5)',
       );
     }
-
-    // Update peak_elo to not be below new rating
-    await conn.execute('UPDATE user_stats SET peak_elo = GREATEST(peak_elo, elo_rating)');
+    // No peak_elo update: a reset only moves ratings toward 1000, peak_elo starts at 1000 and
+    // never falls below elo_rating, so GREATEST(peak_elo, elo_rating) here could not change a row.
   });
 }
 

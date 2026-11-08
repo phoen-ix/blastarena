@@ -6,7 +6,7 @@ import {
   BossPhaseConfig,
 } from '@blast-arena/shared';
 import { MOVE_COOLDOWN_BASE } from '@blast-arena/shared';
-import { ENEMY_ID_OFFSET } from '@blast-arena/shared';
+import { ENEMY_ID_OFFSET, DEFAULT_ENEMY_BOMB_CONFIG } from '@blast-arena/shared';
 
 export class Enemy {
   public readonly id: number;
@@ -125,6 +125,9 @@ export class Enemy {
         }
         if (phase.bombConfig != null) {
           (this.typeConfig as EnemyTypeConfig).bombConfig = phase.bombConfig;
+        } else if (this.typeConfig.canBomb && !this.typeConfig.bombConfig) {
+          // A phase that turns bombing on for an enemy without bomb settings never bombed.
+          (this.typeConfig as EnemyTypeConfig).bombConfig = { ...DEFAULT_ENEMY_BOMB_CONFIG };
         }
 
         return phase;

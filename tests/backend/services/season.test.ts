@@ -307,6 +307,7 @@ describe('Season Service', () => {
 
   describe('deleteSeason', () => {
     it('should call delete with the correct id', async () => {
+      mockQuery.mockResolvedValueOnce([{ is_active: 0 }]);
       mockExecute.mockResolvedValue({ affectedRows: 1 });
 
       await deleteSeason(5);
@@ -318,52 +319,83 @@ describe('Season Service', () => {
     });
 
     it('answers 404 for an unknown id', async () => {
-      mockExecute.mockResolvedValue({ affectedRows: 0 });
+      mockQuery.mockResolvedValueOnce([]);
       await expect(deleteSeason(5)).rejects.toMatchObject({ statusCode: 404 });
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it('refuses to delete the active season (409)', async () => {
+      // It was deleted mid-season, ratings and all, leaving no season active
+      mockQuery.mockResolvedValueOnce([{ is_active: 1 }]);
+      await expect(deleteSeason(5)).rejects.toMatchObject({
+        statusCode: 409,
+        code: 'SEASON_ACTIVE',
+      });
+      expect(mockExecute).not.toHaveBeenCalled();
     });
   });
 
   // ── activateSeason ──────────────────────────────────────────────────
 
   describe('activateSeason', () => {
-    it('should use withTransaction to deactivate all and activate target', async () => {
-      // conn.execute resolves to mysql2's [rows, fields]
+    function conn(...results: unknown[][]) {
       const connExecute = vi.fn<AnyFn>();
-      connExecute.mockResolvedValueOnce([[{ id: 7 }], []]).mockResolvedValue([{}, []]);
+      for (const r of results) connExecute.mockResolvedValueOnce([r, []]);
+      connExecute.mockResolvedValue([{}, []]);
       mockWithTransaction.mockImplementation(async (fn: AnyFn) =>
         fn({ query: vi.fn<AnyFn>(), execute: connExecute }),
       );
+      return connExecute;
+    }
+
+    it('activates the season and creates its season_elo rows when none is active', async () => {
+      const connExecute = conn([{ id: 7, is_active: 0, has_ended: 0 }], []);
 
       await activateSeason(7);
 
       expect(mockWithTransaction).toHaveBeenCalledTimes(1);
-      expect(connExecute).toHaveBeenCalledTimes(4);
-
-      // First call: the season must exist
-      expect(connExecute.mock.calls[0][0]).toContain('SELECT id FROM seasons WHERE id = ?');
-
-      // Second call: deactivate all seasons
-      expect(connExecute.mock.calls[1][0]).toContain('UPDATE seasons SET is_active = FALSE');
-
-      // Third call: activate target season
-      expect(connExecute.mock.calls[2][0]).toContain(
-        'UPDATE seasons SET is_active = TRUE WHERE id = ?',
-      );
+      const sqls = connExecute.mock.calls.map((c) => c[0] as string);
+      expect(sqls).toHaveLength(4);
+      expect(sqls[0]).toContain('FROM seasons WHERE id = ? FOR UPDATE');
+      expect(connExecute.mock.calls[0][1]).toEqual([expect.stringMatching(/^\d{4}-\d\d-\d\d$/), 7]);
+      expect(sqls[1]).toContain('WHERE is_active = TRUE');
+      expect(sqls[2]).toContain('UPDATE seasons SET is_active = TRUE WHERE id = ?');
       expect(connExecute.mock.calls[2][1]).toEqual([7]);
-
-      // Fourth call: create season_elo rows
-      expect(connExecute.mock.calls[3][0]).toContain('INSERT IGNORE INTO season_elo');
+      expect(sqls[3]).toContain('INSERT IGNORE INTO season_elo');
       expect(connExecute.mock.calls[3][1]).toEqual([7]);
+      // It no longer switches another season off behind the reset's back
+      expect(sqls.some((q) => /SET is_active = FALSE/.test(q))).toBe(false);
+    });
+
+    it('refuses while another season is active (409), changing nothing', async () => {
+      // It used to switch over silently, skipping the end-of-season reset
+      const connExecute = conn([{ id: 7, is_active: 0, has_ended: 0 }], [{ id: 2 }]);
+      await expect(activateSeason(7)).rejects.toMatchObject({
+        statusCode: 409,
+        code: 'SEASON_ALREADY_ACTIVE',
+      });
+      expect(connExecute).toHaveBeenCalledTimes(2);
+    });
+
+    it('refuses a season whose end date has passed (400)', async () => {
+      // Re-activating it resumed the season on its stale season_elo rows
+      const connExecute = conn([{ id: 7, is_active: 0, has_ended: 1 }]);
+      await expect(activateSeason(7)).rejects.toMatchObject({
+        statusCode: 400,
+        code: 'SEASON_ENDED',
+      });
+      expect(connExecute).toHaveBeenCalledTimes(1);
+    });
+
+    it('activating the active season again changes nothing', async () => {
+      const connExecute = conn([{ id: 7, is_active: 1, has_ended: 0 }]);
+      await activateSeason(7);
+      expect(connExecute).toHaveBeenCalledTimes(1);
     });
 
     it('changes nothing and answers 404 for an unknown id', async () => {
       // It used to switch every season off and none on
-      const connExecute = vi.fn<AnyFn>();
-      connExecute.mockResolvedValueOnce([[], []]);
-      mockWithTransaction.mockImplementation(async (fn: AnyFn) =>
-        fn({ query: vi.fn<AnyFn>(), execute: connExecute }),
-      );
-
+      const connExecute = conn([]);
       await expect(activateSeason(99)).rejects.toMatchObject({ statusCode: 404 });
       expect(connExecute).toHaveBeenCalledTimes(1);
     });
@@ -400,8 +432,8 @@ describe('Season Service', () => {
       // Third call: hard reset
       expect(connExecute.mock.calls[2][0]).toContain('UPDATE user_stats SET elo_rating = 1000');
 
-      // Fourth call: update peak_elo
-      expect(connExecute.mock.calls[3][0]).toContain('GREATEST(peak_elo, elo_rating)');
+      // Nothing else: the old peak_elo = GREATEST(peak_elo, elo_rating) could not change a row
+      expect(connExecute).toHaveBeenCalledTimes(3);
     });
 
     it('resets nobody for an unknown or an already ended season', async () => {
@@ -436,8 +468,8 @@ describe('Season Service', () => {
       // Third call: soft compression
       expect(connExecute.mock.calls[2][0]).toContain('(elo_rating - 1000) * 0.5');
 
-      // Fourth call: update peak_elo
-      expect(connExecute.mock.calls[3][0]).toContain('GREATEST(peak_elo, elo_rating)');
+      // Nothing else: the old peak_elo = GREATEST(peak_elo, elo_rating) could not change a row
+      expect(connExecute).toHaveBeenCalledTimes(3);
     });
   });
 

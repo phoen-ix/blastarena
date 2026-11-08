@@ -50,6 +50,12 @@ export class Player {
   public bombsPlaced: number = 0;
   public powerupsCollected: number = 0;
   public placement: number | null = null;
+  /**
+   * Ticks spent alive, counted by GameStateManager at the end of every processed tick. In respawn
+   * modes this is the total across all lives (time dead waiting to respawn does not count), so a
+   * player who survived the whole match has aliveTicks == the match's tick count.
+   */
+  public aliveTicks: number = 0;
 
   // Cosmetics (set once at game start, not per-tick)
   public cosmetics?: PlayerCosmeticData;

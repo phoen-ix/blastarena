@@ -700,6 +700,22 @@ describe('BotAI Service', () => {
       expect(mockReadFile).toHaveBeenCalledTimes(2);
     });
 
+    it('the production image ships the source where the dist fallback looks for it', async () => {
+      const realFs = await vi.importActual<typeof import('fs')>('fs');
+      const realPath = await vi.importActual<typeof import('path')>('path');
+      // backend/dist/services/botai.js resolves '../../src/game/BotAI.ts' to backend/src/game/.
+      expect(realPath.resolve('/app/backend/dist/services', '../../src/game/BotAI.ts')).toBe(
+        '/app/backend/src/game/BotAI.ts',
+      );
+      const dockerfile = realFs.readFileSync(
+        realPath.resolve(__dirname, '../../../docker/backend/Dockerfile'),
+        'utf-8',
+      );
+      expect(dockerfile).toMatch(
+        /^COPY backend\/src\/game\/BotAI\.ts \.\/backend\/src\/game\/BotAI\.ts$/m,
+      );
+    });
+
     it('should return null for builtin AI when neither path exists', async () => {
       mockQuery.mockResolvedValue([makeRow({ is_builtin: true })]);
       mockReadFile.mockImplementation(enoent);

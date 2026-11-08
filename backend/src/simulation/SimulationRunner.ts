@@ -99,6 +99,13 @@ export class SimulationRunner extends EventEmitter {
           this.currentGame = null;
         }
 
+        // A game cut short by a cancel is not a result: it used to be counted, and a batch
+        // cancelled during its last game was then reported as completed. (audit AI6)
+        if (this.cancelled) {
+          this.status = 'cancelled';
+          break;
+        }
+
         this.results.push(result);
         this.gamesCompleted = i + 1;
 
@@ -133,14 +140,20 @@ export class SimulationRunner extends EventEmitter {
 
           // Brief pause between games so spectators see the transition
           if (this.config.speed === 'realtime') {
-            await new Promise<void>((resolve) => setTimeout(resolve, 3000));
+            await new Promise<void>((resolve) => {
+              setTimeout(resolve, 3000);
+            });
           } else {
-            await new Promise<void>((resolve) => setTimeout(resolve, 500));
+            await new Promise<void>((resolve) => {
+              setTimeout(resolve, 500);
+            });
           }
         }
       }
 
-      if (this.status === 'running') {
+      if (this.cancelled) {
+        this.status = 'cancelled';
+      } else if (this.status === 'running') {
         this.status = 'completed';
       }
     } catch (err) {
@@ -183,6 +196,11 @@ export class SimulationRunner extends EventEmitter {
   cancel(): void {
     this.cancelled = true;
     this.currentGame?.cancel();
+  }
+
+  /** The batch's directory on disk (where its logs, summary and replays go). */
+  getLogDir(): string {
+    return this.logDir;
   }
 
   getStatus(): SimulationBatchStatus {

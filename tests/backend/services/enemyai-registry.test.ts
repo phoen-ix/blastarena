@@ -167,7 +167,7 @@ describe('EnemyAIRegistry', () => {
       const instance = registry.createInstance('upload-1', 'hard', { speed: 2 } as never);
 
       expect(instance).not.toBeNull();
-      expect(MockIsolatedEnemyAI).toHaveBeenCalledWith('CODE', 'hard', { speed: 2 });
+      expect(MockIsolatedEnemyAI).toHaveBeenCalledWith('CODE', 'hard', { speed: 2 }, undefined);
     });
 
     it('untrusted: returns null if the isolate fails to build', () => {

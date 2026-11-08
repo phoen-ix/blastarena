@@ -283,8 +283,28 @@ export class SimulationManager {
       return true;
     }
 
-    // Remove from memory
-    this.runners.delete(batchId);
+    // A running batch: cancel it and let it finish its summary first, then delete its own
+    // directory. Deleting it from memory up front used to orphan it — it kept writing to disk and
+    // reappeared later, while a disk index cached before it started answered 404. (audit AI7)
+    const runner = this.runners.get(batchId);
+    if (runner) {
+      if (runner.isActive()) {
+        await new Promise<void>((resolve) => {
+          runner.once('completed', () => resolve());
+          runner.cancel();
+        });
+      }
+      this.runners.delete(batchId);
+      this.invalidateDiskIndex();
+      try {
+        await fs.promises.rm(runner.getLogDir(), { recursive: true, force: true });
+        logger.info({ batchId }, 'Simulation batch deleted');
+        return true;
+      } catch (err) {
+        logger.error({ err, batchId }, 'Failed to delete simulation batch');
+        return false;
+      }
+    }
 
     // Find and delete from disk
     try {

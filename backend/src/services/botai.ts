@@ -13,9 +13,11 @@ import { logger } from '../utils/logger';
 import { AppError } from '../middleware/errorHandler';
 
 const AI_BASE_DIR = path.join(process.cwd(), 'ai');
+// Dev (tsx) runs from backend/src, so the source sits next door. The production image runs
+// backend/dist and copies the source to backend/src/game/BotAI.ts for this download (see
+// docker/backend/Dockerfile); neither path used to exist there, so the download 404'd. (audit AI5)
 const BUILTIN_SOURCE_PATH = path.join(__dirname, '../game/BotAI.ts');
-// In compiled dist, source is at a different location — try both
-const BUILTIN_SOURCE_FALLBACK = path.resolve(process.cwd(), 'src/game/BotAI.ts');
+const BUILTIN_SOURCE_FALLBACK = path.resolve(__dirname, '../../src/game/BotAI.ts');
 
 function rowToEntry(row: BotAIRow): BotAIEntry {
   return {

@@ -113,16 +113,27 @@ async function applyEloResults(
         [r.newElo, r.newElo, r.userId],
       );
 
-      // Update season elo if active season
+      // Season Elo moves by this match's delta from the player's own season rating. It used to
+      // be overwritten with the global rating, so it mirrored global Elo. A player without a row
+      // (joined after activation) starts on the rating activation would have given them — their
+      // pre-match global rating. peak_elo is assigned before elo_rating so it reads the old
+      // value under either assignment order.
       if (seasonId) {
         await conn.execute(
           `INSERT INTO season_elo (user_id, season_id, elo_rating, peak_elo, matches_played)
            VALUES (?, ?, ?, ?, 1)
            ON DUPLICATE KEY UPDATE
-             elo_rating = ?,
-             peak_elo = GREATEST(peak_elo, ?),
+             peak_elo = GREATEST(peak_elo, GREATEST(0, elo_rating + ?)),
+             elo_rating = GREATEST(0, elo_rating + ?),
              matches_played = matches_played + 1`,
-          [r.userId, seasonId, r.newElo, r.newElo, r.newElo, r.newElo],
+          [
+            r.userId,
+            seasonId,
+            Math.max(0, r.oldElo + r.delta),
+            Math.max(r.oldElo, r.oldElo + r.delta),
+            r.delta,
+            r.delta,
+          ],
         );
       }
 

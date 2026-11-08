@@ -8,6 +8,7 @@ import {
   ActiveChallengeInfo,
 } from '@blast-arena/shared';
 import { AppError } from '../middleware/errorHandler';
+import * as settingsService from './settings';
 
 interface ChallengeRow extends RowDataPacket {
   id: number;
@@ -251,28 +252,63 @@ export async function deactivateChallenge(id: number): Promise<void> {
   await execute('UPDATE map_challenges SET is_active = FALSE WHERE id = ?', [id]);
 }
 
+/**
+ * Adds one match to a player's score on a challenge.
+ *
+ * Nothing is recorded unless challenges are enabled (`challenges_enabled`), the challenge is
+ * active, today (UTC) lies within its start and end dates (DATE columns, both days inclusive)
+ * and — when `opts.gameMode` is given — the match was played in the challenge's game mode. These
+ * were all ignored: a challenge counted every mode on its map, before its start, after its end
+ * and while challenges were switched off. Without `opts.gameMode` the mode is not checked (older
+ * callers). A placement that is missing or below 1 is not a placement and leaves
+ * `best_placement` untouched (the caller's `|| 0` made 0 everyone's best). Bot ids (≤ 0) are never
+ * written.
+ */
 export async function recordChallengeResult(
   challengeId: number,
   userId: number,
   isWinner: boolean,
   kills: number,
   deaths: number,
-  placement: number,
+  placement: number | null | undefined,
+  opts?: { gameMode?: string },
 ): Promise<void> {
+  if (userId <= 0) return;
+  if ((await settingsService.getSetting('challenges_enabled')) === 'false') return;
+  const bestPlacement = placement != null && placement >= 1 ? placement : null;
+  const gameMode = opts?.gameMode ?? null;
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  // The conditions live in the INSERT's SELECT, so a challenge that does not qualify inserts
+  // nothing, in one round-trip.
   await execute(
     `INSERT INTO challenge_scores (challenge_id, user_id, wins, kills, deaths, games_played, best_placement)
-     VALUES (?, ?, ?, ?, ?, 1, ?)
+     SELECT mc.id, ?, ?, ?, ?, 1, ?
+     FROM map_challenges mc
+     WHERE mc.id = ? AND mc.is_active = TRUE
+       AND ? BETWEEN mc.start_date AND mc.end_date
+       AND (? IS NULL OR mc.game_mode = ?)
      ON DUPLICATE KEY UPDATE
        wins = wins + VALUES(wins),
        kills = kills + VALUES(kills),
        deaths = deaths + VALUES(deaths),
        games_played = games_played + 1,
        best_placement = CASE
+         WHEN VALUES(best_placement) IS NULL THEN best_placement
          WHEN best_placement IS NULL THEN VALUES(best_placement)
          WHEN VALUES(best_placement) < best_placement THEN VALUES(best_placement)
          ELSE best_placement
        END`,
-    [challengeId, userId, isWinner ? 1 : 0, kills, deaths, placement],
+    [
+      userId,
+      isWinner ? 1 : 0,
+      kills,
+      deaths,
+      bestPlacement,
+      challengeId,
+      todayUtc,
+      gameMode,
+      gameMode,
+    ],
   );
 }
 

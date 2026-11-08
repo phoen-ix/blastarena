@@ -470,12 +470,12 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           customMapName = mapName;
         }
 
-        const room = await lobbyService.createRoom(currentUser, parsed.data.name, config);
-        if (customMapName) {
-          room.customMapName = customMapName;
-          // Re-persist with the name attached
-          await lobbyService.updateRoom(room.code, room);
-        }
+        const room = await lobbyService.createRoom(
+          currentUser,
+          parsed.data.name,
+          config,
+          customMapName,
+        );
         void socket.join(`room:${room.code}`);
         socket.data.activeRoomCode = room.code;
         callback({ success: true, room });
@@ -605,50 +605,27 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       const roomCode = requireRoom(socket);
       if (!roomCode) return;
 
-      // This await sits before the try below, so a Redis failure here used to escape the handler
-      // as an unhandled rejection. (audit SOCKET-TRYCATCH-1)
-      let room;
-      try {
-        room = await lobbyService.getRoom(roomCode);
-      } catch (err: unknown) {
-        logger.error({ err: getErrorMessage(err), roomCode }, 'Error handling room:start');
-        socket.emit('error', { message: 'Failed to start game' });
-        return;
-      }
-      if (!room) return;
-
-      // Verify host
-      if (room.host.id !== socket.data.userId) {
-        socket.emit('error', { message: 'Only the host can start the game' });
-        return;
-      }
-
-      // Check all players ready
-      const allReady = room.players.every((p) => p.user.id === room.host.id || p.ready);
-      if (!allReady) {
-        socket.emit('error', { message: 'Not all players are ready' });
-        return;
-      }
-
-      const botCount = room.config.botCount || 0;
-      if (room.players.length < 2 && botCount < 1) {
-        socket.emit('error', { message: 'Need at least 2 players or add bots' });
-        return;
-      }
-
-      // Prevent double-start — in-memory check for existing GameRoom
+      // Prevent double-start — in-memory check for an existing GameRoom
       if (roomManager.getRoom(roomCode)) {
         socket.emit('error', { message: 'Game already starting' });
         return;
       }
 
       try {
-        // Atomically set status from 'waiting' to 'countdown' via Lua script
-        const startedRoom = await lobbyService.startRoom(roomCode);
-        if (!startedRoom) {
-          socket.emit('error', { message: 'Game already starting' });
-          return;
+        // Host, readiness, player count and the 'waiting' status are all checked atomically in
+        // the start script: they used to be checked on a read taken before it, so a player who
+        // un-readied or a host who left in between was started anyway. (audit K3)
+        let startedRoom;
+        try {
+          startedRoom = await lobbyService.startRoom(roomCode, socket.data.userId);
+        } catch (err: unknown) {
+          if (err instanceof AppError) {
+            socket.emit('error', { message: err.message });
+            return;
+          }
+          throw err;
         }
+        const room = startedRoom;
 
         // Load custom map if specified
         let customMap: import('./game/GameState').GameConfig['customMap'];
@@ -725,23 +702,19 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           return;
         }
 
-        const room = await lobbyService.getRoom(roomCode);
-        if (!room) {
-          callback({ success: false, error: 'Room not found' });
-          return;
-        }
-
-        // A direct restart is the solo "Play Again"; with other humans in the room it goes
-        // through the rematch vote.
-        const humans = room.players.filter((p) => p.user.id > 0);
-        if (humans.length !== 1 || humans[0].user.id !== socket.data.userId) {
-          callback({ success: false, error: 'Use the rematch vote' });
-          return;
-        }
-
-        if (room.status !== 'finished') {
-          callback({ success: false, error: 'Game is not finished' });
-          return;
+        // A direct restart is the solo "Play Again" (with other humans in the room it goes through
+        // the rematch vote). The checks and the reset run atomically in one script: this was a
+        // read, checks, then a whole-room SET, so a player who left in between was written back
+        // into the room. (audit K4)
+        let room;
+        try {
+          room = await lobbyService.resetFinishedRoom(roomCode, socket.data.userId);
+        } catch (err: unknown) {
+          if (err instanceof AppError) {
+            callback({ success: false, error: err.message });
+            return;
+          }
+          throw err;
         }
 
         // Clear any pending rematch votes
@@ -753,11 +726,6 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
         // Clean up finished game room
         roomManager.removeRoom(roomCode);
-
-        // Reset room state
-        room.status = 'waiting';
-        room.players.forEach((p) => (p.ready = false));
-        await lobbyService.updateRoom(roomCode, room);
 
         // Notify all players in the room
         io.to(`room:${roomCode}`).emit('room:state', room);
@@ -837,17 +805,16 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           clearTimeout(voteState.timeout);
           rematchVotes.delete(roomCode);
 
-          // Same restart logic as room:restart
+          // Same atomic reset as room:restart: the room as it is now, not the copy read before
+          // the vote, so a player who left meanwhile is not written back in. (audit K4)
+          const resetRoom = await lobbyService.resetFinishedRoom(roomCode);
           roomManager.removeRoom(roomCode);
-          room.status = 'waiting';
-          room.players.forEach((p) => (p.ready = false));
-          await lobbyService.updateRoom(roomCode, room);
 
           io.to(`room:${roomCode}`).emit('rematch:triggered');
-          io.to(`room:${roomCode}`).emit('room:state', room);
+          io.to(`room:${roomCode}`).emit('room:state', resetRoom);
           broadcastRoomList();
           publishPresence(
-            room.players.map((p) => p.user.id),
+            resetRoom.players.map((p) => p.user.id),
             'in_lobby',
             { roomCode },
           );

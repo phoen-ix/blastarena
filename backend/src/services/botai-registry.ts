@@ -5,7 +5,7 @@ import { logger } from '../utils/logger';
 import { BotAI, IBotAI } from '../game/BotAI';
 import { query } from '../db/connection';
 import { BotAIRow } from '../db/types';
-import { IsolatedBotAI } from './IsolatedAIRunner';
+import { IsolatedBotAI, IsolatedAIOptions } from './IsolatedAIRunner';
 
 type BotAIConstructor = new (
   difficulty: 'easy' | 'normal' | 'hard',
@@ -62,6 +62,8 @@ export class BotAIRegistry {
     mapSize?: { width: number; height: number },
     /** Per-bot seed, so bot decisions are reproducible. (audit BOTAI-DETERMINISM-1) */
     seed?: number,
+    /** Isolate options; pass AI_IN_TICK_BOOTSTRAP_TIMEOUT_MS when creating inside a game tick. */
+    options?: IsolatedAIOptions,
   ): IBotAI {
     const id = aiId || 'builtin';
     const entry = this.loaded.get(id);
@@ -76,9 +78,10 @@ export class BotAIRegistry {
       return new entry.ctor(difficulty, mapSize, seed);
     }
     // Untrusted custom AI — run it in an isolate. If the isolate fails to build/instantiate the
-    // class, fall back to the built-in so a broken upload can't break game creation.
+    // class, fall back to the built-in so a broken upload can't break game creation. The seed
+    // seeds the isolate's Math.random, so uploaded bots replay deterministically too.
     try {
-      return new IsolatedBotAI(entry.code, difficulty, mapSize);
+      return new IsolatedBotAI(entry.code, difficulty, mapSize, seed, options);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.warn(

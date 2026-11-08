@@ -481,7 +481,12 @@ describe('GameRoom', () => {
       expect(sqls[0]).toMatch(/^UPDATE matches SET status = \?/);
       expect(sqls[1]).toMatch(/^INSERT INTO match_players/);
       expect(sqls[1]).toContain('ON DUPLICATE KEY UPDATE');
-      expect(sqls[1].match(/\(\?, \?, \?, \?, \?, \?, \?, \?, \?\)/g)).toHaveLength(2);
+      expect(sqls[1].match(/\(\?, \?, \?, \?, \?, \?, \?, \?, \?, \?\)/g)).toHaveLength(2);
+      // The winner flag (migration 048) and each player's own survival time are written.
+      expect(sqls[1]).toContain('is_winner = VALUES(is_winner)');
+      const rowParams = mockConnExecute.mock.calls[1][1] as unknown[];
+      expect(rowParams).toHaveLength(20);
+      expect(rowParams.filter((v) => typeof v === 'boolean')).toHaveLength(2);
       expect(sqls[2]).toMatch(/^SELECT user_id, total_xp, level FROM user_stats .* FOR UPDATE$/);
       const statUpdates = sqls.filter((q) => q.startsWith('UPDATE user_stats'));
       expect(statUpdates).toHaveLength(2);

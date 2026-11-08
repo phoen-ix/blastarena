@@ -383,3 +383,85 @@ describe('IsolatedAIRunner — incremental tile sync', () => {
     }
   });
 });
+
+// The bot guide documents these on the objects an uploaded AI receives; the isolate used to lack
+// them, so calling e.g. explosion.containsCell threw and the bot fell back to the built-in AI.
+// The guest encodes what it sees into the output's seq bits.
+const BOT_DOCUMENTED_API = `module.exports = class {
+  generateInput(player, state) {
+    const exp = [...state.explosions.values()][0];
+    const checks = [
+      player.isBot === true,
+      typeof exp.containsCell === 'function' && exp.containsCell(2, 1) && !exp.containsCell(5, 5),
+      state.zone !== undefined,
+      state.kothScores instanceof Map,
+      state.winnerId === null && state.winnerTeam === null,
+      typeof state.enableMapEvents === 'boolean',
+      Array.isArray(state.map.spawnPoints) && state.map.spawnPoints.length === 1,
+      state.map.seed === 4242,
+    ];
+    let bits = 0;
+    checks.forEach((ok, i) => { if (ok) bits |= 1 << i; });
+    return { seq: bits, tick: state.tick, direction: 'up', action: null };
+  }
+};`;
+
+// Reports Math.random (to check it is seeded) or Date.now (to check it is game time) as seq.
+const BOT_RANDOM = `module.exports = class {
+  generateInput(player, state) {
+    return { seq: Math.floor(Math.random() * 1e9), tick: 0, direction: 'up', action: null };
+  }
+};`;
+const BOT_NOW = `module.exports = class {
+  generateInput(player, state) {
+    return { seq: Date.now(), tick: 0, direction: 'up', action: null };
+  }
+};`;
+
+describe('IsolatedAIRunner — documented API and determinism', () => {
+  it('exposes every documented field the guide promises', () => {
+    const { tiles, width, height } = makeMap();
+    const { self, state } = makeState(tiles, width, height);
+    (self as any).isBot = true;
+    state.map.spawnPoints = [{ x: 1, y: 1 }];
+    state.map.seed = 4242;
+    state.explosions.set('e1', {
+      id: 'e1',
+      cells: [
+        { x: 1, y: 1 },
+        { x: 2, y: 1 },
+      ],
+      ownerId: 1,
+      ticksRemaining: 5,
+    });
+    const { ai, out } = firstCall(
+      () => new IsolatedBotAI(BOT_DOCUMENTED_API, 'normal', { width, height }),
+      (a) => a.generateInput(self, state),
+    );
+    ai.dispose();
+    expect(out!.seq).toBe(0b11111111);
+  });
+
+  it('seeds Math.random per bot and derives Date.now from the game tick', () => {
+    const { tiles, width, height } = makeMap();
+    const run = (seed: number, code = BOT_RANDOM) => {
+      const { self, state } = makeState(tiles, width, height);
+      const { ai, out } = firstCall(
+        () => new IsolatedBotAI(code, 'normal', { width, height }, seed),
+        (a) => a.generateInput(self, state),
+      );
+      ai.dispose();
+      return out!;
+    };
+    const a = run(7);
+    expect(run(7).seq).toBe(a.seq);
+    expect(run(8).seq).not.toBe(a.seq);
+    // tick 10 at 20 ticks/s is 500 ms of game time, not the wall clock
+    expect(run(7, BOT_NOW).seq).toBe(500);
+  });
+
+  it('throws (and frees the isolate) when the bootstrap fails', () => {
+    expect(() => new IsolatedBotAI('module.exports = 42;', 'normal')).toThrow();
+    expect(() => new IsolatedBotAI('this is not javascript', 'normal')).toThrow();
+  });
+});

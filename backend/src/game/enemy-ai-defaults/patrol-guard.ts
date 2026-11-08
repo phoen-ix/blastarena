@@ -1,3 +1,5 @@
+import { WALKABLE_FN_SOURCE } from './walkable';
+
 export const PATROL_GUARD_SOURCE = `
 var DIRS = ['up', 'down', 'left', 'right'];
 var DD = { up: {dx:0,dy:-1}, down: {dx:0,dy:1}, left: {dx:-1,dy:0}, right: {dx:1,dy:0} };
@@ -6,13 +8,7 @@ function manhattan(a, b) {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
-function walkable(tile, ghost) {
-  if (!tile) return false;
-  if (tile === 'wall') return false;
-  if (ghost) return true;
-  return tile === 'empty' || tile === 'spawn' || tile === 'exit' || tile === 'goal'
-    || tile.indexOf('teleporter') === 0 || tile.indexOf('conveyor') === 0;
-}
+${WALKABLE_FN_SOURCE}
 
 function getWalkable(pos, ctx) {
   var dirs = [];
@@ -148,9 +144,27 @@ class PatrolGuardAI {
       // Patrol mode
       var path = ctx.self.patrolPath;
       if (path && path.length > 0) {
-        // Sync local index from context
-        this.localPatrolIdx = ctx.self.patrolIndex;
+        // The waypoint index lives here: ctx.self.patrolIndex only advances in the built-in
+        // pattern code, which never runs while this AI drives the enemy, so syncing from it kept
+        // the guard at waypoint 0 forever. Walk the path back and forth like the built-in does.
+        if (this.localPatrolIdx >= path.length) this.localPatrolIdx = path.length - 1;
         var wp = path[this.localPatrolIdx];
+        if (wp && ctx.self.position.x === wp.x && ctx.self.position.y === wp.y && path.length > 1) {
+          if (this.patrolForward) {
+            this.localPatrolIdx++;
+            if (this.localPatrolIdx >= path.length) {
+              this.patrolForward = false;
+              this.localPatrolIdx = path.length - 2;
+            }
+          } else {
+            this.localPatrolIdx--;
+            if (this.localPatrolIdx < 0) {
+              this.patrolForward = true;
+              this.localPatrolIdx = 1;
+            }
+          }
+          wp = path[this.localPatrolIdx];
+        }
         if (wp) {
           direction = moveToward(ctx.self.position, wp, ctx);
         }

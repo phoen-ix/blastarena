@@ -139,11 +139,20 @@ describe('BotAIRegistry', () => {
       mockReadFileSync.mockReturnValue('CODE');
 
       registry.loadAI('custom-1');
-      const instance = registry.createInstance('custom-1', 'hard', { width: 15, height: 15 });
+      const instance = registry.createInstance('custom-1', 'hard', { width: 15, height: 15 }, 99, {
+        bootstrapTimeoutMs: 100,
+      });
 
       expect(instance).toBeDefined();
-      // The registry passes the stored compiled code + ctor args to the isolated wrapper.
-      expect(MockIsolatedBotAI).toHaveBeenCalledWith('CODE', 'hard', { width: 15, height: 15 });
+      // The registry passes the stored compiled code + ctor args to the isolated wrapper — and the
+      // per-bot seed, which the isolated path used to drop, so uploaded bots ran unseeded.
+      expect(MockIsolatedBotAI).toHaveBeenCalledWith(
+        'CODE',
+        'hard',
+        { width: 15, height: 15 },
+        99,
+        { bootstrapTimeoutMs: 100 },
+      );
       // The built-in must NOT be used for a successfully-loaded custom AI.
       expect(MockBotAI).not.toHaveBeenCalled();
     });

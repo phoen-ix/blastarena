@@ -58,30 +58,48 @@ export function parseRoom(json: string): Room {
   return room;
 }
 
+/** Attempts at a fresh code before giving up; six hex digits make a clash rare, never impossible. */
+const CREATE_ROOM_ATTEMPTS = 5;
+
 export async function createRoom(
   host: PublicUser,
   name: string,
   config: MatchConfig,
+  customMapName?: string,
 ): Promise<Room> {
   const redis = getRedis();
-  const code = generateRoomCode();
 
-  const room: Room = {
-    code,
-    name,
-    host,
-    players: [{ user: host, ready: false, team: null }],
-    config,
-    status: 'waiting',
-    createdAt: new Date(),
-  };
+  for (let attempt = 0; attempt < CREATE_ROOM_ATTEMPTS; attempt++) {
+    const code = generateRoomCode();
+    const room: Room = {
+      code,
+      name,
+      host,
+      players: [{ user: host, ready: false, team: null }],
+      config,
+      status: 'waiting',
+      createdAt: new Date(),
+      ...(customMapName ? { customMapName } : {}),
+    };
 
-  await redis.set(`room:${code}`, JSON.stringify(room), 'EX', ROOM_TTL_SECONDS);
-  await redis.set(`player:${host.id}:room`, code, 'EX', ROOM_TTL_SECONDS);
-  await redis.sadd(ROOM_INDEX_KEY, code);
+    // NX: a code that is already live is never overwritten. A plain SET replaced the other room
+    // in place, players and all, whenever two creations drew the same six hex digits.
+    const created = await redis.set(
+      `room:${code}`,
+      JSON.stringify(room),
+      'EX',
+      ROOM_TTL_SECONDS,
+      'NX',
+    );
+    if (created !== 'OK') continue;
 
-  logger.info({ code, host: host.username }, 'Room created');
-  return room;
+    await redis.set(`player:${host.id}:room`, code, 'EX', ROOM_TTL_SECONDS);
+    await redis.sadd(ROOM_INDEX_KEY, code);
+
+    logger.info({ code, host: host.username }, 'Room created');
+    return room;
+  }
+  throw new AppError('Could not allocate a room code, please retry', 503, 'ROOM_CODE_EXHAUSTED');
 }
 
 export async function getRoom(code: string): Promise<Room | null> {
@@ -191,16 +209,7 @@ export async function joinRoom(code: string, user: PublicUser): Promise<Room> {
     String(user.id),
   )) as string;
 
-  if (result.startsWith('ERR:')) {
-    const errorCode = result.slice(4);
-    const err = JOIN_ERROR_MAP[errorCode];
-    if (err) {
-      throw new AppError(err.message, err.status, err.code);
-    }
-    throw new AppError('Join failed', 500);
-  }
-
-  return parseRoom(result);
+  return parseRoom(throwIfScriptError(result, JOIN_ERROR_MAP));
 }
 
 // Lua script for atomic leave: removes player, transfers host if needed, deletes empty rooms
@@ -352,9 +361,11 @@ redis.call('SET', KEYS[1], updated, 'EX', ${ROOM_TTL_SECONDS})
 return updated
 `;
 
-// Lua script for atomic room start: only succeeds if status is 'waiting'
+// Lua script for atomic room start. Every precondition is checked here, against the room as it is
+// now: the handler used to check host, readiness and player count on a read taken before this
+// script ran, so a player who un-readied (or a host who left) in between was started anyway.
 // KEYS[1] = room key
-// ARGV[1] = new status ('countdown')
+// ARGV[1] = new status ('countdown'), ARGV[2] = requesting user id
 // Returns: updated room JSON or ERR:*
 const START_ROOM_LUA = `
 local data = redis.call('GET', KEYS[1])
@@ -363,8 +374,22 @@ if not data then
 end
 
 local room = cjson.decode(data)
+if room.host.id ~= tonumber(ARGV[2]) then
+  return 'ERR:NOT_HOST'
+end
 if room.status ~= 'waiting' then
   return 'ERR:ALREADY_STARTING'
+end
+
+for _, p in ipairs(room.players) do
+  if p.user.id ~= room.host.id and p.ready ~= true then
+    return 'ERR:NOT_READY'
+  end
+end
+
+local botCount = tonumber(room.config.botCount) or 0
+if #room.players < 2 and botCount < 1 then
+  return 'ERR:NOT_ENOUGH_PLAYERS'
 end
 
 room.status = ARGV[1]
@@ -372,6 +397,79 @@ local updated = cjson.encode(room)
 redis.call('SET', KEYS[1], updated, 'EX', ${ROOM_TTL_SECONDS})
 return updated
 `;
+
+const START_ERROR_MAP: Record<string, { message: string; status: number; code: string }> = {
+  NOT_FOUND: { message: 'Room not found', status: 404, code: 'NOT_FOUND' },
+  NOT_HOST: { message: 'Only the host can start the game', status: 403, code: 'NOT_HOST' },
+  ALREADY_STARTING: { message: 'Game already starting', status: 409, code: 'ALREADY_STARTING' },
+  NOT_READY: { message: 'Not all players are ready', status: 400, code: 'NOT_READY' },
+  NOT_ENOUGH_PLAYERS: {
+    message: 'Need at least 2 players or add bots',
+    status: 400,
+    code: 'NOT_ENOUGH_PLAYERS',
+  },
+};
+
+// Lua script for an atomic "play again": a finished room goes back to waiting with nobody ready.
+// This was a read in JS followed by a whole-room SET, so a player who left in between was written
+// straight back into the room.
+// KEYS[1] = room key
+// ARGV[1] = user id that must be the room's only human ('' = no such requirement)
+// Returns: updated room JSON or ERR:*
+const RESET_ROOM_LUA = `
+local data = redis.call('GET', KEYS[1])
+if not data then
+  return 'ERR:NOT_FOUND'
+end
+
+local room = cjson.decode(data)
+if room.status ~= 'finished' then
+  return 'ERR:NOT_FINISHED'
+end
+
+if ARGV[1] ~= '' then
+  local sole = tonumber(ARGV[1])
+  local humans = 0
+  local found = false
+  for _, p in ipairs(room.players) do
+    if p.user.id > 0 then
+      humans = humans + 1
+      if p.user.id == sole then
+        found = true
+      end
+    end
+  end
+  if humans ~= 1 or not found then
+    return 'ERR:NOT_SOLE_HUMAN'
+  end
+end
+
+room.status = 'waiting'
+for _, p in ipairs(room.players) do
+  p.ready = false
+end
+
+local updated = cjson.encode(room)
+redis.call('SET', KEYS[1], updated, 'EX', ${ROOM_TTL_SECONDS})
+return updated
+`;
+
+const RESET_ERROR_MAP: Record<string, { message: string; status: number; code: string }> = {
+  NOT_FOUND: { message: 'Room not found', status: 404, code: 'NOT_FOUND' },
+  NOT_FINISHED: { message: 'Game is not finished', status: 400, code: 'NOT_FINISHED' },
+  NOT_SOLE_HUMAN: { message: 'Use the rematch vote', status: 400, code: 'NOT_SOLE_HUMAN' },
+};
+
+/** Throw the mapped AppError for an `ERR:CODE` script reply; return the reply otherwise. */
+function throwIfScriptError(
+  result: string,
+  map: Record<string, { message: string; status: number; code: string }>,
+): string {
+  if (!result.startsWith('ERR:')) return result;
+  const err = map[result.slice(4)];
+  if (err) throw new AppError(err.message, err.status, err.code);
+  throw new AppError('Room update failed', 500);
+}
 
 export async function leaveRoom(code: string, userId: number): Promise<Room | null> {
   const redis = getRedis();
@@ -461,24 +559,41 @@ export async function setBotTeamAsHost(
   return parseRoom(result);
 }
 
-export async function updateRoom(code: string, room: Room): Promise<void> {
+/**
+ * Atomically start a room. Host, readiness, player count and the 'waiting' status are all checked
+ * inside the script, so two concurrent room:start events cannot both pass and a stale read cannot
+ * start a room whose players changed meanwhile. Throws an AppError naming the failed check.
+ */
+export async function startRoom(code: string, requestingUserId: number): Promise<Room> {
   const redis = getRedis();
-  await redis.set(`room:${code}`, JSON.stringify(room), 'EX', ROOM_TTL_SECONDS);
+
+  const result = (await redis.eval(
+    START_ROOM_LUA,
+    1,
+    `room:${code}`,
+    'countdown',
+    String(requestingUserId),
+  )) as string;
+
+  return parseRoom(throwIfScriptError(result, START_ERROR_MAP));
 }
 
 /**
- * Atomically start a room — only succeeds if current status is 'waiting'.
- * Prevents TOCTOU race where two concurrent room:start events both pass the guard.
- * Returns the updated room, or null if room not found / already starting.
+ * Atomically put a finished room back to 'waiting' with every ready flag cleared. With
+ * `soleHumanId`, the reset only happens when that user is the room's only human (the solo "Play
+ * Again"). Throws an AppError naming the failed check.
  */
-export async function startRoom(code: string): Promise<Room | null> {
+export async function resetFinishedRoom(code: string, soleHumanId?: number): Promise<Room> {
   const redis = getRedis();
 
-  const result = (await redis.eval(START_ROOM_LUA, 1, `room:${code}`, 'countdown')) as string;
+  const result = (await redis.eval(
+    RESET_ROOM_LUA,
+    1,
+    `room:${code}`,
+    soleHumanId === undefined ? '' : String(soleHumanId),
+  )) as string;
 
-  if (result.startsWith('ERR:')) return null;
-
-  return parseRoom(result);
+  return parseRoom(throwIfScriptError(result, RESET_ERROR_MAP));
 }
 
 // Atomically set a room's status, preserving all other fields. The previous JS read-modify-write

@@ -205,6 +205,14 @@ export class GameStateManager {
   private _processingTick: boolean = false;
   private _hillControllingPlayerId: number | null = null;
 
+  /** Deaths caused between ticks (killPlayer), merged into the next tick's events. (audit G5) */
+  private pendingExternalDeaths: GameStateManager['tickEvents']['playerDied'] = [];
+  /**
+   * Players gone for good (left, or disconnected past the grace period). In respawn modes they
+   * used to keep respawning as idle bodies for the rest of the match. (audit G3)
+   */
+  private departedPlayers: Set<number> = new Set();
+
   // Per-tick event buffers for discrete event emission
   public tickEvents: {
     explosions: { cells: { x: number; y: number }[]; ownerId: number }[];
@@ -402,8 +410,15 @@ export class GameStateManager {
     }
 
     // Initialize puzzle tile processor if puzzle tiles are present (procedural or custom map)
-    // For custom maps, always try — the processor scans the grid and sets hasPuzzleTiles
-    if (puzzleTiles.length > 0 || this.map.puzzleConfig || config.customMap) {
+    // For custom maps, always try — the processor scans the grid and sets hasPuzzleTiles.
+    // Not for the campaign: CampaignGame runs its own processor with the level's puzzleConfig, and
+    // a second one here (without the switch variants, so every switch acted as 'toggle') flipped
+    // the same tiles again — a oneshot switch stepped off and on closed its gates for good.
+    // (audit G1)
+    if (
+      gameMode !== 'campaign' &&
+      (puzzleTiles.length > 0 || this.map.puzzleConfig || config.customMap)
+    ) {
       const processor = new PuzzleTileProcessor(this, this.map.puzzleConfig);
       if (processor.hasPuzzleTiles) {
         this.puzzleProcessor = processor;
@@ -492,7 +507,18 @@ export class GameStateManager {
     this.spectatorCooldowns.delete(id);
     this.kothScores.delete(id);
     this.kothControlTicks.delete(id);
+    this.departedPlayers.delete(id);
     this._alivePlayersCache = null;
+  }
+
+  /** The player left for good: never respawn them. (audit G3) */
+  markDeparted(id: number): void {
+    this.departedPlayers.add(id);
+  }
+
+  /** A departed player came back (reconnect): respawn modes bring them back in. */
+  markReturned(id: number): void {
+    this.departedPlayers.delete(id);
   }
 
   /** Dispose all bot-AI isolates. Call on game teardown to avoid leaking isolates. (audit C1) */
@@ -565,18 +591,37 @@ export class GameStateManager {
 
   processTick(): void {
     if (this.status !== 'playing') return;
-    this.tick++;
     this._processingTick = true;
+    // In a finally: a throw anywhere in the tick used to leave the flag set, and getAlivePlayers()
+    // then served a stale cache to every caller outside the tick (GameRoom, the AIs) until the
+    // next tick happened to complete.
+    try {
+      this.runTick();
+    } finally {
+      this._processingTick = false;
+    }
+  }
 
-    // Clear per-tick event buffers and caches
-    this.tickEvents = { explosions: [], playerDied: [], powerupCollected: [], bombThrown: [] };
+  private runTick(): void {
+    this.tick++;
+
+    // Clear per-tick event buffers and caches. Deaths caused from outside the tick (a voluntary
+    // leave, see killPlayer) are carried into this tick's events: they used to be pushed into the
+    // previous buffer and wiped here before anything broadcast them. (audit G5)
+    this.tickEvents = {
+      explosions: [],
+      playerDied: this.pendingExternalDeaths,
+      powerupCollected: [],
+      bombThrown: [],
+    };
+    this.pendingExternalDeaths = [];
+    const firstInTickDeath = this.tickEvents.playerDied.length;
     this._alivePlayersCache = null;
 
     // Check if grace period has elapsed
     if (this.finishTick !== null) {
       if (this.tick >= this.finishTick + GameStateManager.FINISH_DELAY_TICKS) {
         this.status = 'finished';
-        this._processingTick = false;
         return;
       }
       // During grace period: skip player/bot input, but keep processing explosions and bombs below
@@ -613,7 +658,9 @@ export class GameStateManager {
               // Custom AI crashed/timed out — dispose its isolate and replace with built-in fallback
               const msg = err instanceof Error ? err.message : String(err);
               if (this.gameLogger) {
-                this.gameLogger.logBotDecision(botId, 'ai_crash', `Custom AI error: ${msg}`);
+                this.gameLogger.logBotDecision(botId, botPlayer.username, 'ai_crash', {
+                  error: `Custom AI error: ${msg}`,
+                });
               }
               disposeAI(ai);
               this.botAIs.set(
@@ -865,11 +912,14 @@ export class GameStateManager {
         } else {
           player.die();
           this.invalidateAliveCache();
-          player.placement = this.getAlivePlayers().length + 1;
+          this.placeDeath(player);
 
-          // Credit kill or track self-kill (self-kills subtract 1 from score)
+          // Credit kill or track self-kill (self-kills subtract 1 from score). Killing a teammate
+          // (friendly fire on) credits nothing: it used to count as a kill, which also tipped the
+          // teams time-up tie-break toward the team that blew itself up. (audit G10)
           if (owner && owner.id !== player.id) {
-            owner.kills++;
+            const teamKill = player.team !== null && owner.team === player.team;
+            if (!teamKill) owner.kills++;
             this.gameLogger?.logKill(owner.id, owner.username, player.id, player.username, false);
             this.tickEvents.playerDied.push({
               playerId: player.id,
@@ -1003,6 +1053,9 @@ export class GameStateManager {
 
         if (score >= KOTH_SCORE_TARGET) {
           this.winnerId = controllerId;
+          // Rank everyone, not just the winner: the rest kept placement null (999 for Elo) or a
+          // stale death placement. (audit G2)
+          this.rankAllPlayers((p) => this.kothScores.get(p.id) ?? 0);
           playersInZone[0].placement = 1;
           this.finishTick = this.tick;
           this.finishReason = `${playersInZone[0].username} controls the hill!`;
@@ -1299,7 +1352,7 @@ export class GameStateManager {
           } else {
             player.die();
             this.invalidateAliveCache();
-            player.placement = this.getAlivePlayers().length + 1;
+            this.placeDeath(player);
             this.tickEvents.playerDied.push({ playerId: player.id, killerId: null, cause: 'zone' });
             this.dropPowerUpOnDeath(player);
           }
@@ -1313,6 +1366,7 @@ export class GameStateManager {
     if ((this.gameMode === 'deathmatch' || this.isOpenWorld) && this.finishTick === null) {
       const respawnDelay = this.isOpenWorld ? this.openWorldRespawnTicks : DEATHMATCH_RESPAWN_TICKS;
       for (const player of this.players.values()) {
+        if (!player.alive && this.departedPlayers.has(player.id)) continue;
         if (!player.alive && player.respawnTick === null) {
           player.respawnTick = this.tick + respawnDelay;
         }
@@ -1345,10 +1399,12 @@ export class GameStateManager {
 
     // Players who died in the same tick share a placement. Each death used to take `alive + 1` at
     // the moment it was processed, so two players caught by one blast placed differently purely by
-    // join order (and got different Elo/XP for it).
-    if (this.tickEvents.playerDied.length > 1) {
+    // join order (and got different Elo/XP for it). Deaths carried in from outside the tick
+    // happened earlier and keep their own placement; nothing is re-placed once the result stands.
+    const inTickDeaths = this.tickEvents.playerDied.slice(firstInTickDeath);
+    if (inTickDeaths.length > 1 && this.finishTick === null) {
       const sharedPlacement = this.getAlivePlayers().length + 1;
-      for (const death of this.tickEvents.playerDied) {
+      for (const death of inTickDeaths) {
         const player = this.players.get(death.playerId);
         if (player && !player.alive) player.placement = sharedPlacement;
       }
@@ -1375,7 +1431,10 @@ export class GameStateManager {
       }
     }
 
-    this._processingTick = false;
+    // Survival time for achievements and match_players.survived_seconds (see Player.aliveTicks).
+    for (const player of this.players.values()) {
+      if (player.alive) player.aliveTicks++;
+    }
   }
 
   // --- Hazard tile processing (multiplayer) ---
@@ -1403,7 +1462,7 @@ export class GameStateManager {
           } else if (player.invulnerableTicks <= 0) {
             player.die();
             this.invalidateAliveCache();
-            player.placement = this.getAlivePlayers().length + 1;
+            this.placeDeath(player);
             this.tickEvents.playerDied.push({
               playerId: player.id,
               killerId: null,
@@ -1546,7 +1605,7 @@ export class GameStateManager {
           } else {
             player.die();
             this.invalidateAliveCache();
-            player.placement = this.getAlivePlayers().length + 1;
+            this.placeDeath(player);
             this.tickEvents.playerDied.push({
               playerId: player.id,
               killerId: null,
@@ -1910,7 +1969,6 @@ export class GameStateManager {
     const diff: TileDiff = { x, y, type };
     this._dirtyTiles.set(`${x},${y}`, diff);
     if (previous !== type) this.tileChangeLog.push(diff);
-    // (No collisionSystem.updateTiles() here: it only reassigned the same array reference.)
   }
 
   /** Destroy a tile and track the change for delta broadcasting */
@@ -2025,6 +2083,14 @@ export class GameStateManager {
           }
         } finally {
           this._activeSnapshot = null;
+        }
+        // The detonated bombs (and any they chained) are gone: rebuild the shared occupancy in
+        // place, or players processed later this tick stay blocked by ghost bombs.
+        sharedBombPositions.length = 0;
+        bombPosSet.clear();
+        for (const b of this.bombs.values()) {
+          sharedBombPositions.push(b.position);
+          bombPosSet.add(`${b.position.x},${b.position.y}`);
         }
       } else if (player.hasRemoteBomb) {
         // No remote bombs placed — toggle detonation mode
@@ -2440,16 +2506,17 @@ export class GameStateManager {
     for (const bomb of this.bombs.values()) {
       if (cellSet.has(`${bomb.position.x},${bomb.position.y}`)) chained.push(bomb);
     }
-    for (const cell of cells) {
-      this.destroyTileTracked(cell.x, cell.y);
-    }
-    if (chained.length > 0) {
-      const tileSnapshot = this.beginTileSnapshot();
-      try {
-        for (const bomb of chained) this.detonateBomb(bomb, tileSnapshot);
-      } finally {
-        this._activeSnapshot = null;
+    // Snapshot BEFORE the meteor breaks any wall: the chained bombs belong to the same batch and
+    // must resolve against the pre-impact layout, or they blast through the walls the meteor just
+    // destroyed. (audit G9)
+    const tileSnapshot = this.beginTileSnapshot();
+    try {
+      for (const cell of cells) {
+        this.destroyTileTracked(cell.x, cell.y);
       }
+      for (const bomb of chained) this.detonateBomb(bomb, tileSnapshot);
+    } finally {
+      this._activeSnapshot = null;
     }
   }
 
@@ -2536,14 +2603,20 @@ export class GameStateManager {
 
     // Deathmatch: check kill target
     if (this.gameMode === 'deathmatch') {
+      let leader: Player | null = null;
       for (const player of this.players.values()) {
-        if (player.kills >= DEATHMATCH_KILL_TARGET) {
-          this.winnerId = player.id;
-          player.placement = 1;
-          this.finishTick = this.tick;
-          this.finishReason = `${player.username} reached ${DEATHMATCH_KILL_TARGET} kills!`;
-          return;
+        if (player.kills >= DEATHMATCH_KILL_TARGET && (!leader || player.kills > leader.kills)) {
+          leader = player;
         }
+      }
+      if (leader) {
+        this.winnerId = leader.id;
+        // Rank everyone by kills, as the time-up path does; only the winner used to be placed.
+        // (audit G2)
+        this.rankAllPlayers((p) => p.kills);
+        leader.placement = 1;
+        this.finishTick = this.tick;
+        this.finishReason = `${leader.username} reached ${DEATHMATCH_KILL_TARGET} kills!`;
       }
       // Deathmatch never ends on last-alive condition, only on time or kill target
       return;
@@ -2591,10 +2664,7 @@ export class GameStateManager {
     if (this.gameMode === 'deathmatch' || this.gameMode === 'king_of_the_hill') {
       const isKoth = this.gameMode === 'king_of_the_hill';
       const score = (p: Player): number => (isKoth ? (this.kothScores.get(p.id) ?? 0) : p.kills);
-      const all = [...this.players.values()];
-      // Standard competition ranking: equal scores share a placement.
-      for (const p of all) p.placement = 1 + all.filter((o) => score(o) > score(p)).length;
-      const ranked = [...all].sort((a, b) => score(b) - score(a));
+      const ranked = this.rankAllPlayers(score);
       if (ranked.length > 0 && (ranked.length === 1 || score(ranked[0]) > score(ranked[1]))) {
         this.winnerId = ranked[0].id;
         this.finishReason = isKoth
@@ -2647,6 +2717,25 @@ export class GameStateManager {
     }
   }
 
+  /**
+   * Standard competition ranking of every player by `score` (equal scores share a placement).
+   * Returns the players best first.
+   */
+  private rankAllPlayers(score: (p: Player) => number): Player[] {
+    const all = [...this.players.values()];
+    for (const p of all) p.placement = 1 + all.filter((o) => score(o) > score(p)).length;
+    return all.sort((a, b) => score(b) - score(a));
+  }
+
+  /**
+   * A death's placement: behind everyone still alive. Not once the result stands (finish grace):
+   * a loser caught by a lingering blast after a deathmatch/KOTH/time-up ranking used to overwrite
+   * the placement that ranking gave them. (audit G2)
+   */
+  private placeDeath(player: Player): void {
+    if (this.finishTick === null) player.placement = this.getAlivePlayers().length + 1;
+  }
+
   getAlivePlayers(): Player[] {
     if (this._processingTick && this._alivePlayersCache) {
       return this._alivePlayersCache;
@@ -2667,8 +2756,11 @@ export class GameStateManager {
 
     player.die();
     this.invalidateAliveCache();
-    player.placement = this.getAlivePlayers().length + 1;
-    this.tickEvents.playerDied.push({ playerId, killerId, cause });
+    this.placeDeath(player);
+    // Outside a tick the current buffer has already been broadcast and the next processTick resets
+    // it, so the death would never reach the clients. Queue it for the next tick instead. (audit G5)
+    const deaths = this._processingTick ? this.tickEvents.playerDied : this.pendingExternalDeaths;
+    deaths.push({ playerId, killerId, cause });
     this.dropPowerUpOnDeath(player);
     this.gameLogger?.logKill(
       killerId ?? playerId,

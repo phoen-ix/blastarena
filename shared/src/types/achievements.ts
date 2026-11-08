@@ -17,6 +17,20 @@ export interface Achievement {
   sortOrder: number;
 }
 
+/** Comparison operators a `per_game` condition accepts; anything else evaluates as '>='. */
+export type PerGameOperator = '>=' | '<=' | '==' | '>' | '<';
+
+/** `conditionConfig` of a `per_game` achievement. */
+export interface PerGameConditionConfig {
+  /** One of the per-game stats: kills, deaths, self_kills, bombs_placed, powerups_collected,
+   * survived_seconds, placement, player_count, is_winner. */
+  stat: string;
+  operator?: PerGameOperator;
+  threshold: number;
+  /** Only a won game counts ("Win without self-kills"): without it a lost game met the stat too. */
+  requireWin?: boolean;
+}
+
 export interface UserAchievement {
   achievementId: number;
   unlockedAt: string | null;

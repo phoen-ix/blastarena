@@ -6,7 +6,6 @@ import {
   CampaignLevelSummary,
   EnemyTypeEntry,
   EnemyTypeConfig,
-  EnemyBombConfig,
   EnemySpriteConfig,
   EnemyBodyShape,
   EnemyEyeStyle,
@@ -19,6 +18,7 @@ import {
   ENEMY_EYE_STYLES,
   ENEMY_ACCESSORIES,
   MOVEMENT_PATTERNS,
+  DEFAULT_ENEMY_BOMB_CONFIG,
   EnemyAIEntry,
   CampaignReplayListItem,
   ReplayData,
@@ -52,17 +52,6 @@ function colorAttr(value: unknown, fallback: string): string {
 function numAttr(value: unknown, fallback: number): string {
   return escapeAttr(String(typeof value === 'number' && Number.isFinite(value) ? value : fallback));
 }
-
-/**
- * Bomb settings for an enemy that gets "Can bomb" ticked without any: the backend only lets an
- * enemy bomb with a bombConfig (Enemy.canPlaceBomb). Same values as the seeded Bombotron.
- */
-const DEFAULT_ENEMY_BOMB_CONFIG: EnemyBombConfig = {
-  fireRange: 2,
-  cooldownTicks: 60,
-  trigger: 'proximity',
-  proximityRange: 4,
-};
 
 /** Phase 1 of POST /admin/campaign/enemy-types/import for a type that bundles its own AI. */
 interface EnemyAiImportConflict {

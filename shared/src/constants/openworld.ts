@@ -18,8 +18,9 @@ export const OPENWORLD_RESPAWN_TICKS = 3 * TICK_RATE; // 3 seconds
 export const OPENWORLD_RESPAWN_INVULNERABILITY_TICKS = 2 * TICK_RATE; // 2 seconds
 export const OPENWORLD_JOIN_INVULNERABILITY_TICKS = 3 * TICK_RATE; // 3 seconds on first join
 
-// Guest ID range: -3000 to -9999
+// Guest ID range: -3000 to -9999 (OPENWORLD_GUEST_ID_COUNT ids, reused as guests leave)
 export const OPENWORLD_GUEST_ID_START = -3000;
+export const OPENWORLD_GUEST_ID_COUNT = 7000;
 
 // Score tracking: batch DB writes every N ticks
 export const OPENWORLD_STATS_FLUSH_TICKS = 10 * TICK_RATE; // 10 seconds

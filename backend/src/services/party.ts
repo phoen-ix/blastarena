@@ -181,8 +181,17 @@ const LEAVE_PARTY_LUA = `
   local userId = tonumber(ARGV[1])
   local ttl = tonumber(ARGV[2])
   local playerPrefix = ARGV[3]
+  local partyId = ARGV[4]
 
-  redis.call('DEL', playerKey)
+  -- Only drop a player->party pointer that still names THIS party: a leave for a stale party id
+  -- (an old tab, a late disconnect) used to wipe the pointer to the party the player is really in.
+  local function dropPointer(key)
+    if redis.call('GET', key) == partyId then
+      redis.call('DEL', key)
+    end
+  end
+
+  dropPointer(playerKey)
 
   local partyData = redis.call('GET', partyKey)
   if not partyData then
@@ -200,7 +209,7 @@ const LEAVE_PARTY_LUA = `
   if #newMembers == 0 or party.leaderId == userId then
     redis.call('DEL', partyKey)
     for _, m in ipairs(party.members) do
-      redis.call('DEL', playerPrefix .. m.userId)
+      dropPointer(playerPrefix .. m.userId)
     end
     return 'disbanded'
   end
@@ -220,6 +229,7 @@ export async function leaveParty(partyId: string, userId: number): Promise<'left
     userId.toString(),
     PARTY_TTL,
     PLAYER_PARTY_PREFIX,
+    partyId,
   );
   return result === 'disbanded' ? 'disbanded' : 'left';
 }
@@ -259,7 +269,9 @@ const KICK_FROM_PARTY_LUA = `
   end
 
   party.members = newMembers
-  redis.call('DEL', targetPlayerKey)
+  if redis.call('GET', targetPlayerKey) == party.id then
+    redis.call('DEL', targetPlayerKey)
+  end
   redis.call('SET', partyKey, cjson.encode(party), 'EX', ttl)
   return cjson.encode(party)
 `;
@@ -285,6 +297,47 @@ export async function kickFromParty(
     code: 'PARTY_KICK_FAILED',
   });
   return JSON.parse(json) as Party;
+}
+
+// Extend the TTL of a party and of every member pointer that still names it.
+// KEYS[1] = party key; ARGV[1] = ttl, ARGV[2] = player pointer prefix
+// Returns 1 when the party exists, 0 otherwise.
+const TOUCH_PARTY_LUA = `
+  local partyData = redis.call('GET', KEYS[1])
+  if not partyData then
+    return 0
+  end
+  local ttl = tonumber(ARGV[1])
+  local party = cjson.decode(partyData)
+  redis.call('EXPIRE', KEYS[1], ttl)
+  for _, m in ipairs(party.members) do
+    local key = ARGV[2] .. m.userId
+    if redis.call('GET', key) == party.id then
+      redis.call('EXPIRE', key, ttl)
+    end
+  end
+  return 1
+`;
+
+/**
+ * Keep live parties alive. The party key and the member pointers carry a 1 h TTL that used to be
+ * refreshed only when membership changed, so a party that simply played together for an hour
+ * expired underneath its members. Called from the presence heartbeat for every party a connected
+ * socket belongs to.
+ */
+export async function touchParties(partyIds: string[]): Promise<void> {
+  if (partyIds.length === 0) return;
+  const pipeline = getRedis().pipeline();
+  for (const partyId of partyIds) {
+    pipeline.eval(
+      TOUCH_PARTY_LUA,
+      1,
+      `${PARTY_KEY_PREFIX}${partyId}`,
+      PARTY_TTL,
+      PLAYER_PARTY_PREFIX,
+    );
+  }
+  await pipeline.exec();
 }
 
 // Invite management via Redis with TTL

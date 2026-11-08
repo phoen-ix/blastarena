@@ -7,7 +7,7 @@ import { TileType, Position, Direction, wrapX, wrapY } from '@blast-arena/shared
  * bomb arena: a wall. One hash lookup now, same membership. `lava` is deliberately absent
  * (impassable like a wall). (audit COLLISION-HOTPATH-1)
  */
-const WALKABLE: ReadonlySet<TileType> = new Set<TileType>([
+export const WALKABLE: ReadonlySet<TileType> = new Set<TileType>([
   'empty',
   'spawn',
   'teleporter_a',

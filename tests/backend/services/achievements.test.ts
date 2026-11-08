@@ -657,9 +657,81 @@ describe('Achievements Service', () => {
 
         expect(result.achievements).toHaveLength(1);
       });
+
+      it('requireWin: a lost game does not unlock "Pacifist Win" / "Speed Demon"', async () => {
+        // The stat alone was tested, so a loss without self-kills or a 30 s death unlocked them
+        const pacifist = makeAchievementRow({
+          id: 11,
+          condition_type: 'per_game',
+          condition_config: JSON.stringify({
+            stat: 'self_kills',
+            operator: '==',
+            threshold: 0,
+            requireWin: true,
+          }),
+        });
+        const speed = makeAchievementRow({
+          id: 12,
+          condition_type: 'per_game',
+          condition_config: JSON.stringify({
+            stat: 'survived_seconds',
+            operator: '<=',
+            threshold: 60,
+            requireWin: true,
+          }),
+        });
+        mockQuery.mockResolvedValueOnce([pacifist, speed]);
+        const lost = await evaluateAfterGame(
+          makeGameData({ isWinner: false, selfKills: 0, survivedSeconds: 30 }),
+        );
+        expect(lost.achievements).toHaveLength(0);
+
+        mockQuery.mockResolvedValueOnce([pacifist, speed]);
+        mockExecute.mockResolvedValue({});
+        const won = await evaluateAfterGame(
+          makeGameData({ isWinner: true, selfKills: 0, survivedSeconds: 30 }),
+        );
+        expect(won.achievements.map((a) => a.id)).toEqual([11, 12]);
+      });
     });
 
     describe('mode_specific condition', () => {
+      it('counts wins by is_winner over finished matches only', async () => {
+        // Wins were placement = 1 (a draw's shared first place counted, aborted matches too)
+        const achRow = makeAchievementRow({
+          condition_type: 'mode_specific',
+          condition_config: JSON.stringify({ mode: 'ffa', stat: 'wins', threshold: 5 }),
+        });
+        mockQuery.mockResolvedValueOnce([achRow]).mockResolvedValueOnce([{ total: 1 }]);
+        await evaluateAfterGame(makeGameData({ gameMode: 'ffa' }));
+        const sql = mockQuery.mock.calls[1][0] as string;
+        expect(sql).toContain('mp.is_winner = TRUE');
+        expect(sql).not.toContain('placement');
+        expect(sql).toContain("m.status = 'finished'");
+      });
+
+      it('counts matches and kills over finished matches only', async () => {
+        mockQuery
+          .mockResolvedValueOnce([
+            makeAchievementRow({
+              id: 1,
+              condition_type: 'mode_specific',
+              condition_config: JSON.stringify({ mode: 'ffa', stat: 'matches', threshold: 50 }),
+            }),
+            makeAchievementRow({
+              id: 2,
+              condition_type: 'mode_specific',
+              condition_config: JSON.stringify({ mode: 'ffa', stat: 'kills', threshold: 50 }),
+            }),
+          ])
+          .mockResolvedValue([{ total: 1 }]);
+        await evaluateAfterGame(makeGameData({ gameMode: 'ffa' }));
+        expect(mockQuery.mock.calls.slice(1).map((c) => c[0] as string)).toEqual([
+          expect.stringContaining("m.status = 'finished'"),
+          expect.stringContaining("m.status = 'finished'"),
+        ]);
+      });
+
       it('should unlock when mode matches and stat meets threshold', async () => {
         const achRow = makeAchievementRow({
           id: 8,

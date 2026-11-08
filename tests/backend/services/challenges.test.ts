@@ -14,11 +14,15 @@ vi.mock('../../../backend/src/db/connection', () => ({
   withTransaction: mockWithTransaction,
 }));
 
+const mockGetSetting = vi.hoisted(() => vi.fn<(key: string) => Promise<string | null>>());
+vi.mock('../../../backend/src/services/settings', () => ({ getSetting: mockGetSetting }));
+
 import {
   activateChallenge,
   createChallenge,
   deactivateChallenge,
   deleteChallenge,
+  recordChallengeResult,
   updateChallenge,
 } from '../../../backend/src/services/challenges';
 
@@ -26,6 +30,7 @@ beforeEach(() => {
   mockQuery.mockReset();
   mockExecute.mockReset();
   mockConnExecute.mockReset();
+  mockGetSetting.mockReset().mockResolvedValue('true');
 });
 
 describe('challenge admin service', () => {
@@ -98,5 +103,51 @@ describe('challenge admin service', () => {
     mockQuery.mockResolvedValueOnce([]);
     await expect(deactivateChallenge(5)).rejects.toMatchObject({ statusCode: 404 });
     expect(mockExecute).toHaveBeenCalledTimes(1); // only the DELETE above
+  });
+});
+
+describe('recordChallengeResult', () => {
+  it('only records for an active challenge, inside its dates, in its game mode', async () => {
+    // The challenge's mode and dates were ignored: every match on the map counted, any time
+    mockExecute.mockResolvedValue({ affectedRows: 1 });
+    await recordChallengeResult(3, 7, true, 2, 1, 1, { gameMode: 'teams' });
+
+    const [sql, params] = mockExecute.mock.calls[0];
+    expect(sql).toMatch(/INSERT INTO challenge_scores[\s\S]*SELECT[\s\S]*FROM map_challenges mc/);
+    expect(sql).toContain('mc.is_active = TRUE');
+    expect(sql).toContain('? BETWEEN mc.start_date AND mc.end_date');
+    expect(sql).toContain('(? IS NULL OR mc.game_mode = ?)');
+    const today = new Date().toISOString().slice(0, 10);
+    expect(params).toEqual([7, 1, 2, 1, 1, 3, today, 'teams', 'teams']);
+  });
+
+  it('without a game mode the mode is not checked', async () => {
+    mockExecute.mockResolvedValue({ affectedRows: 1 });
+    await recordChallengeResult(3, 7, false, 0, 1, 2);
+    expect(mockExecute.mock.calls[0][1].slice(-2)).toEqual([null, null]);
+  });
+
+  it('records nothing while challenges are disabled', async () => {
+    mockGetSetting.mockResolvedValue('false');
+    await recordChallengeResult(3, 7, true, 2, 1, 1, { gameMode: 'ffa' });
+    expect(mockGetSetting).toHaveBeenCalledWith('challenges_enabled');
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
+
+  it('a placement of 0 or none is not a best placement', async () => {
+    // GameRoom's `placement || 0` made 0 everyone's best placement
+    mockExecute.mockResolvedValue({ affectedRows: 1 });
+    await recordChallengeResult(3, 7, false, 0, 1, 0);
+    await recordChallengeResult(3, 7, false, 0, 1, null);
+    for (const [sql, params] of mockExecute.mock.calls) {
+      expect(params[4]).toBeNull();
+      // and a NULL leaves the stored best as it was
+      expect(sql).toContain('WHEN VALUES(best_placement) IS NULL THEN best_placement');
+    }
+  });
+
+  it('never writes a bot id', async () => {
+    await recordChallengeResult(3, -1, true, 2, 1, 1);
+    expect(mockExecute).not.toHaveBeenCalled();
   });
 });

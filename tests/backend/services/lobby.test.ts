@@ -227,7 +227,25 @@ describe('lobby service', () => {
 
       await createRoom(host as any, 'Test Room', config as any);
 
-      expect(mockRedis.set).toHaveBeenCalledWith('room:ABCDEF', expect.any(String), 'EX', 3600);
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        'room:ABCDEF',
+        expect.any(String),
+        'EX',
+        3600,
+        'NX',
+      );
+    });
+
+    it('never overwrites a live room: a taken code is retried, not replaced', async () => {
+      mockRedis.set.mockResolvedValueOnce(null); // NX refused: the code is in use
+
+      await createRoom(makeUser(1, 'alice') as any, 'Test Room', makeConfig() as any);
+
+      const roomWrites = mockRedis.set.mock.calls.filter((c: unknown[]) =>
+        String(c[0]).startsWith('room:'),
+      );
+      expect(roomWrites).toHaveLength(2);
+      expect(roomWrites.every((c: unknown[]) => c[4] === 'NX')).toBe(true);
     });
 
     it('returns room with generated 6-char code', async () => {
