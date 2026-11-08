@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { i18n } from '../i18n';
+import { isSupportedLanguage } from '@blast-arena/shared';
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -12,9 +12,9 @@ export function localeMiddleware(req: Request, _res: Response, next: NextFunctio
   const acceptLang = req.headers['accept-language']?.split(',')[0]?.split('-')[0];
 
   const requested = headerLang || acceptLang || 'en';
-  const supported = i18n.languages || ['en'];
-  const locale = supported.includes(requested) ? requested : 'en';
-
-  req.locale = locale;
+  // The supported list, not i18n.languages: that is the current language's fallback chain, which
+  // is ['en'] on the server, so every request was 'en' and every email sent over REST (sign-up,
+  // email change, test mail) went out in English. (audit H1)
+  req.locale = isSupportedLanguage(requested) ? requested : 'en';
   next();
 }

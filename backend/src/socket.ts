@@ -18,6 +18,7 @@ import {
   EMOTES,
   EMOTE_COOLDOWN_MS,
   SPECTATOR_CHAT_MAX_LENGTH,
+  isSupportedLanguage,
 } from '@blast-arena/shared';
 import {
   setupFriendHandlers,
@@ -27,7 +28,7 @@ import {
 } from './handlers/friendHandlers';
 import {
   setupPartyHandlers,
-  handlePartyDisconnect,
+  schedulePartyLeave,
   cleanupPartyLimiters,
 } from './handlers/partyHandlers';
 import { setupLobbyHandlers, cleanupLobbyLimiters } from './handlers/lobbyHandlers';
@@ -53,6 +54,8 @@ import {
   allowGuestPacket,
   guestPacketLabel,
   sanitizeGuestUsername,
+  ROOM_CODE_REGEX,
+  campaignStartSchema,
 } from './utils/socketValidation';
 import { query } from './db/connection';
 import { AppError } from './middleware/errorHandler';
@@ -106,6 +109,11 @@ function requireRoom(
     return null;
   }
   return roomCode;
+}
+
+/** The handshake's locale when it is a supported language (it was taken as any value). */
+function handshakeLocale(value: unknown): string {
+  return isSupportedLanguage(value) ? value : 'en';
 }
 
 // Rematch vote tracking per room
@@ -175,7 +183,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         socket.data.userId = 0; // Placeholder, assigned on join
         socket.data.username = '';
         socket.data.role = 'user';
-        socket.data.locale = (socket.handshake.auth.locale as string) || 'en';
+        socket.data.locale = handshakeLocale(socket.handshake.auth.locale);
         socket.data.isGuest = true;
         return next();
       } catch {
@@ -192,7 +200,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
       // Check email verification status from database
       const rows = await query<UserRow[]>(
-        'SELECT email_verified, is_deactivated, role FROM users WHERE id = ?',
+        'SELECT username, email_verified, is_deactivated, role FROM users WHERE id = ?',
         [payload.userId],
       );
       if (rows.length === 0) {
@@ -206,9 +214,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       }
 
       socket.data.userId = payload.userId;
-      socket.data.username = payload.username;
+      // From the DB, like the role: the token's name is up to 15 minutes old, so a renamed user
+      // kept chatting under the old name, which someone else could already have taken. (audit R1)
+      socket.data.username = rows[0].username;
       socket.data.role = rows[0].role as UserRole;
-      socket.data.locale = (socket.handshake.auth.locale as string) || 'en';
+      socket.data.locale = handshakeLocale(socket.handshake.auth.locale);
       socket.data.isGuest = false;
       next();
     } catch (err) {
@@ -282,6 +292,82 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     for (const userId of real) void notifyFriendsOnline(io, userId, status, joinable);
   }
 
+  type RematchVote = NonNullable<ReturnType<typeof rematchVotes.get>>;
+
+  /** Broadcast a room's rematch vote; returns whether the yes votes now reach the threshold. */
+  function emitRematchUpdate(roomCode: string, voteState: RematchVote): boolean {
+    const threshold = Math.floor(voteState.humanPlayerIds.size / 2) + 1;
+    const votes = [...voteState.votes.entries()].map(([userId, v]) => ({
+      userId,
+      username: v.username,
+      vote: v.vote,
+    }));
+    io.to(`room:${roomCode}`).emit('rematch:update', {
+      votes,
+      threshold,
+      totalPlayers: voteState.humanPlayerIds.size,
+    });
+    return votes.filter((v) => v.vote).length >= threshold;
+  }
+
+  /**
+   * Start the rematch: the room goes back to waiting atomically, as it is now (not as it was read
+   * before the vote, so a player who left meanwhile is not written back in). (audit K4)
+   */
+  async function triggerRematch(roomCode: string): Promise<void> {
+    const voteState = rematchVotes.get(roomCode);
+    if (voteState) clearTimeout(voteState.timeout);
+    rematchVotes.delete(roomCode);
+    const resetRoom = await lobbyService.resetFinishedRoom(roomCode);
+    roomManager.removeRoom(roomCode);
+    io.to(`room:${roomCode}`).emit('rematch:triggered');
+    io.to(`room:${roomCode}`).emit('room:state', resetRoom);
+    broadcastRoomList();
+    publishPresence(
+      resetRoom.players.map((p) => p.user.id),
+      'in_lobby',
+      { roomCode },
+    );
+  }
+
+  /**
+   * A player left the room: they no longer count toward its rematch vote. Only voters used to be
+   * removed, so a player who left without voting kept the threshold out of reach. The remaining
+   * yes votes may now be enough. (audit K2)
+   */
+  function dropRematchVoter(roomCode: string, userId: number): void {
+    const voteState = rematchVotes.get(roomCode);
+    if (!voteState || !voteState.humanPlayerIds.has(userId)) return;
+    voteState.votes.delete(userId);
+    voteState.humanPlayerIds.delete(userId);
+    if (voteState.humanPlayerIds.size === 0) {
+      clearTimeout(voteState.timeout);
+      rematchVotes.delete(roomCode);
+      return;
+    }
+    if (emitRematchUpdate(roomCode, voteState)) {
+      triggerRematch(roomCode).catch((err: unknown) => {
+        logger.error({ err: getErrorMessage(err), roomCode }, 'Rematch after a leave failed');
+      });
+    }
+  }
+
+  /**
+   * Take a user out of a lobby room and tell everyone still in it. The one place for this: there
+   * were four copies (leave, disconnect, admin kick, stale-room cleanup) and they had drifted —
+   * the stale-room cleanup told nobody, leaving a ghost (and, for a host, no Start button) in the
+   * old room, and only some copies kept the rematch vote in step. (audit K12)
+   */
+  async function removeFromRoom(roomCode: string, userId: number): Promise<void> {
+    const room = await lobbyService.leaveRoom(roomCode, userId);
+    if (room) {
+      io.to(`room:${roomCode}`).emit('room:playerLeft', userId);
+      io.to(`room:${roomCode}`).emit('room:state', room);
+    }
+    dropRematchVoter(roomCode, userId);
+    broadcastRoomList();
+  }
+
   /** Clean up stale room membership (e.g. player refreshed during a game) */
   async function cleanupStaleRoom(
     socket: Parameters<Parameters<typeof io.on<'connection'>>[1]>[0],
@@ -300,8 +386,8 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     if (existingGameRoom && existingGameRoom.isRunning()) {
       existingGameRoom.handlePlayerDisconnect(socket.data.userId);
     }
-    await lobbyService.leaveRoom(existingRoom, socket.data.userId);
     void socket.leave(`room:${existingRoom}`);
+    await removeFromRoom(existingRoom, socket.data.userId);
   }
 
   /**
@@ -336,7 +422,17 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       const existingRoomCode = await lobbyService.getPlayerRoom(socket.data.userId);
       if (existingRoomCode) {
         const gameRoom = roomManager.getRoom(existingRoomCode);
-        if (gameRoom && gameRoom.isRunning() && gameRoom.isPlayerDisconnected(socket.data.userId)) {
+        // Resume also when the server has not noticed the old connection die yet (the ping
+        // timeout takes up to ~45 s): requiring isPlayerDisconnected() skipped the resume after a
+        // fast reconnect, and the player was later killed by the old socket's disconnect. That
+        // later disconnect now finds this socket holding the room and leaves the game alone.
+        // (audit K10)
+        if (
+          gameRoom &&
+          gameRoom.isRunning() &&
+          (gameRoom.isPlayerDisconnected(socket.data.userId) ||
+            gameRoom.isPlayerAlive(socket.data.userId))
+        ) {
           // Rejoin socket room and resume game
           void socket.join(`room:${existingRoomCode}`);
           socket.data.activeRoomCode = existingRoomCode;
@@ -501,13 +597,15 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       // the caller waiting forever. (audit SOCKET-TRYCATCH-2)
       if (!joinLimiter(socket.id) || !ipJoinLimiter(clientIp))
         return callback({ success: false, error: 'Rate limited' });
-      if (typeof data.code !== 'string' || data.code.length === 0 || data.code.length > 20) {
+      // Room codes are six uppercase hex/alphanumeric characters; anything else cannot exist.
+      const code = typeof data.code === 'string' ? data.code.trim().toUpperCase() : '';
+      if (!ROOM_CODE_REGEX.test(code)) {
         return callback({ success: false, error: 'Invalid room code' });
       }
       try {
         await cleanupStaleRoom(socket);
 
-        const room = await lobbyService.joinRoom(data.code, currentUser);
+        const room = await lobbyService.joinRoom(code, currentUser);
         void socket.join(`room:${room.code}`);
         socket.data.activeRoomCode = room.code;
         socket
@@ -541,40 +639,10 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           gameRoom.handlePlayerLeave(socket.data.userId);
         }
 
-        const room = await lobbyService.leaveRoom(roomCode, socket.data.userId);
         void socket.leave(`room:${roomCode}`);
         socket.data.activeRoomCode = undefined;
-        if (room) {
-          io.to(`room:${roomCode}`).emit('room:playerLeft', socket.data.userId);
-          io.to(`room:${roomCode}`).emit('room:state', room);
-        }
+        await removeFromRoom(roomCode, socket.data.userId);
         publishPresence([socket.data.userId], 'in_lobby');
-
-        // Clean up rematch votes for the leaving player
-        for (const [code, voteState] of rematchVotes) {
-          if (voteState.votes.has(socket.data.userId)) {
-            voteState.votes.delete(socket.data.userId);
-            voteState.humanPlayerIds.delete(socket.data.userId);
-            if (voteState.humanPlayerIds.size === 0) {
-              clearTimeout(voteState.timeout);
-              rematchVotes.delete(code);
-            } else {
-              const threshold = Math.floor(voteState.humanPlayerIds.size / 2) + 1;
-              const votesArray = [...voteState.votes.entries()].map(([userId, v]) => ({
-                userId,
-                username: v.username,
-                vote: v.vote,
-              }));
-              io.to(`room:${code}`).emit('rematch:update', {
-                votes: votesArray,
-                threshold,
-                totalPlayers: voteState.humanPlayerIds.size,
-              });
-            }
-          }
-        }
-
-        broadcastRoomList();
       } catch (err: unknown) {
         logger.error({ err, userId: socket.data.userId }, 'Error leaving room');
       }
@@ -783,42 +851,9 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           vote: parsed.vote,
         });
 
-        const threshold = Math.floor(voteState.humanPlayerIds.size / 2) + 1;
-        const yesVotes = [...voteState.votes.values()].filter((v) => v.vote).length;
-
-        const votesArray = [...voteState.votes.entries()].map(([userId, v]) => ({
-          userId,
-          username: v.username,
-          vote: v.vote,
-        }));
-
-        io.to(`room:${roomCode}`).emit('rematch:update', {
-          votes: votesArray,
-          threshold,
-          totalPlayers: voteState.humanPlayerIds.size,
-        });
-
+        const thresholdMet = emitRematchUpdate(roomCode, voteState);
         callback({ success: true });
-
-        // Check if threshold met
-        if (yesVotes >= threshold) {
-          clearTimeout(voteState.timeout);
-          rematchVotes.delete(roomCode);
-
-          // Same atomic reset as room:restart: the room as it is now, not the copy read before
-          // the vote, so a player who left meanwhile is not written back in. (audit K4)
-          const resetRoom = await lobbyService.resetFinishedRoom(roomCode);
-          roomManager.removeRoom(roomCode);
-
-          io.to(`room:${roomCode}`).emit('rematch:triggered');
-          io.to(`room:${roomCode}`).emit('room:state', resetRoom);
-          broadcastRoomList();
-          publishPresence(
-            resetRoom.players.map((p) => p.user.id),
-            'in_lobby',
-            { roomCode },
-          );
-        }
+        if (thresholdMet) await triggerRematch(roomCode);
       } catch (err: unknown) {
         callback({ success: false, error: clientError(err) });
       }
@@ -1042,8 +1077,6 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           gameRoom.handlePlayerLeave(parsed.userId);
         }
 
-        const room = await lobbyService.leaveRoom(parsed.roomCode, parsed.userId);
-
         // Find target socket and notify
         const sockets = await io.in(`room:${parsed.roomCode}`).fetchSockets();
         for (const s of sockets) {
@@ -1054,11 +1087,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           }
         }
 
-        if (room) {
-          io.to(`room:${parsed.roomCode}`).emit('room:playerLeft', parsed.userId);
-          io.to(`room:${parsed.roomCode}`).emit('room:state', room);
-        }
-        broadcastRoomList();
+        await removeFromRoom(parsed.roomCode, parsed.userId);
 
         await logAdminAction(
           socket.data.userId,
@@ -1336,11 +1365,14 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
     });
 
     // Campaign: start level (solo, online co-op, or local co-op)
-    socket.on('campaign:start', async (data, callback) => {
+    socket.on('campaign:start', async (rawData, callback) => {
       callback = ackOf(callback);
       if (!campaignStartLimiter.isAllowed(socket.id)) {
         return callback({ success: false, error: 'Too many requests, please wait' });
       }
+      // Bounded and typed: the local P2 name was unbounded and the guest colour any type.
+      const data = validateSocket(campaignStartSchema, rawData, callback);
+      if (!data) return;
       try {
         const campaignManager = getCampaignGameManager();
 
@@ -2007,29 +2039,8 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         const roomHeldElsewhere =
           !!roomCode && others.some((s) => s.data.activeRoomCode === roomCode);
 
-        // Clean up rematch votes for the disconnecting player
-        for (const [code, voteState] of roomHeldElsewhere ? [] : rematchVotes) {
-          if (voteState.votes.has(socket.data.userId)) {
-            voteState.votes.delete(socket.data.userId);
-            voteState.humanPlayerIds.delete(socket.data.userId);
-            if (voteState.humanPlayerIds.size === 0) {
-              clearTimeout(voteState.timeout);
-              rematchVotes.delete(code);
-            } else {
-              const threshold = Math.floor(voteState.humanPlayerIds.size / 2) + 1;
-              const votesArray = [...voteState.votes.entries()].map(([userId, v]) => ({
-                userId,
-                username: v.username,
-                vote: v.vote,
-              }));
-              io.to(`room:${code}`).emit('rematch:update', {
-                votes: votesArray,
-                threshold,
-                totalPlayers: voteState.humanPlayerIds.size,
-              });
-            }
-          }
-        }
+        // The disconnecting player no longer counts toward the room's rematch vote
+        if (roomCode && !roomHeldElsewhere) dropRematchVoter(roomCode, socket.data.userId);
 
         if (lastTab) {
           emoteLastUsed.delete(socket.data.userId);
@@ -2040,10 +2051,11 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           void notifyFriendsOffline(io, socket.data.userId);
         }
 
-        // Handle party disconnect (leave/disband) — unless another tab is still in the party
+        // Party: unless another tab is still in it, leave after a grace period, so a refresh or a
+        // short drop keeps the party (restoreSession rejoins it). (audit K5)
         const partyId = socket.data.activePartyId;
         if (partyId && !others.some((s) => s.data.activePartyId === partyId)) {
-          await handlePartyDisconnect(socket, io);
+          schedulePartyLeave(io, socket.data.userId, partyId);
         }
 
         // Clean up campaign session
@@ -2071,12 +2083,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
             gameRoom.handlePlayerDisconnect(socket.data.userId);
           } else {
             // No active game — leave room normally
-            const room = await lobbyService.leaveRoom(roomCode, socket.data.userId);
-            if (room) {
-              io.to(`room:${roomCode}`).emit('room:playerLeft', socket.data.userId);
-              io.to(`room:${roomCode}`).emit('room:state', room);
-            }
-            broadcastRoomList();
+            await removeFromRoom(roomCode, socket.data.userId);
           }
         }
       } catch (err) {
@@ -2099,6 +2106,8 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
   const cleanupInterval = setInterval(() => {
     roomManager.cleanup();
     getSimulationManager().cleanup();
+    // Keyed by client IP, not socket, so no disconnect ever removed an entry: one per IP forever.
+    openWorldJoinIpLimiter.cleanup();
   }, ROOM_CLEANUP_INTERVAL_MS);
 
   // Keep presence alive for everyone currently connected. Presence keys expire after 120s so an
@@ -2107,11 +2116,18 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
   // to their friends while still playing. (audit PRESENCE-TTL-1)
   const presenceInterval = setInterval(() => {
     const userIds = new Set<number>();
+    const partyIds = new Set<string>();
     for (const s of io.sockets.sockets.values()) {
       if (!s.data.isGuest && s.data.userId > 0) userIds.add(s.data.userId);
+      if (s.data.activePartyId) partyIds.add(s.data.activePartyId);
     }
     presenceService.refreshPresenceBatch([...userIds]).catch((err) => {
       logger.warn({ err: getErrorMessage(err) }, 'Presence heartbeat failed');
+    });
+    // Party keys carry a 1 h TTL that was only refreshed on membership changes, so a party that
+    // simply played together for an hour expired under its members. (audit K6)
+    partyService.touchParties([...partyIds]).catch((err) => {
+      logger.warn({ err: getErrorMessage(err) }, 'Party heartbeat failed');
     });
   }, PRESENCE_HEARTBEAT_MS);
 

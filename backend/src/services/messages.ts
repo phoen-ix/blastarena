@@ -123,11 +123,13 @@ export async function getConversationList(userId: number): Promise<DMConversatio
   }));
 }
 
-export async function markRead(recipientId: number, senderId: number): Promise<void> {
-  await execute(
+/** Marks a sender's messages read; returns how many were unread. */
+export async function markRead(recipientId: number, senderId: number): Promise<number> {
+  const result = await execute(
     'UPDATE direct_messages SET read_at = NOW() WHERE recipient_id = ? AND sender_id = ? AND read_at IS NULL',
     [recipientId, senderId],
   );
+  return result.affectedRows;
 }
 
 function toDirectMessage(row: DirectMessageRow): DirectMessage {

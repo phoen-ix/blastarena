@@ -370,10 +370,14 @@ describe('IsolatedAIRunner — incremental tile sync', () => {
     );
     try {
       expect(out!.direction).toBe('up');
+      // One decision per tick, as in a game: the per-tick AI budget would otherwise count a cold
+      // isolate's slow first call against the later ones.
+      gs.tick++;
       // Guest scribbling on state.map.tiles must not stick (rows are frozen)…
       expect(ai.generateInput(self, gs)!.direction).toBe('up');
       // …but a tracked host change arrives as a diff
       gs.setTileTracked(3, 3, 'ice');
+      gs.tick++;
       expect(ai.generateInput(self, gs)!.direction).toBe('down');
       expect((ai as unknown as { tileLogIndex: number }).tileLogIndex).toBe(
         gs.tileChangeLog.length,

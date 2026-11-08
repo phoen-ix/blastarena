@@ -1,7 +1,7 @@
 import { query, execute, withTransaction } from '../db/connection';
 import { FriendshipRow, UserBlockRow, CountRow, UserRow } from '../db/types';
 import { Friend, FriendRequest, MAX_FRIENDS, ActivityStatus } from '@blast-arena/shared';
-import { PoolConnection, RowDataPacket } from 'mysql2/promise';
+import { PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import * as presenceService from './presence';
 import { AppError } from '../middleware/errorHandler';
 
@@ -10,7 +10,17 @@ interface UserSearchRow extends RowDataPacket {
   username: string;
 }
 
-export async function sendFriendRequest(fromUserId: number, toUsername: string): Promise<number> {
+/** Outgoing requests one user may have pending at a time (they were unbounded). */
+export const MAX_PENDING_FRIEND_REQUESTS = 50;
+
+/**
+ * Sends a friend request, or accepts the target's pending request to us instead (`accepted`):
+ * the caller must then announce a new friendship, not a request. (audit K9)
+ */
+export async function sendFriendRequest(
+  fromUserId: number,
+  toUsername: string,
+): Promise<{ targetUserId: number; accepted: boolean }> {
   // Look up target user
   const [targetUser] = await query<UserRow[]>(
     'SELECT id, username, accept_friend_requests FROM users WHERE username = ? AND is_deactivated = 0',
@@ -41,18 +51,19 @@ export async function sendFriendRequest(fromUserId: number, toUsername: string):
   // wins; the other is rolled back by InnoDB as a deadlock and told to retry — its retry then
   // sees the incoming request and auto-accepts. (audit B11)
   try {
-    await sendFriendRequestLocked(fromUserId, targetUser.id);
+    const accepted = await sendFriendRequestLocked(fromUserId, targetUser.id);
+    return { targetUserId: targetUser.id, accepted };
   } catch (err) {
     if ((err as { code?: unknown } | null)?.code === 'ER_LOCK_DEADLOCK') {
       throw new AppError('Friend request already in progress, please retry', 409, 'RETRY');
     }
     throw err;
   }
-  return targetUser.id;
 }
 
-async function sendFriendRequestLocked(fromUserId: number, targetUserId: number): Promise<void> {
-  await withTransaction(async (conn) => {
+/** Returns true when an incoming request was accepted instead of a new one being sent. */
+async function sendFriendRequestLocked(fromUserId: number, targetUserId: number): Promise<boolean> {
+  return withTransaction(async (conn) => {
     // Check existing friendship
     const [existingRows] = await conn.query<FriendshipRow[]>(
       'SELECT id, status FROM friendships WHERE user_id = ? AND friend_id = ? FOR UPDATE',
@@ -72,11 +83,19 @@ async function sendFriendRequestLocked(fromUserId: number, targetUserId: number)
     );
     if (incomingRows[0]) {
       await acceptWithin(conn, fromUserId, targetUserId);
-      return;
+      return true;
     }
 
     // Check max friends
     await assertFriendCapacity(conn, fromUserId);
+
+    const [pendingRows] = await conn.query<CountRow[]>(
+      'SELECT COUNT(*) AS total FROM friendships WHERE user_id = ? AND status = ?',
+      [fromUserId, 'pending'],
+    );
+    if (Number(pendingRows[0]?.total ?? 0) >= MAX_PENDING_FRIEND_REQUESTS) {
+      throw new AppError('Too many pending friend requests', 429, 'TOO_MANY_PENDING');
+    }
 
     // Insert pending request
     await conn.execute('INSERT INTO friendships (user_id, friend_id, status) VALUES (?, ?, ?)', [
@@ -84,6 +103,7 @@ async function sendFriendRequestLocked(fromUserId: number, targetUserId: number)
       targetUserId,
       'pending',
     ]);
+    return false;
   });
 }
 
@@ -156,20 +176,23 @@ export async function cancelFriendRequest(userId: number, toUserId: number): Pro
   }
 }
 
-export async function removeFriend(userId: number, friendId: number): Promise<void> {
-  await withTransaction(async (conn) => {
-    await conn.execute('DELETE FROM friendships WHERE user_id = ? AND friend_id = ?', [
-      userId,
-      friendId,
-    ]);
-    await conn.execute('DELETE FROM friendships WHERE user_id = ? AND friend_id = ?', [
-      friendId,
-      userId,
-    ]);
+/** Returns whether there was a friendship (or request) between the two to remove. */
+export async function removeFriend(userId: number, friendId: number): Promise<boolean> {
+  return withTransaction(async (conn) => {
+    const [a] = await conn.execute<ResultSetHeader>(
+      'DELETE FROM friendships WHERE user_id = ? AND friend_id = ?',
+      [userId, friendId],
+    );
+    const [b] = await conn.execute<ResultSetHeader>(
+      'DELETE FROM friendships WHERE user_id = ? AND friend_id = ?',
+      [friendId, userId],
+    );
+    return a.affectedRows + b.affectedRows > 0;
   });
 }
 
-export async function blockUser(blockerId: number, blockedId: number): Promise<void> {
+/** Returns whether a friendship (or request) between the two was removed by the block. */
+export async function blockUser(blockerId: number, blockedId: number): Promise<boolean> {
   if (blockerId === blockedId) {
     throw new AppError('Cannot block yourself', 400, 'INVALID_TARGET');
   }
@@ -182,9 +205,9 @@ export async function blockUser(blockerId: number, blockedId: number): Promise<v
     throw new AppError('User not found', 404, 'USER_NOT_FOUND');
   }
 
-  await withTransaction(async (conn) => {
+  return withTransaction(async (conn) => {
     // Remove any existing friendship
-    await conn.execute(
+    const [removed] = await conn.execute<ResultSetHeader>(
       'DELETE FROM friendships WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)',
       [blockerId, blockedId, blockedId, blockerId],
     );
@@ -193,6 +216,7 @@ export async function blockUser(blockerId: number, blockedId: number): Promise<v
       blockerId,
       blockedId,
     ]);
+    return removed.affectedRows > 0;
   });
 }
 

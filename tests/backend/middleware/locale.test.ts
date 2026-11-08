@@ -1,11 +1,9 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 type AnyFn = (...args: any[]) => any;
 
-const mockLanguages = vi.hoisted(() => ['en', 'de', 'fr', 'es', 'ja']);
-vi.mock('../../../backend/src/i18n', () => ({
-  i18n: { languages: mockLanguages },
-}));
-
+// No i18n mock: the middleware checks the shared SUPPORTED_LANGUAGES list. It used to read
+// i18n.languages (the fallback chain, ['en'] on the server), which a mocked five-language list
+// here hid — every real request came out 'en'. (audit H1)
 import { localeMiddleware } from '../../../backend/src/middleware/locale';
 
 function createMockRes() {
@@ -52,6 +50,14 @@ describe('localeMiddleware', () => {
     localeMiddleware(req, mockRes, mockNext);
 
     expect(req.locale).toBe('en');
+  });
+
+  it('accepts every supported language, not only the first', () => {
+    for (const lang of ['it', 'pt', 'pl', 'nl', 'tr', 'sv', 'nb', 'da']) {
+      const req = { headers: { 'x-language': lang } } as any;
+      localeMiddleware(req, mockRes, mockNext);
+      expect(req.locale).toBe(lang);
+    }
   });
 
   it('should default to en when requested language is not in supported list', () => {

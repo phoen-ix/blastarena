@@ -368,12 +368,41 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 }
 
 /** Handle party cleanup when a user disconnects */
-export async function handlePartyDisconnect(socket: TypedSocket, io: TypedServer): Promise<void> {
-  const partyId = socket.data.activePartyId;
-  if (!partyId) return;
+/**
+ * How long a party keeps a member whose last tab closed. A page refresh or a short network drop
+ * used to leave the party at once (disbanding it when the leader refreshed), so the documented
+ * party restore on reconnect never had anything to restore. (audit K5)
+ */
+export const PARTY_DISCONNECT_GRACE_MS = 30_000;
 
+const pendingPartyLeaves = new Map<number, ReturnType<typeof setTimeout>>();
+
+/**
+ * The user's last socket in `partyId` disconnected: leave the party after the grace period, unless
+ * the user has a socket in that party again by then (restoreSession puts a reconnecting socket
+ * back into its party).
+ */
+export function schedulePartyLeave(io: TypedServer, userId: number, partyId: string): void {
+  const previous = pendingPartyLeaves.get(userId);
+  if (previous) clearTimeout(previous);
+  const timer = setTimeout(() => {
+    pendingPartyLeaves.delete(userId);
+    for (const s of io.sockets.sockets.values()) {
+      if (s.data.userId === userId && s.data.activePartyId === partyId) return;
+    }
+    void leavePartyAfterDisconnect(io, userId, partyId);
+  }, PARTY_DISCONNECT_GRACE_MS);
+  timer.unref?.();
+  pendingPartyLeaves.set(userId, timer);
+}
+
+async function leavePartyAfterDisconnect(
+  io: TypedServer,
+  userId: number,
+  partyId: string,
+): Promise<void> {
   try {
-    const result = await partyService.leaveParty(partyId, socket.data.userId);
+    const result = await partyService.leaveParty(partyId, userId);
     if (result === 'disbanded') {
       io.to(`party:${partyId}`).emit('party:disbanded');
       const sockets = await io.in(`party:${partyId}`).fetchSockets();
@@ -388,7 +417,7 @@ export async function handlePartyDisconnect(socket: TypedSocket, io: TypedServer
       }
     }
   } catch (err) {
-    logger.error({ err, userId: socket.data.userId }, 'Failed to handle party disconnect');
+    logger.error({ err: getErrorMessage(err), userId }, 'Failed to handle party disconnect');
   }
 }
 

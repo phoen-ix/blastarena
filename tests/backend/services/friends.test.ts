@@ -46,10 +46,11 @@ describe('Friends Service', () => {
       connQuery
         .mockResolvedValueOnce([[]]) // existing friendship check
         .mockResolvedValueOnce([[]]) // incoming check
-        .mockResolvedValueOnce([[{ total: 5 }]]); // friend count
+        .mockResolvedValueOnce([[{ total: 5 }]]) // friend count
+        .mockResolvedValueOnce([[{ total: 0 }]]); // pending outgoing count
 
       const result = await friendsService.sendFriendRequest(1, 'bob');
-      expect(result).toBe(2);
+      expect(result).toEqual({ targetUserId: 2, accepted: false });
       expect(mockWithTransaction).toHaveBeenCalledTimes(1);
       expect(connQuery).toHaveBeenNthCalledWith(
         1,
@@ -130,6 +131,20 @@ describe('Friends Service', () => {
       expect(connExecute).not.toHaveBeenCalled();
     });
 
+    it('refuses a request beyond the pending-request cap', async () => {
+      mockQuery.mockResolvedValueOnce([{ id: 2, username: 'bob' }]).mockResolvedValueOnce([]);
+      connQuery
+        .mockResolvedValueOnce([[]]) // no existing 1->2
+        .mockResolvedValueOnce([[]]) // no incoming
+        .mockResolvedValueOnce([[{ total: 5 }]]) // friend count
+        .mockResolvedValueOnce([[{ total: friendsService.MAX_PENDING_FRIEND_REQUESTS }]]);
+
+      await expect(friendsService.sendFriendRequest(1, 'bob')).rejects.toMatchObject({
+        code: 'TOO_MANY_PENDING',
+      });
+      expect(connExecute).not.toHaveBeenCalled();
+    });
+
     it('auto-accepts an incoming pending request inside the same transaction', async () => {
       mockQuery.mockResolvedValueOnce([{ id: 2, username: 'bob' }]).mockResolvedValueOnce([]);
       connQuery
@@ -138,7 +153,10 @@ describe('Friends Service', () => {
         .mockResolvedValueOnce([[{ total: 3 }]]) // capacity of 1
         .mockResolvedValueOnce([[{ total: 3 }]]); // capacity of 2
 
-      expect(await friendsService.sendFriendRequest(1, 'bob')).toBe(2);
+      expect(await friendsService.sendFriendRequest(1, 'bob')).toEqual({
+        targetUserId: 2,
+        accepted: true,
+      });
 
       expect(mockWithTransaction).toHaveBeenCalledTimes(1);
       expect(connExecute).toHaveBeenCalledWith(

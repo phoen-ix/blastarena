@@ -118,23 +118,42 @@ const matchConfigSchema = z.object({
   roundTime: z.number().int().min(30).max(600),
   teams: z.number().int().min(2).max(2).optional(),
   wallDensity: z.number().min(0).max(1).optional(),
-  enabledPowerUps: z.array(z.enum(VALID_POWERUP_TYPES)).optional(),
+  enabledPowerUps: z.array(z.enum(VALID_POWERUP_TYPES)).max(VALID_POWERUP_TYPES.length).optional(),
   powerUpDropRate: z.number().min(0).max(1).optional(),
   botCount: z.number().int().min(0).max(7).optional(),
   botDifficulty: z.enum(['easy', 'normal', 'hard']).optional(),
-  botTeams: z.array(z.union([z.number().int().min(0).max(1), z.null()])).optional(),
+  botTeams: z
+    .array(z.union([z.number().int().min(0).max(1), z.null()]))
+    .max(8)
+    .optional(),
   friendlyFire: z.boolean().optional(),
   hazardTiles: z.boolean().optional(),
-  selectedHazardTiles: z.array(z.string()).optional(),
+  selectedHazardTiles: z.array(z.string().max(32)).max(32).optional(),
   enableMapEvents: z.boolean().optional(),
-  selectedMapEvents: z.array(z.string()).optional(),
+  selectedMapEvents: z.array(z.string().max(32)).max(32).optional(),
   reinforcedWalls: z.boolean().optional(),
   puzzleTiles: z.boolean().optional(),
-  selectedPuzzleTiles: z.array(z.string()).optional(),
+  selectedPuzzleTiles: z.array(z.string().max(32)).max(32).optional(),
   enableSpectatorActions: z.boolean().optional(),
   recordGame: z.boolean().optional(),
   botAiId: z.string().optional(),
   customMapId: z.number().int().positive().optional(),
+});
+
+/** campaign:start payload. Local P2 is a guest (name + colour) or a signed-in account (token). */
+export const campaignStartSchema = z.object({
+  levelId: z.number().int().positive(),
+  coopMode: z.boolean().optional(),
+  localCoopMode: z.boolean().optional(),
+  localP2: z
+    .object({
+      userId: z.number().int().optional(),
+      username: z.string().trim().min(1).max(32),
+      guestColor: z.number().int().min(0).max(0xffffff).optional(),
+      token: z.string().max(4096).optional(),
+    })
+    .optional(),
+  buddyMode: z.boolean().optional(),
 });
 
 export const createRoomRequestSchema = z.object({

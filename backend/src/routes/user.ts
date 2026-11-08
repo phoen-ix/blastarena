@@ -16,6 +16,7 @@ import {
   validateUsername,
   validateEmail as validateEmailFn,
   validatePassword,
+  SUPPORTED_LANGUAGES,
 } from '@blast-arena/shared';
 import { param } from '../utils/params';
 import { AppError } from '../middleware/errorHandler';
@@ -150,21 +151,6 @@ router.put(
 );
 
 // --- Language Preference ---
-
-const SUPPORTED_LANGUAGES = [
-  'en',
-  'de',
-  'fr',
-  'es',
-  'it',
-  'pt',
-  'pl',
-  'nl',
-  'tr',
-  'sv',
-  'nb',
-  'da',
-] as const;
 
 const languageSchema = z.object({
   language: z.enum(SUPPORTED_LANGUAGES),

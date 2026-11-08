@@ -134,7 +134,7 @@ describe('friendHandlers', () => {
 
   describe('friend:request', () => {
     it('sends request and emits requestReceived to target', async () => {
-      mockSendFriendRequest.mockResolvedValue(42);
+      mockSendFriendRequest.mockResolvedValue({ targetUserId: 42, accepted: false });
       const callback = vi.fn();
 
       const handler = socket._handlers['friend:request'];
@@ -150,6 +150,22 @@ describe('friendHandlers', () => {
           fromUsername: 'alice',
         }),
       );
+      expect(callback).toHaveBeenCalledWith({ success: true });
+    });
+
+    it('a request that crossed theirs announces the friendship, not a request (K9)', async () => {
+      mockSendFriendRequest.mockResolvedValue({ targetUserId: 42, accepted: true });
+      mockGetFriends.mockResolvedValue([]);
+      mockGetPendingRequests.mockResolvedValue({ incoming: [], outgoing: [] });
+      const callback = vi.fn();
+
+      await socket._handlers['friend:request']({ username: 'bob' }, callback);
+
+      const events = io._toEmit.mock.calls.map((c: unknown[]) => c[0]);
+      expect(events).not.toContain('friend:requestReceived');
+      expect(events).toContain('friend:update');
+      const targets = io.to.mock.calls.map((c: unknown[]) => c[0]);
+      expect(targets).toEqual(expect.arrayContaining(['user:1', 'user:42']));
       expect(callback).toHaveBeenCalledWith({ success: true });
     });
 
@@ -264,7 +280,7 @@ describe('friendHandlers', () => {
 
   describe('friend:remove', () => {
     it('removes and emits friend:removed to the other user', async () => {
-      mockRemoveFriend.mockResolvedValue(undefined);
+      mockRemoveFriend.mockResolvedValue(true);
       const callback = vi.fn();
 
       const handler = socket._handlers['friend:remove'];
@@ -275,11 +291,21 @@ describe('friendHandlers', () => {
       expect(io._toEmit).toHaveBeenCalledWith('friend:removed', { userId: 1 });
       expect(callback).toHaveBeenCalledWith({ success: true });
     });
+
+    it('tells nobody when there was no friendship to remove', async () => {
+      mockRemoveFriend.mockResolvedValue(false);
+      const callback = vi.fn();
+
+      await socket._handlers['friend:remove']({ friendId: 9 }, callback);
+
+      expect(io._toEmit).not.toHaveBeenCalledWith('friend:removed', expect.anything());
+      expect(callback).toHaveBeenCalledWith({ success: true });
+    });
   });
 
   describe('friend:block', () => {
     it('blocks and emits friend:removed to the blocked user', async () => {
-      mockBlockUser.mockResolvedValue(undefined);
+      mockBlockUser.mockResolvedValue(true);
       const callback = vi.fn();
 
       const handler = socket._handlers['friend:block'];

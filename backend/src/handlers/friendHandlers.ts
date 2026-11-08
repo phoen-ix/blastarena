@@ -66,15 +66,25 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
       if (!data.username || typeof data.username !== 'string') {
         return callback({ success: false, error: 'Username required' });
       }
-      const targetUserId = await friendsService.sendFriendRequest(userId, data.username.trim());
+      const { targetUserId, accepted } = await friendsService.sendFriendRequest(
+        userId,
+        data.username.trim(),
+      );
 
-      // Notify the target user if online
-      io.to(`user:${targetUserId}`).emit('friend:requestReceived', {
-        id: userId,
-        fromUserId: userId,
-        fromUsername: username,
-        createdAt: new Date().toISOString(),
-      });
+      if (accepted) {
+        // The target had already asked us: this accepted their request. Both get their new
+        // friend list; announcing a "request" here left the target a phantom request whose Accept
+        // could only fail. (audit K9)
+        await notifyFriendUpdate(io, userId);
+        await notifyFriendUpdate(io, targetUserId);
+      } else {
+        io.to(`user:${targetUserId}`).emit('friend:requestReceived', {
+          id: userId,
+          fromUserId: userId,
+          fromUsername: username,
+          createdAt: new Date().toISOString(),
+        });
+      }
 
       callback({ success: true });
     } catch (err) {
@@ -149,10 +159,10 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
     if (!friendActionLimiter.isAllowed(socket.id))
       return callback({ success: false, error: 'Rate limited' });
     try {
-      await friendsService.removeFriend(userId, data.friendId);
-
-      // Notify the removed friend
-      io.to(`user:${data.friendId}`).emit('friend:removed', { userId });
+      // Notify the removed friend — only if they were one: this pushed an event to any user id.
+      if (await friendsService.removeFriend(userId, data.friendId)) {
+        io.to(`user:${data.friendId}`).emit('friend:removed', { userId });
+      }
 
       callback({ success: true });
     } catch (err) {
@@ -168,10 +178,10 @@ export function setupFriendHandlers(socket: TypedSocket, io: TypedServer): void 
     if (!friendActionLimiter.isAllowed(socket.id))
       return callback({ success: false, error: 'Rate limited' });
     try {
-      await friendsService.blockUser(userId, data.userId);
-
-      // Notify the blocked user they've been removed (they see it as removal)
-      io.to(`user:${data.userId}`).emit('friend:removed', { userId });
+      // A blocked friend sees it as a removal; a stranger is told nothing.
+      if (await friendsService.blockUser(userId, data.userId)) {
+        io.to(`user:${data.userId}`).emit('friend:removed', { userId });
+      }
 
       callback({ success: true });
     } catch (err) {

@@ -216,8 +216,17 @@ describe('dmHandlers', () => {
   });
 
   describe('dm:read', () => {
+    it('sends no receipt when nothing was unread from that user', async () => {
+      mockMarkRead.mockResolvedValue(0);
+
+      await socket._handlers['dm:read']({ fromUserId: 5 });
+
+      expect(mockMarkRead).toHaveBeenCalledWith(1, 5);
+      expect(io._toEmit).not.toHaveBeenCalled();
+    });
+
     it('calls markRead and emits dm:read to sender', async () => {
-      mockMarkRead.mockResolvedValue(undefined);
+      mockMarkRead.mockResolvedValue(2);
 
       const handler = socket._handlers['dm:read'];
       await handler({ fromUserId: 5 });

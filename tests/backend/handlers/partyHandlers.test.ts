@@ -42,7 +42,8 @@ vi.mock('../../../backend/src/utils/logger', () => ({
 
 import {
   setupPartyHandlers,
-  handlePartyDisconnect,
+  schedulePartyLeave,
+  PARTY_DISCONNECT_GRACE_MS,
   cleanupPartyLimiters,
 } from '../../../backend/src/handlers/partyHandlers';
 
@@ -487,22 +488,45 @@ describe('partyHandlers', () => {
     });
   });
 
-  describe('handlePartyDisconnect', () => {
-    it('leaves party and broadcasts state or disbands', async () => {
-      const disconnectSocket = createMockSocket({ activePartyId: 'party-abc' });
-      mockLeaveParty.mockResolvedValue('updated');
-      const remainingParty = {
-        id: 'party-abc',
-        leaderId: 2,
-        members: [{ userId: 2, username: 'bob' }],
-      };
-      mockGetParty.mockResolvedValue(remainingParty);
+  describe('schedulePartyLeave', () => {
+    const remainingParty = {
+      id: 'party-abc',
+      leaderId: 2,
+      members: [{ userId: 2, username: 'bob' }],
+    };
 
-      await handlePartyDisconnect(disconnectSocket, io);
+    it('leaves the party once the grace period has passed', async () => {
+      vi.useFakeTimers();
+      try {
+        mockLeaveParty.mockResolvedValue('updated');
+        mockGetParty.mockResolvedValue(remainingParty);
+        const graceIo = createMockIO([]);
 
-      expect(mockLeaveParty).toHaveBeenCalledWith('party-abc', 1);
-      expect(io.to).toHaveBeenCalledWith('party:party-abc');
-      expect(io._toEmit).toHaveBeenCalledWith('party:state', remainingParty);
+        schedulePartyLeave(graceIo, 1, 'party-abc');
+        expect(mockLeaveParty).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(PARTY_DISCONNECT_GRACE_MS);
+
+        expect(mockLeaveParty).toHaveBeenCalledWith('party-abc', 1);
+        expect(graceIo._toEmit).toHaveBeenCalledWith('party:state', remainingParty);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps the party when the user is back in it before the grace ends (a refresh)', async () => {
+      vi.useFakeTimers();
+      try {
+        mockLeaveParty.mockClear();
+        const back = createMockSocket({ activePartyId: 'party-abc' });
+        const graceIo = createMockIO([back]);
+
+        schedulePartyLeave(graceIo, 1, 'party-abc');
+        await vi.advanceTimersByTimeAsync(PARTY_DISCONNECT_GRACE_MS);
+
+        expect(mockLeaveParty).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

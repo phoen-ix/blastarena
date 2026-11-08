@@ -101,7 +101,7 @@ describe('socket.ts audit fixes', () => {
 
   it('B6: the periodic cleanup interval also reaps finished simulation runners', () => {
     expect(source).toMatch(
-      /setInterval\(\(\) => \{\s*roomManager\.cleanup\(\);\s*getSimulationManager\(\)\.cleanup\(\);\s*\},\s*ROOM_CLEANUP_INTERVAL_MS\)/,
+      /setInterval\(\(\) => \{\s*roomManager\.cleanup\(\);\s*getSimulationManager\(\)\.cleanup\(\);[^}]*\},\s*ROOM_CLEANUP_INTERVAL_MS\)/,
     );
   });
 

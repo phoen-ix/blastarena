@@ -27,6 +27,7 @@ type TypedSocket = Socket<
 >;
 
 const dmChatLimiter = createSocketRateLimiter(5);
+const dmReadLimiter = createSocketRateLimiter(5);
 
 export function setupDMHandlers(socket: TypedSocket, io: TypedServer): void {
   const userId = socket.data.userId;
@@ -72,15 +73,18 @@ export function setupDMHandlers(socket: TypedSocket, io: TypedServer): void {
   });
 
   socket.on('dm:read', async (data) => {
+    if (!dmReadLimiter.isAllowed(socket.id)) return;
     const parsed = validateSocket(dmReadSchema, data);
     if (!parsed) return;
     try {
-      await messageService.markRead(userId, parsed.fromUserId);
-      // Notify sender that messages were read
-      io.to(`user:${parsed.fromUserId}`).emit('dm:read', {
-        fromUserId: userId,
-        readAt: new Date().toISOString(),
-      });
+      // Notify the sender only when this marked their messages read: it used to push a receipt
+      // to any user id, unthrottled. (audit robustness, dm:read)
+      if ((await messageService.markRead(userId, parsed.fromUserId)) > 0) {
+        io.to(`user:${parsed.fromUserId}`).emit('dm:read', {
+          fromUserId: userId,
+          readAt: new Date().toISOString(),
+        });
+      }
     } catch (err) {
       logger.warn({ err: getErrorMessage(err), userId }, 'Failed to mark DM as read');
     }
@@ -89,4 +93,5 @@ export function setupDMHandlers(socket: TypedSocket, io: TypedServer): void {
 
 export function cleanupDMLimiters(socketId: string): void {
   dmChatLimiter.remove(socketId);
+  dmReadLimiter.remove(socketId);
 }

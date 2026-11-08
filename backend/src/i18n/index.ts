@@ -1,13 +1,14 @@
 import i18next, { TFunction } from 'i18next';
 import FsBackend from 'i18next-fs-backend';
 import path from 'path';
+import { SUPPORTED_LANGUAGES } from '@blast-arena/shared';
 
 export const i18n = i18next.createInstance();
 
 export async function initI18n(): Promise<void> {
   await i18n.use(FsBackend).init({
     fallbackLng: 'en',
-    supportedLngs: ['en', 'de', 'fr', 'es', 'it', 'pt', 'pl', 'nl', 'tr', 'sv', 'nb', 'da'],
+    supportedLngs: [...SUPPORTED_LANGUAGES],
     ns: ['server', 'email'],
     defaultNS: 'server',
     backend: {
@@ -16,7 +17,7 @@ export async function initI18n(): Promise<void> {
     interpolation: {
       escapeValue: false,
     },
-    preload: ['en', 'de', 'fr', 'es', 'it', 'pt', 'pl', 'nl', 'tr', 'sv', 'nb', 'da'],
+    preload: [...SUPPORTED_LANGUAGES],
   });
 }
 

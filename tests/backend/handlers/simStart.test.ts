@@ -56,7 +56,7 @@ vi.mock('../../../backend/src/handlers/friendHandlers', () => ({
 }));
 vi.mock('../../../backend/src/handlers/partyHandlers', () => ({
   setupPartyHandlers: vi.fn(),
-  handlePartyDisconnect: vi.fn(),
+  schedulePartyLeave: vi.fn(),
   cleanupPartyLimiters: vi.fn(),
 }));
 vi.mock('../../../backend/src/handlers/lobbyHandlers', () => ({
