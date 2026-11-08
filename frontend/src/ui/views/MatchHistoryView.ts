@@ -30,9 +30,6 @@ function modeLabel(mode: string): string {
 
 export class MatchHistoryView implements ILobbyView {
   readonly viewId = 'matchHistory';
-  get title() {
-    return t('ui:matchHistory.title');
-  }
 
   private container: HTMLElement | null = null;
   private page = 1;

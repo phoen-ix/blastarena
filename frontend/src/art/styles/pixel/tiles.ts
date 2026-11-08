@@ -8,7 +8,6 @@ import { shade } from '../../paint';
 import type { World } from '../../painters/types';
 import { MASK_S } from '../../painters/types';
 import {
-  OUT,
   WHITE,
   R,
   P,
@@ -1474,6 +1473,3 @@ export function specialTile(
     0,
   );
 }
-
-/** Outline ink, re-exported for the other pixel modules. */
-export { OUT };

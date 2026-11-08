@@ -1,12 +1,8 @@
 import { ILobbyView, ViewDeps } from './types';
 import { SettingsUI } from '../SettingsUI';
-import { t } from '../../i18n';
 
 export class SettingsView implements ILobbyView {
   readonly viewId = 'settings';
-  get title() {
-    return t('ui:settings.title');
-  }
 
   private panel: SettingsUI;
 

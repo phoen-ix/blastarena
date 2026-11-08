@@ -54,12 +54,6 @@ export class CampaignGameManager {
     return this.sessions.get(sessionId);
   }
 
-  getPlayerSession(userId: number): CampaignGame | undefined {
-    const sessionId = this.playerSessions.get(userId);
-    if (!sessionId) return undefined;
-    return this.sessions.get(sessionId);
-  }
-
   endSession(sessionId: string): void {
     const game = this.sessions.get(sessionId);
     if (!game) return;

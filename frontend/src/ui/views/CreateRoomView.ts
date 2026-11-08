@@ -19,9 +19,6 @@ import { t } from '../../i18n';
 
 export class CreateRoomView implements ILobbyView {
   readonly viewId = 'create-room';
-  get title() {
-    return t('ui:createRoom.title');
-  }
 
   private deps: ViewDeps;
   private container: HTMLElement | null = null;

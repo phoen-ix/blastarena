@@ -1,7 +1,5 @@
 {
   "title": "Campanha",
-  "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>ANHA",
-  "backToLobby": "Voltar ao Lobby",
   "mapPreview": {
     "loading": "Carregando pré-visualização..."
   },
@@ -22,7 +20,6 @@
     "buddy": "Parceiro"
   },
   "progress": {
-    "completed": "{{completed}}/{{total}}",
     "size": "{{percent}}% tamanho"
   },
   "localCoopModal": {

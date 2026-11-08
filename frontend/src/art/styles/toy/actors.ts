@@ -1,5 +1,5 @@
 import type { Direction, EnemySpriteConfig } from '@blast-arena/shared';
-import { circle, marker as markerPath, poly, rgba, rr, shade, star } from '../../paint';
+import { circle, marker as markerPath, poly, rgba, rr, shade } from '../../paint';
 import type { EnemyOpts, EyeStyle, GhostOpts, MarkerShape, PlayerOpts } from '../../painters/types';
 import { CREAM, INK, ell, fl, seg, st } from './common';
 import type { G } from './common';
@@ -642,11 +642,4 @@ export function enemy(g: G, o: EnemyOpts): void {
   g.globalAlpha = 1;
   drawEnemyExtras(g, o.sprite, look, o.dir, true);
   g.restore();
-}
-
-/** A five-pointed sparkle, used by power-ups and fx. */
-export function sparkle(g: G, x: number, y: number, r: number, color = '#ffffff'): void {
-  g.fillStyle = color;
-  star(g, x, y, 4, r, r * 0.26);
-  g.fill();
 }

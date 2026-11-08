@@ -1,7 +1,5 @@
 {
   "title": "Kampanje",
-  "titleBrand": "<span style=\"color:var(--text);\">KAMP</span>ANJE",
-  "backToLobby": "Tilbake til lobbyen",
   "mapPreview": {
     "loading": "Laster forhåndsvisning..."
   },
@@ -22,7 +20,6 @@
     "buddy": "Kompis"
   },
   "progress": {
-    "completed": "{{completed}}/{{total}}",
     "size": "{{percent}}% størrelse"
   },
   "localCoopModal": {

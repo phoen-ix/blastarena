@@ -245,11 +245,6 @@ export class EnemySpriteRenderer {
     bar.fillRect(barX, barY, barWidth * hpRatio, barHeight);
   }
 
-  /** True once the death animation for this enemy has been started (test seam). */
-  isDying(id: number): boolean {
-    return this.dying.has(id);
-  }
-
   private removeEnemy(id: number): void {
     const sprite = this.sprites.get(id);
     if (sprite) {

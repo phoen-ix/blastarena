@@ -1,12 +1,8 @@
 import { ILobbyView, ViewDeps } from './types';
 import { LeaderboardUI } from '../LeaderboardUI';
-import { t } from '../../i18n';
 
 export class LeaderboardView implements ILobbyView {
   readonly viewId = 'leaderboard';
-  get title() {
-    return t('ui:leaderboard.title');
-  }
 
   private panel: LeaderboardUI;
 

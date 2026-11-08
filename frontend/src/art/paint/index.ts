@@ -7,11 +7,9 @@ import type { PowerUpType } from '@blast-arena/shared';
 import { POWERUP_ICON_DRAWERS } from '../../utils/powerUpIcons';
 import type { MarkerShape } from '../painters/types';
 
-export const T = 48;
-
 /* ---------------- colour ---------------- */
 
-export function hexToRgb(hex: string): [number, number, number] {
+function hexToRgb(hex: string): [number, number, number] {
   let h = hex.replace('#', '');
   if (h.length === 3) {
     h = h
@@ -23,7 +21,7 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-export function rgbToHex(r: number, g: number, b: number): string {
+function rgbToHex(r: number, g: number, b: number): string {
   const c = (v: number) =>
     Math.max(0, Math.min(255, Math.round(v)))
       .toString(16)
@@ -54,12 +52,6 @@ export function rgba(hex: string, a: number): string {
   return `rgba(${r},${g},${b},${a})`;
 }
 
-/** Perceived brightness, 0..1. */
-export function luma(hex: string): number {
-  const [r, g, b] = hexToRgb(hex);
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-}
-
 /* ---------------- numbers ---------------- */
 
 /** Seeded PRNG (mulberry32). */
@@ -85,9 +77,6 @@ export function hash2(x: number, y: number, seed = 0): number {
 }
 
 export const clamp = (v: number, a = 0, b = 1): number => (v < a ? a : v > b ? b : v);
-export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
-/** Triangle wave 0..1..0 over a period of 2. */
-export const tri = (x: number): number => 1 - Math.abs((((x % 2) + 2) % 2) - 1);
 
 export const ease = {
   outBack: (t: number): number => {
@@ -261,10 +250,6 @@ export function setPaintScale(scale: number): void {
 
 export function getPaintScale(): number {
   return paintScale;
-}
-
-export function clearPaintCache(): void {
-  spriteCache.clear();
 }
 
 /** A cached drawing covering [-ox, w-ox] x [-oy, h-oy] units, with (0,0) at its origin. */

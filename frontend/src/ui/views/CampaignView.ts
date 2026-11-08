@@ -1,13 +1,9 @@
 import { ILobbyView, ViewDeps } from './types';
 import { CampaignUI } from '../CampaignUI';
 import { PartyBar } from '../PartyBar';
-import { t } from '../../i18n';
 
 export class CampaignView implements ILobbyView {
   readonly viewId = 'campaign';
-  get title() {
-    return t('campaign:title');
-  }
 
   private panel: CampaignUI;
 

@@ -92,7 +92,6 @@ export interface BotDifficultyConfig {
   escapeCheckBeforeBomb: boolean;
   huntChance: number;
   powerUpVision: number;
-  optimalMoveChance: number;
   useKick: boolean;
   reactionDelay: number;
   huntSearchDepth: number;
@@ -122,7 +121,6 @@ const DIFFICULTY_PRESETS: Record<'easy' | 'normal' | 'hard', BotDifficultyConfig
     escapeCheckBeforeBomb: false,
     huntChance: 0.15,
     powerUpVision: 1,
-    optimalMoveChance: 0.35,
     useKick: false,
     reactionDelay: 5,
     huntSearchDepth: 6,
@@ -150,7 +148,6 @@ const DIFFICULTY_PRESETS: Record<'easy' | 'normal' | 'hard', BotDifficultyConfig
     escapeCheckBeforeBomb: true,
     huntChance: 0.9,
     powerUpVision: 8,
-    optimalMoveChance: 0.8,
     useKick: true,
     reactionDelay: 0,
     huntSearchDepth: 25,
@@ -178,7 +175,6 @@ const DIFFICULTY_PRESETS: Record<'easy' | 'normal' | 'hard', BotDifficultyConfig
     escapeCheckBeforeBomb: true,
     huntChance: 0.95,
     powerUpVision: 15,
-    optimalMoveChance: 0.98,
     useKick: true,
     reactionDelay: 0,
     huntSearchDepth: 40,

@@ -7,7 +7,6 @@ export {
   hash2,
   hexagon,
   icon,
-  lerp,
   mix,
   poly,
   PU_COLORS_NEW,

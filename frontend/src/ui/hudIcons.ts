@@ -431,7 +431,7 @@ const cache = new Map<string, string>();
  * Data URL of an icon `size` CSS pixels wide, painted at the screen's pixel ratio; '' where
  * there is no 2D canvas (tests).
  */
-export function hudIconUrl(name: HudIconName, size: number): string {
+function hudIconUrl(name: HudIconName, size: number): string {
   const px = Math.round(size * pixelRatio());
   const key = `${name}:${px}`;
   const hit = cache.get(key);

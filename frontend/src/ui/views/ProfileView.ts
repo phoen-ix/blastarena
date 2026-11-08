@@ -7,9 +7,6 @@ import type { PublicProfile, AchievementProgress } from '@blast-arena/shared';
 
 export class ProfileView implements ILobbyView {
   readonly viewId = 'profile';
-  get title() {
-    return t('ui:profile.title');
-  }
 
   private deps: ViewDeps;
   private container: HTMLElement | null = null;

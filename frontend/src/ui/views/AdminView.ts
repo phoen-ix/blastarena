@@ -1,12 +1,8 @@
 import { ILobbyView, ViewDeps } from './types';
 import { AdminUI } from '../AdminUI';
-import { t } from '../../i18n';
 
 export class AdminView implements ILobbyView {
   readonly viewId = 'admin';
-  get title() {
-    return t('ui:sidebar.admin');
-  }
 
   private panel: AdminUI;
 

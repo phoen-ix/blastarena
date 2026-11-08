@@ -1,6 +1,6 @@
 import type { ThemeId } from '@blast-arena/shared';
 
-export interface ThemeCSSVars {
+interface ThemeCSSVars {
   primary: string;
   primaryHover: string;
   primaryDim: string;

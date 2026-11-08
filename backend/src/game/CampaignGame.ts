@@ -115,8 +115,6 @@ export class CampaignGame {
 
   public finalizeReplay(
     result: 'completed' | 'failed',
-    _timeSeconds: number,
-    _stars: number,
   ): { filename: string; sessionId: string } | null {
     if (!this.replayRecorder) return null;
 

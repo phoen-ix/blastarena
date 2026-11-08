@@ -11,8 +11,6 @@ import { markTexScale } from '../art/scale';
 /** Standard player colours (Classic's `player_{i}_{dir}` textures). See game/playerPalette. */
 export const PLAYER_COLORS = STANDARD_PLAYER_COLORS;
 
-export { POWERUP_COLORS };
-
 export class BootScene extends Phaser.Scene {
   constructor() {
     super({ key: 'BootScene' });

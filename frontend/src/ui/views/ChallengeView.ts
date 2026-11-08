@@ -17,9 +17,6 @@ const ROOM_NAME_MAX = 50;
 
 export class ChallengeView implements ILobbyView {
   readonly viewId = 'challenge';
-  get title() {
-    return t('ui:challenge.title');
-  }
 
   private deps: ViewDeps;
   private onJoinRoom: (room: Room) => void;

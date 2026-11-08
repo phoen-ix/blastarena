@@ -50,7 +50,7 @@ export const DEFAULT_LOCAL_COOP_CONFIG: LocalCoopConfig = {
   cameraMode: 'shared',
 };
 
-export const DEFAULT_P2_GUEST_COLOR = 0x44aaff; // blue
+const DEFAULT_P2_GUEST_COLOR = 0x44aaff; // blue
 
 const STORAGE_KEY = 'blast-arena-local-coop-controls';
 const P2_IDENTITY_KEY = 'blast-arena-local-coop-p2';

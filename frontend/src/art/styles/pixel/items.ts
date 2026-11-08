@@ -110,7 +110,7 @@ function sparkAt(g: CanvasRenderingContext2D, x: number, y: number, f: number): 
 }
 
 /** Fuse pixels shown for a fuse fraction. */
-export function fuseLength(fuse: number): number {
+function fuseLength(fuse: number): number {
   return Math.max(0, Math.min(5, Math.ceil(fuse * 5 - 1e-6)));
 }
 

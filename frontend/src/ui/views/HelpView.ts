@@ -1,12 +1,8 @@
 import { ILobbyView, ViewDeps } from './types';
 import { HelpUI } from '../HelpUI';
-import { t } from '../../i18n';
 
 export class HelpView implements ILobbyView {
   readonly viewId = 'help';
-  get title() {
-    return t('help:title');
-  }
 
   private panel: HelpUI;
 

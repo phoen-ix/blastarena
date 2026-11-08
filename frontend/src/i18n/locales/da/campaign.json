@@ -1,7 +1,5 @@
 {
   "title": "Kampagne",
-  "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AIGN",
-  "backToLobby": "Tilbage til lobby",
   "mapPreview": {
     "loading": "Indlæser forhåndsvisning..."
   },
@@ -22,7 +20,6 @@
     "buddy": "Makker"
   },
   "progress": {
-    "completed": "{{completed}}/{{total}}",
     "size": "{{percent}}% størrelse"
   },
   "localCoopModal": {

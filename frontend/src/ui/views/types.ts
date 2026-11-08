@@ -4,7 +4,6 @@ import { NotificationUI } from '../NotificationUI';
 
 export interface ILobbyView {
   readonly viewId: string;
-  readonly title: string;
   getHeaderActions?(): string;
   render(container: HTMLElement): Promise<void>;
   destroy(): void;

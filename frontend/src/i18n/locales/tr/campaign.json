@@ -1,7 +1,5 @@
 {
   "title": "Kampanya",
-  "titleBrand": "<span style=\"color:var(--text);\">KAMP</span>ANYA",
-  "backToLobby": "Lobiye Dön",
   "mapPreview": {
     "loading": "Önizleme yükleniyor..."
   },
@@ -22,7 +20,6 @@
     "buddy": "Yardımcı"
   },
   "progress": {
-    "completed": "{{completed}}/{{total}}",
     "size": "%{{percent}} boyut"
   },
   "localCoopModal": {

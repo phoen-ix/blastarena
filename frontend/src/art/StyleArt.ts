@@ -5,9 +5,8 @@ import type { FrameSpec } from './atlas';
 import { PU_TYPES, intToHex } from './paint';
 import type { BombType, EyeStyle, FxKind, StylePainters, World } from './painters/types';
 import { SHADOW_FROM_N, SHADOW_FROM_NW, SHADOW_FROM_W, SPECIAL_TILES } from './painters/types';
-export { SPECIAL_TILES } from './painters/types';
 
-export const DIRECTIONS: Direction[] = ['down', 'up', 'left', 'right'];
+const DIRECTIONS: Direction[] = ['down', 'up', 'left', 'right'];
 const WORLDS: World[] = [
   'classic',
   'forest',
@@ -35,7 +34,7 @@ const FX_KINDS: FxKind[] = [
 ];
 
 /** Seconds a flame lives (EXPLOSION_DURATION_TICKS at 20 ticks per second). */
-export const FLAME_SECONDS = 0.5;
+const FLAME_SECONDS = 0.5;
 
 const FLAME_PIECES: { piece: 'center' | 'arm' | 'end'; dir: Direction }[] = [
   { piece: 'center', dir: 'down' },

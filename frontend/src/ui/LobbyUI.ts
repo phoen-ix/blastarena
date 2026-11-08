@@ -126,10 +126,6 @@ export class LobbyUI {
     void this.navigateTo(this.initialView || 'rooms', this.initialViewOptions || undefined);
   }
 
-  showView(viewId: string, options?: Record<string, unknown>): void {
-    void this.navigateTo(viewId, options);
-  }
-
   hide(): void {
     this.navSeq++; // a navigation still in flight must not install its view into a hidden lobby
     this.activeView?.destroy();
@@ -336,6 +332,8 @@ export class LobbyUI {
       const createMapBtn = this.container.querySelector('#create-map-btn');
       if (createMapBtn) {
         createMapBtn.addEventListener('click', async () => {
+          // Imported lazily on purpose: main.ts boots the game when evaluated, which a static
+          // import would do in every test that imports LobbyUI.
           const game = (await import('../main')).game;
           game.registry.set('editorMode', 'custom_map');
           game.registry.set('customMapId', null);
@@ -634,21 +632,19 @@ export class LobbyUI {
     // /user/rank needs a session. A guest's 401 went through the refresh path and ended in
     // authManager.logout(), which bounced the guest out of the lobby to the menu.
     if (this.authManager.isGuest || !this.authManager.getAccessToken()) return;
-    void import('../network/ApiClient').then(({ ApiClient }) => {
-      ApiClient.get<{ rankTier: string; rankColor: string; level?: number }>('/user/rank')
-        .then((rank) => {
-          const sidebarLevel = this.container.querySelector('#sidebar-level') as HTMLElement;
-          if (sidebarLevel && rank.level) {
-            sidebarLevel.textContent = t('ui:sidebar.level', { level: rank.level });
-          }
-          const sidebarRank = this.container.querySelector('#sidebar-rank') as HTMLElement;
-          if (sidebarRank && rank.rankTier) {
-            sidebarRank.textContent = rank.rankTier;
-            sidebarRank.style.color = rank.rankColor;
-          }
-        })
-        .catch(() => {});
-    });
+    ApiClient.get<{ rankTier: string; rankColor: string; level?: number }>('/user/rank')
+      .then((rank) => {
+        const sidebarLevel = this.container.querySelector('#sidebar-level') as HTMLElement;
+        if (sidebarLevel && rank.level) {
+          sidebarLevel.textContent = t('ui:sidebar.level', { level: rank.level });
+        }
+        const sidebarRank = this.container.querySelector('#sidebar-rank') as HTMLElement;
+        if (sidebarRank && rank.rankTier) {
+          sidebarRank.textContent = rank.rankTier;
+          sidebarRank.style.color = rank.rankColor;
+        }
+      })
+      .catch(() => {});
   }
 
   private updateGamepadContext(): void {

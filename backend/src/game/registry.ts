@@ -7,7 +7,6 @@ import {
 } from '@blast-arena/shared';
 import { RoomManager } from './RoomManager';
 import { SimulationManager } from '../simulation/SimulationManager';
-import { BotAIRegistry, getBotAIRegistry as _getBotAIRegistry } from '../services/botai-registry';
 import {
   EnemyAIRegistry,
   getEnemyAIRegistry as _getEnemyAIRegistry,
@@ -39,10 +38,6 @@ export function getRoomManager(): RoomManager {
 export function getIO(): TypedServer {
   if (!io) throw new Error('Socket.io server not initialized');
   return io;
-}
-
-export function getBotAIRegistry(): BotAIRegistry {
-  return _getBotAIRegistry();
 }
 
 export function getEnemyAIRegistry(): EnemyAIRegistry {

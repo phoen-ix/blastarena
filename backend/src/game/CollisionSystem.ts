@@ -83,10 +83,6 @@ export class CollisionSystem {
     this.wrapping = wrapping;
   }
 
-  updateTiles(tiles: TileType[][]): void {
-    this.tiles = tiles;
-  }
-
   isWalkable(x: number, y: number): boolean {
     if (this.wrapping) {
       x = wrapX(x, this.width);

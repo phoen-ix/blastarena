@@ -1,7 +1,5 @@
 {
   "title": "Kampanj",
-  "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AIGN",
-  "backToLobby": "Tillbaka till lobbyn",
   "mapPreview": {
     "loading": "Laddar förhandsvisning..."
   },
@@ -22,7 +20,6 @@
     "buddy": "Kompis"
   },
   "progress": {
-    "completed": "{{completed}}/{{total}}",
     "size": "{{percent}}% storlek"
   },
   "localCoopModal": {

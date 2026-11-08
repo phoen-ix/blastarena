@@ -1,7 +1,5 @@
 {
   "title": "Campagne",
-  "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AGNE",
-  "backToLobby": "Retour au lobby",
   "mapPreview": {
     "loading": "Chargement de l'aperçu..."
   },
@@ -22,7 +20,6 @@
     "buddy": "Compagnon"
   },
   "progress": {
-    "completed": "{{completed}}/{{total}}",
     "size": "{{percent}}% taille"
   },
   "localCoopModal": {

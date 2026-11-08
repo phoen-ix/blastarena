@@ -186,7 +186,7 @@ describe('LobbyUI navigation token (item 11)', () => {
     lobby.show('rooms');
     await flush();
 
-    lobby.showView('matchHistory'); // render held open by the gate
+    document.querySelector<HTMLElement>('#nav-matchHistory')!.click(); // render held open by the gate
     await flush();
     const slow = created.find((v) => v.id === 'matchHistory')!;
     expect(slow.render).toHaveBeenCalledTimes(1);
@@ -194,7 +194,7 @@ describe('LobbyUI navigation token (item 11)', () => {
       gamepad.pushContext.mock.calls.filter((c) => c[0].id === 'lobby').length;
     const pushesBefore = lobbyPushes();
 
-    lobby.showView('maps');
+    document.querySelector<HTMLElement>('#nav-maps')!.click();
     await flush();
     const maps = created.find((v) => v.id === 'maps')!;
     expect(slow.destroy).toHaveBeenCalledTimes(1);
@@ -221,8 +221,8 @@ describe('LobbyUI navigation token (item 11)', () => {
     await flush();
 
     // Two clicks in the same tick: the first view's chunk is still "loading"
-    lobby.showView('maps');
-    lobby.showView('matchHistory');
+    document.querySelector<HTMLElement>('#nav-maps')!.click();
+    document.querySelector<HTMLElement>('#nav-matchHistory')!.click();
     slowRender.gate.resolve();
     await flush();
     await flush();
@@ -254,9 +254,9 @@ describe('LobbyUI gives every view a root of its own', () => {
 
   it('a render that finishes after the user moved on stays out of the next view', async () => {
     const lobby = await lobbyOn('rooms');
-    lobby.showView('matchHistory'); // render held open by the gate
+    document.querySelector<HTMLElement>('#nav-matchHistory')!.click(); // render held open by the gate
     await flush();
-    lobby.showView('maps');
+    document.querySelector<HTMLElement>('#nav-maps')!.click();
     await flush();
     expect(body().textContent).toBe('view:maps');
 
@@ -268,10 +268,10 @@ describe('LobbyUI gives every view a root of its own', () => {
 
   it('what a view binds on its container goes with it', async () => {
     const lobby = await lobbyOn('rooms');
-    lobby.showView('maps');
+    document.querySelector<HTMLElement>('#nav-maps')!.click();
     await flush();
     slowRender.gate.resolve();
-    lobby.showView('matchHistory');
+    document.querySelector<HTMLElement>('#nav-matchHistory')!.click();
     await flush();
     await flush();
 

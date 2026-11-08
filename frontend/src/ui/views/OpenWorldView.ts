@@ -36,9 +36,6 @@ interface OpenWorldJoinResponse {
 
 export class OpenWorldView implements ILobbyView {
   readonly viewId = 'openWorld';
-  get title() {
-    return t('ui:openWorld.title');
-  }
 
   private deps: ViewDeps;
   private container: HTMLElement | null = null;

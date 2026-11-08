@@ -85,7 +85,7 @@ export function paintPortrait(
 const cache = new Map<string, string>();
 
 /** Data URL of a portrait `size` CSS pixels square; '' where there is no 2D canvas (tests). */
-export function portraitUrl(
+function portraitUrl(
   color: number,
   eyes: EyeStyle,
   size: number,

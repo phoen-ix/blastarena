@@ -8,7 +8,7 @@ import type {
   WallOpts,
   World,
 } from '../../painters/types';
-import { CREAM, INK, RAISE, ell, fl, pal, seg, st } from './common';
+import { INK, RAISE, ell, fl, pal, seg, st } from './common';
 import type { G, Pal } from './common';
 
 const TAU = Math.PI * 2;
@@ -1506,5 +1506,3 @@ export function chunkColors(world: World, kind: 'crate' | 'cracked'): string[] {
       return ['#d6964f', '#a2622b', '#f2c48a'];
   }
 }
-
-export { CREAM };

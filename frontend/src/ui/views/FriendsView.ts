@@ -7,9 +7,6 @@ import { t } from '../../i18n';
 
 export class FriendsView implements ILobbyView {
   readonly viewId = 'friends';
-  get title() {
-    return t('ui:friends.title');
-  }
 
   private deps: ViewDeps;
   private container: HTMLElement | null = null;

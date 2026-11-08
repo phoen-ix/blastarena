@@ -147,7 +147,7 @@ export function generateMap(
       const placed: Position[] = [];
 
       // Place seed tile
-      const tileToPlace = hazardType === 'spikes' ? 'spikes' : hazardType;
+      const tileToPlace = hazardType;
       tiles[seed.y][seed.x] = tileToPlace as TileType;
       placed.push(seed);
 

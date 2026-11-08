@@ -34,7 +34,7 @@ import type {
 
 export type World = CampaignWorldTheme;
 export type EyeStyle = 'default' | 'angry' | 'cyclops' | 'dot';
-export type CrateKind = 'crate' | 'cracked';
+type CrateKind = 'crate' | 'cracked';
 export type BombType = 'normal' | 'pierce' | 'remote';
 export type FlamePiece = 'center' | 'arm' | 'end';
 export type MarkerShape =

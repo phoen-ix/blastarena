@@ -27,9 +27,9 @@ import { logger } from '../utils/logger';
 /** Hard per-call CPU timeout. Generous vs. a normal decision, far below the 50ms tick budget. */
 export const AI_INVOKE_TIMEOUT_MS = 20;
 /** Per-isolate heap cap (MB). */
-export const ISOLATE_MEMORY_LIMIT_MB = 16;
+const ISOLATE_MEMORY_LIMIT_MB = 16;
 /** Timeout for the one-time bootstrap/instantiation when the runner is created. */
-export const AI_COMPILE_TIMEOUT_MS = 5000;
+const AI_COMPILE_TIMEOUT_MS = 5000;
 /**
  * Bootstrap timeout for an instance created INSIDE a game tick (a bot joining the open world, a
  * boss's minions). The bootstrap is synchronous, so the 5 s default would stall every room on the
@@ -42,7 +42,7 @@ export const AI_IN_TICK_BOOTSTRAP_TIMEOUT_MS = 100;
  * several ticks. Once a game's AIs have used this much in a tick, the remaining isolated AIs skip
  * that tick (no input / no move). Wall-clock based, so it only ever kicks in under overload.
  */
-export const AI_TICK_BUDGET_MS = 30;
+const AI_TICK_BUDGET_MS = 30;
 
 export interface IsolatedAIOptions {
   /** Bootstrap (compile + instantiate) timeout; defaults to AI_COMPILE_TIMEOUT_MS. */
@@ -511,10 +511,9 @@ function playerSnap(p: Player) {
  * isolate) or only the entries of GameStateManager.tileChangeLog the isolate has not seen yet.
  * (audit ISOLATE-SNAPSHOT-1)
  */
-export type TileSync =
-  { tiles: readonly (readonly string[])[] } | { tileDiffs: readonly TileDiff[] };
+type TileSync = { tiles: readonly (readonly string[])[] } | { tileDiffs: readonly TileDiff[] };
 
-export function buildBotSnapshotJson(
+function buildBotSnapshotJson(
   self: Player,
   state: GameStateManager,
   tileSync: TileSync = { tiles: state.map.tiles },

@@ -43,8 +43,6 @@
       --text: #eae8e4;
       --text-dim: #8888a0;
       --text-muted: #505068;
-      --team-red: #ff4466;
-      --team-blue: #448aff;
       --rarity-epic: #bb66ff;
       --font-display: 'Chakra Petch', sans-serif;
       --font-body: 'DM Sans', sans-serif;
@@ -68,11 +66,8 @@
       --sp-5: 20px;
       --sp-6: 24px;
       --sp-8: 32px;
-      --sp-10: 40px;
 
       /* Elevation shadows */
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.3);
-      --shadow-md: 0 4px 12px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2);
       --shadow-lg: 0 8px 32px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.2);
       --shadow-xl: 0 16px 48px rgba(0,0,0,0.5), 0 8px 16px rgba(0,0,0,0.3);
       --shadow-glow-primary: 0 0 16px rgba(255, 107, 53, 0.15);
@@ -172,8 +167,6 @@
       --success: #16a34a; --success-dim: rgba(22, 163, 74, 0.08);
       --info: #2563eb; --info-dim: rgba(37, 99, 235, 0.08);
       --text: #1a1a2e; --text-dim: #64748b; --text-muted: #94a3b8;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.08);
-      --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.05);
       --shadow-lg: 0 8px 32px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.06);
       --shadow-xl: 0 16px 48px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08);
       --shadow-glow-primary: 0 0 16px rgba(37, 99, 235, 0.10);
@@ -193,8 +186,6 @@
       --success: #16a34a; --success-dim: rgba(22, 163, 74, 0.08);
       --info: #6366f1; --info-dim: rgba(99, 102, 241, 0.08);
       --text: #2e1a28; --text-dim: #8b6480; --text-muted: #b894a8;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.08);
-      --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.05);
       --shadow-lg: 0 8px 32px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.06);
       --shadow-xl: 0 16px 48px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08);
       --shadow-glow-primary: 0 0 16px rgba(217, 70, 168, 0.10);
@@ -214,8 +205,6 @@
       --success: #16a34a; --success-dim: rgba(22, 163, 74, 0.08);
       --info: #2563eb; --info-dim: rgba(37, 99, 235, 0.08);
       --text: #2e2418; --text-dim: #7a6e58; --text-muted: #a89878;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.08);
-      --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.05);
       --shadow-lg: 0 8px 32px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.06);
       --shadow-xl: 0 16px 48px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08);
       --shadow-glow-primary: 0 0 16px rgba(217, 119, 6, 0.10);
@@ -235,8 +224,6 @@
       --success: #68b888; --success-dim: rgba(104, 184, 136, 0.08);
       --info: #8aaae8; --info-dim: rgba(138, 170, 232, 0.08);
       --text: #384050; --text-dim: #788898; --text-muted: #a0acb8;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
-      --shadow-md: 0 4px 12px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
       --shadow-lg: 0 8px 32px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.04);
       --shadow-xl: 0 16px 48px rgba(0,0,0,0.10), 0 8px 16px rgba(0,0,0,0.06);
       --shadow-glow-primary: 0 0 16px rgba(138, 170, 232, 0.08);
@@ -256,8 +243,6 @@
       --success: #68b888; --success-dim: rgba(104, 184, 136, 0.08);
       --info: #9090d8; --info-dim: rgba(144, 144, 216, 0.08);
       --text: #443040; --text-dim: #907888; --text-muted: #b8a0b0;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
-      --shadow-md: 0 4px 12px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
       --shadow-lg: 0 8px 32px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.04);
       --shadow-xl: 0 16px 48px rgba(0,0,0,0.10), 0 8px 16px rgba(0,0,0,0.06);
       --shadow-glow-primary: 0 0 16px rgba(216, 152, 192, 0.08);
@@ -277,8 +262,6 @@
       --success: #78a880; --success-dim: rgba(120, 168, 128, 0.08);
       --info: #8098c0; --info-dim: rgba(128, 152, 192, 0.08);
       --text: #40382a; --text-dim: #887c68; --text-muted: #b0a490;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
-      --shadow-md: 0 4px 12px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
       --shadow-lg: 0 8px 32px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.04);
       --shadow-xl: 0 16px 48px rgba(0,0,0,0.10), 0 8px 16px rgba(0,0,0,0.06);
       --shadow-glow-primary: 0 0 16px rgba(200, 160, 96, 0.08);
@@ -2216,7 +2199,7 @@
     .emote-wheel-item:hover {
       background: var(--primary);
       color: #fff;
-      transform: translate(var(--tw-translate-x, 0), var(--tw-translate-y, 0)) scale(1.15);
+      transform: scale(1.15);
       z-index: 1;
     }
 
@@ -2687,23 +2670,6 @@
       color: #fff;
     }
 
-    .friends-empty {
-      text-align: center;
-      padding: 30px 16px;
-      color: var(--text-muted);
-      font-size: 13px;
-    }
-    .friends-section-label {
-      padding: 4px 12px 8px;
-      color: var(--text-dim);
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .friends-section-label.spaced {
-      padding-top: 12px;
-    }
     .status-dot.online { background: var(--success); }
     .status-dot.in_lobby { background: var(--success); }
     .status-dot.in_game { background: var(--warning); }
@@ -5267,7 +5233,6 @@
     .mb-md { margin-bottom: var(--sp-4); }
     .mb-0 { margin-bottom: 0; }
 
-    .text-accent { color: var(--accent); }
     .text-info { color: var(--info); }
     .text-sm { font-size: 13px; }
     .text-xs { font-size: 12px; }

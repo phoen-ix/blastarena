@@ -10,7 +10,7 @@ export type G = CanvasRenderingContext2D;
 /** Units a block's top face is raised above its tile. */
 export const RAISE = 11;
 export const INK = '#2a2033';
-export const OUT = 1.6;
+const OUT = 1.6;
 export const CREAM = '#fff4e2';
 
 export function st(g: G, c: string = INK, w: number = OUT): void {
@@ -44,7 +44,7 @@ export function ell(g: G, x: number, y: number, rx: number, ry: number, rot = 0)
 export type Pal = Record<string, string>;
 
 /** Per-world colours. Every world defines the keys its own painters read. */
-export const W: Record<World, Pal> = {
+const W: Record<World, Pal> = {
   classic: {
     floorA: '#d8cdb0',
     floorB: '#cdc1a3',

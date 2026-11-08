@@ -1,7 +1,5 @@
 {
   "title": "Campaign",
-  "titleBrand": "<span style=\"color:var(--text);\">CAMP</span>AIGN",
-  "backToLobby": "Back to Lobby",
   "mapPreview": {
     "loading": "Loading preview..."
   },
@@ -22,7 +20,6 @@
     "buddy": "Buddy"
   },
   "progress": {
-    "completed": "{{completed}}/{{total}}",
     "size": "{{percent}}% size"
   },
   "localCoopModal": {

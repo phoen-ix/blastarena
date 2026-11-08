@@ -9,9 +9,6 @@ import { ensureLevelEditorScene } from '../../scenes/levelEditorLoader';
 
 export class MapsView implements ILobbyView {
   readonly viewId = 'maps';
-  get title() {
-    return t('ui:maps.title');
-  }
 
   private deps: ViewDeps;
   private container: HTMLElement | null = null;

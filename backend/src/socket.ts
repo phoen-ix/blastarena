@@ -1623,7 +1623,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
               }
 
               // Save campaign replay
-              const replayResult = game.finalizeReplay('completed', timeSeconds, stars);
+              const replayResult = game.finalizeReplay('completed');
               if (replayResult) {
                 replayService
                   .saveCampaignReplayRecord({
@@ -1657,7 +1657,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
               emitToCampaign('campaign:gameOver', { levelId: level.id, reason });
 
               // Save campaign replay
-              const replayResult = game.finalizeReplay('failed', 0, 0);
+              const replayResult = game.finalizeReplay('failed');
               if (replayResult) {
                 replayService
                   .saveCampaignReplayRecord({

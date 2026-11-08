@@ -18,9 +18,6 @@ const AVATAR_COLORS = [
 
 export class PartyView implements ILobbyView {
   readonly viewId = 'party';
-  get title() {
-    return t('ui:party.title');
-  }
 
   private deps: ViewDeps;
   private container: HTMLElement | null = null;

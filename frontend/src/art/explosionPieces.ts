@@ -1,7 +1,7 @@
 import { BOMB_TIMER_TICKS } from '@blast-arena/shared';
 import type { Direction, Position } from '@blast-arena/shared';
 
-export type FlameRole = 'center' | 'arm' | 'end';
+type FlameRole = 'center' | 'arm' | 'end';
 
 export interface FlamePiece {
   x: number;

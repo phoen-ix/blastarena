@@ -6,9 +6,6 @@ import { t } from '../../i18n';
 
 export class MessagesView implements ILobbyView {
   readonly viewId = 'messages';
-  get title() {
-    return t('ui:messages.title');
-  }
 
   private deps: ViewDeps;
   private container: HTMLElement | null = null;

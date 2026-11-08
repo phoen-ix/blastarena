@@ -46,12 +46,6 @@ export function neonStroke(g: CanvasRenderingContext2D, color: string, w: number
   g.stroke();
 }
 
-/** Fill the current path with a colour at an alpha. */
-export function fillA(g: CanvasRenderingContext2D, color: string, a: number): void {
-  g.fillStyle = rgba(color, a);
-  g.fill();
-}
-
 /** Run `fn` with additive compositing, restoring the previous state afterwards. */
 export function additive(g: CanvasRenderingContext2D, fn: () => void): void {
   g.save();

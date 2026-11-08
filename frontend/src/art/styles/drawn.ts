@@ -3,10 +3,7 @@ import type { StylePainters } from '../painters/types';
 import { drawStylePreview } from '../preview';
 
 /** Feature set shared by the drawn styles; each style adjusts what differs. */
-export function drawnFeatures(
-  painters: StylePainters,
-  extra: Partial<StyleFeatures> = {},
-): StyleFeatures {
+function drawnFeatures(painters: StylePainters, extra: Partial<StyleFeatures> = {}): StyleFeatures {
   return {
     ySort: true,
     blockHeight: painters.blockHeight,

@@ -33,7 +33,6 @@ describe('EnemySpriteRenderer death animation', () => {
     renderer.update([enemy()]);
     expect(scene.sprites).toHaveLength(1);
     expect(scene.tweens.list).toHaveLength(0);
-    expect(renderer.isDying(1)).toBe(false);
 
     // The tween has not completed, so the sprite is still visible on every one of these ticks
     for (let tick = 0; tick < 6; tick++) {
@@ -42,7 +41,6 @@ describe('EnemySpriteRenderer death animation', () => {
 
     expect(scene.tweens.list).toHaveLength(1);
     expect(scene.sprites[0].tint).toBe(0xff0000);
-    expect(renderer.isDying(1)).toBe(true);
   });
 
   it('shows an enemy again when a replay seeks back to before its death (audit N5)', () => {
@@ -55,8 +53,8 @@ describe('EnemySpriteRenderer death animation', () => {
 
     renderer.update([enemy()]); // seek back: alive again
 
-    expect(renderer.isDying(1)).toBe(false);
     expect(scene.sprites[0].visible).toBe(true);
+    expect(scene.sprites[0].alpha).toBe(1);
   });
 
   it('tracks each enemy separately', () => {
@@ -68,26 +66,23 @@ describe('EnemySpriteRenderer death animation', () => {
     renderer.update([enemy({ id: 1, alive: false }), enemy({ id: 2, position: { x: 4, y: 4 } })]);
 
     expect(scene.tweens.list).toHaveLength(1);
-    expect(renderer.isDying(1)).toBe(true);
-    expect(renderer.isDying(2)).toBe(false);
+    expect(scene.tweens.list[0].targets).toBe(scene.sprites[0]);
+    expect(scene.sprites[1].tint).not.toBe(0xff0000);
   });
 
-  it('forgets the guard when the enemy leaves the state or the renderer is destroyed', () => {
+  it('forgets the guard when the enemy leaves the state', () => {
     const scene = makeFakeScene();
     const renderer = new EnemySpriteRenderer(scene as never);
 
     renderer.update([enemy()]);
     renderer.update([enemy({ alive: false })]);
-    expect(renderer.isDying(1)).toBe(true);
+    expect(scene.tweens.list).toHaveLength(1);
 
+    // Gone from the state, then back and dying again: a new death animation runs.
     renderer.update([]);
-    expect(renderer.isDying(1)).toBe(false);
-
     renderer.update([enemy()]);
     renderer.update([enemy({ alive: false })]);
-    expect(renderer.isDying(1)).toBe(true);
-    renderer.destroy();
-    expect(renderer.isDying(1)).toBe(false);
+    expect(scene.tweens.list).toHaveLength(2);
   });
 });
 

@@ -1,7 +1,7 @@
 import type { World } from '../../painters/types';
 
 /** Surface motif drawn on floors and walls of a world. */
-export type NeonMotif =
+type NeonMotif =
   'panel' | 'moss' | 'sand' | 'crystal' | 'magma' | 'void' | 'rune' | 'swamp' | 'cloud';
 
 export interface NeonWorld {
@@ -26,7 +26,7 @@ export interface NeonWorld {
 }
 
 /** One palette per campaign world. Classic is the open-arena default. */
-export const WORLDS: Record<World, NeonWorld> = {
+const WORLDS: Record<World, NeonWorld> = {
   classic: {
     floor: '#0a0e1d',
     floor2: '#0d1327',
