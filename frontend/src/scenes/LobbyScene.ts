@@ -24,6 +24,7 @@ export class LobbyScene extends Phaser.Scene {
   private adminToastHandler: ((data: { message: string }) => void) | null = null;
   private adminBannerHandler: ((data: { message: string | null }) => void) | null = null;
   private adminKickedHandler: ((data: { reason: string }) => void) | null = null;
+  private serverErrorHandler: ((data: { message: string; code?: string }) => void) | null = null;
   private partyJoinRoomHandler: ((data: { roomCode: string }) => void) | null = null;
   private campaignCoopStartHandler: ((data: CoopStartData) => void) | null = null;
   private reconnectHandler: (() => void) | null = null;
@@ -152,11 +153,20 @@ export class LobbyScene extends Phaser.Scene {
 
     this.adminKickedHandler = (data) => {
       this.notifications.error(data.reason || t('ui:rooms.kicked'));
+      this.registry.remove('currentRoom');
       this.roomUI?.hide();
       this.roomUI = null;
       this.showLobby();
     };
     this.socketClient.on('admin:kicked', this.adminKickedHandler);
+
+    // Lobby actions without an ack (room:start, room:setTeam, room:ready…) report failures with
+    // a socket `error` event, which nothing listened for: a failed start just did nothing.
+    // (audit K8)
+    this.serverErrorHandler = (data) => {
+      this.notifications.error(data.message);
+    };
+    this.socketClient.on('error', this.serverErrorHandler);
 
     // Party join room listener (party leader joined a room, follow them)
     this.partyJoinRoomHandler = (data) => {
@@ -257,9 +267,13 @@ export class LobbyScene extends Phaser.Scene {
     this.registry.set('currentRoom', room);
 
     // Show room waiting UI
-    this.roomUI = new RoomUI(this.socketClient, this.authManager, this.notifications, room, () =>
-      this.showLobby(),
-    );
+    // Leaving drops the stored room: it used to stay in the registry, so the next return to the
+    // lobby (after a campaign level, an admin replay, a re-login) reopened the room we had left.
+    // (audit F3)
+    this.roomUI = new RoomUI(this.socketClient, this.authManager, this.notifications, room, () => {
+      this.registry.remove('currentRoom');
+      this.showLobby();
+    });
     this.roomUI.show();
 
     // Remove previous game:start listener if any
@@ -312,6 +326,10 @@ export class LobbyScene extends Phaser.Scene {
     if (this.adminKickedHandler) {
       this.socketClient.off('admin:kicked', this.adminKickedHandler);
       this.adminKickedHandler = null;
+    }
+    if (this.serverErrorHandler) {
+      this.socketClient.off('error', this.serverErrorHandler);
+      this.serverErrorHandler = null;
     }
     if (this.partyJoinRoomHandler) {
       this.socketClient.off('party:joinRoom', this.partyJoinRoomHandler);

@@ -16,6 +16,8 @@ import {
   HAZARD_TILES_BY_THEME,
   HAZARD_TILE_NAMES,
   CustomMap,
+  validateCustomMap,
+  getErrorMessage,
 } from '@blast-arena/shared';
 import { t } from '../i18n';
 import { EnemyTextureGenerator } from '../game/EnemyTextureGenerator';
@@ -194,6 +196,15 @@ export class LevelEditorScene extends Phaser.Scene {
     this.puzzleSwitchVariants = new Map();
     this.puzzleLinkGraphics = null;
     this.worldTheme = 'classic';
+    // The tool selection too: a tool picked in the campaign editor (lava, exit…) stayed active in
+    // a custom-map session whose toolbar does not show it, so clicks painted tiles the server then
+    // refused. (audit F6)
+    this.currentTool = 'empty';
+    this.selectedEnemyTypeId = 0;
+    this.selectedPowerUpType = 'bomb_up';
+    this.puzzleColor = 'red';
+    this.switchVariant = 'toggle';
+    this.enemyTypes = [];
 
     // Phaser reuses the scene instance, so every session-specific field has to be reset here —
     // these were not, and loadData() only calls initEmptyMap() when `tiles` is empty. Opening an
@@ -1937,6 +1948,13 @@ export class LevelEditorScene extends Phaser.Scene {
       this.showToast(t('editor:toasts.needSpawns'), 'error');
       return;
     }
+    // The server's own rules (border walls, at most 8 spawns, paired teleporters and gates…):
+    // only the spawn minimum used to be checked here, so the rest came back as a failed save.
+    const problems = validateCustomMap(this.tiles, this.mapWidth, this.mapHeight, spawnPoints);
+    if (problems.length > 0) {
+      this.showToast(t('editor:toasts.saveFailed', { error: problems[0] }), 'error');
+      return;
+    }
 
     const mapData = {
       name: this.levelName || t('editor:defaults.untitledMap'),
@@ -1961,7 +1979,7 @@ export class LevelEditorScene extends Phaser.Scene {
       this.isDirty = false;
       this.showToast(t('editor:toasts.mapSaved'), 'success');
     } catch (err) {
-      this.showToast(t('editor:toasts.saveFailed', { error: (err as Error).message }), 'error');
+      this.showToast(t('editor:toasts.saveFailed', { error: getErrorMessage(err) }), 'error');
     }
   }
 

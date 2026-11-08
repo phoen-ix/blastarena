@@ -31,6 +31,8 @@ export class LobbyUI {
   private sidebarCollapsed = false;
   private activeView: ILobbyView | null = null;
   private activeViewId = 'rooms';
+  /** The options the active view was opened with (whose profile, which DM thread). */
+  private activeViewOptions: Record<string, unknown> | undefined;
   private roomsView: RoomsView | null = null;
   private initialView: string | null = null;
   private initialViewOptions: Record<string, unknown> | null = null;
@@ -102,10 +104,11 @@ export class LobbyUI {
     this.lobbyChatToggleHandler = () => this.lobbyChatPanel.refreshVisibility();
     window.addEventListener('lobbychat-toggle', this.lobbyChatToggleHandler);
 
-    // Re-render on language change
+    // Re-render on language change — with the same view options: without them another player's
+    // profile reopened as your own and an open DM thread was lost. (audit P4)
     this.languageChangedHandler = () => {
       this.render();
-      void this.navigateTo(this.activeViewId);
+      void this.navigateTo(this.activeViewId, this.activeViewOptions);
     };
     window.addEventListener('language-changed', this.languageChangedHandler);
 
@@ -166,6 +169,7 @@ export class LobbyUI {
   }
 
   private async navigateTo(viewId: string, options?: Record<string, unknown>): Promise<void> {
+    this.activeViewOptions = options;
     const seq = ++this.navSeq;
 
     // Destroy current view

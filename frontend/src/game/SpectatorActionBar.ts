@@ -86,7 +86,7 @@ export class SpectatorActionBar {
     barOuter.style.cssText = `
       width: 80px;
       height: 8px;
-      background: var(--surface);
+      background: var(--bg-surface);
       border-radius: 4px;
       overflow: hidden;
     `;

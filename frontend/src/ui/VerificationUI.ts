@@ -2,7 +2,7 @@ import { AuthManager } from '../network/AuthManager';
 import { ApiClient } from '../network/ApiClient';
 import { NotificationUI } from './NotificationUI';
 import { getErrorMessage } from '@blast-arena/shared';
-import { t } from '../i18n';
+import { t, i18n } from '../i18n';
 import { escapeHtml, setHtml } from '../utils/html';
 
 export class VerificationUI {
@@ -71,7 +71,7 @@ export class VerificationUI {
             </button>
           </div>
           <div id="verify-status" style="margin-top:var(--sp-3);font-size:13px;min-height:20px;"></div>
-          ${user ? `<p style="color:var(--text-muted);font-size:12px;margin-top:var(--sp-4);">${t('auth:verification.loggedInAs', { username: user.username })}</p>` : ''}
+          ${user ? `<p style="color:var(--text-muted);font-size:12px;margin-top:var(--sp-4);">${escapeHtml(t('auth:verification.loggedInAs', { username: user.username }))}</p>` : ''}
         </div>
       </div>
     `,
@@ -113,11 +113,16 @@ export class VerificationUI {
         this.startResendCountdown(btn, false);
       }
     } catch (err: unknown) {
-      const msg = getErrorMessage(err);
-      if (msg.includes('Resend limit')) {
+      // By code, not by matching the server's English message.
+      const code = (err as { code?: unknown } | null)?.code;
+      if (code === 'RESEND_LIMIT_REACHED') {
         this.resendCount = this.maxResends;
         btn.textContent = t('auth:verification.resendLimitReached');
       } else {
+        const msg =
+          typeof code === 'string' && i18n.exists(`errors:${code}`)
+            ? t(`errors:${code}`)
+            : getErrorMessage(err);
         setHtml(statusEl, `<span class="text-danger">${escapeHtml(msg)}</span>`);
         btn.disabled = false;
       }

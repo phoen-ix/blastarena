@@ -11,7 +11,7 @@
     "messages": "Messaggi",
     "party": "Gruppo",
     "leaderboard": "Classifica",
-    "matchHistory": "Match History",
+    "matchHistory": "Cronologia partite",
     "settings": "Impostazioni",
     "help": "Aiuto",
     "admin": "Admin",
@@ -108,8 +108,8 @@
     "screenShakeDesc": "Scuotimento della telecamera durante le esplosioni",
     "particles": "Particelle",
     "particlesDesc": "Effetti di fuoco, fumo, detriti e scintille",
-    "minimap": "Minimap",
-    "minimapDesc": "Show minimap overlay during gameplay",
+    "minimap": "Minimappa",
+    "minimapDesc": "Mostra la minimappa durante la partita",
     "sharpRendering": "Rendering nitido",
     "sharpRenderingDesc": "Disegna il gioco alla piena risoluzione dello schermo. Richiede più potenza grafica; sempre disattivato con qualità bassa.",
     "colorBlind": "Adatto al daltonismo",
@@ -117,10 +117,10 @@
     "sound": "Suono",
     "soundDesc": "Attiva gli effetti sonori del gioco",
     "audio": "Audio",
-    "mute": "Mute",
-    "muteDesc": "Mute all game sounds",
-    "masterVolume": "Master Volume",
-    "sfxVolume": "SFX Volume",
+    "mute": "Muto",
+    "muteDesc": "Disattiva tutti i suoni del gioco",
+    "masterVolume": "Volume generale",
+    "sfxVolume": "Volume effetti",
     "chat": "Chat",
     "lobbyChat": "Chat lobby",
     "lobbyChatDesc": "Mostra il pannello chat della lobby nell'angolo in basso a destra",
@@ -387,20 +387,20 @@
     "pageInfo": "Pagina {{current}} di {{total}}"
   },
   "matchHistory": {
-    "title": "Match History",
-    "loading": "Loading match history...",
-    "error": "Failed to load match history",
-    "noMatches": "No matches played yet. Get out there!",
-    "mode": "Mode",
-    "result": "Result",
-    "kills": "Kills",
-    "deaths": "Deaths",
-    "players": "Players",
-    "duration": "Duration",
-    "date": "Date",
+    "title": "Cronologia partite",
+    "loading": "Caricamento della cronologia…",
+    "error": "Impossibile caricare la cronologia",
+    "noMatches": "Nessuna partita ancora. Scendi in campo!",
+    "mode": "Modalità",
+    "result": "Risultato",
+    "kills": "Uccisioni",
+    "deaths": "Morti",
+    "players": "Giocatori",
+    "duration": "Durata",
+    "date": "Data",
     "win": "WIN",
-    "prev": "Prev",
-    "next": "Next",
+    "prev": "Prec.",
+    "next": "Succ.",
     "modeSummary": "{{winRate}}% vittorie · {{kd}} K/D"
   },
   "createRoom": {
@@ -420,7 +420,7 @@
     "botAI": "IA Bot",
     "friendlyFire": "Fuoco amico",
     "hazardTiles": "Caselle pericolose",
-    "puzzleTiles": "Puzzle Tiles",
+    "puzzleTiles": "Caselle rompicapo",
     "spectatorActions": "Azioni Spettatore",
     "mapEvents": "Eventi mappa dinamici",
     "reinforcedWalls": "Muri rinforzati",
@@ -460,8 +460,8 @@
       "dark_rift": "Squarcio oscuro"
     },
     "puzzleTypes": {
-      "switches_and_gates": "Switches & Gates",
-      "crumbling": "Crumbling Floors"
+      "switches_and_gates": "Interruttori e cancelli",
+      "crumbling": "Pavimenti friabili"
     },
     "eventTypes": {
       "meteor": "Impatto di meteorite",
@@ -530,10 +530,10 @@
     "spectator": "SPETTATORE — WASD/Frecce/D-Pad per panoramica, 1-9/LB/RB o clic per seguire",
     "eliminated": "{{killer}} ha eliminato {{victim}}",
     "selfEliminated": "{{player}} è stato eliminato",
-    "hazardEliminated": "{{player}} was killed by {{hazard}}",
-    "youWereEliminated": "Eliminated by {{killer}}",
-    "youWereEliminatedBy": "Killed by {{cause}}",
-    "youEliminated": "You were eliminated",
+    "hazardEliminated": "{{player}} è stato ucciso da {{hazard}}",
+    "youWereEliminated": "Eliminato da {{killer}}",
+    "youWereEliminatedBy": "Ucciso da {{cause}}",
+    "youEliminated": "Sei stato eliminato",
     "enemies": "Nemici: {{count}}",
     "teamRed": "Squadra Rossa",
     "teamBlue": "Squadra Blu",
@@ -547,7 +547,15 @@
     "coopDead": "(morto)",
     "coopReady": "(pronto)",
     "coopRespawnIn": "({{seconds}}s)",
-    "adminMessageFrom": "Messaggio da {{from}}"
+    "adminMessageFrom": "Messaggio da {{from}}",
+    "causes": {
+      "zone": "la zona",
+      "lava": "la lava",
+      "quicksand": "le sabbie mobili",
+      "spikes": "le punte",
+      "dark_rift": "una faglia oscura",
+      "disconnect": "una disconnessione"
+    }
   },
   "room": {
     "back": "← Indietro",
@@ -584,14 +592,6 @@
     "playerLeft": "{{username}} è uscito",
     "teamAssignment": "Assegnazione squadra per {{username}}",
     "botTeamAssignment": "Assegnazione squadra per Bot {{index}}",
-    "botNames": {
-      "bomberBot": "Bot Bomber",
-      "blastBot": "Bot Blast",
-      "kaboom": "Kaboom",
-      "tnt": "TNT",
-      "dynamite": "Dynamite",
-      "sparky": "Sparky"
-    },
     "adminMessageFrom": "Messaggio da {{from}}"
   },
   "game": {
@@ -664,7 +664,9 @@
     "disabled": "Il mondo aperto è offline",
     "roundEnd": "Round finito",
     "roundStart": "Nuovo round in arrivo",
-    "nextRound": "Prossimo round tra {{seconds}}s"
+    "nextRound": "Prossimo round tra {{seconds}}s",
+    "notConnected": "Nessuna connessione al server. Attendi un momento.",
+    "joinFailed": "Impossibile entrare nel mondo aperto"
   },
   "replayLog": {
     "filters": {

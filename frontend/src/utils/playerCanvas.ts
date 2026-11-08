@@ -1,4 +1,4 @@
-import { PLAYER_COLORS } from '../scenes/BootScene';
+import { playerColor } from '../game/playerPalette';
 
 /** Draw a player sprite icon using Canvas2D (matches BootScene's Phaser rendering) */
 export function drawPlayerSprite(
@@ -100,9 +100,9 @@ export function playerColorToHex(color: number): string {
   return `#${color.toString(16).padStart(6, '0')}`;
 }
 
-/** Get hex color for a player by index (from PLAYER_COLORS array) */
+/** CSS colour of palette slot `index`, honouring the colour-blind setting (playerPalette). */
 export function getPlayerColorHex(index: number): string {
-  return playerColorToHex(PLAYER_COLORS[index % PLAYER_COLORS.length]);
+  return playerColorToHex(playerColor(index));
 }
 
 /** Draw a bomb sprite icon using Canvas2D (matches BootScene's Phaser rendering) */

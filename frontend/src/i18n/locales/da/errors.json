@@ -11,5 +11,12 @@
   "NOT_FOUND": "Ressource ikke fundet",
   "INTERNAL_ERROR": "Der opstod en uventet fejl",
   "BAD_REQUEST": "Ugyldig forespørgsel",
-  "INVALID_TOTP_CODE": "Ugyldig bekræftelseskode. Prøv igen."
+  "INVALID_TOTP_CODE": "Ugyldig bekræftelseskode. Prøv igen.",
+  "RATE_LIMITED": "For mange forsøg. Vent et øjeblik, og prøv igen.",
+  "EMAIL_NOT_VERIFIED": "Bekræft først din e-mailadresse.",
+  "RESEND_LIMIT_REACHED": "Du har anmodet om for mange bekræftelsesmails. Prøv igen senere.",
+  "TOTP_RATE_LIMITED": "For mange forkerte koder. Vent, før du prøver igen.",
+  "CSRF_INVALID": "Din session kunne ikke bekræftes. Genindlæs siden.",
+  "NO_REFRESH_TOKEN": "Din session er udløbet. Log ind igen.",
+  "PAYLOAD_TOO_LARGE": "Anmodningen er for stor."
 }

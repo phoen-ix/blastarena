@@ -11,5 +11,12 @@
   "NOT_FOUND": "Bron niet gevonden",
   "INTERNAL_ERROR": "Er is een onverwachte fout opgetreden",
   "BAD_REQUEST": "Ongeldig verzoek",
-  "INVALID_TOTP_CODE": "Ongeldige verificatiecode. Probeer het opnieuw."
+  "INVALID_TOTP_CODE": "Ongeldige verificatiecode. Probeer het opnieuw.",
+  "RATE_LIMITED": "Te veel pogingen. Wacht even en probeer het opnieuw.",
+  "EMAIL_NOT_VERIFIED": "Bevestig eerst je e-mailadres.",
+  "RESEND_LIMIT_REACHED": "Je hebt te veel verificatie-e-mails aangevraagd. Probeer het later opnieuw.",
+  "TOTP_RATE_LIMITED": "Te veel onjuiste codes. Wacht even voordat je het opnieuw probeert.",
+  "CSRF_INVALID": "Je sessie kon niet worden gecontroleerd. Laad de pagina opnieuw.",
+  "NO_REFRESH_TOKEN": "Je sessie is beëindigd. Log opnieuw in.",
+  "PAYLOAD_TOO_LARGE": "Het verzoek is te groot."
 }

@@ -11,7 +11,7 @@
     "messages": "Mesajlar",
     "party": "Parti",
     "leaderboard": "Skor Tablosu",
-    "matchHistory": "Match History",
+    "matchHistory": "Maç geçmişi",
     "settings": "Ayarlar",
     "help": "Yardım",
     "admin": "Yönetici",
@@ -108,19 +108,19 @@
     "screenShakeDesc": "Patlamalarda kamera sarsıntısı",
     "particles": "Parçacıklar",
     "particlesDesc": "Ateş, duman, enkaz ve kıvılcım efektleri",
-    "minimap": "Minimap",
-    "minimapDesc": "Show minimap overlay during gameplay",
+    "minimap": "Mini harita",
+    "minimapDesc": "Oyun sırasında mini haritayı göster",
     "sharpRendering": "Net görüntü",
     "sharpRenderingDesc": "Oyunu ekranınızın tam çözünürlüğünde çizer. Daha fazla grafik gücü kullanır; düşük kalitede her zaman kapalıdır.",
     "colorBlind": "Renk körlüğüne uygun",
     "colorBlindDesc": "Renk körlüğünde de ayırt edilebilen oyuncu ve takım renkleri, ayrıca her oyuncuda bir şekil işareti.",
     "sound": "Ses",
     "soundDesc": "Oyun ses efektlerini etkinleştir",
-    "audio": "Audio",
-    "mute": "Mute",
-    "muteDesc": "Mute all game sounds",
-    "masterVolume": "Master Volume",
-    "sfxVolume": "SFX Volume",
+    "audio": "Ses",
+    "mute": "Sessiz",
+    "muteDesc": "Tüm oyun seslerini kapat",
+    "masterVolume": "Ana ses seviyesi",
+    "sfxVolume": "Efekt ses seviyesi",
     "chat": "Sohbet",
     "lobbyChat": "Lobi Sohbeti",
     "lobbyChatDesc": "Sağ alt köşede lobi sohbet panelini göster",
@@ -387,20 +387,20 @@
     "pageInfo": "Sayfa {{current}} / {{total}}"
   },
   "matchHistory": {
-    "title": "Match History",
-    "loading": "Loading match history...",
-    "error": "Failed to load match history",
-    "noMatches": "No matches played yet. Get out there!",
-    "mode": "Mode",
-    "result": "Result",
-    "kills": "Kills",
-    "deaths": "Deaths",
-    "players": "Players",
-    "duration": "Duration",
-    "date": "Date",
+    "title": "Maç geçmişi",
+    "loading": "Maç geçmişi yükleniyor…",
+    "error": "Maç geçmişi yüklenemedi",
+    "noMatches": "Henüz maç oynanmadı. Hadi arenaya!",
+    "mode": "Mod",
+    "result": "Sonuç",
+    "kills": "Öldürme",
+    "deaths": "Ölüm",
+    "players": "Oyuncular",
+    "duration": "Süre",
+    "date": "Tarih",
     "win": "WIN",
-    "prev": "Prev",
-    "next": "Next",
+    "prev": "Önceki",
+    "next": "Sonraki",
     "modeSummary": "%{{winRate}} galibiyet · {{kd}} K/D"
   },
   "createRoom": {
@@ -420,7 +420,7 @@
     "botAI": "Bot Yapay Zekası",
     "friendlyFire": "Dost Ateşi",
     "hazardTiles": "Tehlike Kareleri",
-    "puzzleTiles": "Puzzle Tiles",
+    "puzzleTiles": "Bulmaca kareleri",
     "spectatorActions": "Seyirci Eylemleri",
     "mapEvents": "Dinamik Harita Olayları",
     "reinforcedWalls": "Güçlendirilmiş Duvarlar",
@@ -486,8 +486,8 @@
       "dark_rift": "Karanlık Yarık"
     },
     "puzzleTypes": {
-      "switches_and_gates": "Switches & Gates",
-      "crumbling": "Crumbling Floors"
+      "switches_and_gates": "Anahtarlar ve kapılar",
+      "crumbling": "Çöken zeminler"
     },
     "eventTypes": {
       "meteor": "Meteor Yağmuru",
@@ -530,10 +530,10 @@
     "spectator": "İZLEYİCİ — WASD/Yönler/D-Pad ile kaydır, 1-9/LB/RB veya tıkla ile takip et",
     "eliminated": "{{killer}}, {{victim}} oyuncusunu eledi",
     "selfEliminated": "{{player}} elendi",
-    "hazardEliminated": "{{player}} was killed by {{hazard}}",
-    "youWereEliminated": "Eliminated by {{killer}}",
-    "youWereEliminatedBy": "Killed by {{cause}}",
-    "youEliminated": "You were eliminated",
+    "hazardEliminated": "{{player}} öldü: {{hazard}}",
+    "youWereEliminated": "{{killer}} seni eledi",
+    "youWereEliminatedBy": "Ölüm sebebi: {{cause}}",
+    "youEliminated": "Elendin",
     "enemies": "Düşmanlar: {{count}}",
     "teamRed": "Kırmızı Takım",
     "teamBlue": "Mavi Takım",
@@ -547,7 +547,15 @@
     "coopDead": "(öldü)",
     "coopReady": "(hazır)",
     "coopRespawnIn": "({{seconds}}sn)",
-    "adminMessageFrom": "{{from}} tarafından mesaj"
+    "adminMessageFrom": "{{from}} tarafından mesaj",
+    "causes": {
+      "zone": "bölge",
+      "lava": "lav",
+      "quicksand": "bataklık kumu",
+      "spikes": "dikenler",
+      "dark_rift": "karanlık yarık",
+      "disconnect": "bağlantı kopması"
+    }
   },
   "room": {
     "back": "← Geri",
@@ -584,14 +592,6 @@
     "playerLeft": "{{username}} ayrıldı",
     "teamAssignment": "{{username}} için takım ataması",
     "botTeamAssignment": "Bot {{index}} için takım ataması",
-    "botNames": {
-      "bomberBot": "Bombacı Bot",
-      "blastBot": "Patlama Botu",
-      "kaboom": "Kaboom",
-      "tnt": "TNT",
-      "dynamite": "Dinamit",
-      "sparky": "Kıvılcım"
-    },
     "adminMessageFrom": "{{from}} tarafından mesaj"
   },
   "game": {
@@ -664,7 +664,9 @@
     "disabled": "Açık Dünya şu anda kapalı",
     "roundEnd": "Tur Bitti",
     "roundStart": "Yeni Tur Başlıyor",
-    "nextRound": "Sonraki tur {{seconds}}s içinde"
+    "nextRound": "Sonraki tur {{seconds}}s içinde",
+    "notConnected": "Sunucuya bağlı değil. Lütfen biraz bekle.",
+    "joinFailed": "Açık dünyaya katılınamadı"
   },
   "replayLog": {
     "filters": {

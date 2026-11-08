@@ -11,7 +11,7 @@
     "messages": "Meldinger",
     "party": "Gruppe",
     "leaderboard": "Rangliste",
-    "matchHistory": "Match History",
+    "matchHistory": "Kamphistorikk",
     "settings": "Innstillinger",
     "help": "Hjelp",
     "admin": "Admin",
@@ -108,19 +108,19 @@
     "screenShakeDesc": "Kameraristing ved eksplosjoner",
     "particles": "Partikler",
     "particlesDesc": "Ild-, røyk-, vrakrester- og gnisteffekter",
-    "minimap": "Minimap",
-    "minimapDesc": "Show minimap overlay during gameplay",
+    "minimap": "Minikart",
+    "minimapDesc": "Vis minikartet under spillet",
     "sharpRendering": "Skarp gjengivelse",
     "sharpRenderingDesc": "Tegner spillet i skjermens fulle oppløsning. Krever mer grafikkraft; alltid av ved lav kvalitet.",
     "colorBlind": "Fargeblindvennlig",
     "colorBlindDesc": "Spiller- og lagfarger som holder seg adskilt ved fargeblindhet, pluss en formmarkør på hver spiller.",
     "sound": "Lyd",
     "soundDesc": "Aktiver spillydeffekter",
-    "audio": "Audio",
-    "mute": "Mute",
-    "muteDesc": "Mute all game sounds",
-    "masterVolume": "Master Volume",
-    "sfxVolume": "SFX Volume",
+    "audio": "Lyd",
+    "mute": "Demp",
+    "muteDesc": "Demp alle spillyder",
+    "masterVolume": "Hovedvolum",
+    "sfxVolume": "Effektvolum",
     "chat": "Chat",
     "lobbyChat": "Lobbychat",
     "lobbyChatDesc": "Vis lobbychatpanelet i nederste høyre hjørne",
@@ -387,20 +387,20 @@
     "pageInfo": "Side {{current}} av {{total}}"
   },
   "matchHistory": {
-    "title": "Match History",
-    "loading": "Loading match history...",
-    "error": "Failed to load match history",
-    "noMatches": "No matches played yet. Get out there!",
-    "mode": "Mode",
-    "result": "Result",
-    "kills": "Kills",
-    "deaths": "Deaths",
-    "players": "Players",
-    "duration": "Duration",
-    "date": "Date",
+    "title": "Kamphistorikk",
+    "loading": "Laster inn kamphistorikk …",
+    "error": "Kunne ikke laste inn kamphistorikken",
+    "noMatches": "Ingen kamper spilt ennå. Kom i gang!",
+    "mode": "Modus",
+    "result": "Resultat",
+    "kills": "Drap",
+    "deaths": "Dødsfall",
+    "players": "Spillere",
+    "duration": "Varighet",
+    "date": "Dato",
     "win": "WIN",
-    "prev": "Prev",
-    "next": "Next",
+    "prev": "Forrige",
+    "next": "Neste",
     "modeSummary": "{{winRate}} % seiere · {{kd}} K/D"
   },
   "createRoom": {
@@ -420,7 +420,7 @@
     "botAI": "Robot-KI",
     "friendlyFire": "Vennlig ild",
     "hazardTiles": "Farefliser",
-    "puzzleTiles": "Puzzle Tiles",
+    "puzzleTiles": "Puslefelt",
     "spectatorActions": "Tilskuerhandlinger",
     "mapEvents": "Dynamiske karthendelser",
     "reinforcedWalls": "Forsterkede vegger",
@@ -486,8 +486,8 @@
       "dark_rift": "Mørk sprekk"
     },
     "puzzleTypes": {
-      "switches_and_gates": "Switches & Gates",
-      "crumbling": "Crumbling Floors"
+      "switches_and_gates": "Brytere og porter",
+      "crumbling": "Smuldrende gulv"
     },
     "eventTypes": {
       "meteor": "Meteornedslag",
@@ -530,10 +530,10 @@
     "spectator": "TILSKUER — WASD/Piltaster/D-Pad for å panorere, 1-9/LB/RB eller klikk for å følge",
     "eliminated": "{{killer}} eliminerte {{victim}}",
     "selfEliminated": "{{player}} ble eliminert",
-    "hazardEliminated": "{{player}} was killed by {{hazard}}",
-    "youWereEliminated": "Eliminated by {{killer}}",
-    "youWereEliminatedBy": "Killed by {{cause}}",
-    "youEliminated": "You were eliminated",
+    "hazardEliminated": "{{player}} ble drept av {{hazard}}",
+    "youWereEliminated": "Slått ut av {{killer}}",
+    "youWereEliminatedBy": "Drept av {{cause}}",
+    "youEliminated": "Du ble slått ut",
     "enemies": "Fiender: {{count}}",
     "teamRed": "Lag Rød",
     "teamBlue": "Lag Blå",
@@ -547,7 +547,15 @@
     "coopDead": "(død)",
     "coopReady": "(klar)",
     "coopRespawnIn": "({{seconds}}s)",
-    "adminMessageFrom": "Melding fra {{from}}"
+    "adminMessageFrom": "Melding fra {{from}}",
+    "causes": {
+      "zone": "sonen",
+      "lava": "lava",
+      "quicksand": "kvikksand",
+      "spikes": "pigger",
+      "dark_rift": "en mørk revne",
+      "disconnect": "et brudd i tilkoblingen"
+    }
   },
   "room": {
     "back": "← Tilbake",
@@ -584,14 +592,6 @@
     "playerLeft": "{{username}} forlot",
     "teamAssignment": "Lagtildeling for {{username}}",
     "botTeamAssignment": "Lagtildeling for Robot {{index}}",
-    "botNames": {
-      "bomberBot": "Bombebot",
-      "blastBot": "Eksplosjonsbot",
-      "kaboom": "Kaboom",
-      "tnt": "TNT",
-      "dynamite": "Dynamitt",
-      "sparky": "Gnansen"
-    },
     "adminMessageFrom": "Melding fra {{from}}"
   },
   "game": {
@@ -664,7 +664,9 @@
     "disabled": "Åpen verden er offline",
     "roundEnd": "Runden er over",
     "roundStart": "Ny runde starter",
-    "nextRound": "Neste runde om {{seconds}}s"
+    "nextRound": "Neste runde om {{seconds}}s",
+    "notConnected": "Ikke koblet til serveren. Vent litt.",
+    "joinFailed": "Kunne ikke bli med i den åpne verdenen"
   },
   "replayLog": {
     "filters": {

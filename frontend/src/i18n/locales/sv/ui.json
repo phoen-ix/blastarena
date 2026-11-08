@@ -11,7 +11,7 @@
     "messages": "Meddelanden",
     "party": "Grupp",
     "leaderboard": "Topplista",
-    "matchHistory": "Match History",
+    "matchHistory": "Matchhistorik",
     "settings": "Inställningar",
     "help": "Hjälp",
     "admin": "Admin",
@@ -108,19 +108,19 @@
     "screenShakeDesc": "Kameraskakning vid explosioner",
     "particles": "Partiklar",
     "particlesDesc": "Eld-, rök-, bråk- och gnisteffekter",
-    "minimap": "Minimap",
-    "minimapDesc": "Show minimap overlay during gameplay",
+    "minimap": "Minikarta",
+    "minimapDesc": "Visa minikartan under spelet",
     "sharpRendering": "Skarp rendering",
     "sharpRenderingDesc": "Ritar spelet i skärmens fulla upplösning. Kräver mer grafikkraft; alltid av vid låg kvalitet.",
     "colorBlind": "Färgblindvänligt",
     "colorBlindDesc": "Spelar- och lagfärger som går att skilja åt vid färgblindhet, plus en formmarkering på varje spelare.",
     "sound": "Ljud",
     "soundDesc": "Aktivera spelljudeffekter",
-    "audio": "Audio",
-    "mute": "Mute",
-    "muteDesc": "Mute all game sounds",
-    "masterVolume": "Master Volume",
-    "sfxVolume": "SFX Volume",
+    "audio": "Ljud",
+    "mute": "Tyst",
+    "muteDesc": "Stäng av alla spelljud",
+    "masterVolume": "Huvudvolym",
+    "sfxVolume": "Effektvolym",
     "chat": "Chatt",
     "lobbyChat": "Lobbychatt",
     "lobbyChatDesc": "Visa lobbychattfältet i nedre högra hörnet",
@@ -387,20 +387,20 @@
     "pageInfo": "Sida {{current}} av {{total}}"
   },
   "matchHistory": {
-    "title": "Match History",
-    "loading": "Loading match history...",
-    "error": "Failed to load match history",
-    "noMatches": "No matches played yet. Get out there!",
-    "mode": "Mode",
-    "result": "Result",
+    "title": "Matchhistorik",
+    "loading": "Läser in matchhistorik …",
+    "error": "Det gick inte att läsa in matchhistoriken",
+    "noMatches": "Inga matcher spelade än. Ut och spela!",
+    "mode": "Läge",
+    "result": "Resultat",
     "kills": "Kills",
-    "deaths": "Deaths",
-    "players": "Players",
-    "duration": "Duration",
-    "date": "Date",
+    "deaths": "Dödsfall",
+    "players": "Spelare",
+    "duration": "Längd",
+    "date": "Datum",
     "win": "WIN",
-    "prev": "Prev",
-    "next": "Next",
+    "prev": "Föreg.",
+    "next": "Nästa",
     "modeSummary": "{{winRate}} % vinster · {{kd}} K/D"
   },
   "createRoom": {
@@ -420,7 +420,7 @@
     "botAI": "Bot-AI",
     "friendlyFire": "Friendly fire",
     "hazardTiles": "Farorutor",
-    "puzzleTiles": "Puzzle Tiles",
+    "puzzleTiles": "Pusselrutor",
     "spectatorActions": "Åskådarhandlingar",
     "mapEvents": "Dynamiska karthändelser",
     "reinforcedWalls": "Förstärkta väggar",
@@ -486,8 +486,8 @@
       "dark_rift": "Mörk spricka"
     },
     "puzzleTypes": {
-      "switches_and_gates": "Switches & Gates",
-      "crumbling": "Crumbling Floors"
+      "switches_and_gates": "Brytare och grindar",
+      "crumbling": "Smulande golv"
     },
     "eventTypes": {
       "meteor": "Meteorregn",
@@ -530,10 +530,10 @@
     "spectator": "ÅSKÅDARE — WASD/Pilar/Styrplatta för att panorera, 1-9/LB/RB eller klicka för att följa",
     "eliminated": "{{killer}} eliminerade {{victim}}",
     "selfEliminated": "{{player}} blev eliminerad",
-    "hazardEliminated": "{{player}} was killed by {{hazard}}",
-    "youWereEliminated": "Eliminated by {{killer}}",
-    "youWereEliminatedBy": "Killed by {{cause}}",
-    "youEliminated": "You were eliminated",
+    "hazardEliminated": "{{player}} dödades av {{hazard}}",
+    "youWereEliminated": "Utslagen av {{killer}}",
+    "youWereEliminatedBy": "Dödad av {{cause}}",
+    "youEliminated": "Du är utslagen",
     "enemies": "Fiender: {{count}}",
     "teamRed": "Lag Röd",
     "teamBlue": "Lag Blå",
@@ -547,7 +547,15 @@
     "coopDead": "(död)",
     "coopReady": "(redo)",
     "coopRespawnIn": "({{seconds}}s)",
-    "adminMessageFrom": "Meddelande från {{from}}"
+    "adminMessageFrom": "Meddelande från {{from}}",
+    "causes": {
+      "zone": "zonen",
+      "lava": "lava",
+      "quicksand": "kvicksand",
+      "spikes": "spikar",
+      "dark_rift": "en mörk reva",
+      "disconnect": "en tappad anslutning"
+    }
   },
   "room": {
     "back": "← Tillbaka",
@@ -584,14 +592,6 @@
     "playerLeft": "{{username}} lämnade",
     "teamAssignment": "Lagtilldelning för {{username}}",
     "botTeamAssignment": "Lagtilldelning för Bott {{index}}",
-    "botNames": {
-      "bomberBot": "Bombbott",
-      "blastBot": "Sprängbott",
-      "kaboom": "Kaboom",
-      "tnt": "TNT",
-      "dynamite": "Dynamit",
-      "sparky": "Sparky"
-    },
     "adminMessageFrom": "Meddelande från {{from}}"
   },
   "game": {
@@ -664,7 +664,9 @@
     "disabled": "Öppen värld är offline just nu",
     "roundEnd": "Rundan slut",
     "roundStart": "Ny runda startar",
-    "nextRound": "Nästa runda om {{seconds}}s"
+    "nextRound": "Nästa runda om {{seconds}}s",
+    "notConnected": "Ingen anslutning till servern. Vänta en stund.",
+    "joinFailed": "Det gick inte att gå med i den öppna världen"
   },
   "replayLog": {
     "filters": {

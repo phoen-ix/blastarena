@@ -11,5 +11,12 @@
   "NOT_FOUND": "Resource not found",
   "INTERNAL_ERROR": "An unexpected error occurred",
   "BAD_REQUEST": "Invalid request",
-  "INVALID_TOTP_CODE": "Invalid verification code. Please try again."
+  "INVALID_TOTP_CODE": "Invalid verification code. Please try again.",
+  "RATE_LIMITED": "Too many attempts. Please wait a moment and try again.",
+  "EMAIL_NOT_VERIFIED": "Please verify your email address first.",
+  "RESEND_LIMIT_REACHED": "You have requested too many verification emails. Please try again later.",
+  "TOTP_RATE_LIMITED": "Too many incorrect codes. Please wait before trying again.",
+  "CSRF_INVALID": "Your session could not be verified. Please reload the page.",
+  "NO_REFRESH_TOKEN": "Your session has ended. Please log in again.",
+  "PAYLOAD_TOO_LARGE": "The request is too large."
 }

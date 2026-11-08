@@ -11,5 +11,12 @@
   "NOT_FOUND": "Nie znaleziono zasobu",
   "INTERNAL_ERROR": "Wystąpił nieoczekiwany błąd",
   "BAD_REQUEST": "Nieprawidłowe żądanie",
-  "INVALID_TOTP_CODE": "Nieprawidłowy kod weryfikacyjny. Spróbuj ponownie."
+  "INVALID_TOTP_CODE": "Nieprawidłowy kod weryfikacyjny. Spróbuj ponownie.",
+  "RATE_LIMITED": "Zbyt wiele prób. Odczekaj chwilę i spróbuj ponownie.",
+  "EMAIL_NOT_VERIFIED": "Najpierw potwierdź swój adres e-mail.",
+  "RESEND_LIMIT_REACHED": "Zażądano zbyt wielu e-maili weryfikacyjnych. Spróbuj ponownie później.",
+  "TOTP_RATE_LIMITED": "Zbyt wiele błędnych kodów. Odczekaj przed kolejną próbą.",
+  "CSRF_INVALID": "Nie udało się zweryfikować sesji. Odśwież stronę.",
+  "NO_REFRESH_TOKEN": "Sesja wygasła. Zaloguj się ponownie.",
+  "PAYLOAD_TOO_LARGE": "Żądanie jest zbyt duże."
 }

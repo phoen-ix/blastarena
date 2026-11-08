@@ -11,5 +11,12 @@
   "NOT_FOUND": "Ressursen ble ikke funnet",
   "INTERNAL_ERROR": "En uventet feil oppstod",
   "BAD_REQUEST": "Ugyldig forespørsel",
-  "INVALID_TOTP_CODE": "Ugyldig verifiseringskode. Prøv igjen."
+  "INVALID_TOTP_CODE": "Ugyldig verifiseringskode. Prøv igjen.",
+  "RATE_LIMITED": "For mange forsøk. Vent litt og prøv igjen.",
+  "EMAIL_NOT_VERIFIED": "Bekreft e-postadressen din først.",
+  "RESEND_LIMIT_REACHED": "Du har bedt om for mange bekreftelses-e-poster. Prøv igjen senere.",
+  "TOTP_RATE_LIMITED": "For mange feil koder. Vent før du prøver igjen.",
+  "CSRF_INVALID": "Økten din kunne ikke bekreftes. Last inn siden på nytt.",
+  "NO_REFRESH_TOKEN": "Økten din er avsluttet. Logg inn på nytt.",
+  "PAYLOAD_TOO_LARGE": "Forespørselen er for stor."
 }

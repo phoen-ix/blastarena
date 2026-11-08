@@ -11,7 +11,7 @@
     "messages": "Berichten",
     "party": "Groep",
     "leaderboard": "Ranglijst",
-    "matchHistory": "Match History",
+    "matchHistory": "Wedstrijdgeschiedenis",
     "settings": "Instellingen",
     "help": "Help",
     "admin": "Beheer",
@@ -108,19 +108,19 @@
     "screenShakeDesc": "Camera trilt bij explosies",
     "particles": "Deeltjes",
     "particlesDesc": "Vuur-, rook-, puin- en vonkeffecten",
-    "minimap": "Minimap",
-    "minimapDesc": "Show minimap overlay during gameplay",
+    "minimap": "Minikaart",
+    "minimapDesc": "Minikaart tonen tijdens het spel",
     "sharpRendering": "Scherpe weergave",
     "sharpRenderingDesc": "Tekent het spel op de volledige resolutie van je scherm. Vraagt meer grafische kracht; altijd uit bij lage kwaliteit.",
     "colorBlind": "Kleurenblindvriendelijk",
     "colorBlindDesc": "Speler- en teamkleuren die ook bij kleurenblindheid te onderscheiden zijn, plus een vormmarkering bij elke speler.",
     "sound": "Geluid",
     "soundDesc": "Spelgeluidseffecten inschakelen",
-    "audio": "Audio",
-    "mute": "Mute",
-    "muteDesc": "Mute all game sounds",
-    "masterVolume": "Master Volume",
-    "sfxVolume": "SFX Volume",
+    "audio": "Geluid",
+    "mute": "Dempen",
+    "muteDesc": "Alle spelgeluiden dempen",
+    "masterVolume": "Hoofdvolume",
+    "sfxVolume": "Effectvolume",
     "chat": "Chat",
     "lobbyChat": "Lobbychat",
     "lobbyChatDesc": "Toon het lobbychatpaneel in de rechterbenedenhoek",
@@ -387,20 +387,20 @@
     "pageInfo": "Pagina {{current}} van {{total}}"
   },
   "matchHistory": {
-    "title": "Match History",
-    "loading": "Loading match history...",
-    "error": "Failed to load match history",
-    "noMatches": "No matches played yet. Get out there!",
-    "mode": "Mode",
-    "result": "Result",
+    "title": "Wedstrijdgeschiedenis",
+    "loading": "Geschiedenis laden…",
+    "error": "Kon de geschiedenis niet laden",
+    "noMatches": "Nog geen wedstrijden gespeeld. Ga ervoor!",
+    "mode": "Modus",
+    "result": "Resultaat",
     "kills": "Kills",
-    "deaths": "Deaths",
-    "players": "Players",
-    "duration": "Duration",
-    "date": "Date",
+    "deaths": "Doden",
+    "players": "Spelers",
+    "duration": "Duur",
+    "date": "Datum",
     "win": "WIN",
-    "prev": "Prev",
-    "next": "Next",
+    "prev": "Vorige",
+    "next": "Volgende",
     "modeSummary": "{{winRate}}% winst · {{kd}} K/D"
   },
   "createRoom": {
@@ -420,7 +420,7 @@
     "botAI": "Bot-AI",
     "friendlyFire": "Friendly fire",
     "hazardTiles": "Gevaarlijke tegels",
-    "puzzleTiles": "Puzzle Tiles",
+    "puzzleTiles": "Puzzelvakken",
     "spectatorActions": "Toeschouweracties",
     "mapEvents": "Dynamische kaartgebeurtenissen",
     "reinforcedWalls": "Versterkte muren",
@@ -486,8 +486,8 @@
       "dark_rift": "Duistere scheur"
     },
     "puzzleTypes": {
-      "switches_and_gates": "Switches & Gates",
-      "crumbling": "Crumbling Floors"
+      "switches_and_gates": "Schakelaars en poorten",
+      "crumbling": "Afbrokkelende vloeren"
     },
     "eventTypes": {
       "meteor": "Meteorinslag",
@@ -530,10 +530,10 @@
     "spectator": "TOESCHOUWER — WASD/Pijltjes/D-Pad om te bewegen, 1-9/LB/RB of klik om te volgen",
     "eliminated": "{{killer}} heeft {{victim}} uitgeschakeld",
     "selfEliminated": "{{player}} is uitgeschakeld",
-    "hazardEliminated": "{{player}} was killed by {{hazard}}",
-    "youWereEliminated": "Eliminated by {{killer}}",
-    "youWereEliminatedBy": "Killed by {{cause}}",
-    "youEliminated": "You were eliminated",
+    "hazardEliminated": "{{player}} werd gedood door {{hazard}}",
+    "youWereEliminated": "Uitgeschakeld door {{killer}}",
+    "youWereEliminatedBy": "Gedood door {{cause}}",
+    "youEliminated": "Je bent uitgeschakeld",
     "enemies": "Vijanden: {{count}}",
     "teamRed": "Team Rood",
     "teamBlue": "Team Blauw",
@@ -547,7 +547,15 @@
     "coopDead": "(dood)",
     "coopReady": "(klaar)",
     "coopRespawnIn": "({{seconds}}s)",
-    "adminMessageFrom": "Bericht van {{from}}"
+    "adminMessageFrom": "Bericht van {{from}}",
+    "causes": {
+      "zone": "de zone",
+      "lava": "lava",
+      "quicksand": "drijfzand",
+      "spikes": "spijkers",
+      "dark_rift": "een duistere scheur",
+      "disconnect": "een verbroken verbinding"
+    }
   },
   "room": {
     "back": "← Terug",
@@ -584,14 +592,6 @@
     "playerLeft": "{{username}} is vertrokken",
     "teamAssignment": "Teamtoewijzing voor {{username}}",
     "botTeamAssignment": "Teamtoewijzing voor Bot {{index}}",
-    "botNames": {
-      "bomberBot": "Bomber Bot",
-      "blastBot": "Blast Bot",
-      "kaboom": "Kaboom",
-      "tnt": "TNT",
-      "dynamite": "Dynamiet",
-      "sparky": "Sparky"
-    },
     "adminMessageFrom": "Bericht van {{from}}"
   },
   "game": {
@@ -664,7 +664,9 @@
     "disabled": "Open wereld is momenteel offline",
     "roundEnd": "Ronde voorbij",
     "roundStart": "Nieuwe ronde start",
-    "nextRound": "Volgende ronde over {{seconds}}s"
+    "nextRound": "Volgende ronde over {{seconds}}s",
+    "notConnected": "Geen verbinding met de server. Wacht even.",
+    "joinFailed": "Kon niet deelnemen aan de open wereld"
   },
   "replayLog": {
     "filters": {

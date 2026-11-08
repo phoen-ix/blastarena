@@ -11,5 +11,12 @@
   "NOT_FOUND": "Resursen hittades inte",
   "INTERNAL_ERROR": "Ett oväntat fel uppstod",
   "BAD_REQUEST": "Ogiltig förfrågan",
-  "INVALID_TOTP_CODE": "Ogiltig verifieringskod. Försök igen."
+  "INVALID_TOTP_CODE": "Ogiltig verifieringskod. Försök igen.",
+  "RATE_LIMITED": "För många försök. Vänta en stund och försök igen.",
+  "EMAIL_NOT_VERIFIED": "Verifiera din e-postadress först.",
+  "RESEND_LIMIT_REACHED": "Du har begärt för många verifieringsmejl. Försök igen senare.",
+  "TOTP_RATE_LIMITED": "För många felaktiga koder. Vänta innan du försöker igen.",
+  "CSRF_INVALID": "Din session kunde inte verifieras. Ladda om sidan.",
+  "NO_REFRESH_TOKEN": "Din session har avslutats. Logga in igen.",
+  "PAYLOAD_TOO_LARGE": "Begäran är för stor."
 }

@@ -11,5 +11,12 @@
   "NOT_FOUND": "Kaynak bulunamadı",
   "INTERNAL_ERROR": "Beklenmeyen bir hata oluştu",
   "BAD_REQUEST": "Geçersiz istek",
-  "INVALID_TOTP_CODE": "Geçersiz doğrulama kodu. Lütfen tekrar dene."
+  "INVALID_TOTP_CODE": "Geçersiz doğrulama kodu. Lütfen tekrar dene.",
+  "RATE_LIMITED": "Çok fazla deneme. Lütfen biraz bekleyip tekrar deneyin.",
+  "EMAIL_NOT_VERIFIED": "Lütfen önce e-posta adresini doğrula.",
+  "RESEND_LIMIT_REACHED": "Çok fazla doğrulama e-postası istedin. Lütfen daha sonra tekrar dene.",
+  "TOTP_RATE_LIMITED": "Çok fazla hatalı kod. Tekrar denemeden önce lütfen bekle.",
+  "CSRF_INVALID": "Oturumun doğrulanamadı. Lütfen sayfayı yenile.",
+  "NO_REFRESH_TOKEN": "Oturumun sona erdi. Lütfen tekrar giriş yap.",
+  "PAYLOAD_TOO_LARGE": "İstek çok büyük."
 }

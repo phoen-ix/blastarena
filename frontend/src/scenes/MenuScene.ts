@@ -374,6 +374,12 @@ export class MenuScene extends Phaser.Scene {
         this.scene.launch('GameScene');
         this.scene.bringToTop('MenuScene');
         this.bgArenaStarted = true;
+        // The arena can end under the menu (the idle guest is AFK-kicked). "Play as Guest" then
+        // waited for a GameScene 'create' that never came; forget the arena so it rejoins via the
+        // lobby instead. (audit F4)
+        this.scene.get('GameScene').events.once('shutdown', () => {
+          this.bgArenaStarted = false;
+        });
         if (this.pendingReveal) this.revealArena();
       } else if (this.pendingReveal) {
         // Join failed but the user already asked to play — fall back to the lobby flow.
@@ -446,14 +452,15 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private onAuthenticated(): void {
+    // A sign-in (also from the guest's HUD bar) auto-joins the world once as the account — also
+    // after the email verification step, which returned before this was cleared. (audit F5)
+    this.registry.remove('openWorldAutoJoined');
     const user = this.authManager.getUser();
     if (user && !user.emailVerified) {
       this.showVerification();
       return;
     }
     this.socketClient.connect();
-    // A sign-in (also from the guest's HUD bar) auto-joins the world once as the account.
-    this.registry.remove('openWorldAutoJoined');
     this.scene.start('LobbyScene');
   }
 

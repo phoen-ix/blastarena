@@ -76,6 +76,9 @@ export class CampaignUI {
   // appended the campaign under whatever view came next (and pushed a stale gamepad context).
   private destroyed = false;
 
+  /** A campaign:start is on its way (see startLevel). */
+  private startingLevel = false;
+
   constructor(
     socketClient: SocketClient,
     notifications: NotificationUI,
@@ -539,9 +542,11 @@ export class CampaignUI {
       });
       btnArea.appendChild(startBtn);
 
-      // Online co-op button: shown when in a 2-person party as the leader
+      // Online co-op button: shown when in a 2-person party as the leader (the leader check was
+      // missing, so a member got a button the server refused with an English error).
       const party = this.partyBar?.getParty();
-      if (party && party.members.length === 2) {
+      const myId = this.authManager?.getUser()?.id;
+      if (party && party.members.length === 2 && party.leaderId === myId) {
         const coopBtn = document.createElement('button');
         coopBtn.className = 'btn btn-secondary';
         coopBtn.style.cssText = `
@@ -740,6 +745,9 @@ export class CampaignUI {
     localCoopMode = false,
     buddyMode = false,
   ): Promise<void> {
+    // A double click sent campaign:start twice and left two gameStart handlers. (audit P8)
+    if (this.startingLevel) return;
+    this.startingLevel = true;
     try {
       this.notifications.info(t('campaign:loadingLevel'));
 
@@ -822,12 +830,14 @@ export class CampaignUI {
 
       // Emit campaign:start socket event
       this.socketClient.emit('campaign:start', startData, (response) => {
+        this.startingLevel = false;
         if (response && response.error) {
           this.socketClient.off('campaign:gameStart', gameStartHandler);
           this.notifications.error(response.error);
         }
       });
     } catch (err: unknown) {
+      this.startingLevel = false;
       this.notifications.error(t('campaign:startFailed', { error: getErrorMessage(err) }));
     }
   }

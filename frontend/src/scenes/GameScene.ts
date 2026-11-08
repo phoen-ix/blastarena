@@ -302,6 +302,9 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     UIGamepadNavigator.getInstance().setActive(false);
+    // The keyboard plugin outlives the scene: a guest who signed in from the HUD bar (which
+    // blocks input while its form is open) started the next match with a dead keyboard. (audit F1)
+    if (this.input.keyboard) this.input.keyboard.enabled = true;
 
     this.socketClient = this.registry.get('socketClient');
     this.authManager = this.registry.get('authManager');

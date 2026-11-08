@@ -11,5 +11,12 @@
   "NOT_FOUND": "Recurso no encontrado",
   "INTERNAL_ERROR": "Ocurrió un error inesperado",
   "BAD_REQUEST": "Solicitud inválida",
-  "INVALID_TOTP_CODE": "Código de verificación no válido. Inténtalo de nuevo."
+  "INVALID_TOTP_CODE": "Código de verificación no válido. Inténtalo de nuevo.",
+  "RATE_LIMITED": "Demasiados intentos. Espera un momento y vuelve a intentarlo.",
+  "EMAIL_NOT_VERIFIED": "Primero verifica tu dirección de correo.",
+  "RESEND_LIMIT_REACHED": "Has solicitado demasiados correos de verificación. Inténtalo más tarde.",
+  "TOTP_RATE_LIMITED": "Demasiados códigos incorrectos. Espera antes de volver a intentarlo.",
+  "CSRF_INVALID": "No se pudo verificar tu sesión. Recarga la página.",
+  "NO_REFRESH_TOKEN": "Tu sesión ha terminado. Vuelve a iniciar sesión.",
+  "PAYLOAD_TOO_LARGE": "La solicitud es demasiado grande."
 }

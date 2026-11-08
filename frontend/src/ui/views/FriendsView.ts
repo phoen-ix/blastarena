@@ -183,13 +183,20 @@ export class FriendsView implements ILobbyView {
           break;
         }
         case 'invite': {
+          // A party invite: this view only exists in the lobby, where the room invite it used to
+          // send could never succeed ("Not in a room"). Without a party, one is created first.
+          // (audit P21)
           const targetUserId = parseInt(btn.dataset.userId!);
-          sc.emit('invite:room', { userId: targetUserId }, (res) => {
-            if (res.success) {
-              this.deps.notifications.success(t('ui:friends.inviteSent'));
-            } else {
-              this.deps.notifications.error(res.error || t('ui:friends.inviteFailed'));
-            }
+          const report = (res: { success: boolean; error?: string }) => {
+            if (res.success) this.deps.notifications.success(t('ui:friends.inviteSent'));
+            else this.deps.notifications.error(res.error || t('ui:friends.inviteFailed'));
+          };
+          sc.emit('party:invite', { userId: targetUserId }, (res) => {
+            if (res.success || res.error !== 'Not in a party') return report(res);
+            sc.emit('party:create', (created) => {
+              if (!created.success) return report(created);
+              sc.emit('party:invite', { userId: targetUserId }, report);
+            });
           });
           break;
         }
@@ -359,6 +366,11 @@ export class FriendsView implements ILobbyView {
   private renderContent(): void {
     if (!this.container) return;
     const incomingCount = this.incoming.length;
+    // Every presence update re-renders the page: keep what is being typed in the search box (and
+    // its focus), which used to be wiped mid-word. (audit P20)
+    const oldSearch = this.container.querySelector<HTMLInputElement>('#friend-search-input');
+    const searchValue = oldSearch?.value ?? '';
+    const searchFocused = !!oldSearch && document.activeElement === oldSearch;
 
     setHtml(
       this.container,
@@ -389,6 +401,9 @@ export class FriendsView implements ILobbyView {
     );
 
     // Listeners are delegated via setupDelegatedListeners() — no per-render attachment needed
+    const newSearch = this.container.querySelector<HTMLInputElement>('#friend-search-input');
+    if (newSearch && searchValue) newSearch.value = searchValue;
+    if (newSearch && searchFocused) newSearch.focus();
   }
 
   private renderActiveTab(): string {
@@ -433,7 +448,7 @@ export class FriendsView implements ILobbyView {
 
         return `
           <div class="friend-card" data-user-id="${f.userId}">
-            <div class="friend-card-avatar" style="background:${color}${isOnline ? '' : '80'};">
+            <div class="friend-card-avatar" style="background:${color};${isOnline ? '' : 'opacity:0.5;'}">
               ${escapeHtml(f.username.charAt(0).toUpperCase())}
               <span class="status-dot ${f.activity}"></span>
             </div>

@@ -1,12 +1,13 @@
 import { SocketClient } from '../network/SocketClient';
 import { AuthManager } from '../network/AuthManager';
 import { NotificationUI } from './NotificationUI';
-import { Room, RoomPlayer, POWERUP_DEFINITIONS, Friend } from '@blast-arena/shared';
+import { Room, RoomPlayer, POWERUP_DEFINITIONS, Friend, BOT_NAMES } from '@blast-arena/shared';
 import { escapeHtml, escapeAttr, setHtml } from '../utils/html';
 import { createModal } from '../utils/modal';
 import { UIGamepadNavigator } from '../game/UIGamepadNavigator';
 import { t } from '../i18n';
-import { teamColor } from '../game/playerPalette';
+import { teamColor, playerColor } from '../game/playerPalette';
+import { playerColorToHex } from '../utils/playerCanvas';
 
 export class RoomUI {
   private container: HTMLElement;
@@ -439,20 +440,9 @@ export class RoomUI {
 
     // In teams mode, use team color; otherwise individual color
     const teamColors = [teamColor(0), teamColor(1)];
-    const individualColors = [
-      '#ff6b35',
-      '#448aff',
-      '#00e676',
-      '#ffaa22',
-      '#bb44ff',
-      '#ffdd44',
-      '#ff44dd',
-      '#00d4aa',
-    ];
     const playerTeam = player.team ?? index % 2;
-    const color = isTeamsMode
-      ? teamColors[playerTeam]
-      : individualColors[index % individualColors.length];
+    // The arena's player palette (colour-blind setting included), not a hard-coded list.
+    const color = isTeamsMode ? teamColors[playerTeam] : playerColorToHex(playerColor(index));
     const teamLabel = isTeamsMode
       ? playerTeam === 0
         ? t('game:teams.red')
@@ -506,20 +496,12 @@ export class RoomUI {
 
     const isTeamsMode = this.room.config.gameMode === 'teams';
     const iAmHost = this.isHost();
-    const botNames = [
-      t('ui:room.botNames.bomberBot'),
-      t('ui:room.botNames.blastBot'),
-      t('ui:room.botNames.kaboom'),
-      t('ui:room.botNames.tnt'),
-      t('ui:room.botNames.dynamite'),
-      t('ui:room.botNames.sparky'),
-    ];
     const botTeams = this.room.config.botTeams || [];
     const humanCount = this.room.players.length;
 
     let html = '';
     for (let i = 0; i < botCount; i++) {
-      const botName = botNames[i % botNames.length];
+      const botName = BOT_NAMES[i % BOT_NAMES.length];
       const botTeam = botTeams[i] ?? (humanCount + i) % 2;
       const teamColors = [teamColor(0), teamColor(1)];
       const color = isTeamsMode ? teamColors[botTeam] : 'var(--text-muted)';

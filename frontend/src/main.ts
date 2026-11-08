@@ -67,18 +67,25 @@ async function boot(): Promise<Phaser.Game> {
   // Same for the arena art style; MenuScene waits for it before starting the landing arena.
   void artStyleManager.initialize();
 
-  // Update canvas background when theme changes
+  // Update the canvas background when the theme changes. The renderer clears every frame with
+  // the colour captured at boot, which covers the CSS background, so it is updated too: the area
+  // around the arena kept the old theme's colour until a reload. (audit F7)
   themeManager.onChange(() => {
     const newBg = getComputedStyle(document.documentElement).getPropertyValue('--bg-deep').trim();
-    if (newBg && game.canvas) {
-      game.canvas.style.backgroundColor = newBg;
-    }
+    if (!newBg || !game.canvas) return;
+    game.canvas.style.backgroundColor = newBg;
+    const renderer = game.renderer as unknown as {
+      config?: { backgroundColor?: Phaser.Display.Color };
+    };
+    if (renderer.config) renderer.config.backgroundColor = Phaser.Display.Color.ValueToColor(newBg);
   });
 
   return game;
 }
 
-void boot();
+boot().catch((err: unknown) => {
+  console.error('Failed to start the game', err);
+});
 
 // Named export of the `let` so importers get a LIVE binding to the instance assigned inside the
 // async boot(). A `export default game` would snapshot `undefined` (boot() runs after this line),

@@ -91,10 +91,12 @@ export class AuthUI {
     if (this.onClose && !this.escHandler) {
       // Capture phase so Escape closes the form before GameScene's window handler sees it.
       this.escHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
-          e.stopPropagation();
-          this.close();
-        }
+        if (e.key !== 'Escape') return;
+        // A modal opened over the form (the imprint) closes on its own Escape: closing the form
+        // here instead left that modal and its gamepad context orphaned. (audit P11)
+        if (document.querySelector('[aria-modal="true"]:not(.auth-overlay)')) return;
+        e.stopPropagation();
+        this.close();
       };
       document.addEventListener('keydown', this.escHandler, true);
     }
@@ -408,6 +410,9 @@ export class AuthUI {
     const password = (document.getElementById('login-password') as HTMLInputElement).value;
     const errorEl = document.getElementById('login-error')!;
     const btn = document.getElementById('login-btn') as HTMLButtonElement;
+    // Enter in a field submits too: ignore it while the request is in flight (it used to resubmit,
+    // spending the 3-per-15-minutes registration and login attempts). (audit P12)
+    if (btn.disabled) return;
 
     if (!username || !password) {
       errorEl.textContent = t('auth:login.fillAllFields');
@@ -478,6 +483,7 @@ export class AuthUI {
     const code = (document.getElementById('totp-code') as HTMLInputElement).value.trim();
     const errorEl = document.getElementById('totp-error')!;
     const btn = document.getElementById('totp-btn') as HTMLButtonElement;
+    if (btn.disabled) return; // a request is in flight (see handleLogin)
 
     if (!code) {
       errorEl.textContent = t('auth:totp.invalidCode');
@@ -507,6 +513,7 @@ export class AuthUI {
     const password = (document.getElementById('reg-password') as HTMLInputElement).value;
     const errorEl = document.getElementById('reg-error')!;
     const btn = document.getElementById('reg-btn') as HTMLButtonElement;
+    if (btn.disabled) return; // a request is in flight (see handleLogin)
 
     if (!username || !email || !password) {
       errorEl.textContent = t('auth:register.fillAllFields');
@@ -543,6 +550,7 @@ export class AuthUI {
     const email = (document.getElementById('forgot-email') as HTMLInputElement).value.trim();
     const errorEl = document.getElementById('forgot-error')!;
     const btn = document.getElementById('forgot-btn') as HTMLButtonElement;
+    if (btn.disabled) return; // a request is in flight (see handleLogin)
 
     if (!email) {
       errorEl.textContent = t('auth:forgotPassword.enterEmail');
@@ -637,6 +645,7 @@ export class AuthUI {
     const confirm = (document.getElementById('reset-confirm') as HTMLInputElement).value;
     const errorEl = document.getElementById('reset-error')!;
     const btn = document.getElementById('reset-btn') as HTMLButtonElement;
+    if (btn.disabled) return; // a request is in flight (see handleLogin)
 
     if (!this.resetToken) {
       // Reached without a token (e.g. a bookmarked form): only a fresh email link can help.

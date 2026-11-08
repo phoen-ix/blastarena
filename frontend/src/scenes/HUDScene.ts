@@ -487,7 +487,7 @@ export class HUDScene extends Phaser.Scene {
       // Hazard/environment kill
       text = `${causeIcon} ${t('ui:hud.hazardEliminated', {
         player: victimName,
-        hazard: data.cause,
+        hazard: HUDScene.causeName(data.cause),
       })}`;
     } else {
       text = `${causeIcon} ${t('ui:hud.selfEliminated', { player: victimName })}`;
@@ -505,13 +505,20 @@ export class HUDScene extends Phaser.Scene {
     }
   }
 
+  /** A hazard cause as words ("the zone", "a dark rift"): the raw enum value used to be shown. */
+  private static causeName(cause: Exclude<KillCause, 'bomb' | 'self'>): string {
+    return t(`ui:hud.causes.${cause}`);
+  }
+
   private showDeathBanner(killer: PlayerState | null | undefined, cause?: KillCause): void {
     const causeIcon = HUDScene.causeIcon(cause, 22);
     let message: string;
     if (killer && killer.id !== this.localPlayerId) {
       message = `${causeIcon} ${t('ui:hud.youWereEliminated', { killer: escapeHtml(killer.username) })}`;
     } else if (cause && cause !== 'bomb' && cause !== 'self') {
-      message = `${causeIcon} ${t('ui:hud.youWereEliminatedBy', { cause })}`;
+      message = `${causeIcon} ${t('ui:hud.youWereEliminatedBy', {
+        cause: HUDScene.causeName(cause),
+      })}`;
     } else {
       message = `${causeIcon} ${t('ui:hud.youEliminated')}`;
     }

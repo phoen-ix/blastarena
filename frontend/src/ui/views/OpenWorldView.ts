@@ -210,7 +210,7 @@ export class OpenWorldView implements ILobbyView {
     const socket = this.deps.socketClient.getSocket();
     if (!socket) {
       this.restoreLobbyVisibility();
-      this.showError('Not connected');
+      this.showError(t('ui:openWorld.notConnected'));
       return;
     }
 
@@ -245,7 +245,7 @@ export class OpenWorldView implements ILobbyView {
         }
       } else {
         this.restoreLobbyVisibility();
-        this.showError(response.error || 'Failed to join');
+        this.showError(response.error || t('ui:openWorld.joinFailed'));
       }
     });
   }

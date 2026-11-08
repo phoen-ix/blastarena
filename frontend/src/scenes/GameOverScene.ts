@@ -63,6 +63,8 @@ export class GameOverScene extends Phaser.Scene {
   private eloColX = 0;
   private xpColX = 0;
   private achievementToasts: Phaser.GameObjects.Text[] = [];
+  /** A campaign start is on its way: Retry/Next ignore further clicks until it lands or fails. */
+  private startingLevel = false;
   private hasVoted = false;
   private voteTallyText: Phaser.GameObjects.Text | null = null;
 
@@ -71,6 +73,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.startingLevel = false;
     this.selectedIndex = 0;
     this.buttons = [];
     this.baseColors = [];
@@ -740,6 +743,10 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private startCampaignLevel(levelId: number, socketClient: SocketClient): void {
+    // A double click sent two campaign:start and registered two gameStart handlers; the second
+    // start hit the rate limit, cleared the campaign run and flashed the lobby. (audit R1)
+    if (this.startingLevel) return;
+    this.startingLevel = true;
     const isCoopMode = !!this.registry.get('campaignCoopMode');
     const isLocalCoopMode = !!this.registry.get('localCoopMode');
     const isBuddyMode = !!this.registry.get('buddyMode');
@@ -792,6 +799,7 @@ export class GameOverScene extends Phaser.Scene {
 
         socketClient.emit('campaign:start', startData, (response) => {
           if (response && response.error) {
+            this.startingLevel = false;
             socketClient.off('campaign:gameStart', gameStartHandler);
             clearCampaignRun(this.registry);
             this.scene.start('LobbyScene');
@@ -799,6 +807,7 @@ export class GameOverScene extends Phaser.Scene {
         });
       })
       .catch(() => {
+        this.startingLevel = false;
         clearCampaignRun(this.registry);
         this.scene.start('LobbyScene');
       });

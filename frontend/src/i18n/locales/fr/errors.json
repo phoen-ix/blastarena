@@ -11,5 +11,12 @@
   "NOT_FOUND": "Ressource introuvable",
   "INTERNAL_ERROR": "Une erreur inattendue s'est produite",
   "BAD_REQUEST": "Requête invalide",
-  "INVALID_TOTP_CODE": "Code de vérification invalide. Veuillez réessayer."
+  "INVALID_TOTP_CODE": "Code de vérification invalide. Veuillez réessayer.",
+  "RATE_LIMITED": "Trop de tentatives. Patiente un instant et réessaie.",
+  "EMAIL_NOT_VERIFIED": "Vérifie d’abord ton adresse e-mail.",
+  "RESEND_LIMIT_REACHED": "Tu as demandé trop d’e-mails de vérification. Réessaie plus tard.",
+  "TOTP_RATE_LIMITED": "Trop de codes incorrects. Patiente avant de réessayer.",
+  "CSRF_INVALID": "Ta session n’a pas pu être vérifiée. Recharge la page.",
+  "NO_REFRESH_TOKEN": "Ta session est terminée. Reconnecte-toi.",
+  "PAYLOAD_TOO_LARGE": "La requête est trop volumineuse."
 }

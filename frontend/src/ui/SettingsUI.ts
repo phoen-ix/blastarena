@@ -90,12 +90,20 @@ export class SettingsUI {
     ];
   }
 
+  /**
+   * The tab last shown, for the next SettingsUI: a language change rebuilds the view, which used
+   * to jump back to Account (for a guest, an error banner). (audit P6)
+   */
+  private static lastTabId: string | null = null;
+
   constructor(authManager: AuthManager, notifications: NotificationUI, initialTab?: string) {
     this.authManager = authManager;
     this.notifications = notifications;
     this.container = document.createElement('div');
-    this.activeTabId =
-      initialTab && this.tabs.some((tab) => tab.id === initialTab) ? initialTab : 'account';
+    const wanted = initialTab ?? SettingsUI.lastTabId;
+    // A guest has no account, privacy or cosmetics data: start them on Preferences.
+    const fallback = authManager.isGuest ? 'preferences' : 'account';
+    this.activeTabId = wanted && this.tabs.some((tab) => tab.id === wanted) ? wanted : fallback;
   }
 
   private unbindPrefsChange(): void {
@@ -116,6 +124,7 @@ export class SettingsUI {
 
   private async switchTab(tabId: string): Promise<void> {
     this.activeTabId = tabId;
+    SettingsUI.lastTabId = tabId;
 
     const tabBar = this.container.querySelector('#settings-tab-bar');
     if (tabBar) {
@@ -156,12 +165,14 @@ export class SettingsUI {
     try {
       profile = await this.getProfile();
     } catch (err: unknown) {
+      if (this.activeTabId !== 'account') return;
       setHtml(
         this.contentEl,
         `<div class="error-banner">${t('settings.loadProfileFailed', { error: escapeHtml(getErrorMessage(err)) })}</div>`,
       );
       return;
     }
+    if (this.activeTabId !== 'account') return; // the user moved on meanwhile
 
     const user = this.authManager.getUser();
     const isAdmin = user?.role === 'admin';
@@ -1070,12 +1081,14 @@ export class SettingsUI {
     try {
       profile = await this.getProfile();
     } catch (err: unknown) {
+      if (this.activeTabId !== 'privacy') return;
       setHtml(
         this.contentEl,
         `<div class="error-banner">${t('settings.loadProfileFailed', { error: escapeHtml(getErrorMessage(err)) })}</div>`,
       );
       return;
     }
+    if (this.activeTabId !== 'privacy') return; // the user moved on meanwhile
 
     setHtml(
       this.contentEl,
@@ -1144,6 +1157,7 @@ export class SettingsUI {
           equipped: equippedResp,
         };
       } catch (err: unknown) {
+        if (this.activeTabId !== 'cosmetics') return;
         setHtml(
           this.contentEl,
           `<div class="error-banner">${t('settings.cosmetics.loadFailed', { error: escapeHtml(getErrorMessage(err)) })}</div>`,
@@ -1151,6 +1165,7 @@ export class SettingsUI {
         return;
       }
     }
+    if (this.activeTabId !== 'cosmetics') return; // the user moved on meanwhile
     const allCosmetics = this.cosmeticsCache.all;
     const myCosmetics = this.cosmeticsCache.mine;
     const equipped = this.cosmeticsCache.equipped;

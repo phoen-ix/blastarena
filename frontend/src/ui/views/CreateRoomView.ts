@@ -563,27 +563,25 @@ export class CreateRoomView implements ILobbyView {
     const reinforcedWalls = (
       this.container.querySelector('#cr-reinforced-walls') as HTMLInputElement
     ).checked;
-    const enableMapEvents = (this.container.querySelector('#cr-map-events') as HTMLInputElement)
+    // A feature switched on with every sub-type unticked is off: an empty list reached the server,
+    // which reads an empty selection as "all types", so the match got every event. (audit P19)
+    const root = this.container;
+    const checked = (selector: string): string[] =>
+      Array.from(root.querySelectorAll<HTMLInputElement>(`${selector}:checked`)).map(
+        (cb) => cb.value,
+      );
+    const mapEventsOn = (this.container.querySelector('#cr-map-events') as HTMLInputElement)
       .checked;
-    const selectedMapEvents = enableMapEvents
-      ? Array.from(this.container.querySelectorAll('.cr-event-type:checked')).map(
-          (cb) => (cb as HTMLInputElement).value,
-        )
-      : undefined;
-    const hazardTiles = (this.container.querySelector('#cr-hazard-tiles') as HTMLInputElement)
+    const selectedMapEvents = mapEventsOn ? checked('.cr-event-type') : undefined;
+    const enableMapEvents = (selectedMapEvents?.length ?? 0) > 0;
+    const hazardTilesOn = (this.container.querySelector('#cr-hazard-tiles') as HTMLInputElement)
       .checked;
-    const selectedHazardTiles = hazardTiles
-      ? Array.from(this.container.querySelectorAll('.cr-hazard-type:checked')).map(
-          (cb) => (cb as HTMLInputElement).value,
-        )
-      : undefined;
-    const puzzleTiles = (this.container.querySelector('#cr-puzzle-tiles') as HTMLInputElement)
+    const selectedHazardTiles = hazardTilesOn ? checked('.cr-hazard-type') : undefined;
+    const hazardTiles = (selectedHazardTiles?.length ?? 0) > 0;
+    const puzzleTilesOn = (this.container.querySelector('#cr-puzzle-tiles') as HTMLInputElement)
       .checked;
-    const selectedPuzzleTiles = puzzleTiles
-      ? Array.from(this.container.querySelectorAll('.cr-puzzle-type:checked')).map(
-          (cb) => (cb as HTMLInputElement).value,
-        )
-      : undefined;
+    const selectedPuzzleTiles = puzzleTilesOn ? checked('.cr-puzzle-type') : undefined;
+    const puzzleTiles = (selectedPuzzleTiles?.length ?? 0) > 0;
     const enableSpectatorActions = (
       this.container.querySelector('#cr-spectator-actions') as HTMLInputElement
     ).checked;

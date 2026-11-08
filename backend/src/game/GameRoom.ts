@@ -15,6 +15,7 @@ import {
   GAME_MODES,
   MAX_SPEED,
   TICK_RATE,
+  BOT_NAMES,
   calculateXpGained,
   getLevelForXp,
   getXpForLevel,
@@ -131,12 +132,10 @@ export class GameRoom {
       room.config.botCount || 0,
       room.config.maxPlayers - room.players.length,
     );
-    // One name per possible bot (max 7), so no two bots in a match share a name.
-    const botNames = ['Bomber Bot', 'Blast Bot', 'Kaboom', 'TNT', 'Dynamite', 'Sparky', 'Fuse'];
     const botTeams = room.config.botTeams || [];
     for (let i = 0; i < botCount; i++) {
       const botId = -(i + 1); // Negative IDs for bots
-      const botName = botNames[i % botNames.length];
+      const botName = BOT_NAMES[i % BOT_NAMES.length];
       // Use pre-assigned bot team if set, otherwise round-robin
       const team = modeConfig.teamsCount
         ? botTeams[i] !== null && botTeams[i] !== undefined

@@ -44,3 +44,17 @@ export const SPECTATOR_WALL_DURATION_TICKS = 200; // 10 seconds at 20 tps
 export const SPECTATOR_SPEED_ZONE_DURATION_TICKS = 160; // 8 seconds
 export const SPECTATOR_SPAWN_EXCLUSION_RADIUS = 2;
 export const SPECTATOR_WARNING_TICKS = 30; // 1.5 second warning before impact
+
+/**
+ * Bot names, one per possible bot (7), in seat order: the lobby room shows the same names the
+ * match uses (it used to translate six of them, so a 7th bot appeared twice under the first name).
+ */
+export const BOT_NAMES = [
+  'Bomber Bot',
+  'Blast Bot',
+  'Kaboom',
+  'TNT',
+  'Dynamite',
+  'Sparky',
+  'Fuse',
+] as const;

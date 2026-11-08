@@ -11,5 +11,12 @@
   "NOT_FOUND": "Risorsa non trovata",
   "INTERNAL_ERROR": "Si è verificato un errore imprevisto",
   "BAD_REQUEST": "Richiesta non valida",
-  "INVALID_TOTP_CODE": "Codice di verifica non valido. Riprova."
+  "INVALID_TOTP_CODE": "Codice di verifica non valido. Riprova.",
+  "RATE_LIMITED": "Troppi tentativi. Attendi un momento e riprova.",
+  "EMAIL_NOT_VERIFIED": "Prima verifica il tuo indirizzo email.",
+  "RESEND_LIMIT_REACHED": "Hai richiesto troppe email di verifica. Riprova più tardi.",
+  "TOTP_RATE_LIMITED": "Troppi codici errati. Attendi prima di riprovare.",
+  "CSRF_INVALID": "Non è stato possibile verificare la sessione. Ricarica la pagina.",
+  "NO_REFRESH_TOKEN": "La sessione è terminata. Accedi di nuovo.",
+  "PAYLOAD_TOO_LARGE": "La richiesta è troppo grande."
 }

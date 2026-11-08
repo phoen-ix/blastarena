@@ -78,11 +78,12 @@ export class ProfileView implements ILobbyView {
       p.role !== 'user'
         ? `<span class="profile-role-badge" style="color:${roleColor}">${escapeHtml(t(`common:roles.${p.role}`, { defaultValue: p.role }))}</span>`
         : '';
-    // Resolve player color: cosmetic color > fallback by player index
+    // Resolve player color: cosmetic color > the first palette colour (a user id is not a palette
+    // index; using it gave each profile an arbitrary colour)
     const cosmeticHex = p.cosmeticData?.colorHex;
     const playerColor = cosmeticHex
       ? `#${cosmeticHex.toString(16).padStart(6, '0')}`
-      : getPlayerColorHex(p.id);
+      : getPlayerColorHex(0);
     const eyeStyle = p.cosmeticData?.eyeStyle;
     const joinDate = new Date(p.createdAt).toLocaleDateString(i18n.language || undefined, {
       year: 'numeric',

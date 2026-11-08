@@ -547,7 +547,15 @@
     "coopDead": "(dead)",
     "coopReady": "(ready)",
     "coopRespawnIn": "({{seconds}}s)",
-    "adminMessageFrom": "Message from {{from}}"
+    "adminMessageFrom": "Message from {{from}}",
+    "causes": {
+      "zone": "the zone",
+      "lava": "lava",
+      "quicksand": "quicksand",
+      "spikes": "spikes",
+      "dark_rift": "a dark rift",
+      "disconnect": "a lost connection"
+    }
   },
   "room": {
     "back": "← Back",
@@ -584,14 +592,6 @@
     "playerLeft": "{{username}} left",
     "teamAssignment": "Team assignment for {{username}}",
     "botTeamAssignment": "Team assignment for Bot {{index}}",
-    "botNames": {
-      "bomberBot": "Bomber Bot",
-      "blastBot": "Blast Bot",
-      "kaboom": "Kaboom",
-      "tnt": "TNT",
-      "dynamite": "Dynamite",
-      "sparky": "Sparky"
-    },
     "adminMessageFrom": "Message from {{from}}"
   },
   "game": {
@@ -664,7 +664,9 @@
     "disabled": "Open World is currently offline",
     "roundEnd": "Round Over",
     "roundStart": "New Round Starting",
-    "nextRound": "Next round in {{seconds}}s"
+    "nextRound": "Next round in {{seconds}}s",
+    "notConnected": "Not connected to the server. Please wait a moment.",
+    "joinFailed": "Could not join the open world"
   },
   "replayLog": {
     "filters": {

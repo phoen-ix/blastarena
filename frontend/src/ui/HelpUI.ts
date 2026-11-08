@@ -688,8 +688,32 @@ export class HelpUI {
     });
 
     this.contentEl = this.container.querySelector('#help-tab-content');
+    this.contentEl?.addEventListener('click', (e) => this.onDocLinkClick(e));
     await this.renderActiveTab();
     // No gamepad context of its own: the lobby's covers .main-body, sidebar and Back.
+  }
+
+  /**
+   * Links between the docs (`bot-ai-guide.md#…`) are relative: followed by the browser they left
+   * the app for a raw file, dropping the socket, the in-memory session, the party and any room.
+   * Open the linked guide's section on this tab instead; other relative links stay in the app.
+   * (audit P1)
+   */
+  private onDocLinkClick(e: MouseEvent): void {
+    const link = (e.target as HTMLElement | null)?.closest('.help-markdown a[href]');
+    if (!(link instanceof HTMLAnchorElement)) return;
+    const href = link.getAttribute('href') ?? '';
+    if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//')) return; // external: as is
+    if (href.startsWith('#')) return; // an anchor within the shown page
+    e.preventDefault();
+    const file = href.split('#')[0].split('/').pop();
+    if (!file || !this.contentEl) return;
+    const section = this.contentEl.querySelector<HTMLDetailsElement>(
+      `details.help-guide-section[data-doc="${CSS.escape(file)}"]`,
+    );
+    if (!section) return;
+    section.open = true;
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   private async loadFooterSettings(): Promise<void> {
