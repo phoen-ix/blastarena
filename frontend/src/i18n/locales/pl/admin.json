@@ -461,7 +461,9 @@
       "threshold": "Próg",
       "operator": "Operator",
       "gameMode": "Tryb gry",
-      "subType": "Podtyp"
+      "subType": "Podtyp",
+      "requireWin": "Tylko wygrane mecze",
+      "worldId": "ID świata (świat ukończony)"
     },
     "cosmeticCount": "{{count}} kosmetyk",
     "cosmeticCount_few": "{{count}} kosmetyki",

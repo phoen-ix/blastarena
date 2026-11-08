@@ -459,7 +459,9 @@
       "threshold": "Soglia",
       "operator": "Operatore",
       "gameMode": "Modalità di gioco",
-      "subType": "Sotto-tipo"
+      "subType": "Sotto-tipo",
+      "requireWin": "Solo partite vinte",
+      "worldId": "ID mondo (mondo completato)"
     },
     "cosmeticCount": "{{count}} cosmetico",
     "cosmeticCount_other": "{{count}} cosmetici",

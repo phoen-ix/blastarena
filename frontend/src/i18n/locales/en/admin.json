@@ -459,7 +459,9 @@
       "threshold": "Threshold",
       "operator": "Operator",
       "gameMode": "Game Mode",
-      "subType": "Sub-Type"
+      "subType": "Sub-Type",
+      "requireWin": "Won games only",
+      "worldId": "World ID (world complete)"
     },
     "cosmeticCount": "{{count}} cosmetic",
     "cosmeticCount_other": "{{count}} cosmetics",

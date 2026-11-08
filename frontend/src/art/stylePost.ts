@@ -102,16 +102,33 @@ const AMBIENT: Record<World, { kind: FxKind; fall: number; drift: number; rate: 
 export class AmbientParticles {
   private emitter: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
   private cam: Phaser.Cameras.Scene2D.Camera;
+  /**
+   * The spawn area, resized to the camera view every frame. It was sized once in the
+   * constructor, from a worldView Phaser only fills in at render time (0×0 then), so every
+   * particle came out of the view's top-left corner, and zoom or resize never reached it.
+   * (audit R3)
+   */
+  private area = { width: 1, height: 1 };
 
   constructor(scene: Phaser.Scene, art: StyleArt, world: World, depth: number) {
     this.cam = scene.cameras.main;
     if (!qualityAtLeast('high') || !getSettings().particles) return;
     const a = AMBIENT[world] ?? AMBIENT.classic;
     const view = this.cam.worldView;
+    this.area.width = Math.max(1, view.width);
+    this.area.height = Math.max(1, view.height);
+    const area = this.area;
     this.emitter = scene.add.particles(view.x, view.y, art.fxKey(), {
       frame: StyleArt.fxFrame(a.kind),
-      x: { min: 0, max: Math.max(1, view.width) },
-      y: { min: 0, max: Math.max(1, view.height) },
+      emitZone: {
+        type: 'random',
+        source: {
+          getRandomPoint: (p: Phaser.Types.Math.Vector2Like) => {
+            p.x = Math.random() * area.width;
+            p.y = Math.random() * area.height;
+          },
+        },
+      },
       speedX: { min: -a.drift, max: a.drift },
       speedY: { min: a.fall * 0.6, max: a.fall * 1.4 },
       lifespan: { min: 3500, max: 7000 },
@@ -132,6 +149,8 @@ export class AmbientParticles {
     if (!this.emitter) return;
     const v = this.cam.worldView;
     this.emitter.setPosition(v.x, v.y);
+    this.area.width = Math.max(1, v.width);
+    this.area.height = Math.max(1, v.height);
   }
 
   destroy(): void {

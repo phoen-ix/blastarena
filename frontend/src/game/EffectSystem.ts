@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { SocketClient } from '../network/SocketClient';
-import { TILE_SIZE, Position } from '@blast-arena/shared';
+import { TILE_SIZE, Position, wrapDistance } from '@blast-arena/shared';
 import { getSettings } from './Settings';
 import { audioManager } from './AudioManager';
 import { POWERUP_COLORS } from '../utils/powerUpColors';
@@ -235,12 +235,15 @@ export class EffectSystem {
     for (const cell of cells) {
       const px = cell.x * TILE_SIZE + TILE_SIZE / 2;
       const py = cell.y * TILE_SIZE + TILE_SIZE / 2;
-      let dx = Math.abs(px - camCenterX);
-      let dy = Math.abs(py - camCenterY);
-      if (this.wrappingMapSize) {
-        dx = Math.min(dx, worldW - dx);
-        dy = Math.min(dy, worldH - dy);
-      }
+      // The camera centre can lie outside [0, world) (scrollX stays inside it, the centre adds
+      // half a screen), so the inline min(d, world - d) went negative and a far blast shook,
+      // flashed and boomed like one at the player's feet. (audit N1)
+      const dx = this.wrappingMapSize
+        ? wrapDistance(px, camCenterX, worldW)
+        : Math.abs(px - camCenterX);
+      const dy = this.wrappingMapSize
+        ? wrapDistance(py, camCenterY, worldH)
+        : Math.abs(py - camCenterY);
       const dist = dx + dy;
       if (dist < minDist) minDist = dist;
     }

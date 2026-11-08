@@ -70,7 +70,13 @@ class ThemeManager {
   setTheme(themeId: ThemeId): void {
     if (!this.isValidTheme(themeId)) return;
     this.currentTheme = themeId;
-    localStorage.setItem(STORAGE_KEY, themeId);
+    // Storage can be blocked (private mode, site data off): the theme still applies for the page.
+    // The write used to throw first, so the picker did nothing at all.
+    try {
+      localStorage.setItem(STORAGE_KEY, themeId);
+    } catch {
+      /* not persisted */
+    }
     this.applyTheme(themeId);
     this.notifyListeners();
   }

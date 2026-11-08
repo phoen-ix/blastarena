@@ -1578,7 +1578,11 @@ export class GameScene extends Phaser.Scene {
     if (menu.pause) {
       const simSpectate = this.registry.get('simulationSpectate') as
         { batchId: string } | undefined;
-      if (this.campaignMode) {
+      // A replay has its own controls (ReplayControls); Start must not pause a campaign that
+      // is only being watched.
+      if (this.replayControls) {
+        // handled by ReplayControls
+      } else if (this.campaignMode) {
         if (this.paused) this.resumeCampaign();
         else this.pauseCampaign();
       } else if (simSpectate) {
@@ -1624,7 +1628,9 @@ export class GameScene extends Phaser.Scene {
           this.freeCamY += gpSpec.panY * panSpeed;
           this.spectateTargetId = null;
         }
-        if (gpSpec.nextPlayer || gpSpec.prevPlayer) {
+        // In a replay LB/RB seek (ReplayControls); they used to switch the followed player too.
+        // (audit N2)
+        if ((gpSpec.nextPlayer || gpSpec.prevPlayer) && !this.replayControls) {
           this.cycleSpectateTarget(gpSpec.nextPlayer ? 1 : -1);
         }
       }

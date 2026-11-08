@@ -55,11 +55,27 @@ export function trapFocus(
     }
   };
   modal.addEventListener('keydown', handler);
+  // When focus has dropped out of the modal (a button that disabled itself leaves it on <body>),
+  // the modal's own listener never sees Tab and focus walked into the page behind the dialog.
+  // Bring it back. With stacked modals the last-opened trap runs last and wins. (audit U5)
+  const strayHandler = (e: KeyboardEvent) => {
+    if (e.key !== 'Tab' || !modal.isConnected) return;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    const focusable = Array.from(modal.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+      (el) => !el.hasAttribute('disabled'),
+    );
+    if (focusable.length === 0) return;
+    e.preventDefault();
+    (e.shiftKey ? focusable[focusable.length - 1] : focusable[0]).focus();
+  };
+  document.addEventListener('keydown', strayHandler, true);
   // Auto-focus first focusable element
   const first = modal.querySelector<HTMLElement>(FOCUSABLE);
   if (first && !modal.querySelector(':focus')) first.focus();
   return () => {
     modal.removeEventListener('keydown', handler);
+    document.removeEventListener('keydown', strayHandler, true);
     // Only while the modal still holds focus (or nothing does): never take it from an element
     // the user has moved to since, or from another modal opened on top.
     const active = document.activeElement;

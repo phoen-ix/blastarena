@@ -60,7 +60,9 @@ const PER_GAME_STATS = [
   'is_winner',
 ];
 
-const PER_GAME_OPERATORS = ['>=', '<=', '==', '>'];
+// Every operator the server evaluates: an achievement using one the editor lacked was silently
+// rewritten to '>=' on its next edit.
+const PER_GAME_OPERATORS = ['>=', '<=', '==', '>', '<'];
 
 // Mode ids as matches record them. 'koth' matched no game, so a KOTH achievement could never be
 // earned; migration 043 moved stored conditions to 'king_of_the_hill'.
@@ -75,7 +77,7 @@ const GAME_MODES = [
 
 const MODE_SPECIFIC_STATS = ['wins', 'matches', 'kills'];
 
-const CAMPAIGN_SUBTYPES = ['total_stars', 'levels_completed'];
+const CAMPAIGN_SUBTYPES = ['total_stars', 'levels_completed', 'world_complete'];
 
 const COSMETIC_TYPES: CosmeticType[] = ['color', 'eyes', 'trail', 'bomb_skin'];
 
@@ -332,7 +334,7 @@ export class AchievementsTab {
               <select class="admin-select w-full mt-label" id="am-rewardType">
                 <option value="none" ${!existing || existing.rewardType === 'none' ? 'selected' : ''}>${t('admin:achievements.rewardTypes.none')}</option>
                 <option value="cosmetic" ${existing?.rewardType === 'cosmetic' ? 'selected' : ''}>${t('admin:achievements.rewardTypes.cosmetic')}</option>
-                <option value="title" ${existing?.rewardType === 'title' ? 'selected' : ''}>${t('admin:achievements.rewardTypes.title')}</option>
+                ${existing?.rewardType === 'title' ? `<option value="title" selected>${t('admin:achievements.rewardTypes.title')}</option>` : '' /* no code grants titles: offered only where one is already set */}
               </select>
             </div>
             <div id="am-reward-id-wrap">
@@ -473,6 +475,10 @@ export class AchievementsTab {
             <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfgAttr(cfg.threshold, 1)}" min="0">
           </div>
         </div>
+        <label class="field-label mt-label">
+          <input type="checkbox" id="am-cond-requireWin" ${cfg.requireWin ? 'checked' : ''}>
+          ${t('admin:achievements.conditionFields.requireWin')}
+        </label>
       `,
       );
     } else if (type === 'mode_specific') {
@@ -514,6 +520,10 @@ export class AchievementsTab {
             <label class="field-label" for="am-cond-threshold">${t('admin:achievements.conditionFields.threshold')}</label>
             <input type="number" class="admin-input mt-label" id="am-cond-threshold" value="${cfgAttr(cfg.threshold, 1)}" min="1">
           </div>
+          <div>
+            <label class="field-label" for="am-cond-worldId">${t('admin:achievements.conditionFields.worldId')}</label>
+            <input type="number" class="admin-input mt-label" id="am-cond-worldId" value="${cfgAttr(cfg.worldId, '')}" min="1">
+          </div>
         </div>
       `,
       );
@@ -538,6 +548,9 @@ export class AchievementsTab {
       config.operator =
         (overlay.querySelector('#am-cond-operator') as HTMLSelectElement)?.value || '>=';
       config.threshold = threshold;
+      if ((overlay.querySelector('#am-cond-requireWin') as HTMLInputElement | null)?.checked) {
+        config.requireWin = true;
+      }
     } else if (type === 'mode_specific') {
       config.mode = (overlay.querySelector('#am-cond-mode') as HTMLSelectElement)?.value;
       config.stat = stat;
@@ -545,6 +558,10 @@ export class AchievementsTab {
     } else if (type === 'campaign') {
       config.subType = (overlay.querySelector('#am-cond-subType') as HTMLSelectElement)?.value;
       config.threshold = threshold;
+      const worldId = parseInt(
+        (overlay.querySelector('#am-cond-worldId') as HTMLInputElement | null)?.value || '',
+      );
+      if (config.subType === 'world_complete' && worldId > 0) config.worldId = worldId;
     }
 
     return config;

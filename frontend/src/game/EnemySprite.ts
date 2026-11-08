@@ -164,6 +164,17 @@ export class EnemySpriteRenderer {
         continue;
       }
 
+      // Alive again after dying: a replay seeked back to before this enemy's death. Undo the
+      // death animation; the enemy stayed invisible (only its HP bar came back). (audit N5)
+      if (this.dying.has(enemy.id)) {
+        this.dying.delete(enemy.id);
+        this.scene.tweens.killTweensOf(sprite);
+        sprite.clearTint();
+        sprite.setAlpha(1);
+        sprite.setScale(this.scaleFor(sprite, enemy.enemyTypeId));
+        sprite.setVisible(true);
+      }
+
       // Record where the sprite should head; frame() moves it there
       const target = this.targets.get(enemy.id);
       if (target) {

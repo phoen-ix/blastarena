@@ -213,8 +213,12 @@ export interface StylePainters {
   powerUpFrames: number;
   /** Fuse frames to bake per bomb type (remote bombs use 1). */
   fuseFrames: number;
-  /** Where the fuse spark sits relative to the bomb's origin, for the spark particles. */
-  fuseTip: { x: number; y: number };
+  /**
+   * Where the fuse spark sits relative to the bomb's origin at fuse `fuse` (1 full, 0 burnt), for
+   * the spark particles. The painted spark moves as the fuse burns; a single fixed tip left the
+   * particles up to 38 units away from it. (audit R1)
+   */
+  fuseTip(fuse: number): { x: number; y: number };
   palette: StylePalette;
 
   floor(g: CanvasRenderingContext2D, o: FloorOpts): void;

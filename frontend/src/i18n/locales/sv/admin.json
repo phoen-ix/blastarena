@@ -459,7 +459,9 @@
       "threshold": "Tröskel",
       "operator": "Operator",
       "gameMode": "Spelläge",
-      "subType": "Undertyp"
+      "subType": "Undertyp",
+      "requireWin": "Endast vunna matcher",
+      "worldId": "Världs-ID (värld klar)"
     },
     "cosmeticCount": "{{count}} kosmetik",
     "cosmeticCount_other": "{{count}} kosmetika",

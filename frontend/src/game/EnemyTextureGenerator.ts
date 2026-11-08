@@ -58,12 +58,25 @@ function darkenHex(hex: string, amount: number): string {
 }
 
 export class EnemyTextureGenerator {
+  /** The look each enemy type's textures were drawn from (see generateForLevel). */
+  private static drawnLooks = new Map<number, string>();
+
   /**
    * Generate textures for all enemy types needed in a level.
    * Called in GameScene.create() and LevelEditorScene.create().
    */
   static generateForLevel(scene: Phaser.Scene, enemyTypes: EnemyTypeEntry[]): void {
     for (const et of enemyTypes) {
+      // Textures are keyed by type id and live for the page session, so an enemy type edited in
+      // the admin editor kept its old look until a reload: redraw when its look changed. (audit N8)
+      const look = JSON.stringify([et.config.sprite, et.config.sizeMultiplier]);
+      if (EnemyTextureGenerator.drawnLooks.get(et.id) !== look) {
+        for (const dir of DIRECTIONS) {
+          const key = `enemy_${et.id}_${dir}`;
+          if (scene.textures.exists(key)) scene.textures.remove(key);
+        }
+        EnemyTextureGenerator.drawnLooks.set(et.id, look);
+      }
       for (const dir of DIRECTIONS) {
         const key = `enemy_${et.id}_${dir}`;
         if (scene.textures.exists(key)) continue;
@@ -718,7 +731,8 @@ export class EnemyTextureGenerator {
     ctx.arc(cx - eyeSpacing, cy - r * 0.1, eyeR * 0.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(cx + eyeSpacing, cy - r * 0.1, eyeR * 0.35, 0, Math.PI * 2);
+    // Only the 'crazy' style has a smaller right eye (and pupil); every preview drew one.
+    ctx.arc(cx + eyeSpacing, cy - r * 0.1, eyeR * (style === 'crazy' ? 0.35 : 0.5), 0, Math.PI * 2);
     ctx.fill();
   }
 }

@@ -17,8 +17,11 @@ export const neonPainters: StylePainters = {
   flameFrames: 10,
   powerUpFrames: 6,
   fuseFrames: 8,
-  // the spark sits at the top of the timer ring while the fuse is full
-  fuseTip: { x: 0, y: -17 },
+  // the spark runs clockwise round the timer ring from the top (see items.ts bomb())
+  fuseTip: (fuse: number) => {
+    const a = -Math.PI / 2 + Math.max(0, Math.min(1, fuse)) * Math.PI * 2;
+    return { x: Math.cos(a) * 19, y: 2 + Math.sin(a) * 19 };
+  },
   palette: {
     flameLight: '#ff7040',
     shock: '#ffb08a',

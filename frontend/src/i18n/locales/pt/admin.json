@@ -459,7 +459,9 @@
       "threshold": "Limite",
       "operator": "Operador",
       "gameMode": "Modo de Jogo",
-      "subType": "Subtipo"
+      "subType": "Subtipo",
+      "requireWin": "Apenas partidas ganhas",
+      "worldId": "ID do mundo (mundo concluído)"
     },
     "cosmeticCount": "{{count}} cosmético",
     "cosmeticCount_other": "{{count}} cosméticos",

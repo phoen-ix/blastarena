@@ -41,6 +41,14 @@ describe('player palette', () => {
     expect(a.filter((i) => b.includes(i))).toEqual([]);
   });
 
+  it('gives every member of a four-player team its own colour (audit N6)', () => {
+    for (const team of [0, 1]) {
+      const idx = teamColorIndices(team);
+      expect(idx).toHaveLength(4);
+      expect(new Set(idx).size).toBe(4);
+    }
+  });
+
   it('wraps indices and gives eight distinct shapes', () => {
     expect(playerColor(8)).toBe(playerColor(0));
     expect(playerColor(-1)).toBe(playerColor(7));

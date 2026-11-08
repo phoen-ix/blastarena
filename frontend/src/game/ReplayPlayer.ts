@@ -54,6 +54,11 @@ export class ReplayPlayer {
         this.tileDiffFrames.add(i);
       }
     }
+
+    // Playback starts ON frame 0 and tick() applies frames from 1, so frame 0's own diffs were
+    // only ever applied by a backward seek (which replays 0..target): the tiles shown depended on
+    // how a frame was reached. (audit N3)
+    this.applyTileDiffs(0);
   }
 
   get isPlaying(): boolean {

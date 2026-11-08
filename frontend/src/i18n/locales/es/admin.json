@@ -459,7 +459,9 @@
       "threshold": "Umbral",
       "operator": "Operador",
       "gameMode": "Modo de Juego",
-      "subType": "Subtipo"
+      "subType": "Subtipo",
+      "requireWin": "Solo partidas ganadas",
+      "worldId": "ID del mundo (mundo completado)"
     },
     "cosmeticCount": "{{count}} cosmético",
     "cosmeticCount_other": "{{count}} cosméticos",

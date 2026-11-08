@@ -459,7 +459,9 @@
       "threshold": "Grænse",
       "operator": "Operator",
       "gameMode": "Spiltilstand",
-      "subType": "Undertype"
+      "subType": "Undertype",
+      "requireWin": "Kun vundne kampe",
+      "worldId": "Verdens-id (verden gennemført)"
     },
     "cosmeticCount": "{{count}} kosmetik",
     "cosmeticCount_other": "{{count}} kosmetikker",

@@ -19,7 +19,7 @@ import { enemy, ghost, marker, player, shield } from './actors';
 import {
   FLAME_FRAMES,
   FUSE_FRAMES,
-  FUSE_TIP,
+  fuseTip,
   POWERUP_FRAMES,
   bomb,
   bombBand,
@@ -40,7 +40,7 @@ export const toyPainters: StylePainters = {
   flameFrames: FLAME_FRAMES,
   powerUpFrames: POWERUP_FRAMES,
   fuseFrames: FUSE_FRAMES,
-  fuseTip: FUSE_TIP,
+  fuseTip,
   palette: {
     flameLight: '#ffa040',
     shock: '#fff0c8',

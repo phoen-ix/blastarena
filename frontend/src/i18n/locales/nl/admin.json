@@ -459,7 +459,9 @@
       "threshold": "Drempelwaarde",
       "operator": "Operator",
       "gameMode": "Spelmodus",
-      "subType": "Subtype"
+      "subType": "Subtype",
+      "requireWin": "Alleen gewonnen wedstrijden",
+      "worldId": "Wereld-ID (wereld voltooid)"
     },
     "cosmeticCount": "{{count}} cosmetisch item",
     "cosmeticCount_other": "{{count}} cosmetische items",

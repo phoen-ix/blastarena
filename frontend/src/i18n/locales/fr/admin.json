@@ -459,7 +459,9 @@
       "threshold": "Seuil",
       "operator": "Opérateur",
       "gameMode": "Mode de jeu",
-      "subType": "Sous-type"
+      "subType": "Sous-type",
+      "requireWin": "Parties gagnées uniquement",
+      "worldId": "ID du monde (monde terminé)"
     },
     "cosmeticCount": "{{count}} cosmétique",
     "cosmeticCount_other": "{{count}} cosmétiques",

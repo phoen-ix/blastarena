@@ -195,6 +195,9 @@ export class UIGamepadNavigator {
 
     const els = ctx.elements();
     if (els.length === 0) return;
+    // The list can shrink under a stored index (a re-render): an out-of-range index reached
+    // findScrollParent(undefined) and threw on every frame the D-pad was held. (audit N7)
+    if (ctx.focusIndex >= els.length) ctx.focusIndex = els.length - 1;
 
     if (!this.gamepadVisible) {
       this.gamepadVisible = true;

@@ -41,6 +41,7 @@ export class AITab {
     } catch {
       /* enemy AI endpoint may not exist yet */
     }
+    if (!this.container) return; // left the tab during the requests
 
     setHtml(
       this.container,

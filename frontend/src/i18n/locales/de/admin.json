@@ -459,7 +459,9 @@
       "threshold": "Schwellenwert",
       "operator": "Operator",
       "gameMode": "Spielmodus",
-      "subType": "Untertyp"
+      "subType": "Untertyp",
+      "requireWin": "Nur gewonnene Spiele",
+      "worldId": "Welt-ID (Welt abgeschlossen)"
     },
     "cosmeticCount": "{{count}} Kosmetik-Objekt",
     "cosmeticCount_other": "{{count}} Kosmetik-Objekte",

@@ -17,6 +17,12 @@ type Listener = (style: ArtStyleId) => void;
 export class ArtStyleManager {
   private current: ArtStyleId = DEFAULT_ART_STYLE;
   private adminDefault: ArtStyleId = DEFAULT_ART_STYLE;
+  /**
+   * The player's pick when storage is blocked. It used to live only in `current`, so the next
+   * resolve() (the late admin-default fetch, an admin change) read storage, found nothing and
+   * reverted to the admin default. (audit R4)
+   */
+  private unstoredPick: ArtStyleId | null = null;
   private listeners: Listener[] = [];
   private loading: Promise<void> | null = null;
 
@@ -53,16 +59,14 @@ export class ArtStyleManager {
 
   /** Store the player's pick (null forgets it and follows the admin default again). */
   set(style: ArtStyleId | null): void {
+    if (style !== null && !isStyleAvailable(style)) return;
+    this.unstoredPick = null;
     try {
       if (style === null) localStorage.removeItem(STORAGE_KEY);
-      else if (isStyleAvailable(style)) localStorage.setItem(STORAGE_KEY, style);
-      else return;
+      else localStorage.setItem(STORAGE_KEY, style);
     } catch {
       // Storage blocked: the pick still applies for this page load.
-      if (style !== null && isStyleAvailable(style)) {
-        this.update(style);
-        return;
-      }
+      this.unstoredPick = style;
     }
     this.update(this.resolve());
   }
@@ -92,6 +96,7 @@ export class ArtStyleManager {
   }
 
   private resolve(): ArtStyleId {
+    if (this.unstoredPick) return this.unstoredPick;
     const stored = this.readStored();
     if (stored) return stored;
     if (isStyleAvailable(this.adminDefault)) return this.adminDefault;

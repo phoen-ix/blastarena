@@ -45,6 +45,20 @@ describe('EnemySpriteRenderer death animation', () => {
     expect(renderer.isDying(1)).toBe(true);
   });
 
+  it('shows an enemy again when a replay seeks back to before its death (audit N5)', () => {
+    const scene = makeFakeScene();
+    const renderer = new EnemySpriteRenderer(scene as never);
+
+    renderer.update([enemy()]);
+    renderer.update([enemy({ alive: false })]);
+    scene.sprites[0].setVisible(false); // the death tween completed
+
+    renderer.update([enemy()]); // seek back: alive again
+
+    expect(renderer.isDying(1)).toBe(false);
+    expect(scene.sprites[0].visible).toBe(true);
+  });
+
   it('tracks each enemy separately', () => {
     const scene = makeFakeScene();
     const renderer = new EnemySpriteRenderer(scene as never);

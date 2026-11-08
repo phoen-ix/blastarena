@@ -229,6 +229,17 @@ export class BombSpriteRenderer {
     }
   }
 
+  /**
+   * Where the painted spark is on the frame shown now: the fuse value that frame was baked with
+   * (StyleArt bakes frame i at 1 - i / (frames - 1), the hot frame at 0.04).
+   */
+  private sparkTip(bomb: BombState, art: StyleArt): { x: number; y: number } {
+    if (bomb.ticksRemaining < 20) return art.painters.fuseTip(0.04);
+    const frames = art.fuseFrames;
+    const i = fuseFrame(fuseFraction(bomb.ticksRemaining, bomb.bombType), frames);
+    return art.painters.fuseTip(frames > 1 ? 1 - i / (frames - 1) : 1);
+  }
+
   /** Frame for a drawn-style bomb at its current fuse. */
   private styledFrame(bomb: BombState): string {
     const type = bomb.bombType as BombType;
@@ -307,7 +318,7 @@ export class BombSpriteRenderer {
     }
 
     if (settings.particles && bomb.bombType !== 'remote') {
-      const tip = art.painters.fuseTip;
+      const tip = this.sparkTip(bomb, art);
       const emitter = this.scene.add.particles(posX + tip.x, posY + tip.y, key, {
         frame: StyleArt.fxFrame('spark'),
         speed: { min: 15, max: 50 },
@@ -368,7 +379,7 @@ export class BombSpriteRenderer {
 
     const emitter = this.sparkEmitters.get(bomb.id);
     if (emitter) {
-      const tip = fx.art.painters.fuseTip;
+      const tip = this.sparkTip(bomb, fx.art);
       emitter.setPosition(sprite.x + tip.x, sprite.y + tip.y);
       emitter.frequency = bomb.ticksRemaining < 20 ? Math.max(25, bomb.ticksRemaining * 5) : 110;
     }

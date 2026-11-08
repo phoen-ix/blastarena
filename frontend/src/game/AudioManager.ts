@@ -186,7 +186,11 @@ class AudioManagerImpl {
   }
 
   private saveSettings(): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
+    } catch {
+      /* storage blocked: the setting applies for this page only */
+    }
   }
 }
 

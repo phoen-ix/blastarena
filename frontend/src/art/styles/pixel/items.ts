@@ -134,11 +134,13 @@ export function bombSprite(
   }
 }
 
-/** Where the full-length fuse burns, in game units from the bomb's centre. */
-export const FUSE_TIP = {
-  x: (-10 + FUSE[4][0]) * 3 + 1.5,
-  y: (-10 + FUSE[4][1] + (BTOP - 4)) * 3 + 1.5,
-};
+/** Where the fuse burns at fuse `fuse`, in game units from the bomb's centre (see bombSprite()). */
+export function fuseTip(fuse: number): { x: number; y: number } {
+  const n = fuseLength(fuse);
+  const tx = n > 0 ? FUSE[n - 1][0] : BCX;
+  const ty = n > 0 ? FUSE[n - 1][1] + (BTOP - 4) : BTOP - 1;
+  return { x: (-10 + tx) * 3 + 1.5, y: (-10 + ty) * 3 + 1.5 };
+}
 
 /** The owner stripe: a two-pixel band round the bomb's middle, white. */
 export function bombBandSprite(g: CanvasRenderingContext2D, type: BombType): void {

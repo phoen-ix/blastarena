@@ -459,7 +459,9 @@
       "threshold": "Terskel",
       "operator": "Operator",
       "gameMode": "Spillmodus",
-      "subType": "Undertype"
+      "subType": "Undertype",
+      "requireWin": "Bare vunne kamper",
+      "worldId": "Verdens-ID (verden fullført)"
     },
     "cosmeticCount": "{{count}} kosmetikk",
     "cosmeticCount_other": "{{count}} kosmetikkartikler",

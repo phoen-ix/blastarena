@@ -73,6 +73,9 @@ export function showLocalCoopModal(
   const config = loadLocalCoopConfig();
   const savedP2 = loadP2Identity();
 
+  // What P2 has typed into the login form: render() rebuilds the form, which wiped both fields
+  // after a failed login or any chip click. (audit P9)
+  const loginDraft = { username: '', password: '' };
   const p2: P2State = {
     mode: 'guest',
     guestName: savedP2.guestName,
@@ -144,6 +147,7 @@ export function showLocalCoopModal(
 
   function applyLoggedIn(data: LocalCoopAuthResponse): void {
     p2.mode = 'loggedIn';
+    loginDraft.password = ''; // never kept after use
     p2.loggedInUser = data.user;
     p2.loggedInCosmetics = data.cosmetics;
     p2.totpToken = undefined;
@@ -498,6 +502,8 @@ export function showLocalCoopModal(
     usernameInput.setAttribute('aria-label', t('campaign:localCoopModal.nameAriaLabel'));
     usernameInput.style.cssText = 'padding:6px 10px;font-size:14px;';
     usernameInput.autocomplete = 'off';
+    usernameInput.value = loginDraft.username;
+    usernameInput.addEventListener('input', () => (loginDraft.username = usernameInput.value));
     container.appendChild(usernameInput);
 
     // Password
@@ -508,6 +514,8 @@ export function showLocalCoopModal(
     passwordInput.setAttribute('aria-label', t('campaign:localCoopModal.passwordAriaLabel'));
     passwordInput.style.cssText = 'padding:6px 10px;font-size:14px;';
     passwordInput.autocomplete = 'off';
+    passwordInput.value = loginDraft.password;
+    passwordInput.addEventListener('input', () => (loginDraft.password = passwordInput.value));
     container.appendChild(passwordInput);
 
     // Duration + Login button row
@@ -674,6 +682,7 @@ export function showLocalCoopModal(
       if (closed) return;
       if (data?.user) {
         p2.mode = 'loggedIn';
+        loginDraft.password = ''; // never kept after use
         p2.loggedInUser = data.user;
         p2.loggedInCosmetics = data.cosmetics;
         render();

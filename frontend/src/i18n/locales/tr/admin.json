@@ -459,7 +459,9 @@
       "threshold": "Eşik",
       "operator": "Operatör",
       "gameMode": "Oyun Modu",
-      "subType": "Alt Tür"
+      "subType": "Alt Tür",
+      "requireWin": "Yalnızca kazanılan maçlar",
+      "worldId": "Dünya kimliği (dünya tamamlandı)"
     },
     "cosmeticCount": "{{count}} kozmetik",
     "cosmeticCount_other": "{{count}} kozmetik",

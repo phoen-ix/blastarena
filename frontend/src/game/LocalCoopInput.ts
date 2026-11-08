@@ -74,11 +74,15 @@ export function loadP2Identity(): LocalCoopP2Identity {
 }
 
 export function saveP2Identity(identity: LocalCoopP2Identity): void {
-  // Only persist guest name/color (not login credentials)
-  localStorage.setItem(
-    P2_IDENTITY_KEY,
-    JSON.stringify({ guestName: identity.guestName, guestColor: identity.guestColor }),
-  );
+  // Only persist guest name/color (not login credentials). Storage may be blocked.
+  try {
+    localStorage.setItem(
+      P2_IDENTITY_KEY,
+      JSON.stringify({ guestName: identity.guestName, guestColor: identity.guestColor }),
+    );
+  } catch {
+    /* not persisted */
+  }
 }
 
 export function loadLocalCoopConfig(): LocalCoopConfig {
@@ -97,7 +101,11 @@ export function loadLocalCoopConfig(): LocalCoopConfig {
 }
 
 export function saveLocalCoopConfig(config: LocalCoopConfig): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  } catch {
+    /* storage blocked: not persisted */
+  }
 }
 
 const WASD_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'KeyE', 'KeyQ']);

@@ -1305,6 +1305,9 @@ export class DashboardTab {
     if (!this.container) return;
     try {
       const stats = await ApiClient.get<AdminStats>('/admin/stats');
+      // The tab may have been left during the request (container null): a TypeError here showed
+      // a false "Failed to load stats" toast on the next tab.
+      if (!this.container) return;
 
       // Remove existing stats if re-rendering
       this.container.querySelector('.admin-stats')?.remove();
@@ -1345,7 +1348,7 @@ export class DashboardTab {
         this.container.appendChild(statsDiv);
       }
     } catch {
-      this.notifications.error(t('admin:dashboard.failedLoadStats'));
+      if (this.container) this.notifications.error(t('admin:dashboard.failedLoadStats'));
     }
   }
 }

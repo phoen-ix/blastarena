@@ -5,14 +5,19 @@ import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
 import { confirmModal } from '../../utils/modal';
 import { t } from '../../i18n';
 
+/**
+ * A fresh copy of the default rank config. The tier objects are copied too: the editor writes into
+ * them (syncTiers), and a shallow copy changed the shared DEFAULT_RANK_CONFIG itself.
+ */
+function defaultRankConfig(): RankConfig {
+  return { ...DEFAULT_RANK_CONFIG, tiers: DEFAULT_RANK_CONFIG.tiers.map((tier) => ({ ...tier })) };
+}
+
 export class SeasonsTab {
   private container: HTMLElement;
   private notifications: NotificationUI;
   private seasons: Season[] = [];
-  private rankConfig: RankConfig = {
-    ...DEFAULT_RANK_CONFIG,
-    tiers: [...DEFAULT_RANK_CONFIG.tiers],
-  };
+  private rankConfig: RankConfig = defaultRankConfig();
   private showCreateForm = false;
   // Bumped by destroy(): a load that finishes after a tab switch must not render into the
   // shared tab content, which by then belongs to the next tab.
@@ -50,7 +55,7 @@ export class SeasonsTab {
       const config = await ApiClient.get<RankConfig>('/admin/settings/rank_tiers');
       this.rankConfig = config;
     } catch {
-      this.rankConfig = { ...DEFAULT_RANK_CONFIG, tiers: [...DEFAULT_RANK_CONFIG.tiers] };
+      this.rankConfig = defaultRankConfig();
     }
   }
 
@@ -461,13 +466,16 @@ export class SeasonsTab {
 
   // ---- Helpers ----
 
+  /**
+   * Season dates are calendar days (YYYY-MM-DD). `new Date('2026-01-01')` is UTC midnight, which
+   * west of UTC is still the previous day, so every date showed one day early there. Format the
+   * day itself, as a local date.
+   */
   private formatDate(dateStr: string): string {
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-    } catch {
-      return dateStr;
-    }
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
+    if (!m) return dateStr;
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
   destroy(): void {

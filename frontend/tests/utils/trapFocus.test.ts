@@ -80,6 +80,21 @@ describe('trapFocus', () => {
     expect(document.activeElement?.id).toBe('a');
   });
 
+  it('brings Tab back into the modal when focus has dropped to the page (audit U5)', () => {
+    const modal = document.createElement('div');
+    modal.innerHTML = '<button id="a">A</button><button id="b">B</button>';
+    document.body.appendChild(modal);
+    const release = trapFocus(modal);
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).toBe(document.body);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+
+    expect(document.activeElement?.id).toBe('a');
+    release();
+    modal.remove();
+  });
+
   it('stops handling keys after cleanup', () => {
     const cleanup = trapFocus(modal);
     cleanup();

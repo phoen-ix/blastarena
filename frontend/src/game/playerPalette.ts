@@ -24,14 +24,17 @@ const COLOR_BLIND_TEAMS = ['#e69f00', '#56b4e9'];
 const STANDARD_TEAM_TEXT = ['#ff6b7f', '#6bb8ff'];
 const COLOR_BLIND_TEAM_TEXT = ['#ffc04d', '#9ad3f5'];
 
-/** Which player colours each team uses: warm for team 0, cool for team 1. */
+/**
+ * Which player colours each team uses: warm for team 0, cool for team 1. Four each, so all 8
+ * players of a 4v4 differ (with three, a team's 4th member repeated its 1st colour and marker).
+ */
 const STANDARD_TEAM_INDICES: Record<number, number[]> = {
-  0: [0, 3, 5],
-  1: [1, 7, 4],
+  0: [0, 3, 5, 6],
+  1: [1, 7, 4, 2],
 };
 const COLOR_BLIND_TEAM_INDICES: Record<number, number[]> = {
-  0: [0, 6, 3],
-  1: [1, 5, 2],
+  0: [0, 6, 3, 4],
+  1: [1, 5, 2, 7],
 };
 
 export const MARKER_SHAPES: readonly MarkerShape[] = [

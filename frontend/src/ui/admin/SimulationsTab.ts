@@ -70,7 +70,8 @@ export class SimulationsTab {
     if (this.container !== container) return;
     if (this.refreshInterval) clearInterval(this.refreshInterval);
     this.refreshInterval = setInterval(() => {
-      if (this.viewMode === 'list') void this.loadBatchList();
+      // Not while the browser tab is hidden.
+      if (this.viewMode === 'list' && !document.hidden) void this.loadBatchList();
     }, 5000);
   }
 
@@ -78,6 +79,10 @@ export class SimulationsTab {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
       this.refreshInterval = null;
+    }
+    if (this.listReloadTimer) {
+      clearTimeout(this.listReloadTimer);
+      this.listReloadTimer = null;
     }
     this.socketClient.off('sim:progress', this.handleProgress);
     this.socketClient.off('sim:gameResult', this.handleGameResult);
@@ -94,7 +99,7 @@ export class SimulationsTab {
   private handleProgress = (data: SimulationBatchStatus) => {
     this.activeBatch = data;
     if (this.viewMode === 'list') {
-      void this.loadBatchList();
+      this.scheduleListReload();
     } else if (this.viewMode === 'detail' && this.detailBatchId === data.batchId) {
       this.renderDetailView(data);
     }
@@ -114,9 +119,23 @@ export class SimulationsTab {
 
   private handleQueueUpdate = () => {
     if (this.viewMode === 'list') {
-      void this.loadBatchList();
+      this.scheduleListReload();
     }
   };
+
+  /**
+   * Coalesce reloads triggered by socket events: every finished game of a fast batch emits
+   * sim:progress, and one GET per event hit the route's 15-per-10-s limit, replacing the list
+   * with "Failed to load simulations". (audit A20)
+   */
+  private listReloadTimer: ReturnType<typeof setTimeout> | null = null;
+  private scheduleListReload(): void {
+    if (this.listReloadTimer) return;
+    this.listReloadTimer = setTimeout(() => {
+      this.listReloadTimer = null;
+      if (this.container && this.viewMode === 'list') void this.loadBatchList();
+    }, 2000);
+  }
 
   private handleCompleted = (data: { batchId: string; status: SimulationBatchStatus }) => {
     this.activeBatch = null;
@@ -290,24 +309,33 @@ export class SimulationsTab {
   };
 
   private startSpectating(batchId: string): void {
+    // Registered before the request: the server sends the first sim:state before its ack, so a
+    // handler added in the ack callback always missed it.
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const stateHandler = (data: { batchId: string; state: GameState }) => {
+      if (data.batchId !== batchId) return;
+      this.socketClient.off('sim:state', stateHandler);
+      if (timeout) clearTimeout(timeout);
+      // The admin may have left the tab meanwhile: do not pull them into the game.
+      if (!this.container) {
+        this.socketClient.emit('sim:unspectate', { batchId });
+        return;
+      }
+      this.launchGameScene(batchId, data.state);
+    };
+    this.socketClient.on('sim:state', stateHandler);
+
     this.socketClient.emit('sim:spectate', { batchId }, (res) => {
       if (!res.success) {
+        this.socketClient.off('sim:state', stateHandler);
         this.notifications.error(res.error || t('admin:simulations.errors.spectateFailed'));
         return;
       }
-
-      // Wait for the first sim:state to get the initial game state, then launch GameScene
-      const stateHandler = (data: { batchId: string; state: GameState }) => {
-        if (data.batchId !== batchId) return;
+      // No state in time (a game between transitions): stop listening AND leave the batch's
+      // socket room, which kept streaming its state into the lobby. (audit A19)
+      timeout = setTimeout(() => {
         this.socketClient.off('sim:state', stateHandler);
-
-        this.launchGameScene(batchId, data.state);
-      };
-      this.socketClient.on('sim:state', stateHandler);
-
-      // Timeout in case no state arrives (game between transitions)
-      setTimeout(() => {
-        this.socketClient.off('sim:state', stateHandler);
+        this.socketClient.emit('sim:unspectate', { batchId });
       }, 5000);
     });
   }

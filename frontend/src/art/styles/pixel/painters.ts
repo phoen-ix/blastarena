@@ -26,7 +26,7 @@ import {
   chunkSprite,
   scorchSprite,
   meteorSprite,
-  FUSE_TIP,
+  fuseTip,
 } from './items';
 
 /** Run `draw` with the origin at (0,0) of the current context, in art pixels. */
@@ -46,7 +46,7 @@ export const pixelPainters: StylePainters = {
   flameFrames: 10,
   powerUpFrames: 6,
   fuseFrames: 6,
-  fuseTip: FUSE_TIP,
+  fuseTip,
   specialFrames: specialFrameCount,
   specialLoopSeconds: specialLoopLength,
   palette: {

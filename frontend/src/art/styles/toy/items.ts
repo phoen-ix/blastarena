@@ -34,7 +34,11 @@ const TAU = Math.PI * 2;
 /* ================================================================== bombs */
 
 /** Where the spark sits with a full fuse (the renderer's spark particles start here). */
-export const FUSE_TIP = { x: 9, y: -22 };
+/** Where the spark burns at fuse `fuse`: the end of the drawn fuse curve (see bomb()). */
+export function fuseTip(fuse: number): { x: number; y: number } {
+  const { Q2 } = fusePath(Math.max(0.1, fuse));
+  return { x: Q2[0], y: Q2[1] };
+}
 export const FUSE_FRAMES = 8;
 
 function bombBody(g: G, type: BombType): void {

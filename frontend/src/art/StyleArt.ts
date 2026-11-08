@@ -56,7 +56,9 @@ interface Box {
 }
 
 /** Entity frame boxes, in logical units around the tile-centre origin. */
-const ENTITY: Box = { w: 64, h: 80, ox: 32, oy: 52 };
+// y from -52 to +32: the painter contract allows art down to y = 32, and h: 80 (to +28) clipped
+// the neon player/enemy glow and the shield glints. (audit R2)
+const ENTITY: Box = { w: 64, h: 84, ox: 32, oy: 52 };
 const BOMB: Box = { w: 64, h: 64, ox: 32, oy: 36 };
 const FLAME: Box = { w: 64, h: 64, ox: 32, oy: 32 };
 const TOKEN: Box = { w: 64, h: 64, ox: 32, oy: 34 };
