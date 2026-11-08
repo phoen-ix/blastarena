@@ -258,3 +258,23 @@ export interface PlayerInput {
   action: 'bomb' | 'detonate' | 'throw' | null;
   tick: number;
 }
+
+/** One player's line in a match result (`game:over`, replays). */
+export interface GameOverPlacement {
+  userId: number;
+  username: string;
+  isBot: boolean;
+  placement: number;
+  kills: number;
+  selfKills: number;
+  team: number | null;
+  alive: boolean;
+}
+
+/** A finished match's result, as broadcast in `game:over` and stored in replays. */
+export interface GameOverData {
+  winnerId: number | null;
+  winnerTeam: number | null;
+  reason: string;
+  placements: GameOverPlacement[];
+}

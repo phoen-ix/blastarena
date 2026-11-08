@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from './logger';
-import { getErrorMessage, USERNAME_MAX_LENGTH } from '@blast-arena/shared';
+import {
+  getErrorMessage,
+  USERNAME_MAX_LENGTH,
+  GAME_MODES,
+  POWERUP_DEFINITIONS,
+  GameMode,
+  PowerUpType,
+} from '@blast-arena/shared';
 
 /** Longest message we will hand to a socket client. */
 const MAX_CLIENT_ERROR_LENGTH = 200;
@@ -79,26 +86,17 @@ export const adminCloseRoomSchema = z.object({
   roomCode: z.string().min(1).max(20),
 });
 
+// Derived from the shared tables, which are Records over the mode and power-up types, so every
+// type is listed and none can be forgotten here: hand-copied lists in several schemas had drifted
+// (bomb_throw was once missing from one, which made every simulation start fail).
+const GAME_MODE_IDS = Object.keys(GAME_MODES) as [GameMode, ...GameMode[]];
+const POWERUP_TYPES = Object.keys(POWERUP_DEFINITIONS) as [PowerUpType, ...PowerUpType[]];
+/** Modes a room, a simulation or a challenge can use: every mode but the open world's. */
+export const gameModeSchema = z.enum(GAME_MODE_IDS).exclude(['open_world']);
+export const powerUpTypeSchema = z.enum(POWERUP_TYPES);
+export const powerUpListSchema = z.array(powerUpTypeSchema).max(POWERUP_TYPES.length);
+
 // MatchConfig validation for room:create socket events
-const VALID_GAME_MODES = [
-  'ffa',
-  'teams',
-  'battle_royale',
-  'sudden_death',
-  'deathmatch',
-  'king_of_the_hill',
-] as const;
-const VALID_POWERUP_TYPES = [
-  'bomb_up',
-  'fire_up',
-  'speed_up',
-  'shield',
-  'kick',
-  'pierce_bomb',
-  'remote_bomb',
-  'line_bomb',
-  'bomb_throw',
-] as const;
 
 // Odd, as validateCustomMap() in shared mapValidation requires: the generator's pillar grid and
 // border walls assume an odd size. (audit K11)
@@ -110,7 +108,7 @@ const mapDimensionSchema = z
   .refine((n) => n % 2 === 1, 'Map dimensions must be odd');
 
 const matchConfigSchema = z.object({
-  gameMode: z.enum(VALID_GAME_MODES),
+  gameMode: gameModeSchema,
   maxPlayers: z.number().int().min(2).max(8),
   mapWidth: mapDimensionSchema,
   mapHeight: mapDimensionSchema,
@@ -118,7 +116,7 @@ const matchConfigSchema = z.object({
   roundTime: z.number().int().min(30).max(600),
   teams: z.number().int().min(2).max(2).optional(),
   wallDensity: z.number().min(0).max(1).optional(),
-  enabledPowerUps: z.array(z.enum(VALID_POWERUP_TYPES)).max(VALID_POWERUP_TYPES.length).optional(),
+  enabledPowerUps: powerUpListSchema.optional(),
   powerUpDropRate: z.number().min(0).max(1).optional(),
   botCount: z.number().int().min(0).max(7).optional(),
   botDifficulty: z.enum(['easy', 'normal', 'hard']).optional(),

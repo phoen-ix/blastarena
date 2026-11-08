@@ -64,3 +64,20 @@ describe('createRoomRequestSchema map size', () => {
     expect(createRoomRequestSchema.safeParse(request(w, h)).success).toBe(false);
   });
 });
+
+describe('shared mode and power-up schemas', () => {
+  it('accept every power-up type of the shared table and no other', async () => {
+    const { powerUpListSchema } = await import('../../../backend/src/utils/socketValidation');
+    const { POWERUP_DEFINITIONS } = await import('@blast-arena/shared');
+    const all = Object.keys(POWERUP_DEFINITIONS);
+    expect(all).toContain('bomb_throw');
+    expect(powerUpListSchema.safeParse(all).success).toBe(true);
+    expect(powerUpListSchema.safeParse(['nuke']).success).toBe(false);
+  });
+
+  it('accept the room modes but not the open world', async () => {
+    const { gameModeSchema } = await import('../../../backend/src/utils/socketValidation');
+    expect(gameModeSchema.safeParse('king_of_the_hill').success).toBe(true);
+    expect(gameModeSchema.safeParse('open_world').success).toBe(false);
+  });
+});

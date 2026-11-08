@@ -11,3 +11,18 @@ export function param(value: string | string[] | undefined): string {
   if (Array.isArray(value)) return value[0] ?? '';
   return value ?? '';
 }
+
+/**
+ * `?page=&limit=` for list endpoints: page at least 1, limit between 1 and `maxLimit`. Unclamped,
+ * `?page=-5` gave a negative SQL OFFSET (a driver error, an opaque 500) and a huge `limit` streamed
+ * a whole table. The same two lines were repeated in a dozen routes. (audit ADMIN-PAGINATION-1)
+ */
+export function pageParams(
+  query: { page?: unknown; limit?: unknown },
+  defaultLimit: number,
+  maxLimit: number,
+): { page: number; limit: number } {
+  const page = Math.max(1, parseInt(String(query.page)) || 1);
+  const limit = Math.min(maxLimit, Math.max(1, parseInt(String(query.limit)) || defaultLimit));
+  return { page, limit };
+}

@@ -6,6 +6,7 @@ import {
   SocketData,
   DM_MAX_LENGTH,
   getErrorMessage,
+  chatModeAllows,
 } from '@blast-arena/shared';
 import * as settingsService from '../services/settings';
 import * as messageService from '../services/messages';
@@ -49,9 +50,7 @@ export function setupDMHandlers(socket: TypedSocket, io: TypedServer): void {
       const dmMode = await settingsService.getDMMode();
       if (dmMode === 'disabled')
         return callback({ success: false, error: 'Direct messages are disabled' });
-      if (dmMode === 'admin_only' && socket.data.role !== 'admin')
-        return callback({ success: false, error: 'Direct messages are restricted' });
-      if (dmMode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator')
+      if (!chatModeAllows(dmMode, socket.data.role))
         return callback({ success: false, error: 'Direct messages are restricted' });
 
       const message =

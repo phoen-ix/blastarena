@@ -15,6 +15,8 @@ import {
   TileType,
   TILE_SIZE,
   TICK_MS,
+  wrapX,
+  wrapY,
 } from '@blast-arena/shared';
 import { t } from '../i18n';
 import { TileMapRenderer } from '../game/TileMap';
@@ -1188,8 +1190,8 @@ export class GameScene extends Phaser.Scene {
         if (this.openWorldMode && this.lastGameState?.map?.wrapping) {
           const worldW = this.lastGameState.map.width * TILE_SIZE;
           const worldH = this.lastGameState.map.height * TILE_SIZE;
-          snapX = ((snapX % worldW) + worldW) % worldW;
-          snapY = ((snapY % worldH) + worldH) % worldH;
+          snapX = wrapX(snapX, worldW);
+          snapY = wrapY(snapY, worldH);
         }
         cam.scrollX = snapX;
         cam.scrollY = snapY;
@@ -1547,8 +1549,8 @@ export class GameScene extends Phaser.Scene {
       const worldH = this.lastGameState.map.height * TILE_SIZE;
 
       // Wrap target to canonical range, then shortest-path interpolation
-      const wrappedTargetX = ((targetX % worldW) + worldW) % worldW;
-      const wrappedTargetY = ((targetY % worldH) + worldH) % worldH;
+      const wrappedTargetX = wrapX(targetX, worldW);
+      const wrappedTargetY = wrapY(targetY, worldH);
 
       let dx = wrappedTargetX - cam.scrollX;
       let dy = wrappedTargetY - cam.scrollY;
@@ -1561,8 +1563,8 @@ export class GameScene extends Phaser.Scene {
       cam.scrollY += dy * 0.15;
 
       // Keep camera in canonical range
-      cam.scrollX = ((cam.scrollX % worldW) + worldW) % worldW;
-      cam.scrollY = ((cam.scrollY % worldH) + worldH) % worldH;
+      cam.scrollX = wrapX(cam.scrollX, worldW);
+      cam.scrollY = wrapY(cam.scrollY, worldH);
     } else {
       cam.scrollX = Phaser.Math.Linear(cam.scrollX, targetX, 0.15);
       cam.scrollY = Phaser.Math.Linear(cam.scrollY, targetY, 0.15);

@@ -1,3 +1,4 @@
+import { quadRoundRect } from './canvasShapes';
 import { playerColor } from '../game/playerPalette';
 
 /** Draw a player sprite icon using Canvas2D (matches BootScene's Phaser rendering) */
@@ -15,23 +16,23 @@ export function drawPlayerSprite(
   // Body darker bottom
   const darkerColor = darkenHex(hexColor, 0.7);
   ctx.fillStyle = darkerColor;
-  roundRect(ctx, x + pad, y + pad, size - pad * 2, size - pad * 2, r);
+  quadRoundRect(ctx, x + pad, y + pad, size - pad * 2, size - pad * 2, r);
   ctx.fill();
 
   // Body lighter top
   ctx.fillStyle = hexColor;
-  roundRect(ctx, x + pad, y + pad, size - pad * 2, size * 0.75, r);
+  quadRoundRect(ctx, x + pad, y + pad, size - pad * 2, size * 0.75, r);
   ctx.fill();
 
   // Border
   ctx.strokeStyle = 'rgba(255,255,255,0.4)';
   ctx.lineWidth = Math.max(1, size * 0.04);
-  roundRect(ctx, x + pad, y + pad, size - pad * 2, size - pad * 2, r);
+  quadRoundRect(ctx, x + pad, y + pad, size - pad * 2, size - pad * 2, r);
   ctx.stroke();
 
   // Highlight shine
   ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  roundRect(ctx, x + size * 0.12, y + size * 0.1, size * 0.22, size * 0.13, size * 0.06);
+  quadRoundRect(ctx, x + size * 0.12, y + size * 0.1, size * 0.22, size * 0.13, size * 0.06);
   ctx.fill();
 
   const cx = x + size / 2;
@@ -170,27 +171,6 @@ export function drawBombSprite(
   ctx.beginPath();
   ctx.arc(x + sparkX * s, y + sparkY * s, (isCustom ? 1.5 : 2) * s, 0, Math.PI * 2);
   ctx.fill();
-}
-
-function roundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-): void {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
 }
 
 function darkenHex(hex: string, factor: number): string {

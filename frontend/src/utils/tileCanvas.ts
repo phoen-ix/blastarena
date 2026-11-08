@@ -1,3 +1,4 @@
+import { quadRoundRect } from './canvasShapes';
 /**
  * Canvas2D tile preview renderer for DOM-based UI (Help panel, Level Editor docs, etc.).
  * Replicates the procedural Phaser tile textures from BootScene + campaignThemes.
@@ -233,10 +234,10 @@ function drawExit(ctx: CanvasRenderingContext2D, s: number, floorColor: number):
   ctx.fillRect(0, 0, 48 * s, 48 * s);
   // Trapdoor
   ctx.fillStyle = hexToRgb(0x4a3a2e);
-  roundRect(ctx, 6 * s, 6 * s, 36 * s, 36 * s, 4 * s);
+  quadRoundRect(ctx, 6 * s, 6 * s, 36 * s, 36 * s, 4 * s);
   ctx.fill();
   ctx.fillStyle = hexToRgb(0x3a2a1e);
-  roundRect(ctx, 8 * s, 8 * s, 32 * s, 32 * s, 3 * s);
+  quadRoundRect(ctx, 8 * s, 8 * s, 32 * s, 32 * s, 3 * s);
   ctx.fill();
   // Door handle
   ctx.fillStyle = hexToRgb(0xccaa44);
@@ -610,27 +611,6 @@ function drawDarkRift(ctx: CanvasRenderingContext2D, s: number): void {
 }
 
 // --- Helper ---
-
-function roundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-): void {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-}
 
 // --- Public API ---
 

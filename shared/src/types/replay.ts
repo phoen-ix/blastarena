@@ -1,6 +1,7 @@
 import {
   GameState,
   GameMap,
+  GameOverData,
   PlayerState,
   BombState,
   ExplosionState,
@@ -106,21 +107,7 @@ export interface ReplayData {
     botDifficulty?: string;
     botCount?: number;
   };
-  gameOver: {
-    winnerId: number | null;
-    winnerTeam: number | null;
-    reason: string;
-    placements: {
-      userId: number;
-      username: string;
-      isBot: boolean;
-      placement: number;
-      kills: number;
-      selfKills: number;
-      team: number | null;
-      alive: boolean;
-    }[];
-  };
+  gameOver: GameOverData;
   map: GameMap;
   totalTicks: number;
   tickRate: number;

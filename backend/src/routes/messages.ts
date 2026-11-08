@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { emailVerifiedMiddleware } from '../middleware/emailVerified';
 import * as messageService from '../services/messages';
-import { param } from '../utils/params';
+import { param, pageParams } from '../utils/params';
 
 const router = Router();
 
@@ -28,8 +28,7 @@ router.get('/messages/:userId', authMiddleware, emailVerifiedMiddleware, async (
     // missing a lower bound: `?page=-5` produced a negative SQL OFFSET and `?limit=-5` a negative
     // LIMIT, both of which the driver rejects — surfacing as an opaque 500 plus an error-level log
     // for anyone who edits the URL. (audit ADMIN-PAGINATION-1)
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const { page, limit } = pageParams(req.query, 20, 50);
     const result = await messageService.getConversation(req.user!.userId, otherUserId, page, limit);
     res.json(result);
   } catch (err) {

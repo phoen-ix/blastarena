@@ -6,6 +6,7 @@ import {
   SocketData,
   PARTY_CHAT_MAX_LENGTH,
   getErrorMessage,
+  chatModeAllows,
 } from '@blast-arena/shared';
 import * as partyService from '../services/party';
 import * as friendsService from '../services/friends';
@@ -264,10 +265,7 @@ export function setupPartyHandlers(socket: TypedSocket, io: TypedServer): void {
 
       // Check chat mode setting
       const chatMode = await settingsService.getChatMode();
-      if (chatMode === 'disabled') return;
-      if (chatMode === 'admin_only' && socket.data.role !== 'admin') return;
-      if (chatMode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator')
-        return;
+      if (!chatModeAllows(chatMode, socket.data.role)) return;
 
       const message =
         typeof data.message === 'string'

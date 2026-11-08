@@ -13,7 +13,7 @@ import {
 import { UIGamepadNavigator } from '../../game/UIGamepadNavigator';
 import { PLAYER_COLORS } from '../../scenes/BootScene';
 import { AuthManager } from '../../network/AuthManager';
-import { trapFocus, setHtml } from '../../utils/html';
+import { trapFocus, setHtml, escapeHtml } from '../../utils/html';
 import { PlayerCosmeticData } from '@blast-arena/shared';
 import { t } from '../../i18n';
 
@@ -798,12 +798,4 @@ export function createCameraModeSection(
 
   section.appendChild(chips);
   return section;
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }

@@ -3,15 +3,14 @@ import { authMiddleware } from '../middleware/auth';
 import { emailVerifiedMiddleware } from '../middleware/emailVerified';
 import * as leaderboardService from '../services/leaderboard';
 import * as seasonService from '../services/season';
-import { param } from '../utils/params';
+import { param, pageParams } from '../utils/params';
 
 const router = Router();
 
 // Public: paginated leaderboard
 router.get('/leaderboard', async (req, res, next) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
+    const { page, limit } = pageParams(req.query, 25, 100);
     const rawSeasonId = req.query.season_id ? parseInt(req.query.season_id as string) : undefined;
     const seasonId = rawSeasonId !== undefined && isNaN(rawSeasonId) ? undefined : rawSeasonId;
 
@@ -35,8 +34,7 @@ router.get('/leaderboard/tiers', async (_req, res, next) => {
 // Public: seasons list
 router.get('/leaderboard/seasons', async (req, res, next) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const { page, limit } = pageParams(req.query, 20, 50);
     const result = await seasonService.getSeasons(page, limit);
     res.json(result);
   } catch (err) {

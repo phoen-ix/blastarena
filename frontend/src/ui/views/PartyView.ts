@@ -1,6 +1,6 @@
 import { ILobbyView, ViewDeps } from './types';
 import { ApiClient } from '../../network/ApiClient';
-import { Party, PartyChatMessage, ChatMode, Friend } from '@blast-arena/shared';
+import { Party, PartyChatMessage, ChatMode, Friend, chatModeAllows } from '@blast-arena/shared';
 import type { ServerToClientEvents } from '@blast-arena/shared';
 import { PartyBar } from '../PartyBar';
 import { escapeHtml, escapeAttr, setHtml } from '../../utils/html';
@@ -96,12 +96,7 @@ export class PartyView implements ILobbyView {
   }
 
   private canChat(): boolean {
-    if (this.chatMode === 'everyone') return true;
-    if (this.chatMode === 'disabled') return false;
-    if (this.chatMode === 'admin_only') return this.currentUserRole === 'admin';
-    if (this.chatMode === 'staff')
-      return this.currentUserRole === 'admin' || this.currentUserRole === 'moderator';
-    return false;
+    return chatModeAllows(this.chatMode, this.currentUserRole);
   }
 
   private get isLeader(): boolean {

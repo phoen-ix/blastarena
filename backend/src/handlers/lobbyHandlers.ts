@@ -6,6 +6,7 @@ import {
   SocketData,
   LOBBY_CHAT_MAX_LENGTH,
   getErrorMessage,
+  chatModeAllows,
 } from '@blast-arena/shared';
 import { logger } from '../utils/logger';
 import * as settingsService from '../services/settings';
@@ -35,10 +36,7 @@ export function setupLobbyHandlers(socket: TypedSocket, io: TypedServer): void {
       if (!lobbyChatLimiter.isAllowed(socket.id)) return;
 
       const chatMode = await settingsService.getLobbyChatMode();
-      if (chatMode === 'disabled') return;
-      if (chatMode === 'admin_only' && socket.data.role !== 'admin') return;
-      if (chatMode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator')
-        return;
+      if (!chatModeAllows(chatMode, socket.data.role)) return;
 
       const message =
         typeof data.message === 'string'

@@ -1,4 +1,11 @@
-import { GameState, PlayerInput, Position, OpenWorldScoreEntry, KillCause } from './game';
+import {
+  GameState,
+  PlayerInput,
+  Position,
+  OpenWorldScoreEntry,
+  KillCause,
+  GameOverData,
+} from './game';
 import { Room, RoomPlayer, CreateRoomRequest, RoomListItem } from './lobby';
 import { UserRole } from './auth';
 import { SimulationConfig, SimulationBatchStatus, SimulationGameResult } from './simulation';
@@ -245,21 +252,7 @@ export interface ServerToClientEvents {
     killerId: number | null;
     cause: KillCause;
   }) => void;
-  'game:over': (data: {
-    winnerId: number | null;
-    winnerTeam: number | null;
-    reason: string;
-    placements: {
-      userId: number;
-      username: string;
-      isBot: boolean;
-      placement: number;
-      kills: number;
-      selfKills: number;
-      team: number | null;
-      alive: boolean;
-    }[];
-  }) => void;
+  'game:over': (data: GameOverData) => void;
   error: (data: { message: string; code?: string }) => void;
   'admin:toast': (data: { message: string }) => void;
   'admin:banner': (data: { message: string | null }) => void;

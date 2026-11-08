@@ -12,7 +12,7 @@ import { renderPowerUpCanvas } from '../utils/powerUpCanvas';
 import { renderTileCanvas } from '../utils/tileCanvas';
 import { marked } from 'marked';
 import { t } from '../i18n';
-import { setHtml, insertHtml } from '../utils/html';
+import { setHtml, insertHtml, escapeHtml } from '../utils/html';
 
 interface HelpTab {
   id: string;
@@ -620,7 +620,7 @@ export class HelpUI {
     // silently disappeared from the docs. (audit CSP-1)
     // The OpenAPI spec is YAML, not markdown — shown verbatim in a <pre>.
     const html = url.endsWith('.yaml')
-      ? `<pre><code>${this.escapeForPre(raw)}</code></pre>`
+      ? `<pre><code>${escapeHtml(raw)}</code></pre>`
       : await marked.parse(raw);
     this.markdownCache.set(url, html);
     return html;
@@ -633,10 +633,6 @@ export class HelpUI {
     const resp = await fetch(url, { headers });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp.text();
-  }
-
-  private escapeForPre(text: string): string {
-    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   async renderEmbedded(container: HTMLElement): Promise<void> {

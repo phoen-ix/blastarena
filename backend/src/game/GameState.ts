@@ -10,7 +10,7 @@ import {
   SpectatorActionType,
   SpectatorEnergyState,
 } from '@blast-arena/shared';
-import { getExplosionCells } from '@blast-arena/shared';
+import { getExplosionCells, wrapX, wrapY } from '@blast-arena/shared';
 import {
   DEFAULT_WALL_DENSITY,
   DEFAULT_POWERUP_DROP_RATE,
@@ -795,8 +795,8 @@ export class GameStateManager {
         let nextY = bomb.position.y + dy;
         // Wrap for toroidal maps
         if (this.map.wrapping) {
-          nextX = ((nextX % this.map.width) + this.map.width) % this.map.width;
-          nextY = ((nextY % this.map.height) + this.map.height) % this.map.height;
+          nextX = wrapX(nextX, this.map.width);
+          nextY = wrapY(nextY, this.map.height);
         }
         const nextKey = `${nextX},${nextY}`;
 
@@ -1538,8 +1538,8 @@ export class GameStateManager {
       let nextX = bomb.position.x + dx;
       let nextY = bomb.position.y + dy;
       if (this.map.wrapping) {
-        nextX = ((nextX % this.map.width) + this.map.width) % this.map.width;
-        nextY = ((nextY % this.map.height) + this.map.height) % this.map.height;
+        nextX = wrapX(nextX, this.map.width);
+        nextY = wrapY(nextY, this.map.height);
       }
       if (this.collisionSystem.isWalkable(nextX, nextY)) {
         let blocked = false;
@@ -1958,8 +1958,8 @@ export class GameStateManager {
 
   setTileTracked(x: number, y: number, type: TileType): void {
     if (this.map.wrapping) {
-      x = ((x % this.map.width) + this.map.width) % this.map.width;
-      y = ((y % this.map.height) + this.map.height) % this.map.height;
+      x = wrapX(x, this.map.width);
+      y = wrapY(y, this.map.height);
     }
     if (x < 0 || x >= this.map.width || y < 0 || y >= this.map.height) return;
     const previous = this.map.tiles[y][x];
@@ -1974,8 +1974,8 @@ export class GameStateManager {
   /** Destroy a tile and track the change for delta broadcasting */
   private destroyTileTracked(x: number, y: number): boolean {
     if (this.map.wrapping) {
-      x = ((x % this.map.width) + this.map.width) % this.map.width;
-      y = ((y % this.map.height) + this.map.height) % this.map.height;
+      x = wrapX(x, this.map.width);
+      y = wrapY(y, this.map.height);
     }
     const inBounds = x >= 0 && x < this.map.width && y >= 0 && y < this.map.height;
     if (!inBounds) return false;
@@ -2047,8 +2047,8 @@ export class GameStateManager {
         let targetX = player.position.x + dx;
         let targetY = player.position.y + dy;
         if (this.map.wrapping) {
-          targetX = ((targetX % this.map.width) + this.map.width) % this.map.width;
-          targetY = ((targetY % this.map.height) + this.map.height) % this.map.height;
+          targetX = wrapX(targetX, this.map.width);
+          targetY = wrapY(targetY, this.map.height);
         }
 
         for (const bomb of this.bombs.values()) {
@@ -2137,8 +2137,8 @@ export class GameStateManager {
         while (player.canPlaceBomb()) {
           // Wrap coordinates for toroidal maps
           if (this.map.wrapping) {
-            cx = ((cx % this.map.width) + this.map.width) % this.map.width;
-            cy = ((cy % this.map.height) + this.map.height) % this.map.height;
+            cx = wrapX(cx, this.map.width);
+            cy = wrapY(cy, this.map.height);
           }
           const tileKey = `${cx},${cy}`;
           // Check if the tile is walkable, has no bomb, and has no player
@@ -2204,8 +2204,8 @@ export class GameStateManager {
         let tx = player.position.x + dx * i;
         let ty = player.position.y + dy * i;
         if (this.map.wrapping) {
-          tx = ((tx % this.map.width) + this.map.width) % this.map.width;
-          ty = ((ty % this.map.height) + this.map.height) % this.map.height;
+          tx = wrapX(tx, this.map.width);
+          ty = wrapY(ty, this.map.height);
         } else {
           if (tx < 0 || tx >= this.map.width || ty < 0 || ty >= this.map.height) continue;
         }
@@ -2221,8 +2221,8 @@ export class GameStateManager {
           let tx = player.position.x + dx * i;
           let ty = player.position.y + dy * i;
           if (this.map.wrapping) {
-            tx = ((tx % this.map.width) + this.map.width) % this.map.width;
-            ty = ((ty % this.map.height) + this.map.height) % this.map.height;
+            tx = wrapX(tx, this.map.width);
+            ty = wrapY(ty, this.map.height);
           } else {
             if (tx < 0 || tx >= this.map.width || ty < 0 || ty >= this.map.height) break;
           }
@@ -2373,8 +2373,8 @@ export class GameStateManager {
       let nextX = bomb.position.x + dx;
       let nextY = bomb.position.y + dy;
       if (this.map.wrapping) {
-        nextX = ((nextX % this.map.width) + this.map.width) % this.map.width;
-        nextY = ((nextY % this.map.height) + this.map.height) % this.map.height;
+        nextX = wrapX(nextX, this.map.width);
+        nextY = wrapY(nextY, this.map.height);
       }
       const nextKey = `${nextX},${nextY}`;
 

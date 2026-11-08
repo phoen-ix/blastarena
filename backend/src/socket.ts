@@ -19,6 +19,7 @@ import {
   EMOTE_COOLDOWN_MS,
   SPECTATOR_CHAT_MAX_LENGTH,
   isSupportedLanguage,
+  chatModeAllows,
 } from '@blast-arena/shared';
 import {
   setupFriendHandlers,
@@ -109,6 +110,11 @@ function requireRoom(
     return null;
   }
   return roomCode;
+}
+
+/** Admins and moderators: the staff who may kick, spectate and message rooms. */
+function isStaff(role: string | undefined): boolean {
+  return role === 'admin' || role === 'moderator';
 }
 
 /** The handshake's locale when it is a supported language (it was taken as any value). */
@@ -930,14 +936,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
           return;
 
         const emoteMode = await settingsService.getEmoteMode();
-        if (emoteMode === 'disabled') return;
-        if (emoteMode === 'admin_only' && socket.data.role !== 'admin') return;
-        if (
-          emoteMode === 'staff' &&
-          socket.data.role !== 'admin' &&
-          socket.data.role !== 'moderator'
-        )
-          return;
+        if (!chatModeAllows(emoteMode, socket.data.role)) return;
 
         const now = Date.now();
         const last = emoteLastUsed.get(socket.data.userId) ?? 0;
@@ -967,10 +966,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
         if (!message) return;
 
         const mode = await settingsService.getSpectatorChatMode();
-        if (mode === 'disabled') return;
-        if (mode === 'admin_only' && socket.data.role !== 'admin') return;
-        if (mode === 'staff' && socket.data.role !== 'admin' && socket.data.role !== 'moderator')
-          return;
+        if (!chatModeAllows(mode, socket.data.role)) return;
 
         if (!spectatorChatLimiter.isAllowed(socket.id)) return;
 
@@ -1062,7 +1058,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       try {
         if (!adminActionLimiter(socket.id))
           return callback({ success: false, error: 'Rate limited' });
-        if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') {
+        if (!isStaff(socket.data.role)) {
           return callback({ success: false, error: 'Insufficient permissions' });
         }
 
@@ -1167,7 +1163,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       callback = ackOf(callback);
       if (!adminRoomLimiter.isAllowed(socket.id))
         return callback({ success: false, error: 'Rate limited' }); // audit B16
-      if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') {
+      if (!isStaff(socket.data.role)) {
         return callback({ success: false, error: 'Insufficient permissions' });
       }
 
@@ -1192,7 +1188,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
 
     socket.on('admin:unspectate', (data) => {
       if (!adminRoomLimiter.isAllowed(socket.id)) return;
-      if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') return;
+      if (!isStaff(socket.data.role)) return;
       const parsed = validateSocket(adminSpectateSchema, data);
       if (!parsed) return;
       // Never pull a player out of their own room.
@@ -1207,7 +1203,7 @@ export function createSocketServer(httpServer: HttpServer): TypedServer {
       const ack = ackOf(callback);
       if (!adminRoomLimiter.isAllowed(socket.id))
         return ack({ success: false, error: 'Rate limited' }); // audit B16
-      if (socket.data.role !== 'admin' && socket.data.role !== 'moderator') {
+      if (!isStaff(socket.data.role)) {
         return ack({ success: false, error: 'Insufficient permissions' });
       }
       const parsed = validateSocket(adminSpectateSchema, { roomCode: data?.roomCode });

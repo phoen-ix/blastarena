@@ -8,6 +8,7 @@ import {
   ChatMode,
   UserRole,
   ServerToClientEvents,
+  chatModeAllows,
 } from '@blast-arena/shared';
 import { escapeHtml, setHtml } from '../utils/html';
 import { t } from '../i18n';
@@ -87,12 +88,7 @@ export class PartyBar {
   }
 
   private canChat(): boolean {
-    if (this.chatMode === 'everyone') return true;
-    if (this.chatMode === 'disabled') return false;
-    if (this.chatMode === 'admin_only') return this.currentUserRole === 'admin';
-    if (this.chatMode === 'staff')
-      return this.currentUserRole === 'admin' || this.currentUserRole === 'moderator';
-    return false;
+    return chatModeAllows(this.chatMode, this.currentUserRole);
   }
 
   mount(parent: HTMLElement): void {

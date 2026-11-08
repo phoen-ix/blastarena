@@ -1,6 +1,12 @@
 import { SocketClient } from '../network/SocketClient';
 import { ApiClient } from '../network/ApiClient';
-import { LobbyChatMessage, ChatMode, UserRole, LOBBY_CHAT_MAX_LENGTH } from '@blast-arena/shared';
+import {
+  LobbyChatMessage,
+  ChatMode,
+  UserRole,
+  LOBBY_CHAT_MAX_LENGTH,
+  chatModeAllows,
+} from '@blast-arena/shared';
 import type { ServerToClientEvents } from '@blast-arena/shared';
 import { escapeHtml, setHtml } from '../utils/html';
 import { getSettings } from '../game/Settings';
@@ -38,12 +44,7 @@ export class LobbyChatPanel {
   }
 
   private canChat(): boolean {
-    if (this.chatMode === 'everyone') return true;
-    if (this.chatMode === 'disabled') return false;
-    if (this.chatMode === 'admin_only') return this.currentUserRole === 'admin';
-    if (this.chatMode === 'staff')
-      return this.currentUserRole === 'admin' || this.currentUserRole === 'moderator';
-    return false;
+    return chatModeAllows(this.chatMode, this.currentUserRole);
   }
 
   mount(parent: HTMLElement): void {

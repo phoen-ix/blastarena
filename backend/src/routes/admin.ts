@@ -21,6 +21,7 @@ import { execute, query, withTransaction } from '../db/connection';
 import { logAdminAction } from '../services/admin-audit';
 import { IdRow } from '../db/types';
 import { logger } from '../utils/logger';
+import { gameModeSchema, powerUpListSchema } from '../utils/socketValidation';
 import {
   SimulationConfig,
   GameDefaults,
@@ -48,7 +49,7 @@ import {
 import multer from 'multer';
 import { AppError } from '../middleware/errorHandler';
 import { scrubEmailError } from '../utils/crypto';
-import { param } from '../utils/params';
+import { param, pageParams } from '../utils/params';
 
 const router = Router();
 
@@ -755,9 +756,7 @@ router.put(
 
 const gameDefaultsSchema = z.object({
   defaults: z.object({
-    gameMode: z
-      .enum(['ffa', 'teams', 'battle_royale', 'sudden_death', 'deathmatch', 'king_of_the_hill'])
-      .optional(),
+    gameMode: gameModeSchema.optional(),
     maxPlayers: z.number().int().min(2).max(8).optional(),
     roundTime: z.number().int().min(30).max(600).optional(),
     mapWidth: z.number().int().min(11).max(51).optional(),
@@ -772,30 +771,14 @@ const gameDefaultsSchema = z.object({
     puzzleTiles: z.boolean().optional(),
     enableSpectatorActions: z.boolean().optional(),
     friendlyFire: z.boolean().optional(),
-    enabledPowerUps: z
-      .array(
-        z.enum([
-          'bomb_up',
-          'fire_up',
-          'speed_up',
-          'shield',
-          'kick',
-          'pierce_bomb',
-          'remote_bomb',
-          'line_bomb',
-          'bomb_throw',
-        ]),
-      )
-      .optional(),
+    enabledPowerUps: powerUpListSchema.optional(),
     botAiId: z.string().max(36).optional(),
   }),
 });
 
 const simulationDefaultsSchema = z.object({
   defaults: z.object({
-    gameMode: z
-      .enum(['ffa', 'teams', 'battle_royale', 'sudden_death', 'deathmatch', 'king_of_the_hill'])
-      .optional(),
+    gameMode: gameModeSchema.optional(),
     maxPlayers: z.number().int().min(2).max(8).optional(),
     roundTime: z.number().int().min(30).max(600).optional(),
     mapWidth: z.number().int().min(11).max(61).optional(),
@@ -809,21 +792,7 @@ const simulationDefaultsSchema = z.object({
     puzzleTiles: z.boolean().optional(),
     enableSpectatorActions: z.boolean().optional(),
     friendlyFire: z.boolean().optional(),
-    enabledPowerUps: z
-      .array(
-        z.enum([
-          'bomb_up',
-          'fire_up',
-          'speed_up',
-          'shield',
-          'kick',
-          'pierce_bomb',
-          'remote_bomb',
-          'line_bomb',
-          'bomb_throw',
-        ]),
-      )
-      .optional(),
+    enabledPowerUps: powerUpListSchema.optional(),
     totalGames: z.number().int().min(1).max(1000).optional(),
     speed: z.enum(['fast', 'realtime']).optional(),
     logVerbosity: z.enum(['normal', 'detailed', 'full']).optional(),
@@ -1026,8 +995,7 @@ router.get('/admin/users', async (req, res, next) => {
     // Clamped like /admin/simulations and /leaderboard already are. Unclamped, `?page=-5`
     // produced a negative SQL OFFSET (a driver error surfacing as an opaque 500) and
     // `?limit=1000000` streamed the whole table. (audit ADMIN-PAGINATION-1)
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const { page, limit } = pageParams(req.query, 20, 100);
     // `?search=a&search=b` arrives as an array; only a single string is a search term.
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     const result = await adminService.listUsers(page, limit, search);
@@ -1189,8 +1157,7 @@ router.get('/admin/matches', async (req, res, next) => {
     // Clamped like /admin/simulations and /leaderboard already are. Unclamped, `?page=-5`
     // produced a negative SQL OFFSET (a driver error surfacing as an opaque 500) and
     // `?limit=1000000` streamed the whole table. (audit ADMIN-PAGINATION-1)
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const { page, limit } = pageParams(req.query, 20, 100);
     const result = await adminService.getMatchHistory(page, limit);
     res.json(result);
   } catch (err) {
@@ -1285,8 +1252,7 @@ router.get('/admin/actions', adminOnlyMiddleware, async (req, res, next) => {
     // Clamped like /admin/simulations and /leaderboard already are. Unclamped, `?page=-5`
     // produced a negative SQL OFFSET (a driver error surfacing as an opaque 500) and
     // `?limit=1000000` streamed the whole table. (audit ADMIN-PAGINATION-1)
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const { page, limit } = pageParams(req.query, 20, 100);
     const action = typeof req.query.action === 'string' ? req.query.action : undefined;
     const result = await adminService.getAdminActions(page, limit, action);
     res.json(result);
@@ -1360,8 +1326,7 @@ router.get('/admin/replays', fsReadLimiter, async (req, res, next) => {
     // Clamped like /admin/simulations and /leaderboard already are. Unclamped, `?page=-5`
     // produced a negative SQL OFFSET (a driver error surfacing as an opaque 500) and
     // `?limit=1000000` streamed the whole table. (audit ADMIN-PAGINATION-1)
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const { page, limit } = pageParams(req.query, 20, 100);
     const result = await replayService.listReplays(page, limit);
     res.json(result);
   } catch (err) {
@@ -1405,8 +1370,7 @@ router.get('/admin/campaign-replays', async (req, res, next) => {
     // Clamped like /admin/simulations and /leaderboard already are. Unclamped, `?page=-5`
     // produced a negative SQL OFFSET (a driver error surfacing as an opaque 500) and
     // `?limit=1000000` streamed the whole table. (audit ADMIN-PAGINATION-1)
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const { page, limit } = pageParams(req.query, 20, 100);
     const userId = req.query.userId ? parseInt(req.query.userId as string) : undefined;
     const levelId = req.query.levelId ? parseInt(req.query.levelId as string) : undefined;
     const result = await replayService.listCampaignReplays(page, limit, userId, levelId);
@@ -1458,35 +1422,16 @@ router.delete('/admin/campaign-replays/:sessionId', adminOnlyMiddleware, async (
 // --- Simulations ---
 
 export const simulationConfigSchema = z.object({
-  gameMode: z.enum([
-    'ffa',
-    'teams',
-    'battle_royale',
-    'sudden_death',
-    'deathmatch',
-    'king_of_the_hill',
-  ]),
+  gameMode: gameModeSchema,
   botCount: z.number().int().min(2).max(8),
   botDifficulty: z.enum(['easy', 'normal', 'hard']),
   mapWidth: z.number().int().min(11).max(61),
   mapHeight: z.number().int().min(11).max(61),
   roundTime: z.number().int().min(30).max(600),
   wallDensity: z.number().min(0).max(1),
-  // All 9 types, as in the simulation defaults: bomb_throw was missing here, so saved defaults
-  // that included it made every simulation start fail validation.
-  enabledPowerUps: z.array(
-    z.enum([
-      'bomb_up',
-      'fire_up',
-      'speed_up',
-      'shield',
-      'kick',
-      'pierce_bomb',
-      'remote_bomb',
-      'line_bomb',
-      'bomb_throw',
-    ]),
-  ),
+  // Every power-up type, from the shared table (a hand-copied list here once lacked bomb_throw,
+  // so saved defaults that included it made every simulation start fail validation).
+  enabledPowerUps: powerUpListSchema,
   powerUpDropRate: z.number().min(0).max(1),
   friendlyFire: z.boolean(),
   hazardTiles: z.boolean(),
@@ -1505,8 +1450,7 @@ export const simulationConfigSchema = z.object({
 router.get('/admin/simulations', adminOnlyMiddleware, fsReadLimiter, async (req, res, next) => {
   try {
     const mgr = getSimulationManager();
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const { page, limit } = pageParams(req.query, 20, 100);
     res.json(await mgr.getHistory(page, limit));
   } catch (err) {
     next(err);
@@ -1877,8 +1821,7 @@ router.delete('/admin/enemy-ai/:id', adminOnlyMiddleware, async (req, res, next)
 
 router.get('/admin/seasons', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const { page, limit } = pageParams(req.query, 20, 50);
     const result = await seasonService.getSeasons(page, limit);
     res.json(result);
   } catch (err) {
@@ -2583,8 +2526,7 @@ router.post(
 
 router.get('/admin/challenges', adminOnlyMiddleware, async (req, res, next) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const { page, limit } = pageParams(req.query, 20, 50);
     const result = await challengesService.listChallenges(page, limit);
     res.json(result);
   } catch (err) {
@@ -2597,14 +2539,7 @@ const challengeSchema = z.object({
   description: z.string().max(2000).optional().default(''),
   customMapId: z.number().int().positive(),
   // Room modes only (any string up to 30 characters used to be stored)
-  gameMode: z.enum([
-    'ffa',
-    'teams',
-    'battle_royale',
-    'sudden_death',
-    'deathmatch',
-    'king_of_the_hill',
-  ]),
+  gameMode: gameModeSchema,
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });

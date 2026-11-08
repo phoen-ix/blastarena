@@ -18,7 +18,7 @@ import {
   validatePassword,
   SUPPORTED_LANGUAGES,
 } from '@blast-arena/shared';
-import { param } from '../utils/params';
+import { param, pageParams } from '../utils/params';
 import { AppError } from '../middleware/errorHandler';
 
 const router = Router();
@@ -231,8 +231,7 @@ router.delete(
 
 router.get('/user/matches', authMiddleware, emailVerifiedMiddleware, async (req, res, next) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const { page, limit } = pageParams(req.query, 20, 50);
     const result = await userService.getMatchHistory(req.user!.userId, page, limit);
     res.json(result);
   } catch (err) {

@@ -5,6 +5,7 @@ import { generateHazardTileTextures } from '../utils/campaignThemes';
 import { t } from '../i18n';
 import { POWERUP_COLORS } from '../utils/powerUpColors';
 import { STANDARD_PLAYER_COLORS } from '../game/playerPalette';
+import { quadRoundRect } from '../utils/canvasShapes';
 import { bakeGraphics, hiResGraphics, textureRatio, uiCamera } from '../art/hidpi';
 import { markTexScale } from '../art/scale';
 
@@ -597,14 +598,14 @@ export class BootScene extends Phaser.Scene {
       // Background rounded rect
       ctx.globalAlpha = 0.8;
       ctx.fillStyle = color;
-      this.canvasRoundRect(ctx, 4, 4, 40, 40, 8);
+      quadRoundRect(ctx, 4, 4, 40, 40, 8);
       ctx.fill();
 
       // Border
       ctx.globalAlpha = 0.5;
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
-      this.canvasRoundRect(ctx, 4, 4, 40, 40, 8);
+      quadRoundRect(ctx, 4, 4, 40, 40, 8);
       ctx.stroke();
 
       // Procedural icon
@@ -616,27 +617,6 @@ export class BootScene extends Phaser.Scene {
 
       markTexScale(this.textures.addCanvas(`powerup_${type}`, canvas), r);
     }
-  }
-
-  private canvasRoundRect(
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    r: number,
-  ): void {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
   }
 
   private generateParticleTextures(): void {

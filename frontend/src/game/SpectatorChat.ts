@@ -1,3 +1,4 @@
+import { chatModeAllows } from '@blast-arena/shared';
 import { SocketClient } from '../network/SocketClient';
 import { ApiClient } from '../network/ApiClient';
 import { escapeHtml, setHtml } from '../utils/html';
@@ -99,11 +100,7 @@ export class SpectatorChat {
   }
 
   private canChat(): boolean {
-    if (this.chatMode === 'disabled') return false;
-    if (this.chatMode === 'admin_only' && this.userRole !== 'admin') return false;
-    if (this.chatMode === 'staff' && this.userRole !== 'admin' && this.userRole !== 'moderator')
-      return false;
-    return true;
+    return chatModeAllows(this.chatMode, this.userRole);
   }
 
   private render(): void {

@@ -30,6 +30,24 @@ export interface SimulationDefaults extends GameDefaults {
 
 export type ChatMode = 'everyone' | 'staff' | 'admin_only' | 'disabled';
 
+/**
+ * Whether a user of `role` may use a chat feature set to `mode`. One rule for every chat feature
+ * (lobby, party, DMs, emotes, spectator chat) on both client and server; it was written out nine
+ * times. An unknown mode allows nothing.
+ */
+export function chatModeAllows(mode: ChatMode, role: string | null | undefined): boolean {
+  switch (mode) {
+    case 'everyone':
+      return true;
+    case 'staff':
+      return role === 'admin' || role === 'moderator';
+    case 'admin_only':
+      return role === 'admin';
+    default:
+      return false;
+  }
+}
+
 /** `starttls`: STARTTLS required; `tls`: implicit TLS; `none`: plaintext (local catchers only). */
 export const SMTP_SECURITY_MODES = ['starttls', 'tls', 'none'] as const;
 export type SmtpSecurity = (typeof SMTP_SECURITY_MODES)[number];

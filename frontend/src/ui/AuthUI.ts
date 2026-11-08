@@ -9,7 +9,7 @@ import {
   validateUsernameI18n,
 } from '@blast-arena/shared';
 import { i18n, t } from '../i18n';
-import { setHtml } from '../utils/html';
+import { setHtml, escapeHtml } from '../utils/html';
 import { createModal } from '../utils/modal';
 
 export class AuthUI {
@@ -252,18 +252,10 @@ export class AuthUI {
           <h3>${t('auth:imprint.title')}</h3>
           <button class="modal-close" aria-label="${t('common:actions.close')}">&times;</button>
         </div>
-        <div class="modal-body" style="white-space:pre-wrap;font-size:14px;line-height:1.6;max-height:60vh;overflow-y:auto;">${this.escapeHtml(text)}</div>
+        <div class="modal-body" style="white-space:pre-wrap;font-size:14px;line-height:1.6;max-height:60vh;overflow-y:auto;">${escapeHtml(text)}</div>
     `,
     );
     overlay.querySelector('.modal-close')!.addEventListener('click', close);
-  }
-
-  private escapeHtml(str: string): string {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
   }
 
   private renderRegister(): void {
