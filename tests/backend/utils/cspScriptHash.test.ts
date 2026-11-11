@@ -13,10 +13,10 @@ const root = path.resolve(__dirname, '../../..');
 
 function inlineScriptBodies(html: string): string[] {
   const bodies: string[] = [];
-  const re = /<script(\s[^>]*)?>([\s\S]*?)<\/script>/g;
+  const re = /<script(\s[^>]*)?>([\s\S]*?)<\/script\b[^>]*>/gi;
   for (let m = re.exec(html); m; m = re.exec(html)) {
     const attrs = m[1] ?? '';
-    if (/\bsrc=/.test(attrs) || /type="application\/ld\+json"/.test(attrs)) continue;
+    if (/\bsrc=/i.test(attrs) || /type="application\/ld\+json"/i.test(attrs)) continue;
     bodies.push(m[2]);
   }
   return bodies;
