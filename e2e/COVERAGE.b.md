@@ -275,7 +275,7 @@ Part a (player side: landing, lobby views, rooms, matches, open world, social, s
 | Admin panel as moderator (Users read-only, Matches, Rooms with Kick but no Close; admin-only API 403) | ✅ | admin-sweep.spec.ts › a moderator gets the staff tabs and nothing admin-only; admin-games.spec.ts › a moderator kicks one player; the room stays for the other |
 | Admin panel as player (no Admin entry; API 403) and guest (API 401) | ✅ | admin-sweep.spec.ts › a player has no Admin entry and the API refuses |
 | Register: empty fields, short password, bad username, taken username (409) | ✅ | account.spec.ts › register and verify › the form checks its fields before and on the server |
-| Register → unverified login → verification screen → "not yet" → mail link → signed in; link single-use (400) | ✅ | account.spec.ts › register and verify › register, get stuck at verification, verify by mail, play |
+| Register → unverified login → verification screen → "not yet" → mail link → signed in; link single-use (second open redirects with `?emailVerified=false`) | ✅ | account.spec.ts › register and verify › register, get stuck at verification, verify by mail, play |
 | Verification screen: resend (empty address, countdown, second mail), back to login (logout) | ✅ | account.spec.ts › register and verify › resend the verification mail, then go back to login |
 | Register with a taken email: same answer, warning mail to the owner | ✅ | account.spec.ts › register and verify › registering a taken email looks the same and warns the owner |
 | Registration closed: no Register on landing, guest HUD bar or login form; API 403 | ✅ | account.spec.ts › register and verify › with registration off there is no way to register |

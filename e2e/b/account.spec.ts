@@ -91,9 +91,10 @@ test.describe('register and verify', () => {
     ).toBeVisible();
     // Still signed in (refresh cookie): straight into the game.
     await expect(page.locator('.hud-ow-board')).toBeVisible();
-    // The link is single-use.
+    // The link is single-use: a second open lands in the app with the failure flag.
     const again = await page.request.get(firstLink(mail.html), { maxRedirects: 0 });
-    expect(again.status()).toBe(400);
+    expect(again.status()).toBe(302);
+    expect(again.headers().location).toMatch(/\?emailVerified=false$/);
   });
 
   test('resend the verification mail, then go back to login', async ({ page }) => {

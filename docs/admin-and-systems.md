@@ -155,7 +155,7 @@ Users manage their account from the lobby Account modal:
 `POST /api/user/password` with `currentPassword` and `newPassword`; bcrypt compare before updating.
 
 ### Admin Password Reset
-`PUT /admin/users/:id/password` (admin-only) — sets new password, revokes all refresh tokens (forces re-login), audit-logged as `reset_password`. Frontend: "Reset PW" button with new password + confirm fields (min 6 chars).
+`PUT /admin/users/:id/password` (admin-only) — sets new password, revokes all refresh tokens (forces re-login), audit-logged as `reset_password`. Frontend: "Reset PW" button with new password + confirm fields (min 8 chars).
 
 ### Forgot Password
 `POST /api/auth/forgot-password` sends reset link (rate limited: 3/15min); response intentionally vague ("If the email exists...") to prevent enumeration. `POST /api/auth/reset-password` accepts token + new password. Tokens stored in `users.password_reset_token`/`users.password_reset_expires`. AuthUI `forgot` mode: email input -> POST -> returns to login with success message.

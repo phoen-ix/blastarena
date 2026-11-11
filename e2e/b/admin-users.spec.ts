@@ -45,9 +45,9 @@ test('search and create a user', async ({ page }) => {
   const name = `c${uid()}`;
   await dialog.getByLabel('Username').fill(name);
   await dialog.getByLabel('Email').fill(`${name}@blast-e2e.example`);
-  await dialog.getByLabel('Password').fill('12345');
+  await dialog.getByLabel('Password').fill('1234567');
   await dialog.getByRole('button', { name: 'Create' }).click();
-  await expect(dialog.locator('#cu-error')).toHaveText('Password must be at least 6 characters');
+  await expect(dialog.locator('#cu-error')).toHaveText('Password must be at least 8 characters');
   await dialog.getByLabel('Password').fill(PASSWORD);
   await dialog.getByLabel('Role').selectOption('moderator');
   await dialog.getByRole('button', { name: 'Create' }).click();

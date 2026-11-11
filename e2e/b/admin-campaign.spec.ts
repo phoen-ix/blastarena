@@ -282,6 +282,8 @@ test('campaign replays: a lost run is listed, watched and deleted', async ({ pag
     name: `Replay World ${uid()}`,
     theme: 'classic',
   });
+  // campaign:start refuses a level whose world is unpublished.
+  await ok('PUT', `/admin/campaign/worlds/${world.id}`, adminToken, { isPublished: true });
   const levelName = `Timeout ${uid()}`;
   const level = await ok<{ id: number }>('POST', '/admin/campaign/levels', adminToken, {
     worldId: world.id,

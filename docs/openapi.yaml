@@ -352,7 +352,7 @@ paths:
     get:
       tags: [Auth]
       summary: Verify email address
-      description: The link sent by email. On success the browser is redirected to `{APP_URL}?emailVerified=true`.
+      description: The link sent by email. The browser is redirected to `{APP_URL}?emailVerified=true` on success and to `{APP_URL}?emailVerified=false` for an invalid, expired or already-used token.
       security: []
       operationId: verifyEmail
       parameters:
@@ -363,13 +363,7 @@ paths:
             type: string
       responses:
         '302':
-          description: Email verified; redirect to the app with `?emailVerified=true`
-        '400':
-          description: Invalid or expired token (`INVALID_TOKEN`)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          description: Redirect to the app with `?emailVerified=true` (verified) or `?emailVerified=false` (invalid or expired token)
         '429':
           $ref: '#/components/responses/RateLimited'
 
@@ -615,7 +609,7 @@ paths:
     get:
       tags: [User]
       summary: Confirm email change
-      description: The link sent by email. On success the browser is redirected to `{APP_URL}?emailChanged=true`, like `/auth/verify-email`.
+      description: The link sent by email. Like `/auth/verify-email`, the browser is redirected to `{APP_URL}?emailChanged=true` on success and to `{APP_URL}?emailChanged=false` for an invalid or expired token or an address another account took meanwhile.
       security: []
       operationId: confirmEmailChange
       parameters:
@@ -626,19 +620,7 @@ paths:
             type: string
       responses:
         '302':
-          description: Email updated; redirect to the app with `?emailChanged=true`
-        '400':
-          description: Invalid token (`INVALID_TOKEN`) or expired link (`TOKEN_EXPIRED`)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '409':
-          description: The new address is already in use by another account (`CONFLICT`)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          description: Redirect to the app with `?emailChanged=true` (updated) or `?emailChanged=false` (invalid or expired token, address in use)
         '429':
           $ref: '#/components/responses/RateLimited'
 

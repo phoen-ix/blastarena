@@ -59,7 +59,7 @@ the same table without the action buttons.
 
 1. Click **Create User**.
 2. Fill in **Username** (3–20 characters, letters, digits, `-` and `_`), **Email**, **Password**
-   (at least 6 characters) and pick a **Role**.
+   (at least 8 characters) and pick a **Role**.
 3. Click **Create**. The account is verified at once, so it can play without the email step. This
    works even when **User Registration** is switched off on the Dashboard.
 
@@ -76,7 +76,7 @@ run an [account cleanup](#cleaning-up-old-accounts).
 
 ### Resetting a password, 2FA or sessions
 
-- **Reset PW**: enter **New Password** and **Confirm Password** (at least 6 characters) and click
+- **Reset PW**: enter **New Password** and **Confirm Password** (at least 8 characters) and click
   **Reset Password**. The user is logged out and signs in with the new password.
 - **Reset 2FA** (only shown when the **2FA** column says **Enabled**): turns two-factor
   authentication off, for a user who lost their authenticator and backup codes. They can set it up

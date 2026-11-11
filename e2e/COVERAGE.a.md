@@ -136,7 +136,7 @@ Roles: G guest, U user, M moderator, A admin. ✅ = `spec › test`; ❌ = not d
 | register: name taken (409) | G | ✅ `auth.spec.ts › register validates, then verify by mail and log in` |
 | verify: verification screen, "not yet", resend | U | ✅ `auth.spec.ts › register validates, then verify by mail and log in` |
 | verify: link from the mail (Mailpit) | U | ✅ `auth.spec.ts › register validates, then verify by mail and log in` |
-| verify: bad token (4xx) | G | ✅ `auth.spec.ts › a bad verification link is refused` |
+| verify: bad token (redirect into the app, error message) | G | ✅ `auth.spec.ts › a bad verification link is refused` |
 | login form, empty fields, wrong password | G | ✅ `auth.spec.ts › wrong password shows an error; logout returns to the landing page` |
 | logout (session gone after reload) | U | ✅ `auth.spec.ts › wrong password shows an error; logout returns to the landing page` |
 | forgot password, reset link, mismatch, single-use link | G | ✅ `auth.spec.ts › forgot password: reset link from the mail sets a new password` |

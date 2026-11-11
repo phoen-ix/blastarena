@@ -80,11 +80,9 @@ test('register validates, then verify by mail and log in', async ({ page }) => {
 });
 
 test('a bad verification link is refused', async ({ page }) => {
-  const res = await page.request.get('/api/auth/verify-email/not-a-real-token', {
-    maxRedirects: 0,
-  });
-  expect(res.status()).toBeGreaterThanOrEqual(400);
-  expect(res.status()).toBeLessThan(500);
+  // The link opens in a browser: it lands in the app with a message, not on raw JSON.
+  await page.goto('/api/auth/verify-email/not-a-real-token');
+  await expect(page.getByText('This verification link is invalid or has expired.')).toBeVisible();
 });
 
 test('wrong password shows an error; logout returns to the landing page', async ({ page }) => {
