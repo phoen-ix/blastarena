@@ -1,10 +1,18 @@
-// fleet-copy: openGCP@d1f0a16 backend/src/db/redis.ts
+// fleet-copy: openGCP@bae0815 backend/src/db/redis.ts
 import Redis from 'ioredis';
 import { getConfig } from '../config';
 import { logger } from '../utils/logger';
 
 let redis: Redis;
 
+/** How long startup waits for the first connection to become ready before giving up. */
+const READY_TIMEOUT_MS = 30_000;
+
+/**
+ * Resolves once the client is `ready`, not on the TCP `connect` before it: the rate limiter
+ * treats any other status as Redis being down. Rejects when the first connection attempt fails
+ * or isn't ready within READY_TIMEOUT_MS.
+ */
 export async function createRedisClient(): Promise<Redis> {
   const config = getConfig();
 
@@ -19,7 +27,13 @@ export async function createRedisClient(): Promise<Redis> {
   });
 
   return new Promise((resolve, reject) => {
-    redis.on('connect', () => {
+    const timer = setTimeout(
+      () => reject(new Error(`Redis not ready after ${READY_TIMEOUT_MS} ms (${redis.status})`)),
+      READY_TIMEOUT_MS,
+    );
+
+    redis.on('ready', () => {
+      clearTimeout(timer);
       logger.info('Redis connection established');
       resolve(redis);
     });
@@ -27,6 +41,7 @@ export async function createRedisClient(): Promise<Redis> {
     redis.on('error', (err) => {
       logger.error({ err }, 'Redis connection error');
       if (!redis.status || redis.status === 'connecting') {
+        clearTimeout(timer);
         reject(err);
       }
     });
