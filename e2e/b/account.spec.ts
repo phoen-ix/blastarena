@@ -419,7 +419,10 @@ test.describe('settings: account', () => {
     await field.fill(second);
     await send.click();
     const link = firstLink((await mailTo(second, /Confirm your new email address/)).html);
-    expect((await page.request.get(stale, { maxRedirects: 0 })).status()).toBe(400);
+    // The cancelled request's link lands in the app with the failure flag.
+    const refused = await page.request.get(stale, { maxRedirects: 0 });
+    expect(refused.status()).toBe(302);
+    expect(refused.headers().location).toMatch(/\?emailChanged=false$/);
     await page.goto(link);
     await expect(
       page.locator('.toast').filter({ hasText: 'Email address updated!' }),
